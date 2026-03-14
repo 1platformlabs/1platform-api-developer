@@ -3,10 +3,8 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 // ─── API Configuration ───────────────────────────────────────────────────────
-// Central place to define API-related constants.
-// OPENAPI_PUBLIC_URL: remote source used by scripts/fetch-openapi.mjs to download the spec.
-// OPENAPI_LOCAL_PATH: local path served by the site, used by Scalar at runtime (avoids CORS).
-const OPENAPI_PUBLIC_URL = 'https://wpcontentai.1platform.pro/openapi.json';
+// OPENAPI_LOCAL_PATH: local copy served by the site, used by Scalar at runtime (avoids CORS).
+// Remote source URL lives in scripts/fetch-openapi.mjs (keep them in sync).
 const OPENAPI_LOCAL_PATH = '/openapi.json';
 const ROUTE_API_REFERENCE = '/api-docs';
 
@@ -19,7 +17,7 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://your-docusaurus-site.example.com',
+  url: 'https://developer.1platform.pro',
   baseUrl: '/',
 
   onBrokenLinks: 'throw',
@@ -65,42 +63,18 @@ const config: Config = {
       },
     ],
 
-    // ─── Multiple APIs (example, uncomment when needed) ───────────────────
-    // When adding a second API, each plugin instance MUST have a unique `id`.
-    //
-    // [
-    //   '@scalar/docusaurus',
-    //   {
-    //     id: 'api-payments',          // unique id required for multiple instances
-    //     label: 'Payments API',
-    //     route: '/api-payments',
-    //     showNavLink: true,
-    //     configuration: {
-    //       // Option A: single URL
-    //       url: 'https://example.com/payments/openapi.json',
-    //
-    //       // Option B: multiple sources in one page
-    //       // sources: [
-    //       //   { title: 'Payments v1', url: 'https://example.com/payments/v1/openapi.json' },
-    //       //   { title: 'Payments v2', url: 'https://example.com/payments/v2/openapi.json' },
-    //       // ],
-    //     },
-    //   },
-    // ],
+    // To add a second API: https://github.com/scalar/scalar/tree/main/packages/docusaurus
+    // Each additional instance MUST have a unique `id`.
   ],
 
   // ─── Theme ────────────────────────────────────────────────────────────────
   themeConfig: {
     image: 'img/docusaurus-social-card.jpg',
     colorMode: {
+      defaultMode: 'light',
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: '1Platform Api Developer',
-      logo: {
-        alt: '1Platform Logo',
-        src: 'img/logo.svg',
-      },
       items: [
         // "API Reference" link is auto-injected by @scalar/docusaurus (showNavLink: true).
         {
@@ -109,10 +83,17 @@ const config: Config = {
           label: 'Flows',
           position: 'left',
         },
+        // Cross-project navigation — back to marketing site
+        {
+          href: 'https://1platform.pro',
+          label: '1platform.pro',
+          position: 'right',
+          className: 'navbar__link--back',
+        },
       ],
     },
     footer: {
-      style: 'dark',
+      style: 'light',
       links: [
         {
           title: 'API',
@@ -123,7 +104,6 @@ const config: Config = {
             },
             {
               label: 'OpenAPI Spec (JSON)',
-              // pathname:// tells Docusaurus this is a static asset, not a route
               href: 'pathname:///openapi.json',
             },
           ],
@@ -137,8 +117,25 @@ const config: Config = {
             },
           ],
         },
+        {
+          title: '1Platform',
+          items: [
+            {
+              label: 'Website',
+              href: 'https://1platform.pro',
+            },
+            {
+              label: 'Solutions',
+              href: 'https://1platform.pro/solutions/',
+            },
+            {
+              label: 'Pricing',
+              href: 'https://1platform.pro/pricing/',
+            },
+          ],
+        },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} 1Platform. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} 1Platform Labs.`,
     },
     prism: {
       theme: prismThemes.github,

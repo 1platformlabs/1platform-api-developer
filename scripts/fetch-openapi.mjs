@@ -18,20 +18,26 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const OPENAPI_URL =
-  process.env.OPENAPI_URL ||
-  'https://api-qa.1platform.pro/openapi.json';
+// Default matches OPENAPI_PUBLIC_URL in docusaurus.config.ts — keep in sync.
+const DEFAULT_OPENAPI_URL = 'https://api.1platform.pro/openapi.json';
+
+const OPENAPI_URL = process.env.OPENAPI_URL || DEFAULT_OPENAPI_URL;
 
 const OUTPUT_PATH = resolve(__dirname, '..', 'static', 'openapi.json');
 
 async function main() {
   console.log(`Fetching OpenAPI spec from: ${OPENAPI_URL}`);
+  if (OPENAPI_URL === DEFAULT_OPENAPI_URL) {
+    console.log('  (Override with OPENAPI_URL env variable if needed)');
+  }
 
   const response = await fetch(OPENAPI_URL);
 
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch OpenAPI spec: ${response.status} ${response.statusText}`
+      `Failed to fetch OpenAPI spec: ${response.status} ${response.statusText}\n` +
+      `  URL: ${OPENAPI_URL}\n` +
+      `  Tip: set OPENAPI_URL env variable to override the default endpoint.`
     );
   }
 

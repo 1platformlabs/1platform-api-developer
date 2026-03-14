@@ -12,7 +12,7 @@ This flow documents the step-by-step process to issue an electronic invoice (FEL
 
 **Use case:** Issue electronic invoices from your application, associated with a previously configured Business.
 
-**End result:** An invoice with `issued` status, registered in TribuTax with its FEL UUID, series, and fiscal number.
+**End result:** An invoice with `issued` status, registered in TribuTax with its FEL UUID, series, fiscal number, and full FEL report metadata (receiver, issuer, certification, taxes, etc.).
 
 ---
 
@@ -22,7 +22,7 @@ This flow documents the step-by-step process to issue an electronic invoice (FEL
 |---|---|
 | App API Key | Application key (`ak-...`) provided when registering your app |
 | User API Key | User key (`sk-...`) obtained when creating the user |
-| TribuTax configured | The server must have `TRIBUTAX_API_URL`, `TRIBUTAX_TOKEN`, and `TRIBUTAX_LOGIN` set as environment variables |
+| TribuTax configured | The App must have `keys.tributax` configured with `api_url`, `token`, and `login` (stored in the App document, not env vars) |
 | Business created | You need a business with a valid `documentNumber` (NIT) |
 
 ### Required headers for all requests
@@ -240,7 +240,7 @@ Save `data.id` as `$BUSINESS_ID`.
 
 **Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
 
-#### Minimal example
+#### Minimal cURL
 
 ```bash
 curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
@@ -264,7 +264,7 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
   }'
 ```
 
-#### Full example (all fields)
+#### Full cURL (all fields)
 
 ```bash
 curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
@@ -313,6 +313,7 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
     "created_by": "64a1b2c3d4e5f6a7b8c9d0e1",
     "externalId": 48291,
     "uid": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+    "invoiceUrl": "https://report.feel.com.gt/ingfacereport/ingfacereport_documento?uuid=A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
     "serieFEL": "3FA02638",
     "numeroFEL": "1234567890",
     "items": [
@@ -345,8 +346,80 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
     "issued_at": "2026-02-17T10:10:00Z",
     "cancelled_at": null,
     "cancellation_reason": null,
+    "fel_synced": true,
+    "document_type": "FACT",
+    "total_in_words_es": "ocho mil cuatrocientos quetzales exactos",
+    "total_in_words_en": "eight thousand four hundred quetzales exact",
+    "fel_receiver": {
+      "receiver_tax_id": "12349876",
+      "receiver_name": "ABC Corporation S.A.",
+      "receiver_address": "4th Avenue 12-30, Zone 1, Guatemala",
+      "receiver_city": null,
+      "receiver_state": null,
+      "receiver_country": "GT",
+      "receiver_phone": null,
+      "receiver_email": "accounting@abccorp.com"
+    },
+    "fel_issuer": {
+      "issuer_tax_id": "55667788",
+      "issuer_name": "Global Technology S.A.",
+      "issuer_trade_name": "Global Technology S.A.",
+      "issuer_vat_affiliation": "GEN",
+      "issuer_address": "Boulevard Los Proceres 15-80, Zone 10, Guatemala",
+      "issuer_city": "Guatemala",
+      "issuer_state": "Guatemala",
+      "issuer_country": "GT",
+      "issuer_phone": null,
+      "issuer_email": null,
+      "issuer_establishment_code": "1",
+      "issuer_currency": "GTQ"
+    },
+    "fel_items": [
+      {
+        "quantity": 1,
+        "description": "Monthly consulting service",
+        "unit_price": 5000.00,
+        "discount": 0,
+        "price": 5000.00,
+        "line_total": 5000.00,
+        "unit_measure": "UND",
+        "item_kind": "S",
+        "taxes": [
+          {
+            "tax_short_name": "IVA",
+            "taxable_amount": 4464.29,
+            "tax_amount": 535.71
+          }
+        ]
+      }
+    ],
+    "fel_cancellation": null,
+    "fel_certification": {
+      "certifier_tax_id": "12521337",
+      "certifier_name": "INFILE, S.A.",
+      "authorization_number": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+      "series": "3FA02638",
+      "certified_number": "1234567890",
+      "certified_at": "2026-02-17T10:10:05-06:00"
+    },
+    "fel_phrases": [
+      {
+        "phrase_type": "1",
+        "scenario_code": "1",
+        "description": "Sujeto a pagos trimestrales ISR"
+      }
+    ],
+    "fel_general_taxes": [
+      {
+        "tax_short_name": "IVA",
+        "tax_amount": 535.71
+      }
+    ],
+    "fel_addendum": {
+      "document": "TRI_10838655-295502784"
+    },
     "created_at": "2026-02-17T10:10:00Z",
-    "updated_at": "2026-02-17T10:10:00Z"
+    "updated_at": "2026-02-17T10:10:05Z"
   },
   "msg": "Invoice created successfully"
 }
@@ -357,9 +430,12 @@ Save `data.id` as `$INVOICE_ID` for subsequent queries.
 
 **Key fiscal fields:**
 - `uid` — FEL invoice UUID
+- `invoiceUrl` — Direct link to view the invoice on FEEL
 - `serieFEL` — FEL invoice series
 - `numeroFEL` — FEL invoice number
 - `externalId` — TribuTax ID (required for cancellation)
+
+**FEL report metadata** is automatically fetched from FEEL and included in the response. If the fetch fails, the invoice is still created successfully with `fel_synced: false` and the FEL fields as `null`.
 :::
 
 **Common errors:**
@@ -375,7 +451,7 @@ Save `data.id` as `$INVOICE_ID` for subsequent queries.
 
 ### Step 4 — Get Invoice Details
 
-**Goal:** Retrieve the full details of an issued invoice.
+**Goal:** Retrieve the full details of an issued invoice. The response is read directly from the database — FEL metadata was already fetched during creation (or cancellation).
 
 **Endpoint:** `GET /api/v1/businesses/{businessId}/invoices/{invoiceId}`
 
@@ -389,6 +465,8 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
 
 **Response (200):**
 
+The response has the same structure as the create response (Step 3), including all FEL report fields (`fel_synced`, `fel_receiver`, `fel_issuer`, `fel_items`, `fel_certification`, `fel_phrases`, `fel_general_taxes`, `fel_addendum`, `fel_cancellation`, `document_type`, `total_in_words_es`, `total_in_words_en`).
+
 ```json
 {
   "success": true,
@@ -398,37 +476,40 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
     "created_by": "64a1b2c3d4e5f6a7b8c9d0e1",
     "externalId": 48291,
     "uid": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+    "invoiceUrl": "https://report.feel.com.gt/ingfacereport/ingfacereport_documento?uuid=A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
     "serieFEL": "3FA02638",
     "numeroFEL": "1234567890",
-    "items": [
-      {
-        "description": "Monthly consulting service",
-        "unit_price": 5000.00,
-        "quantity": 1,
-        "discounts": 0,
-        "type": "S"
-      }
-    ],
-    "amount": 5000.00,
+    "items": [ "..." ],
+    "amount": 8400.00,
     "description": "Invoice for February 2026 services",
-    "receptorInfo": {
-      "name": "ABC Corporation S.A.",
-      "documentType": "NIT",
-      "documentNumber": "12349876",
-      "email": "accounting@abccorp.com",
-      "address": "4th Avenue 12-30, Zone 1, Guatemala"
-    },
+    "receptorInfo": { "..." : "..." },
     "currency": "GTQ",
     "status": "issued",
     "issued_at": "2026-02-17T10:10:00Z",
     "cancelled_at": null,
     "cancellation_reason": null,
+    "fel_synced": true,
+    "document_type": "FACT",
+    "total_in_words_es": "ocho mil cuatrocientos quetzales exactos",
+    "total_in_words_en": "eight thousand four hundred quetzales exact",
+    "fel_receiver": { "..." : "..." },
+    "fel_issuer": { "..." : "..." },
+    "fel_items": [ "..." ],
+    "fel_cancellation": null,
+    "fel_certification": { "..." : "..." },
+    "fel_phrases": [ "..." ],
+    "fel_general_taxes": [ "..." ],
+    "fel_addendum": { "..." : "..." },
     "created_at": "2026-02-17T10:10:00Z",
-    "updated_at": "2026-02-17T10:10:00Z"
+    "updated_at": "2026-02-17T10:10:05Z"
   },
   "msg": "Invoice retrieved successfully"
 }
 ```
+
+:::note
+If `fel_synced` is `false`, it means the FEL report fetch failed during creation. The fiscal fields (`uid`, `serieFEL`, `numeroFEL`) are still available but the FEL metadata fields will be `null`.
+:::
 
 **Common errors:**
 
@@ -483,9 +564,10 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices?status=issued&date_from=
         "business_id": "507f1f77bcf86cd799439011",
         "externalId": 48291,
         "uid": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+        "invoiceUrl": "https://report.feel.com.gt/ingfacereport/ingfacereport_documento?uuid=A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
         "serieFEL": "3FA02638",
         "numeroFEL": "1234567890",
-        "amount": 5000.00,
+        "amount": 8400.00,
         "currency": "GTQ",
         "status": "issued",
         "issued_at": "2026-02-17T10:10:00Z",
@@ -514,7 +596,7 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices?status=issued&date_from=
 
 ### Step 6 — Cancel Invoice
 
-**Goal:** Cancel an issued invoice. If it was registered in TribuTax, it will also be voided there.
+**Goal:** Cancel an issued invoice. If it was registered in TribuTax, it will also be voided there. After cancellation, the FEL report is re-fetched to capture updated cancellation data from FEL (`fel_cancellation`).
 
 **Endpoint:** `DELETE /api/v1/businesses/{businessId}/invoices/{invoiceId}`
 
@@ -660,6 +742,8 @@ curl -s -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
 
 ## Idempotency and best practices
 
+### Idempotency
+
 :::warning[No idempotency mechanism]
 The API does not support an `Idempotency-Key` header. If a request fails due to timeout, check with `GET /invoices` before retrying to avoid duplicate invoices.
 :::
@@ -673,7 +757,7 @@ The API does not support an `Idempotency-Key` header. If a request fails due to 
 ### Timeouts
 
 :::warning
-Invoice emission involves an external call to TribuTax with a **30-second** timeout. Configure your HTTP client with at least **45 seconds** timeout for this endpoint.
+Invoice emission involves an external call to TribuTax with a configurable timeout (default: **30 seconds**, set in `App.keys.tributax.timeout`). Additionally, the FEL report is fetched from FEEL after emission. Configure your HTTP client with at least **60 seconds** timeout for the create endpoint.
 :::
 
 ### Tokens
@@ -715,5 +799,5 @@ Invoice emission involves an external call to TribuTax with a **30-second** time
 - [ ] I have the receptor data (name, NIT, email)
 - [ ] I have at least 1 item with description, unit price, and quantity
 - [ ] I issued the invoice (`POST /businesses/{id}/invoices`)
-- [ ] I verified the invoice status (`status: "issued"`)
-- [ ] I saved the `uid`, `serieFEL`, and `numeroFEL` as fiscal reference
+- [ ] I verified the invoice status (`status: "issued"`) and FEL sync (`fel_synced: true`)
+- [ ] I saved the `uid`, `serieFEL`, `numeroFEL`, and `invoiceUrl` as fiscal reference

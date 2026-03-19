@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"ak-your-app-api-key\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv1.6.0"
+    "version": "PRODv1.7.2"
   },
   "servers": [
     {
@@ -961,8 +961,11 @@
                     },
                     "subscription": {
                       "id": "507f1f77bcf86cd799439013",
-                      "plan_id": "free",
-                      "status": "active"
+                      "user_id": "507f1f77bcf86cd799439011",
+                      "plan_id": "plan_free",
+                      "status": "active",
+                      "start_date": "2026-01-01T00:00:00Z",
+                      "auto_renew": false
                     }
                   },
                   "msg": "Billing information retrieved successfully"
@@ -1065,6 +1068,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_list_CategoryResponse__"
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "id": "507f1f77bcf86cd799439011",
+                      "title": {
+                        "es": "Tecnología",
+                        "en": "Technology"
+                      },
+                      "slug": "technology",
+                      "status": "active",
+                      "created_at": "2026-01-01T00:00:00Z"
+                    }
+                  ],
+                  "msg": "Categories retrieved successfully"
                 }
               }
             }
@@ -1152,6 +1171,34 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_WebsiteResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "url": "https://example.com",
+                    "slug": "example-com",
+                    "active": true,
+                    "user_id": "507f1f77bcf86cd799439012",
+                    "lang": "es",
+                    "status": "active",
+                    "site_name": "My Website",
+                    "created_at": "2026-01-15T10:30:00Z",
+                    "actions": {
+                      "search_console": {
+                        "verification": {
+                          "verified": false
+                        },
+                        "sitemaps": []
+                      },
+                      "publisuites": {
+                        "verification": {
+                          "verified": false
+                        }
+                      }
+                    }
+                  },
+                  "msg": "Website added successfully"
                 }
               }
             }
@@ -1187,7 +1234,14 @@
             }
           },
           "422": {
-            "description": "Validation error in request body"
+            "description": "Validation error in request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "429": {
             "description": "Rate limit exceeded",
@@ -1251,6 +1305,34 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_WebsiteResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "url": "https://example.com",
+                    "slug": "example-com",
+                    "active": true,
+                    "user_id": "507f1f77bcf86cd799439012",
+                    "lang": "es",
+                    "status": "active",
+                    "site_name": "My Website",
+                    "created_at": "2026-01-15T10:30:00Z",
+                    "actions": {
+                      "search_console": {
+                        "verification": {
+                          "verified": false
+                        },
+                        "sitemaps": []
+                      },
+                      "publisuites": {
+                        "verification": {
+                          "verified": false
+                        }
+                      }
+                    }
+                  },
+                  "msg": "Website already exists"
                 }
               }
             }
@@ -1359,6 +1441,34 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_WebsiteResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "url": "https://example.com",
+                    "slug": "example-com",
+                    "active": true,
+                    "user_id": "507f1f77bcf86cd799439012",
+                    "lang": "en",
+                    "status": "active",
+                    "site_name": "Updated Name",
+                    "created_at": "2026-01-15T10:30:00Z",
+                    "actions": {
+                      "search_console": {
+                        "verification": {
+                          "verified": false
+                        },
+                        "sitemaps": []
+                      },
+                      "publisuites": {
+                        "verification": {
+                          "verified": false
+                        }
+                      }
+                    }
+                  },
+                  "msg": "Website updated successfully"
                 }
               }
             }
@@ -1384,7 +1494,14 @@
             }
           },
           "422": {
-            "description": "Validation error in request body"
+            "description": "Validation error in request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "429": {
             "description": "Rate limit exceeded",
@@ -1448,6 +1565,34 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_WebsiteResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "url": "https://example.com",
+                    "slug": "example-com",
+                    "active": true,
+                    "user_id": "507f1f77bcf86cd799439012",
+                    "lang": "es",
+                    "status": "active",
+                    "site_name": "My Website",
+                    "created_at": "2026-01-15T10:30:00Z",
+                    "actions": {
+                      "search_console": {
+                        "verification": {
+                          "verified": false
+                        },
+                        "sitemaps": []
+                      },
+                      "publisuites": {
+                        "verification": {
+                          "verified": false
+                        }
+                      }
+                    }
+                  },
+                  "msg": "Website retrieved successfully"
                 }
               }
             }
@@ -1544,6 +1689,10 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_NoneType_"
+                },
+                "example": {
+                  "success": true,
+                  "msg": "Website deleted successfully"
                 }
               }
             }
@@ -1652,6 +1801,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "status": "verified",
+                    "website_id": 12345
+                  },
+                  "msg": "Website verified in marketplace successfully"
                 }
               }
             }
@@ -1780,6 +1937,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "status": "verified",
+                    "site_url": "https://example.com"
+                  },
+                  "msg": "Website verified successfully in Search Console"
                 }
               }
             }
@@ -1853,7 +2018,7 @@
           "Websites"
         ],
         "summary": "Generate legal pages for a website",
-        "description": "Generate all legal pages for a website: privacy policy, cookie policy, legal notice, contact page, and about-me page.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Template-based pages use static HTML with placeholder substitution\n- Contact and about-me pages are generated via 1Platform AI\n- Requires an active App with AI provider configured",
+        "description": "Generate all legal pages for a website: privacy policy, cookie policy, legal notice, contact page, and about-me page.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Template-based pages use static HTML with variable substitution\n- Contact and about-me pages are generated via 1Platform AI\n- Requires an active App with AI provider configured",
         "operationId": "generate_legal_pages_api_v1_users_websites__website_id__legal_post",
         "security": [
           {
@@ -1908,6 +2073,29 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_LegalPageData_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "lang": "es",
+                    "pages": {
+                      "privacy_policy": {
+                        "title": "Política de Privacidad",
+                        "content": "<h1>Política de Privacidad</h1>..."
+                      },
+                      "cookie_policy": {
+                        "title": "Política de Cookies",
+                        "content": "<h1>Política de Cookies</h1>..."
+                      }
+                    },
+                    "meta": {
+                      "slug_map": {
+                        "privacy_policy": "politica-de-privacidad",
+                        "cookie_policy": "politica-de-cookies"
+                      }
+                    }
+                  },
+                  "msg": "Legal pages generated successfully"
                 }
               }
             }
@@ -2019,11 +2207,13 @@
                 "example": {
                   "success": true,
                   "data": {
+                    "user_id": "507f1f77bcf86cd799439011",
+                    "lang": "es",
                     "count": 5,
                     "comments": [
                       {
-                        "name": "María García",
-                        "comment": "Excelente artículo..."
+                        "full_name": "María García",
+                        "content": "Excelente artículo, muy bien documentado."
                       }
                     ]
                   },
@@ -2053,7 +2243,14 @@
             }
           },
           "422": {
-            "description": "Validation error in request data"
+            "description": "Validation error in request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "429": {
             "description": "Rate limit exceeded",
@@ -2118,6 +2315,20 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_GenerateUserImagesResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 2,
+                    "provider": "openai",
+                    "images": [
+                      {
+                        "url": "https://cdn.example.com/img1.png",
+                        "prompt": "Professional headshot..."
+                      }
+                    ]
+                  },
+                  "msg": "Successfully generated 2 images"
                 }
               }
             }
@@ -2500,7 +2711,7 @@
           "Subscriptions"
         ],
         "summary": "Get subscription details",
-        "description": "Retrieve details of a specific subscription for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Note:** This endpoint is a placeholder — full subscription management will be available in a future release",
+        "description": "Retrieve details of a specific subscription for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Note:** This endpoint currently returns a preview response — full subscription management will be available in a future release",
         "operationId": "get_subscription_api_v1_users_subscriptions__subscription_id__get",
         "security": [
           {
@@ -6436,15 +6647,18 @@
             "description": "Job unique identifier"
           },
           "type": {
-            "$ref": "#/components/schemas/JobType"
+            "$ref": "#/components/schemas/JobType",
+            "description": "Job type discriminator"
           },
           "status": {
-            "$ref": "#/components/schemas/JobStatus"
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Current job status"
           },
           "input": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Input"
+            "title": "Input",
+            "description": "Job input parameters"
           },
           "result": {
             "anyOf": [
@@ -6456,7 +6670,8 @@
                 "type": "null"
               }
             ],
-            "title": "Result"
+            "title": "Result",
+            "description": "Job result on completion"
           },
           "error": {
             "anyOf": [
@@ -6467,7 +6682,8 @@
                 "type": "null"
               }
             ],
-            "title": "Error"
+            "title": "Error",
+            "description": "Error message on failure"
           },
           "timing": {
             "anyOf": [
@@ -6477,12 +6693,14 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Execution timing instrumentation"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "Job creation timestamp"
           },
           "started_at": {
             "anyOf": [
@@ -6494,7 +6712,8 @@
                 "type": "null"
               }
             ],
-            "title": "Started At"
+            "title": "Started At",
+            "description": "Job start timestamp"
           },
           "completed_at": {
             "anyOf": [
@@ -6506,7 +6725,8 @@
                 "type": "null"
               }
             ],
-            "title": "Completed At"
+            "title": "Completed At",
+            "description": "Job completion timestamp"
           }
         },
         "type": "object",
@@ -6527,7 +6747,8 @@
           "completed",
           "failed"
         ],
-        "title": "JobStatus"
+        "title": "JobStatus",
+        "description": "Current status of a background job."
       },
       "JobTiming": {
         "properties": {
@@ -6540,7 +6761,8 @@
                 "type": "null"
               }
             ],
-            "title": "Total Ms"
+            "title": "Total Ms",
+            "description": "Total execution time in milliseconds"
           }
         },
         "type": "object",
@@ -6552,7 +6774,8 @@
         "enum": [
           "content"
         ],
-        "title": "JobType"
+        "title": "JobType",
+        "description": "Type of background job."
       },
       "KeywordData": {
         "properties": {
@@ -7050,11 +7273,13 @@
       "PublisuitesActions": {
         "properties": {
           "verification": {
-            "$ref": "#/components/schemas/PublisuitesVerificationAction"
+            "$ref": "#/components/schemas/PublisuitesVerificationAction",
+            "description": "Marketplace verification state"
           }
         },
         "type": "object",
-        "title": "PublisuitesActions"
+        "title": "PublisuitesActions",
+        "description": "Link-building marketplace integration actions."
       },
       "PublisuitesVerificationAction": {
         "properties": {
@@ -7210,14 +7435,16 @@
       "SearchConsoleActions": {
         "properties": {
           "verification": {
-            "$ref": "#/components/schemas/VerificationAction"
+            "$ref": "#/components/schemas/VerificationAction",
+            "description": "Search Console verification state"
           },
           "sitemaps": {
             "items": {
               "$ref": "#/components/schemas/SitemapEntry"
             },
             "type": "array",
-            "title": "Sitemaps"
+            "title": "Sitemaps",
+            "description": "Submitted sitemaps"
           }
         },
         "type": "object",
@@ -8433,11 +8660,13 @@
                 "type": "null"
               }
             ],
-            "title": "Token"
+            "title": "Token",
+            "description": "Verification token from Search Console"
           },
           "method": {
             "type": "string",
             "title": "Method",
+            "description": "Verification method (FILE, META_TAG, DNS)",
             "default": "FILE"
           },
           "file_name": {
@@ -8449,7 +8678,8 @@
                 "type": "null"
               }
             ],
-            "title": "File Name"
+            "title": "File Name",
+            "description": "Verification file name"
           },
           "file_content": {
             "anyOf": [
@@ -8460,7 +8690,8 @@
                 "type": "null"
               }
             ],
-            "title": "File Content"
+            "title": "File Content",
+            "description": "Verification file content"
           },
           "meta_tag": {
             "anyOf": [
@@ -8471,7 +8702,8 @@
                 "type": "null"
               }
             ],
-            "title": "Meta Tag"
+            "title": "Meta Tag",
+            "description": "HTML meta tag for verification"
           },
           "dns_record": {
             "anyOf": [
@@ -8482,11 +8714,13 @@
                 "type": "null"
               }
             ],
-            "title": "Dns Record"
+            "title": "Dns Record",
+            "description": "DNS TXT record for verification"
           },
           "verified": {
             "type": "boolean",
             "title": "Verified",
+            "description": "Whether ownership is verified",
             "default": false
           },
           "verified_at": {
@@ -8499,7 +8733,8 @@
                 "type": "null"
               }
             ],
-            "title": "Verified At"
+            "title": "Verified At",
+            "description": "Verification timestamp"
           }
         },
         "type": "object",
@@ -8684,7 +8919,7 @@
           },
           "actions": {
             "$ref": "#/components/schemas/WebsiteActions",
-            "description": "Website actions"
+            "description": "Website integration actions (Search Console, link building)"
           },
           "domain": {
             "anyOf": [

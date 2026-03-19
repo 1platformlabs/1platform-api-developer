@@ -40,6 +40,7 @@ jobs:
     outputs:
       has_changes: ${{ steps.check_diff.outputs.has_changes }}
       branch: ${{ steps.create_branch.outputs.branch }}
+      pr_number: ${{ steps.create_pr.outputs.pr_number }}
 
     steps:
       - name: Checkout repository
@@ -103,13 +104,14 @@ jobs:
 
       - name: Create PR to main
         if: steps.check_diff.outputs.has_changes == 'true'
+        id: create_pr
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.create_branch.outputs.branch }}
         shell: bash
         run: |
           set -euo pipefail
-          gh pr create \
+          PR_URL=$(gh pr create \
             --repo "${{ github.repository }}" \
             --title "chore: update OpenAPI spec from Production API" \
             --body "$(cat <<'EOF'
@@ -123,16 +125,24 @@ jobs:
           EOF
           )" \
             --head "$BRANCH" \
-            --base main
-          echo "PR created from branch ${BRANCH}"
+            --base main)
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "PR #${PR_NUMBER} created from branch ${BRANCH}"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SCENARIO 2: PR checks (pull_request only)
+# Shared jobs: Build, AI Review, Label & Auto-merge
+# Run for both repository_dispatch (after spec update) and pull_request events
 # ─────────────────────────────────────────────────────────────────────────────
 
   build_check:
     name: Build & Typecheck
-    if: github.event_name == 'pull_request'
+    needs: [update_spec]
+    if: >-
+      always() && (
+        (github.event_name == 'repository_dispatch' && needs.update_spec.outputs.has_changes == 'true') ||
+        github.event_name == 'pull_request'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -141,6 +151,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.update_spec.outputs.branch || '' }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -173,7 +185,12 @@ jobs:
 
   ai_review:
     name: AI Code Review
-    if: github.event_name == 'pull_request'
+    needs: [update_spec]
+    if: >-
+      always() && (
+        (github.event_name == 'repository_dispatch' && needs.update_spec.outputs.has_changes == 'true') ||
+        github.event_name == 'pull_request'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: PROD
@@ -185,12 +202,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
+          ref: ${{ needs.update_spec.outputs.branch || '' }}
           fetch-depth: 0
 
       - name: Get PR diff
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ needs.update_spec.outputs.pr_number || github.event.pull_request.number }}
         shell: bash
         run: |
           set -euo pipefail
@@ -278,7 +296,7 @@ jobs:
       - name: Post review comment on PR
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ needs.update_spec.outputs.pr_number || github.event.pull_request.number }}
           CLAUDE_MODEL: ${{ env.CLAUDE_MODEL }}
         shell: bash
         run: |
@@ -302,9 +320,9 @@ jobs:
 
   label_and_merge:
     name: Label & Auto-merge
-    needs: [build_check, ai_review]
-    if: >
-      github.event_name == 'pull_request' &&
+    needs: [update_spec, build_check, ai_review]
+    if: >-
+      always() &&
       needs.build_check.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -316,7 +334,7 @@ jobs:
       - name: Add ci:review-passed label
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ needs.update_spec.outputs.pr_number || github.event.pull_request.number }}
         shell: bash
         run: |
           set -euo pipefail
@@ -327,7 +345,7 @@ jobs:
       - name: Merge PR
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ needs.update_spec.outputs.pr_number || github.event.pull_request.number }}
         shell: bash
         run: |
           set -euo pipefail

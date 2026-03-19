@@ -1,6 +1,7 @@
 name: 1Platform API Developer — PROD
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -37,26 +38,32 @@ jobs:
         id: check_merge
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
+          EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
           python3 << 'PYEOF'
           import os, re
 
+          event_name = os.environ.get("EVENT_NAME", "")
           commit_msg = os.environ.get("COMMIT_MSG", "")
           first_line = commit_msg.split("\n", 1)[0]
           is_merge = "false"
           pr_number = ""
 
-          merge_match  = re.search(r"Merge pull request #(\d+)", first_line)
-          squash_match = re.search(r"\(#(\d+)\)\s*$", first_line)
+          # Manual trigger always proceeds
+          if event_name == "workflow_dispatch":
+              is_merge = "true"
+          else:
+              merge_match  = re.search(r"Merge pull request #(\d+)", first_line)
+              squash_match = re.search(r"\(#(\d+)\)\s*$", first_line)
 
-          if merge_match:
-              is_merge = "true"
-              pr_number = merge_match.group(1)
-          elif squash_match:
-              is_merge = "true"
-              pr_number = squash_match.group(1)
+              if merge_match:
+                  is_merge = "true"
+                  pr_number = merge_match.group(1)
+              elif squash_match:
+                  is_merge = "true"
+                  pr_number = squash_match.group(1)
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write(f"is_merge={is_merge}\n")

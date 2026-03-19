@@ -7,6 +7,7 @@ name: 1Platform API Developer — QA
 #      → Build check, typecheck, AI review, label, auto-merge
 
 on:
+  workflow_dispatch:
   repository_dispatch:
     types: [api-deployed]
   pull_request:
@@ -30,7 +31,7 @@ env:
 jobs:
   update_spec:
     name: Fetch & Update OpenAPI Spec
-    if: github.event_name == 'repository_dispatch'
+    if: github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: PROD
@@ -140,7 +141,7 @@ jobs:
     needs: [update_spec]
     if: >-
       always() && (
-        (github.event_name == 'repository_dispatch' && needs.update_spec.outputs.has_changes == 'true') ||
+        ((github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch') && needs.update_spec.outputs.has_changes == 'true') ||
         github.event_name == 'pull_request'
       )
     runs-on: ubuntu-latest
@@ -188,7 +189,7 @@ jobs:
     needs: [update_spec]
     if: >-
       always() && (
-        (github.event_name == 'repository_dispatch' && needs.update_spec.outputs.has_changes == 'true') ||
+        ((github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch') && needs.update_spec.outputs.has_changes == 'true') ||
         github.event_name == 'pull_request'
       )
     runs-on: ubuntu-latest

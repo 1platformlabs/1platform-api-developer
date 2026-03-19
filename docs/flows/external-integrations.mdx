@@ -1,0 +1,486 @@
+---
+title: "External Integrations"
+description: "Step-by-step flow to connect websites with Google Search Console and the link-building marketplace via the 1Platform API."
+sidebar_position: 4
+---
+
+# Flow: External Integrations
+
+## Overview
+
+This flow documents how to connect registered websites with external services through the 1Platform API: Google Search Console for SEO management and the link-building marketplace for backlink acquisition.
+
+**Use case:** After registering a website, connect it to Google Search Console for indexing management and sitemap submission, and to the link-building marketplace for backlink opportunities.
+
+**End result:** A website registered in Google Search Console with sitemaps configured, and listed in the link-building marketplace with ownership verified.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| Website registered | A website must be registered via `POST /users/websites` first |
+| Google service account | A service account with Search Console access (for Search Console integration) |
+| Marketplace credentials | User must have marketplace credentials configured (for link-building integration) |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""       # Obtained in Step 0
+USER_TOKEN=""      # Obtained in Step 1
+WEBSITE_ID=""      # From an existing registered website
+```
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Add Website to Search Console
+
+**Goal:** Register the website in Google Search Console.
+
+**Endpoint:** `POST /api/v1/users/websites/{website_id}/searchconsole`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "add"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "action": "add",
+    "status": "completed",
+    "message": "Website added to Search Console"
+  },
+  "msg": "Action completed successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid action or website not registered in Search Console | Verify action is `add`, `verify`, `delete`, or `sitemaps` |
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found | Verify the `website_id` |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 502 | Google Search Console API error | Service temporarily unavailable — retry later |
+
+---
+
+### Step 3 — Verify Website in Search Console
+
+**Goal:** Confirm ownership of the website in Google Search Console.
+
+**Endpoint:** `POST /api/v1/users/websites/{website_id}/searchconsole`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "verify"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "action": "verify",
+    "status": "completed",
+    "message": "Website ownership verified"
+  },
+  "msg": "Action completed successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Website not registered in Search Console or verification failed | Add the website first (Step 2) |
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found | Verify the `website_id` |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 502 | Google Search Console API error | Service temporarily unavailable — retry later |
+
+---
+
+### Step 4 — Submit Sitemaps
+
+**Goal:** Submit sitemap URLs for the website in Google Search Console.
+
+**Endpoint:** `POST /api/v1/users/websites/{website_id}/searchconsole`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "sitemaps",
+    "payload": {
+      "sitemaps": [
+        "https://mijardin.com/sitemap.xml",
+        "https://mijardin.com/sitemap-posts.xml"
+      ]
+    }
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "action": "sitemaps",
+    "status": "completed",
+    "message": "Sitemaps submitted successfully"
+  },
+  "msg": "Action completed successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid action or missing sitemaps payload | Include `payload.sitemaps` array for sitemaps action |
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found | Verify the `website_id` |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 502 | Google Search Console API error | Service temporarily unavailable — retry later |
+
+---
+
+### Step 5 — Add Website to Link-Building Marketplace
+
+**Goal:** Register the website in the link-building marketplace for backlink opportunities.
+
+**Endpoint:** `POST /api/v1/users/websites/{website_id}/publisuites`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "add"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "action": "add",
+    "status": "completed",
+    "message": "Website added to marketplace"
+  },
+  "msg": "Action completed successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid action, missing credentials, or website already added | Verify action is `add` or `verify` and marketplace credentials are configured |
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found in marketplace | Verify the `website_id` |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 502 | Link-building service unavailable | Service temporarily unavailable — retry later |
+
+---
+
+### Step 6 — Verify Website in Marketplace
+
+**Goal:** Confirm ownership of the website in the link-building marketplace to activate the listing.
+
+**Endpoint:** `POST /api/v1/users/websites/{website_id}/publisuites`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "verify"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "action": "verify",
+    "status": "completed",
+    "message": "Website ownership verified in marketplace"
+  },
+  "msg": "Action completed successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Verification failed or website not added yet | Add the website first (Step 5) |
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found in marketplace | Verify the website was added |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 502 | Link-building service unavailable | Service temporarily unavailable — retry later |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+WEBSITE_ID="65b2c3d4e5f6a789bcdef012"  # From a previously registered website
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: Add to Search Console ===
+curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "add"}' \
+  | jq .
+
+# === STEP 3: Verify in Search Console ===
+curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "verify"}' \
+  | jq .
+
+# === STEP 4: Submit Sitemaps ===
+curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "sitemaps",
+    "payload": {
+      "sitemaps": ["https://mijardin.com/sitemap.xml"]
+    }
+  }' \
+  | jq .
+
+# === STEP 5: Add to Link-Building Marketplace ===
+curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "add"}' \
+  | jq .
+
+# === STEP 6: Verify in Marketplace ===
+curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "verify"}' \
+  | jq .
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+- Search Console and marketplace actions are generally idempotent — re-adding an already-added website will return an appropriate error rather than creating duplicates.
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **502** (service unavailable), the external service is temporarily down — retry after a short delay.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- External integration calls involve third-party APIs and may take **5-15 seconds**.
+- Configure your HTTP client with at least **30 seconds** timeout for these endpoints.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all integration endpoints.
+
+### Important validations
+- The website must be registered in the platform (`POST /users/websites`) before adding to external services.
+- For Search Console, a Google service account with appropriate permissions is required.
+- For the link-building marketplace, user marketplace credentials must be configured.
+- The `sitemaps` action requires a `payload.sitemaps` array with valid sitemap URLs.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Add to Search Console |
+| 3 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Verify in Search Console |
+| 4 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Submit sitemaps |
+| 5 | `POST` | `/api/v1/users/websites/{website_id}/publisuites` | Add to marketplace |
+| 6 | `POST` | `/api/v1/users/websites/{website_id}/publisuites` | Verify in marketplace |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I have a registered website with its `website_id`
+- [ ] I added the website to Search Console (`action: "add"`)
+- [ ] I verified website ownership in Search Console (`action: "verify"`)
+- [ ] I submitted sitemaps (`action: "sitemaps"`)
+- [ ] I added the website to the link-building marketplace (`action: "add"`)
+- [ ] I verified ownership in the marketplace (`action: "verify"`)

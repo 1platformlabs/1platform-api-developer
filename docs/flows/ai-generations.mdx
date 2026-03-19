@@ -1,0 +1,462 @@
+---
+title: "AI Generations"
+description: "Step-by-step flow to generate fictional comments, AI images, and profile cards via the 1Platform API."
+sidebar_position: 3
+---
+
+# Flow: AI Generations
+
+## Overview
+
+This flow documents how to use the 1Platform AI generation endpoints to create fictional comments, generate images, and build complete profile cards.
+
+**Use case:** Seed your website with realistic fictional comments, generate AI-powered images for content, and create complete profile cards with bio, social media links, and photos.
+
+**End result:** Generated comments, images, and profile cards ready to integrate into your application.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| AI provider configured | The App must have AI provider keys configured |
+| Image provider configured | Required for AI image generation |
+| Search provider configured | Required for profile card social media discovery |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtained in Step 0
+USER_TOKEN=""   # Obtained in Step 1
+```
+
+---
+
+## Data required for generations
+
+### Comments
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `count` | integer | Yes | Number of comments to generate (1-50) |
+| `lang` | string | Yes | Language: `"es"` or `"en"` |
+| `context` | string | Yes | Context to orient comment content (min 5 chars) |
+
+### Images
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `count` | integer | Yes | Number of images to generate (1-10) |
+| `context` | string | Yes | Context to orient image generation (min 3 chars) |
+
+### Profile
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `owner` | string | Yes | Person's full name (min 1 char) |
+| `lang` | string | Yes | Language: `"es"` or `"en"` |
+| `context` | string | No | Additional context to influence bio generation (default: `""`) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Generate Comments
+
+**Goal:** Generate realistic fictional comments for website content seeding.
+
+**Endpoint:** `POST /api/v1/users/generations/comments`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/generations/comments" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 5,
+    "lang": "en",
+    "context": "Article about sustainable gardening tips"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "507f1f77bcf86cd799439011",
+    "lang": "en",
+    "count": 5,
+    "comments": [
+      {
+        "full_name": "Sarah Mitchell",
+        "content": "I've been composting for three years now and this article really captures the essence of why it matters. The tip about companion planting was new to me!"
+      },
+      {
+        "full_name": "James Rodriguez",
+        "content": "Great read! My balcony garden has thrived since I started using organic mulch. Would love to see a follow-up on vertical gardening."
+      },
+      {
+        "full_name": "Emily Chen",
+        "content": "The section on water conservation techniques is exactly what I needed. Living in a drought-prone area, every drop counts."
+      },
+      {
+        "full_name": "David Okafor",
+        "content": "Shared this with my local gardening community. The pest management tips without chemicals are brilliant."
+      },
+      {
+        "full_name": "Ana Petrova",
+        "content": "As a beginner gardener, I found this incredibly helpful. Clear, practical advice that I can actually implement this weekend."
+      }
+    ]
+  },
+  "msg": "Successfully generated 5 comments"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid input or AI generation failed | Verify `count`, `lang`, and `context` values |
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Validation error — missing or invalid fields | `count` must be 1-50, `lang` must be `"es"` or `"en"`, `context` min 5 chars |
+| 429 | Rate limit exceeded (5 req/min) | Wait and retry — this is an AI-intensive endpoint |
+
+---
+
+### Step 3 — Generate Images
+
+**Goal:** Generate AI-powered images based on a context description.
+
+**Endpoint:** `POST /api/v1/users/generations/images`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/generations/images" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 3,
+    "context": "Professional headshot for LinkedIn"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 3,
+    "provider": "openai",
+    "images": [
+      {
+        "url": "https://storage.1platform.pro/images/gen-abc123-1.png",
+        "prompt": "Professional headshot portrait, clean background, business attire, warm lighting"
+      },
+      {
+        "url": "https://storage.1platform.pro/images/gen-abc123-2.png",
+        "prompt": "Corporate headshot, neutral background, confident expression, studio lighting"
+      },
+      {
+        "url": "https://storage.1platform.pro/images/gen-abc123-3.png",
+        "prompt": "Professional profile photo, office setting, natural lighting, approachable expression"
+      }
+    ]
+  },
+  "msg": "Successfully generated 3 images"
+}
+```
+
+:::note
+Each image includes the `url` where it can be accessed and the `prompt` that was used to generate it. Partial results may be returned if some generation attempts fail.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Validation error — `count` must be 1-10, `context` min 3 chars | Check field values |
+| 429 | Rate limit exceeded (5 req/min) | Wait and retry — this is an AI-intensive endpoint |
+| 500 | All image generation attempts failed | Verify AI provider configuration |
+
+---
+
+### Step 4 — Generate Profile Card
+
+**Goal:** Generate a complete profile card including gender detection, AI bio, social media links, and a profile image.
+
+**Endpoint:** `POST /api/v1/users/generations/profile`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/generations/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "owner": "Maria Garcia",
+    "lang": "en",
+    "context": "Software engineer specializing in AI"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "fullname": "Maria Garcia",
+    "gender": "female",
+    "bio": "<p>Maria Garcia is a passionate software engineer with deep expertise in artificial intelligence and machine learning. She has contributed to open-source projects and spoken at international tech conferences about responsible AI development.</p>",
+    "rrss": "<a href='https://linkedin.com/in/mariagarcia'>LinkedIn</a> <a href='https://github.com/mariagarcia'>GitHub</a>",
+    "profile_image_url": "https://storage.1platform.pro/images/profile-maria-garcia.jpg"
+  },
+  "msg": "Profile generated successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Missing or invalid owner name | Provide a valid person name (min 1 char) |
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Validation error — `owner` and `lang` are required | Check required fields |
+| 429 | Rate limit exceeded (5 req/min) | Wait and retry |
+| 500 | AI generation failed | Verify AI, search, and image provider configuration |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: Generate Comments ===
+curl -s -X POST "$BASE_URL/users/generations/comments" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 3,
+    "lang": "es",
+    "context": "Blog de tecnología sobre inteligencia artificial"
+  }' \
+  | jq .
+
+# === STEP 3: Generate Images ===
+curl -s -X POST "$BASE_URL/users/generations/images" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 2,
+    "context": "Modern office workspace with plants"
+  }' \
+  | jq .
+
+# === STEP 4: Generate Profile Card ===
+curl -s -X POST "$BASE_URL/users/generations/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "owner": "Carlos Mendez",
+    "lang": "es",
+    "context": "Experto en marketing digital y SEO"
+  }' \
+  | jq .
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+
+:::warning[No idempotency mechanism]
+Generation endpoints create new content on each call. There is no deduplication. Store generated results in your application to avoid unnecessary regeneration.
+:::
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout**, do not retry immediately — partial results may have been generated.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- Comment generation typically takes **5-10 seconds** depending on count.
+- Image generation may take **10-30 seconds** per image.
+- Profile generation involves multiple AI calls and may take **15-30 seconds**.
+- Configure your HTTP client with at least **60 seconds** timeout for generation endpoints.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all generation endpoints.
+
+### Important validations
+- Comment `count` must be between 1 and 50.
+- Image `count` must be between 1 and 10.
+- Comment `context` must be at least 5 characters.
+- Image `context` must be at least 3 characters.
+- Profile `lang` must be `"es"` or `"en"`.
+- All generation endpoints are AI-intensive with a rate limit of **5 req/min**.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `POST` | `/api/v1/users/generations/comments` | Generate comments |
+| 3 | `POST` | `/api/v1/users/generations/images` | Generate images |
+| 4 | `POST` | `/api/v1/users/generations/profile` | Generate profile card |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I generated comments (`POST /users/generations/comments`)
+- [ ] I generated images (`POST /users/generations/images`)
+- [ ] I generated a profile card (`POST /users/generations/profile`)
+- [ ] I stored the generated content in my application

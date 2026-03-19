@@ -1,0 +1,334 @@
+---
+title: "User Onboarding"
+description: "Step-by-step flow to register a new user, authenticate, and retrieve their profile via the 1Platform API."
+sidebar_position: 2
+---
+
+# Flow: User Onboarding
+
+## Overview
+
+This flow documents the step-by-step process to onboard a new user on the 1Platform API. It covers creating a user account, obtaining authentication tokens, and retrieving the user's profile.
+
+**Use case:** Register new users from your application, set up their billing and subscription, and authenticate them for subsequent API calls.
+
+**End result:** A fully registered user with an API key, authenticated tokens, and a retrievable profile.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+APP_TOKEN=""       # Obtained in Step 0
+USER_API_KEY=""    # Obtained in Step 1 (from user creation response)
+USER_TOKEN=""      # Obtained in Step 2
+```
+
+---
+
+## Data required to create a user
+
+### User
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `email` | string | Yes | User email address (unique, min 5 chars) |
+| `currency` | string | No | Billing currency code (default: `"USD"`) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Create User
+
+**Goal:** Register a new user with automatic billing and subscription setup.
+
+**Endpoint:** `POST /api/v1/users`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "carlos.mendez@example.com",
+    "currency": "USD"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "email": "carlos.mendez@example.com",
+    "username": "carlos_mendez",
+    "api_key": "sk-abc123xyz",
+    "is_active": true,
+    "billing_id": "507f1f77bcf86cd799439012",
+    "created_at": "2026-03-18T10:30:00"
+  },
+  "msg": "User created successfully with billing and subscription"
+}
+```
+
+:::note
+Save `data.api_key` as `$USER_API_KEY`. This is the user's permanent API key used to generate user tokens.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid email format or validation error | Verify the email address format |
+| 409 | Email already registered | Use the existing user; obtain their token with `POST /users/token` |
+| 422 | Missing `email` field | Send `{"email": "..."}` in the body |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+### Step 2 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 3 — Get User Profile
+
+**Goal:** Retrieve the authenticated user's profile information to verify the onboarding was successful.
+
+**Endpoint:** `GET /api/v1/users/profile`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "username": "carlos_mendez",
+    "email": "carlos.mendez@example.com",
+    "is_active": true,
+    "created_at": "2026-03-18T10:30:00"
+  },
+  "msg": "User profile retrieved successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required — invalid or missing token | Regenerate tokens (Steps 0 and 2) |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values, from authentication to profile verification.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Create User ===
+USER_RESPONSE=$(curl -s -X POST "$BASE_URL/users" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "carlos.mendez@example.com",
+    "currency": "USD"
+  }')
+
+echo "USER_RESPONSE: $USER_RESPONSE"
+
+USER_API_KEY=$(echo $USER_RESPONSE | jq -r '.data.api_key')
+echo "USER_API_KEY: $USER_API_KEY"
+
+# === STEP 2: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 3: Get User Profile ===
+curl -s -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+
+:::warning[No idempotency mechanism]
+The API does not support an `Idempotency-Key` header. If a user creation request fails due to timeout, check with `POST /users/token` using the expected API key before retrying to avoid duplicate accounts. Duplicate emails will return a **409** error.
+:::
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout**, verify the user state before retrying.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- User creation is synchronous and typically completes within **2-3 seconds** (creates User, Billing, and Subscription records).
+- Configure your HTTP client with at least **10 seconds** timeout for the create endpoint.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all protected endpoints (except user creation and token generation which only need the app token).
+
+### Important validations
+- The user email must be unique across the platform.
+- The email must be at least 5 characters long and in a valid format.
+- The `currency` field defaults to `"USD"` if not specified.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users` | Create user |
+| 2 | `POST` | `/api/v1/users/token` | Get user token |
+| 3 | `GET` | `/api/v1/users/profile` | Get user profile |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I created the User (`POST /users`) and saved the `api_key`
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I verified the user profile (`GET /users/profile`)
+- [ ] I stored the user's `api_key` securely for future token generation

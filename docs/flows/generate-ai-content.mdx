@@ -1,0 +1,543 @@
+---
+title: "Generate AI Content"
+description: "Step-by-step flow to extract keywords, generate AI-powered content, and submit URLs for Google indexing via the 1Platform API."
+sidebar_position: 5
+---
+
+# Flow: Generate AI Content
+
+## Overview
+
+This flow documents the end-to-end process for AI-powered content creation through the 1Platform API. It covers keyword extraction from a domain, asynchronous content generation, and URL indexing submission.
+
+**Use case:** Automatically generate SEO-optimized articles for your website based on keyword analysis, then submit the published URL for Google indexing.
+
+**End result:** A complete article with title, content, slug, and images — plus a Google indexing submission for the published URL.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| AI provider configured | The App must have AI provider keys configured |
+| Image provider configured | The App must have image provider keys configured (for content generation) |
+| Google Search Console | Service account with Search Console access (for indexing only) |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtained in Step 0
+USER_TOKEN=""   # Obtained in Step 1
+JOB_ID=""       # Obtained in Step 3
+```
+
+---
+
+## Data required to generate content
+
+### Keyword extraction
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `domain` | string | Yes | Domain URL to extract keywords from (min 3 chars) |
+| `country` | string | No | Country code for search analysis (default: `"es"`) |
+| `lang` | string | No | Language code for categorization (default: `"en"`) |
+
+### Content generation
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `keyword` | string | Yes | Keyword to generate content for (min 3 chars) |
+| `lang` | string | No | Language code (default: `"en"`) |
+| `country` | string | No | Country code for search context |
+| `image_provider` | string | No | Image provider: `"pixabay"` or `"pexels"` (default: `"pixabay"`) |
+| `categories` | array | No | List of category names for content classification |
+
+### Indexing
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `url` | string | Yes | Published URL to submit for Google indexing (min 3 chars) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Extract Keywords
+
+**Goal:** Analyze a domain and extract SEO keywords with search volume and categorization data.
+
+**Endpoint:** `POST /api/v1/posts/keywords/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/posts/keywords/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "ecologiaverde.com",
+    "country": "es",
+    "lang": "en"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 50,
+    "categories": [
+      "Wildlife",
+      "Insects"
+    ],
+    "country": "es",
+    "lang": "en",
+    "domain": "ecologiaverde.com",
+    "keywords": [
+      {
+        "keyword": "black panther",
+        "title": "Black Panther: characteristics and habitat",
+        "original_title": "Pantera negra: que animal es, caracteristicas y habitat",
+        "original_keyword": "pantera negra",
+        "volume": 20000,
+        "url": "https://ecologiaverde.com/pantera-negra.html"
+      },
+      {
+        "keyword": "types of crickets",
+        "title": "10 Types of Crickets - Names and Photos",
+        "original_title": "10 tipos de grillos - Nombres y fotos",
+        "original_keyword": "tipos de grillos",
+        "volume": 19000,
+        "url": "https://ecologiaverde.com/tipos-de-grillos.html"
+      }
+    ]
+  },
+  "msg": "Successfully generated 50 keywords"
+}
+```
+
+:::note
+Choose a keyword with high search volume from the results for content generation. The `categories` array can be passed to the content generation endpoint.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid domain or validation error | Verify the domain format |
+| 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 422 | Validation error — missing or malformed fields | Check required fields |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 500 | Service configuration error or provider unavailable | Verify AI provider configuration |
+
+---
+
+### Step 3 — Submit Content Generation Job
+
+**Goal:** Submit an asynchronous content generation job for a target keyword.
+
+**Endpoint:** `POST /api/v1/posts/content/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/posts/content/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keyword": "sustainable gardening tips",
+    "lang": "en",
+    "country": "us",
+    "image_provider": "pixabay",
+    "categories": ["Home & Garden"]
+  }'
+```
+
+**Response (202):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "job_id": "507f1f77bcf86cd799439011",
+    "type": "content",
+    "status": "pending",
+    "input": {
+      "keyword": "sustainable gardening tips",
+      "lang": "en",
+      "image_provider": "pixabay"
+    },
+    "created_at": "2026-03-18T10:30:00"
+  },
+  "msg": "Content generation job created for keyword: sustainable gardening tips"
+}
+```
+
+:::note
+Save `data.job_id` as `$JOB_ID`. The job runs asynchronously — poll its status using Step 4.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 422 | Validation error — keyword too short or invalid fields | Keyword must be at least 3 characters |
+| 429 | Rate limit exceeded (5 req/min) | Wait and retry — this is an AI-intensive endpoint |
+| 500 | Service configuration error or AI provider unavailable | Verify AI and image provider configuration |
+
+---
+
+### Step 4 — Poll Job Status
+
+**Goal:** Check the status of the content generation job until it completes.
+
+**Endpoint:** `GET /api/v1/posts/content/jobs/{job_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/posts/content/jobs/$JOB_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200) — Job completed:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "job_id": "507f1f77bcf86cd799439011",
+    "type": "content",
+    "status": "completed",
+    "input": {
+      "keyword": "sustainable gardening tips",
+      "lang": "en",
+      "image_provider": "pixabay"
+    },
+    "result": {
+      "title": "Sustainable Gardening Tips for 2026",
+      "content": "<h2>Introduction</h2><p>Sustainable gardening...</p>...",
+      "slug": "sustainable-gardening-tips-2026"
+    },
+    "timing": {
+      "total_ms": 8420
+    },
+    "created_at": "2026-03-18T10:30:00",
+    "started_at": "2026-03-18T10:30:01",
+    "completed_at": "2026-03-18T10:30:09"
+  },
+  "msg": "Job status: completed"
+}
+```
+
+:::tip
+**Recommended polling interval:** 5 seconds. The `status` field transitions through: `pending` → `processing` → `completed` (or `failed`).
+:::
+
+:::warning
+If the job `status` is `"failed"`, check `data.error` for details. You may need to retry with different parameters or verify your AI provider configuration.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid job ID format | Verify the job ID is a valid ObjectId |
+| 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 404 | Job not found | Verify the `job_id` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 5 — Submit URL for Indexing
+
+**Goal:** Submit the published article URL to the Google Indexing API for faster crawling.
+
+**Endpoint:** `POST /api/v1/posts/indexing/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/posts/indexing/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://myblog.com/sustainable-gardening-tips-2026"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "submitted",
+    "url": "https://myblog.com/sustainable-gardening-tips-2026"
+  },
+  "msg": "URL successfully submitted for indexing"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid URL format or inaccessible URL | Verify the URL is publicly accessible |
+| 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 422 | Validation error — missing URL field | Send `{"url": "..."}` in the body |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 500 | Google Indexing API error or service unavailable | Verify Search Console configuration |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values, from authentication to indexing.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: Extract Keywords ===
+KEYWORDS_RESPONSE=$(curl -s -X POST "$BASE_URL/posts/keywords/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "myblog.com",
+    "country": "us",
+    "lang": "en"
+  }')
+
+echo "KEYWORDS: $(echo $KEYWORDS_RESPONSE | jq '.data.keywords[:3]')"
+
+# === STEP 3: Submit Content Generation Job ===
+JOB_ID=$(curl -s -X POST "$BASE_URL/posts/content/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keyword": "sustainable gardening tips",
+    "lang": "en",
+    "country": "us",
+    "image_provider": "pixabay",
+    "categories": ["Home & Garden"]
+  }' \
+  | jq -r '.data.job_id')
+
+echo "JOB_ID: $JOB_ID"
+
+# === STEP 4: Poll Job Status ===
+while true; do
+  STATUS=$(curl -s -X GET "$BASE_URL/posts/content/jobs/$JOB_ID" \
+    -H "Authorization: Bearer $APP_TOKEN" \
+    -H "x-user-token: $USER_TOKEN" \
+    | jq -r '.data.status')
+
+  echo "Job status: $STATUS"
+
+  if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
+    break
+  fi
+
+  sleep 5
+done
+
+# === STEP 5: Submit for Indexing ===
+curl -s -X POST "$BASE_URL/posts/indexing/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://myblog.com/sustainable-gardening-tips-2026"}' \
+  | jq .
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+
+:::warning[No idempotency mechanism]
+The API does not support an `Idempotency-Key` header. Content generation jobs are unique per submission. If a request fails due to timeout, do not retry immediately — the job may have been created. Poll the job status endpoint first.
+:::
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout**, verify the job state before retrying to avoid duplicate jobs.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- Keyword extraction may take **10-20 seconds** depending on the domain complexity.
+- Content generation is asynchronous — the submission returns immediately, but the job may take **10-60 seconds** to complete.
+- Configure your HTTP client with at least **30 seconds** timeout for keyword extraction and **10 seconds** for other endpoints.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all content endpoints.
+
+### Important validations
+- The `keyword` must be at least 3 characters long.
+- The `domain` must be a valid domain name (min 3 chars).
+- The `image_provider` must be either `"pixabay"` or `"pexels"`.
+- The `lang` field must be a 2-character language code.
+- The indexing URL must be publicly accessible and belong to a Google Search Console verified property.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `POST` | `/api/v1/posts/keywords/` | Extract keywords from domain |
+| 3 | `POST` | `/api/v1/posts/content/` | Submit content generation job |
+| 4 | `GET` | `/api/v1/posts/content/jobs/{job_id}` | Poll job status |
+| 5 | `POST` | `/api/v1/posts/indexing/` | Submit URL for indexing |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I extracted keywords from my domain (`POST /posts/keywords/`)
+- [ ] I selected a keyword with good search volume
+- [ ] I submitted a content generation job (`POST /posts/content/`)
+- [ ] I polled the job until completion (`GET /posts/content/jobs/{job_id}`)
+- [ ] I published the generated content on my website
+- [ ] I submitted the published URL for indexing (`POST /posts/indexing/`)

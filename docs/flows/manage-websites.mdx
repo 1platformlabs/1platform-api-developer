@@ -1,0 +1,681 @@
+---
+title: "Manage Websites"
+description: "Step-by-step flow to register, update, search, delete websites, and generate legal pages via the 1Platform API."
+sidebar_position: 6
+---
+
+# Flow: Manage Websites
+
+## Overview
+
+This flow documents how to manage websites through the 1Platform API. It covers listing categories, registering websites, searching by URL, updating website details, generating legal pages, and deleting websites.
+
+**Use case:** Register and manage your users' websites for content generation, SEO analysis, legal page creation, and third-party integrations.
+
+**End result:** A fully registered website with category assignment, AI-generated description, and complete legal pages (privacy policy, cookie policy, legal notice, contact, and about-me).
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| AI provider configured | Required for AI-generated descriptions and legal pages |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""       # Obtained in Step 0
+USER_TOKEN=""      # Obtained in Step 1
+CATEGORY_ID=""     # Obtained in Step 2
+WEBSITE_ID=""      # Obtained in Step 3
+```
+
+---
+
+## Data required to create a website
+
+### Website
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `url` | string | Yes | Website URL to register |
+| `site_name` | string | Yes | Website display name |
+| `category_id` | string | No | Category ID to assign |
+| `lang` | string | No | Website language: `"es"` or `"en"` (default: `"es"`) |
+| `site_description` | string | No | Website description (AI-generated if empty) |
+
+### Legal pages
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `legal_email` | string | Yes | Contact email address (min 5 chars) |
+| `legal_owner` | string | No | Legal owner name (default: `""`) |
+| `legal_address` | string | No | Fiscal/business address (default: `""`) |
+| `legal_activity` | string | No | Business activity description (default: `""`) |
+| `site_topic` | string | No | Website topic for AI-generated pages (default: `""`) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — List Categories
+
+**Goal:** Retrieve available website categories to assign to the new website.
+
+**Endpoint:** `GET /api/v1/users/categories`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/categories?status_filter=active" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "65a1b2c3d4e5f6789abcdef0",
+      "title": {
+        "es": "Tecnologia",
+        "en": "Technology"
+      },
+      "slug": "technology",
+      "status": "active",
+      "created_at": "2026-01-01T00:00:00"
+    },
+    {
+      "id": "65a1b2c3d4e5f6789abcdef1",
+      "title": {
+        "es": "Hogar y Jardin",
+        "en": "Home & Garden"
+      },
+      "slug": "home-garden",
+      "status": "active",
+      "created_at": "2026-01-01T00:00:00"
+    }
+  ],
+  "msg": "Categories retrieved successfully"
+}
+```
+
+:::note
+Save the desired `id` as `$CATEGORY_ID` to use when creating or updating a website.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+
+---
+
+### Step 3 — Add Website
+
+**Goal:** Register a new website for the authenticated user.
+
+**Endpoint:** `POST /api/v1/users/websites`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/websites" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://mijardin.com",
+    "site_name": "Mi Jardin Digital",
+    "category_id": "'$CATEGORY_ID'",
+    "lang": "es",
+    "site_description": "Blog sobre jardineria sostenible y paisajismo urbano"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65b2c3d4e5f6a789bcdef012",
+    "url": "https://mijardin.com",
+    "slug": "mijardin-com",
+    "active": true,
+    "user_id": "507f1f77bcf86cd799439011",
+    "category_id": "65a1b2c3d4e5f6789abcdef1",
+    "category": {
+      "id": "65a1b2c3d4e5f6789abcdef1",
+      "title": "Hogar y Jardin",
+      "slug": "home-garden"
+    },
+    "lang": "es",
+    "status": "active",
+    "domain": "mijardin.com",
+    "site_name": "Mi Jardin Digital",
+    "site_description": "Blog sobre jardineria sostenible y paisajismo urbano",
+    "created_at": "2026-03-18T10:30:00",
+    "updated_at": null,
+    "actions": {}
+  },
+  "msg": "Website added successfully"
+}
+```
+
+:::note
+Save `data.id` as `$WEBSITE_ID`.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Website already exists for this user | Use a different URL or search for the existing website |
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Category not found | Verify the `category_id` exists |
+| 422 | Validation error — missing required fields | Verify `url` and `site_name` are present |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+
+---
+
+### Step 4 — Search Website by URL
+
+**Goal:** Find a website by its URL among the authenticated user's websites.
+
+**Endpoint:** `GET /api/v1/users/websites`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/websites?url=https://mijardin.com" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65b2c3d4e5f6a789bcdef012",
+    "url": "https://mijardin.com",
+    "slug": "mijardin-com",
+    "active": true,
+    "user_id": "507f1f77bcf86cd799439011",
+    "lang": "es",
+    "status": "active",
+    "domain": "mijardin.com",
+    "site_name": "Mi Jardin Digital",
+    "created_at": "2026-03-18T10:30:00",
+    "actions": {}
+  },
+  "msg": "Website found"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found | Verify the URL matches exactly |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+
+---
+
+### Step 5 — Get Website by ID
+
+**Goal:** Retrieve details of a specific website by its ID.
+
+**Endpoint:** `GET /api/v1/users/websites/{website_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/websites/$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+The response has the same structure as the create response (Step 3).
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found | Verify the `website_id` |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+
+---
+
+### Step 6 — Update Website
+
+**Goal:** Update an existing website's details. All fields are optional (partial update).
+
+**Endpoint:** `PATCH /api/v1/users/websites/{website_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PATCH "$BASE_URL/users/websites/$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "site_name": "Mi Jardin Digital - Edicion 2026",
+    "site_description": "Blog actualizado sobre jardineria sostenible",
+    "lang": "es"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65b2c3d4e5f6a789bcdef012",
+    "url": "https://mijardin.com",
+    "slug": "mijardin-com",
+    "active": true,
+    "user_id": "507f1f77bcf86cd799439011",
+    "lang": "es",
+    "status": "active",
+    "domain": "mijardin.com",
+    "site_name": "Mi Jardin Digital - Edicion 2026",
+    "site_description": "Blog actualizado sobre jardineria sostenible",
+    "created_at": "2026-03-18T10:30:00",
+    "updated_at": "2026-03-18T11:00:00",
+    "actions": {}
+  },
+  "msg": "Website updated successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found | Verify the `website_id` |
+| 422 | Validation error in request body | Check field formats |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+
+---
+
+### Step 7 — Generate Legal Pages
+
+**Goal:** Generate all legal pages for the website: privacy policy, cookie policy, legal notice, contact page, and about-me page.
+
+**Endpoint:** `POST /api/v1/users/websites/{website_id}/legal`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/legal" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "legal_owner": "Jardines Digitales S.A.",
+    "legal_email": "legal@example.com",
+    "legal_address": "Avenida Reforma 10-20, Zona 9, Guatemala",
+    "legal_activity": "Blog de jardineria y paisajismo",
+    "site_topic": "Sustainable gardening and urban landscaping"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "lang": "es",
+    "pages": {
+      "privacy_policy": {
+        "title": "Politica de Privacidad",
+        "content": "<h1>Politica de Privacidad</h1><p>En Jardines Digitales S.A....</p>"
+      },
+      "cookie_policy": {
+        "title": "Politica de Cookies",
+        "content": "<h1>Politica de Cookies</h1><p>Este sitio web...</p>"
+      },
+      "legal_notice": {
+        "title": "Aviso Legal",
+        "content": "<h1>Aviso Legal</h1><p>Jardines Digitales S.A....</p>"
+      },
+      "contact": {
+        "title": "Contacto",
+        "content": "<h1>Contacto</h1><p>AI-generated contact page...</p>"
+      },
+      "about_me": {
+        "title": "Sobre Nosotros",
+        "content": "<h1>Sobre Nosotros</h1><p>AI-generated about page...</p>"
+      }
+    },
+    "meta": {
+      "slug_map": {
+        "privacy_policy": "politica-de-privacidad",
+        "cookie_policy": "politica-de-cookies",
+        "legal_notice": "aviso-legal",
+        "contact": "contacto",
+        "about_me": "sobre-nosotros"
+      },
+      "generated_owner": null,
+      "generated_address": null
+    }
+  },
+  "msg": "Legal pages generated successfully"
+}
+```
+
+:::note
+The `pages` object contains each legal page with its `title` and HTML `content`. The `meta.slug_map` provides URL-friendly slugs for each page type.
+:::
+
+:::tip
+If you omit `legal_owner` or `legal_address`, the API will use AI to generate suitable values based on the website's context.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found | Verify the `website_id` |
+| 422 | Validation error — `legal_email` missing or too short | Provide a valid email (min 5 chars) |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 500 | AI generation failed | Verify AI provider configuration |
+
+---
+
+### Step 8 — Delete Website
+
+**Goal:** Remove a website from the authenticated user's account. This action is irreversible.
+
+**Endpoint:** `DELETE /api/v1/users/websites/{website_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/users/websites/$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": null,
+  "msg": "Website deleted successfully"
+}
+```
+
+:::warning
+This action is irreversible. The website and all its associated data will be permanently removed.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Website not found | Verify the `website_id` |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: List Categories ===
+CATEGORY_ID=$(curl -s -X GET "$BASE_URL/users/categories?status_filter=active" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq -r '.data[0].id')
+
+echo "CATEGORY_ID: $CATEGORY_ID"
+
+# === STEP 3: Add Website ===
+WEBSITE_ID=$(curl -s -X POST "$BASE_URL/users/websites" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://mijardin.com",
+    "site_name": "Mi Jardin Digital",
+    "category_id": "'$CATEGORY_ID'",
+    "lang": "es"
+  }' \
+  | jq -r '.data.id')
+
+echo "WEBSITE_ID: $WEBSITE_ID"
+
+# === STEP 4: Search Website by URL ===
+curl -s -X GET "$BASE_URL/users/websites?url=https://mijardin.com" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 5: Update Website ===
+curl -s -X PATCH "$BASE_URL/users/websites/$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"site_name": "Mi Jardin Digital - Edicion 2026"}' \
+  | jq .
+
+# === STEP 6: Generate Legal Pages ===
+curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/legal" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "legal_owner": "Jardines Digitales S.A.",
+    "legal_email": "legal@example.com",
+    "legal_address": "Avenida Reforma 10-20, Zona 9, Guatemala",
+    "legal_activity": "Blog de jardineria",
+    "site_topic": "Sustainable gardening"
+  }' \
+  | jq '.data.pages | keys'
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+
+:::warning[No idempotency mechanism]
+The API does not support an `Idempotency-Key` header. If a website creation request fails due to timeout, search for the website by URL (`GET /users/websites?url=...`) before retrying. Duplicate URLs for the same user return a **400** error.
+:::
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout**, verify the resource state before retrying.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- Website creation typically completes within **2-5 seconds** (may take longer if AI description generation is triggered).
+- Legal page generation involves AI calls and may take **10-30 seconds**.
+- Configure your HTTP client with at least **45 seconds** timeout for the legal pages endpoint.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all website management endpoints.
+
+### Important validations
+- Website URLs must be unique per user.
+- The `category_id` must reference an existing active category.
+- The `lang` field must be `"es"` or `"en"`.
+- The `legal_email` field is required and must be at least 5 characters long.
+- Website deletion is irreversible — there is no restore endpoint.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/users/categories` | List categories |
+| 3 | `POST` | `/api/v1/users/websites` | Add website |
+| 4 | `GET` | `/api/v1/users/websites` | Search website by URL |
+| 5 | `GET` | `/api/v1/users/websites/{website_id}` | Get website by ID |
+| 6 | `PATCH` | `/api/v1/users/websites/{website_id}` | Update website |
+| 7 | `POST` | `/api/v1/users/websites/{website_id}/legal` | Generate legal pages |
+| 8 | `DELETE` | `/api/v1/users/websites/{website_id}` | Delete website |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I listed available categories (`GET /users/categories`)
+- [ ] I registered the website (`POST /users/websites`)
+- [ ] I verified the website details (`GET /users/websites/{id}`)
+- [ ] I generated legal pages (`POST /users/websites/{id}/legal`)

@@ -5,7 +5,15 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Flows',
-      items: ['flows/generate-invoice'],
+      items: [
+        'flows/generate-invoice',
+        'flows/user-onboarding',
+        'flows/ai-generations',
+        'flows/external-integrations',
+        'flows/generate-ai-content',
+        'flows/manage-websites',
+        'flows/payments-and-subscriptions',
+      ],
     },
   ],
 };

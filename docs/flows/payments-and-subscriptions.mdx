@@ -1,0 +1,496 @@
+---
+title: "Payments & Subscriptions"
+description: "Step-by-step flow to check billing, create payment transactions, view transaction history, and check subscription details via the 1Platform API."
+sidebar_position: 7
+---
+
+# Flow: Payments & Subscriptions
+
+## Overview
+
+This flow documents how to manage payments and subscriptions through the 1Platform API. It covers checking billing balance, creating payment transactions, viewing transaction history, and retrieving subscription details.
+
+**Use case:** Allow users to top up their account balance via the integrated payment service, track transaction history, and manage their subscription plan.
+
+**End result:** A completed payment transaction with balance credited to the user's account, and full visibility into billing and subscription status.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| Payment provider configured | The App must have payment provider (Migo) configured |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""          # Obtained in Step 0
+USER_TOKEN=""         # Obtained in Step 1
+TRANSACTION_ID=""     # Obtained in Step 3
+SUBSCRIPTION_ID=""    # Obtained in Step 2 (from billing response)
+```
+
+---
+
+## Data required to create a transaction
+
+### Transaction
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `amount` | number | Yes | Transaction amount (must be positive) |
+| `description` | string | No | Transaction description (max 500 chars) |
+| `metadata` | object | No | Additional metadata (key-value pairs) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Check Billing Info
+
+**Goal:** Retrieve the user's current balance and active subscription.
+
+**Endpoint:** `GET /api/v1/users/billing`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/billing" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "billing": {
+      "id": "65a1b2c3d4e5f6789abcdef4",
+      "user_id": "507f1f77bcf86cd799439011",
+      "balance": 25.50,
+      "currency": "USD",
+      "payment_gateway_id": "65a1b2c3d4e5f6789abcdef0",
+      "updated_at": "2026-03-18T10:00:00Z"
+    },
+    "subscription": {
+      "id": "65a1b2c3d4e5f6789abcdef3",
+      "plan_id": "plan_free",
+      "status": "active",
+      "user_id": "507f1f77bcf86cd799439011",
+      "start_date": "2026-01-01T00:00:00Z",
+      "auto_renew": false
+    }
+  },
+  "msg": "Billing information retrieved successfully"
+}
+```
+
+:::note
+Save `data.subscription.id` as `$SUBSCRIPTION_ID` if you need to check subscription details later.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+| 500 | Failed to retrieve billing information | Contact support |
+
+---
+
+### Step 3 — Create Payment Transaction
+
+**Goal:** Create a payment transaction and obtain a checkout URL where the user completes payment.
+
+**Endpoint:** `POST /api/v1/users/transactions`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/transactions" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 10.00,
+    "description": "Account top-up - March 2026",
+    "metadata": {
+      "source": "web",
+      "campaign_id": "spring-promo-2026"
+    }
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65a1b2c3d4e5f6789abcdef0",
+    "user_id": "507f1f77bcf86cd799439011",
+    "usd_amount": 10.00,
+    "amount": 78.00,
+    "currency": "USD",
+    "currency_provider": "GTQ",
+    "status": "created",
+    "payment_url": "https://sb-mw.migopayments.com/checkout/abc123",
+    "reference": null,
+    "description": "Account top-up - March 2026",
+    "created_at": "2026-03-18T10:30:00Z",
+    "updated_at": "2026-03-18T10:30:00Z"
+  },
+  "msg": "Transaction created — redirect user to payment URL"
+}
+```
+
+:::note
+Redirect the user to `data.payment_url` to complete the payment. Save `data.id` as `$TRANSACTION_ID`.
+
+**Key fields:**
+- `usd_amount` — original amount in the merchant's currency (USD)
+- `amount` — converted amount sent to the payment provider (GTQ)
+- `payment_url` — checkout URL where the user completes the payment
+- `status` — starts as `"created"`, updated to `"approved"` or `"rejected"` via webhook
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid request data | Verify `amount` is a positive number |
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Billing record not found for user | Ensure the user has a billing record (created during user registration) |
+| 422 | Validation error — invalid request data | Check field formats and constraints |
+| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 502 | Payment provider temporarily unavailable | Retry after a short delay |
+
+---
+
+### Step 4 — Get Transaction History
+
+**Goal:** Retrieve the user's paginated transaction history.
+
+**Endpoint:** `GET /api/v1/users/transactions`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/transactions?limit=10&skip=0" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 25,
+    "transactions": [
+      {
+        "id": "65a1b2c3d4e5f6789abcdef0",
+        "user_id": "507f1f77bcf86cd799439011",
+        "usd_amount": 10.00,
+        "amount": 78.00,
+        "currency": "USD",
+        "currency_provider": "GTQ",
+        "status": "approved",
+        "payment_url": null,
+        "reference": "MIGOGT123456",
+        "description": "Account top-up - March 2026",
+        "created_at": "2026-03-18T10:30:00Z",
+        "updated_at": "2026-03-18T10:35:00Z"
+      }
+    ]
+  },
+  "msg": "Transaction history retrieved successfully"
+}
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `limit` | integer | `50` | Maximum transactions to return (1-100) |
+| `skip` | integer | `0` | Number of transactions to skip for pagination |
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+### Step 5 — Get Subscription Details
+
+**Goal:** Retrieve details of the user's subscription plan.
+
+**Endpoint:** `GET /api/v1/users/subscriptions/{subscription_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/subscriptions/$SUBSCRIPTION_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65a1b2c3d4e5f6789abcdef3",
+    "plan_id": "plan_free",
+    "status": "active",
+    "user_id": "507f1f77bcf86cd799439011"
+  },
+  "msg": "Subscription details retrieved"
+}
+```
+
+:::note
+This endpoint is a placeholder — full subscription management will be available in a future release.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Subscription not found | Verify the `subscription_id` from the billing response |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: Check Billing Info ===
+BILLING_RESPONSE=$(curl -s -X GET "$BASE_URL/users/billing" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN")
+
+echo "Current balance: $(echo $BILLING_RESPONSE | jq '.data.billing.balance')"
+
+SUBSCRIPTION_ID=$(echo $BILLING_RESPONSE | jq -r '.data.subscription.id')
+echo "SUBSCRIPTION_ID: $SUBSCRIPTION_ID"
+
+# === STEP 3: Create Payment Transaction ===
+TRANSACTION_RESPONSE=$(curl -s -X POST "$BASE_URL/users/transactions" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 25.00,
+    "description": "Account top-up"
+  }')
+
+PAYMENT_URL=$(echo $TRANSACTION_RESPONSE | jq -r '.data.payment_url')
+echo "Redirect user to: $PAYMENT_URL"
+
+# === STEP 4: Get Transaction History ===
+curl -s -X GET "$BASE_URL/users/transactions?limit=5" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 5: Get Subscription Details ===
+curl -s -X GET "$BASE_URL/users/subscriptions/$SUBSCRIPTION_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+
+:::warning[No idempotency mechanism]
+The API does not support an `Idempotency-Key` header for transactions. If a transaction creation request fails due to timeout, check the transaction history before retrying to avoid creating duplicate charges.
+:::
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **502** (payment provider unavailable), retry after a short delay.
+- If you receive **500** or a **timeout**, check the transaction history (`GET /users/transactions`) before retrying.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- Transaction creation involves an external call to the payment provider and may take **5-15 seconds**.
+- Configure your HTTP client with at least **30 seconds** timeout for the transaction creation endpoint.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all billing and payment endpoints.
+
+### Important validations
+- The `amount` must be a positive number.
+- The `description` field has a maximum length of 500 characters.
+- Transaction status updates (`approved`, `rejected`) arrive via webhook to `POST /webhooks/transactions` — your application should listen for these updates.
+- The `payment_url` is only valid for a limited time — redirect the user promptly.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/users/billing` | Check billing info |
+| 3 | `POST` | `/api/v1/users/transactions` | Create payment transaction |
+| 4 | `GET` | `/api/v1/users/transactions` | Get transaction history |
+| 5 | `GET` | `/api/v1/users/subscriptions/{subscription_id}` | Get subscription details |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I checked the user's billing info (`GET /users/billing`)
+- [ ] I created a payment transaction (`POST /users/transactions`)
+- [ ] I redirected the user to the `payment_url`
+- [ ] I set up a webhook listener for transaction status updates
+- [ ] I verified the updated balance after payment approval

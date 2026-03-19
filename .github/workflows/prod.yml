@@ -20,14 +20,12 @@ env:
 
 jobs:
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 1: Automated spec update (repository_dispatch only)
-# Fetches latest OpenAPI spec, commits directly to main if changed.
-# If no changes, stops the pipeline. If changes, continues to build & deploy.
+# JOB 1: Fetch latest OpenAPI spec (runs on every pipeline execution)
+# If spec changed, commits to main. Build always continues after this.
 # ─────────────────────────────────────────────────────────────────────────────
 
   update_spec:
     name: Fetch & Update OpenAPI Spec
-    if: github.event_name == 'repository_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: PROD
@@ -91,17 +89,12 @@ jobs:
           git push origin main
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 2+: Build & Deploy (all events — gated by update_spec for repository_dispatch)
+# JOB 2+: Build & Deploy (runs after spec is fetched and committed if needed)
 # ─────────────────────────────────────────────────────────────────────────────
 
   build:
     name: Build
     needs: [update_spec]
-    if: |
-      always() && (
-        (github.event_name == 'repository_dispatch' && needs.update_spec.outputs.has_changes == 'true') ||
-        (github.event_name != 'repository_dispatch')
-      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: PROD

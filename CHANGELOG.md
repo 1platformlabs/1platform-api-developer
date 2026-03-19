@@ -2,6 +2,24 @@
 
 All notable changes to **1Platform API Developer Docs** will be documented in this file.
 
+## [0.3.0] — 2026-03-18
+
+### Added
+
+- **User Onboarding** flow — register, authenticate, and retrieve user profiles
+- **AI Generations** flow — generate fictional comments, AI images, and profile cards
+- **External Integrations** flow — connect websites with Google Search Console and the link-building marketplace
+- **Generate AI Content** flow — extract keywords, generate AI-powered content, and submit URLs for Google indexing
+- **Manage Websites** flow — register, update, search, delete websites, and generate legal pages
+- **Payments & Subscriptions** flow — check billing, create payment transactions, view history, and check subscription details
+- Homepage quick-link cards for all new integration flows
+- Sidebar navigation entries for all new flows
+
+### Changed
+
+- Updated homepage layout to accommodate new flow cards
+- Minor fixes to the Generate Invoice flow
+
 ## [0.2.0] — 2026-03-14
 
 ### Added

@@ -2,13 +2,15 @@ name: 1Platform API Developer — PROD
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [api-deployed]
   push:
     branches: [main]
 
 permissions: {}
 
 concurrency:
-  group: prod-${{ github.ref }}
+  group: prod-pipeline
   cancel-in-progress: false
 
 env:
@@ -17,8 +19,89 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1: Automated spec update (repository_dispatch only)
+# Fetches latest OpenAPI spec, commits directly to main if changed.
+# If no changes, stops the pipeline. If changes, continues to build & deploy.
+# ─────────────────────────────────────────────────────────────────────────────
+
+  update_spec:
+    name: Fetch & Update OpenAPI Spec
+    if: github.event_name == 'repository_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: PROD
+    permissions:
+      contents: write
+    outputs:
+      has_changes: ${{ steps.check_diff.outputs.has_changes }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+
+      - name: Fetch OpenAPI spec from Production
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run fetch-openapi
+
+      - name: Check for spec changes
+        id: check_diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet static/openapi.json; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "OpenAPI spec unchanged — stopping pipeline."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "OpenAPI spec changed — committing to main and continuing."
+          fi
+
+      - name: Commit updated spec to main
+        if: steps.check_diff.outputs.has_changes == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add static/openapi.json
+          git commit -m "chore: update OpenAPI spec from Production API"
+          git push origin main
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2+: Build & Deploy (all events — gated by update_spec for repository_dispatch)
+# ─────────────────────────────────────────────────────────────────────────────
+
   build:
     name: Build
+    needs: [update_spec]
+    if: |
+      always() && (
+        (github.event_name == 'repository_dispatch' && needs.update_spec.outputs.has_changes == 'true') ||
+        (github.event_name != 'repository_dispatch')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: PROD
@@ -32,6 +115,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Detect merge-like push
@@ -51,8 +135,8 @@ jobs:
           is_merge = "false"
           pr_number = ""
 
-          # Manual trigger always proceeds
-          if event_name == "workflow_dispatch":
+          # Manual trigger and repository_dispatch (spec already committed) always proceed
+          if event_name in ("workflow_dispatch", "repository_dispatch"):
               is_merge = "true"
           else:
               merge_match  = re.search(r"Merge pull request #(\d+)", first_line)
@@ -472,18 +556,6 @@ jobs:
             --title "Release ${VERSION}" \
             --notes-file final_release_notes.txt \
             1platform-api-developer.zip
-
-      - name: Remove QA pass label after merge
-        if: needs.build.outputs.pr_number != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ needs.build.outputs.pr_number }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh pr edit "$PR_NUMBER" \
-            --repo "${{ github.repository }}" \
-            --remove-label "ci:review-passed" || true
 
       - name: Rollback on release failure
         if: failure()

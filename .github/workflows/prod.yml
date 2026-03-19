@@ -100,10 +100,6 @@ jobs:
     environment: PROD
     permissions:
       contents: read
-    outputs:
-      is_merge: ${{ steps.check_merge.outputs.is_merge }}
-      pr_number: ${{ steps.check_merge.outputs.pr_number }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -111,75 +107,30 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Detect merge-like push
-        id: check_merge
-        env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          EVENT_NAME: ${{ github.event_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 << 'PYEOF'
-          import os, re
-
-          event_name = os.environ.get("EVENT_NAME", "")
-          commit_msg = os.environ.get("COMMIT_MSG", "")
-          first_line = commit_msg.split("\n", 1)[0]
-          is_merge = "false"
-          pr_number = ""
-
-          # Manual trigger and repository_dispatch (spec already committed) always proceed
-          if event_name in ("workflow_dispatch", "repository_dispatch"):
-              is_merge = "true"
-          else:
-              merge_match  = re.search(r"Merge pull request #(\d+)", first_line)
-              squash_match = re.search(r"\(#(\d+)\)\s*$", first_line)
-
-              if merge_match:
-                  is_merge = "true"
-                  pr_number = merge_match.group(1)
-              elif squash_match:
-                  is_merge = "true"
-                  pr_number = squash_match.group(1)
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-              f.write(f"is_merge={is_merge}\n")
-              f.write(f"pr_number={pr_number}\n")
-          PYEOF
-
-      - name: Stop early if not a merge push
-        if: steps.check_merge.outputs.is_merge != 'true'
-        run: echo "Not a merge push. Skipping PROD pipeline."
-
       - name: Setup pnpm
-        if: steps.check_merge.outputs.is_merge == 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
       - name: Setup Node
-        if: steps.check_merge.outputs.is_merge == 'true'
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Install dependencies
-        if: steps.check_merge.outputs.is_merge == 'true'
         shell: bash
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
 
       - name: Build
-        if: steps.check_merge.outputs.is_merge == 'true'
         shell: bash
         run: |
           set -euo pipefail
           npm run build
 
       - name: Upload build artifact
-        if: steps.check_merge.outputs.is_merge == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: docusaurus-build
@@ -189,7 +140,6 @@ jobs:
   version_bump:
     name: Auto Version Bump
     needs: build
-    if: needs.build.outputs.is_merge == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: PROD
@@ -445,7 +395,7 @@ jobs:
   release:
     name: Tag & Release
     needs: [build, version_bump]
-    if: needs.build.outputs.is_merge == 'true' && needs.version_bump.result == 'success'
+    if: needs.version_bump.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: PROD
@@ -589,7 +539,7 @@ jobs:
   deploy:
     name: Deploy to Hetzner
     needs: [build, version_bump, release]
-    if: needs.build.outputs.is_merge == 'true' && needs.release.result == 'success'
+    if: needs.release.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: PROD
@@ -670,7 +620,7 @@ jobs:
   notify:
     name: Slack Notification
     needs: [build, version_bump, release, deploy]
-    if: always() && needs.build.outputs.is_merge == 'true'
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: PROD

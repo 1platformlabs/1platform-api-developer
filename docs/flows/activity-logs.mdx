@@ -1,0 +1,559 @@
+---
+title: "Activity Logs"
+description: "Step-by-step flow to list, inspect, register, and clear API activity logs via the 1Platform API."
+sidebar_position: 8
+---
+
+# Flow: Activity Logs
+
+## Overview
+
+This flow documents how to manage API activity logs through the 1Platform API. Logs capture every API interaction — requests, responses, errors, and client-side events — providing full observability for debugging and auditing.
+
+**Use case:** Monitor API usage, diagnose errors by inspecting individual log entries, register client-side events for unified observability, and clear stale logs.
+
+**End result:** Full visibility into API activity with the ability to filter, inspect, register custom events, and manage log retention.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtained in Step 0
+USER_TOKEN=""   # Obtained in Step 1
+LOG_ID=""       # Obtained in Step 2
+```
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — List Logs
+
+**Goal:** Retrieve a paginated, filtered list of API activity logs.
+
+**Endpoint:** `GET /api/v1/logs/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+# List recent logs (page 1, default page size)
+curl -X GET "$BASE_URL/logs/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+
+# With filters
+curl -X GET "$BASE_URL/logs/?provider=openai&success=false&from_date=2026-03-01T00:00:00Z&to_date=2026-03-21T23:59:59Z&page=1&page_size=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `website_id` | string | — | Filter by website ID |
+| `provider` | string | — | Filter by provider |
+| `success` | boolean | — | Filter by success status (`true` or `false`) |
+| `error_type` | string | — | Filter by error type |
+| `status_code` | integer | — | Filter by HTTP response status code |
+| `endpoint` | string | — | Filter by endpoint path |
+| `source_type` | string | — | Filter by source type (e.g., `"server"`, `"client"`) |
+| `trace_id` | string | — | Filter by trace ID |
+| `from_date` | datetime | — | Start date (ISO 8601 format) |
+| `to_date` | datetime | — | End date (ISO 8601 format) |
+| `page` | integer | `1` | Page number |
+| `page_size` | integer | `20` | Results per page |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "logs": [
+      {
+        "id": "65f1a2b3c4d5e6f7a8b9c0d1",
+        "timestamp": "2026-03-21T14:30:00Z",
+        "method": "POST",
+        "endpoint": "/api/v1/posts/content/",
+        "action": "generate_content",
+        "source_module": "content",
+        "website_id": "507f1f77bcf86cd799439011",
+        "provider": "openai",
+        "response_status": 200,
+        "response_message": "Content generated successfully",
+        "success": true,
+        "error_type": null,
+        "trace_id": "tr-abc123",
+        "source_type": "server"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "page_size": 20,
+      "total_items": 150,
+      "total_pages": 8
+    }
+  },
+  "msg": "Logs retrieved successfully"
+}
+```
+
+:::note
+Save the `id` of any log entry you want to inspect as `$LOG_ID`.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Invalid query parameter format | Check date formats (ISO 8601), boolean values |
+| 429 | Rate limit exceeded | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+### Step 3 — Get Log Detail
+
+**Goal:** Retrieve the full details of a specific log entry, including request context.
+
+**Endpoint:** `GET /api/v1/logs/{log_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/logs/$LOG_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65f1a2b3c4d5e6f7a8b9c0d1",
+    "timestamp": "2026-03-21T14:30:00Z",
+    "method": "POST",
+    "endpoint": "/api/v1/posts/content/",
+    "action": "generate_content",
+    "source_module": "content",
+    "website_id": "507f1f77bcf86cd799439011",
+    "provider": "openai",
+    "response_status": 200,
+    "response_message": "Content generated successfully",
+    "success": true,
+    "error_type": null,
+    "trace_id": "tr-abc123",
+    "source_type": "server",
+    "request_context": {
+      "keyword": "best restaurants in guatemala",
+      "lang": "es",
+      "country": "GT"
+    }
+  },
+  "msg": "Log detail retrieved successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Log not found | Verify the `log_id` |
+| 422 | Invalid log ID format | Verify the `log_id` is a valid identifier |
+| 429 | Rate limit exceeded | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+### Step 4 — Register Client-Side Logs
+
+**Goal:** Send a batch of client-side log entries to the API for unified observability. Useful for tracking frontend events, errors, and metrics alongside server-side logs.
+
+**Endpoint:** `POST /api/v1/logs/client`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/logs/client" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entries": [
+      {
+        "timestamp": "2026-03-21T14:25:00Z",
+        "endpoint": "/api/v1/posts/keywords/",
+        "method": "POST",
+        "action": "extract_keywords",
+        "source_module": "seo-dashboard",
+        "website_id": "507f1f77bcf86cd799439011",
+        "provider": "valueserp",
+        "response_status": 200,
+        "response_message": "Keywords extracted",
+        "success": true,
+        "error_type": "none",
+        "trace_id": "tr-client-001"
+      },
+      {
+        "timestamp": "2026-03-21T14:26:00Z",
+        "endpoint": "/api/v1/posts/content/",
+        "method": "POST",
+        "action": "generate_content",
+        "source_module": "content-editor",
+        "response_status": 500,
+        "response_message": "Timeout waiting for content generation",
+        "success": false,
+        "error_type": "timeout",
+        "trace_id": "tr-client-002"
+      }
+    ]
+  }'
+```
+
+**Client log entry fields:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `timestamp` | datetime | Yes | Event timestamp (ISO 8601) |
+| `endpoint` | string | Yes | API endpoint path (max 500 chars) |
+| `response_message` | string | Yes | Response or event description (max 2000 chars) |
+| `error_type` | string | Yes | Error category (max 50 chars, e.g., `"timeout"`, `"validation"`, `"none"`) |
+| `method` | string | No | HTTP method (max 10 chars) |
+| `action` | string | No | Action name (max 100 chars) |
+| `source_module` | string | No | Source module or feature (max 100 chars) |
+| `website_id` | string | No | Associated website ID (max 100 chars) |
+| `provider` | string | No | Provider name (max 50 chars) |
+| `response_status` | integer | No | HTTP status code (0-599, default: `0`) |
+| `success` | boolean | No | Whether the operation succeeded (default: `false`) |
+| `trace_id` | string | No | Correlation trace ID (max 20 chars) |
+| `request_context` | object | No | Additional context data |
+
+:::warning
+Maximum **50 entries** per batch request. Exceeding this limit will result in a 422 error.
+:::
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "accepted": 2,
+    "rejected": 0,
+    "errors": []
+  },
+  "msg": "Client logs processed"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Invalid request data or exceeds 50 entries | Check entry formats and batch size |
+| 429 | Rate limit exceeded | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+### Step 5 — Clear Logs
+
+**Goal:** Delete logs matching optional filters. Use with caution — this operation is irreversible.
+
+**Endpoint:** `DELETE /api/v1/logs/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+# Clear logs older than a specific date for a website
+curl -X DELETE "$BASE_URL/logs/?confirm=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "website_id": "507f1f77bcf86cd799439011",
+    "older_than": "2026-01-01T00:00:00Z"
+  }'
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `confirm` | boolean | Yes | Must be `true` to confirm the deletion |
+
+**Request body (optional filters):**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | No | Only clear logs for this website |
+| `provider` | string | No | Only clear logs for this provider |
+| `older_than` | datetime | No | Only clear logs older than this date (ISO 8601) |
+
+:::warning
+If no filters are provided, **all logs** for the authenticated context will be cleared. Always use filters to avoid accidental data loss.
+:::
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "deleted_count": 42
+  },
+  "msg": "Logs cleared successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Missing `confirm=true` query parameter | Add `?confirm=true` to the URL |
+| 429 | Rate limit exceeded | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: List Recent Error Logs ===
+LOGS_RESPONSE=$(curl -s -X GET "$BASE_URL/logs/?success=false&page_size=5" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN")
+
+echo "Error logs: $(echo $LOGS_RESPONSE | jq '.data.pagination.total_items') total"
+
+LOG_ID=$(echo $LOGS_RESPONSE | jq -r '.data.logs[0].id')
+echo "LOG_ID: $LOG_ID"
+
+# === STEP 3: Get Log Detail ===
+curl -s -X GET "$BASE_URL/logs/$LOG_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 4: Register Client-Side Logs ===
+curl -s -X POST "$BASE_URL/logs/client" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entries": [
+      {
+        "timestamp": "2026-03-21T14:25:00Z",
+        "endpoint": "/api/v1/posts/keywords/",
+        "method": "POST",
+        "response_status": 200,
+        "response_message": "Keywords extracted successfully",
+        "success": true,
+        "error_type": "none"
+      }
+    ]
+  }' | jq .
+
+# === STEP 5: Clear Old Logs ===
+curl -s -X DELETE "$BASE_URL/logs/?confirm=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "older_than": "2026-01-01T00:00:00Z"
+  }' | jq .
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+- `GET` endpoints (list, detail) are naturally idempotent.
+- `POST /logs/client` is idempotent if you send the same entries — duplicates may be created, so use `trace_id` to correlate events.
+- `DELETE /logs/` is **not idempotent** — once logs are cleared, they cannot be recovered.
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout**, verify the resource state before retrying to avoid duplicates.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- Log listing and detail endpoints typically respond within **2-5 seconds**.
+- Client log registration may take up to **10 seconds** for large batches (50 entries).
+- Log clearing may take longer depending on the volume — configure at least **30 seconds** timeout.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all log endpoints.
+
+### Important validations
+- Client log batches have a maximum of **50 entries** per request.
+- The `confirm=true` query parameter is required for clearing logs — without it, the API returns a 422 error.
+- Use `trace_id` to correlate client-side and server-side logs for the same operation.
+- Filter by `error_type` and `success=false` to quickly identify failing operations.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/logs/` | List logs |
+| 3 | `GET` | `/api/v1/logs/{log_id}` | Get log detail |
+| 4 | `POST` | `/api/v1/logs/client` | Register client-side logs |
+| 5 | `DELETE` | `/api/v1/logs/` | Clear logs |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I can list and filter logs (`GET /logs/`)
+- [ ] I can inspect individual log details (`GET /logs/{log_id}`)
+- [ ] I can register client-side events (`POST /logs/client`)
+- [ ] I understand that clearing logs is irreversible (`DELETE /logs/`)

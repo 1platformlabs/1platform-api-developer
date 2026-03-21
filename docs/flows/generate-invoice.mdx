@@ -44,6 +44,7 @@ USER_API_KEY="sk-user-abc123"
 APP_TOKEN=""    # Obtained in Step 0
 USER_TOKEN=""   # Obtained in Step 1
 BUSINESS_ID=""  # Obtained in Step 2
+BRANCH_ID=""    # Obtained in Step 2b (optional)
 ```
 
 ---
@@ -229,6 +230,119 @@ Save `data.id` as `$BUSINESS_ID`.
 | 401 | Invalid or expired token | Regenerate tokens (Steps 0 and 1) |
 | 409 | A Business with that `documentNumber` already exists | Use the existing Business; retrieve it with `GET /api/v1/businesses/{businessId}` |
 | 422 | Missing required fields | Verify that `name`, `documentType`, `documentNumber`, and `address` are present |
+
+---
+
+### Step 2b — Create Branch (optional)
+
+**Goal:** Register a branch under the business. Branches hold a `commerceId` required by TribuTax for multi-establishment businesses. If your business operates from a single location, you can skip this step.
+
+**Endpoint:** `POST /api/v1/businesses/{businessId}/branches`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/branches" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Sucursal Central",
+    "commerceId": "COM-001"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "607f1f77bcf86cd799439022",
+    "business_id": "507f1f77bcf86cd799439011",
+    "name": "Sucursal Central",
+    "commerceId": "COM-001",
+    "status": "active",
+    "assigned_users": [],
+    "created_at": "2026-02-17T10:05:00Z",
+    "updated_at": "2026-02-17T10:05:00Z"
+  },
+  "msg": "Branch created successfully"
+}
+```
+
+:::note
+Save `data.id` as `$BRANCH_ID`. The `commerceId` is the TribuTax commerce identifier for this branch.
+:::
+
+**Branch data:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Branch display name (max 255 chars) |
+| `commerceId` | string | Yes | Commerce ID for TribuTax integration |
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid or expired token | Regenerate tokens (Steps 0 and 1) |
+| 404 | Business not found | Verify the `businessId` in the URL |
+| 422 | Missing required fields | Verify that `name` and `commerceId` are present |
+| 429 | Rate limit exceeded | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+### Step 2c — Get Branch Details
+
+**Goal:** Retrieve the details of a specific branch.
+
+**Endpoint:** `GET /api/v1/businesses/{businessId}/branches/{branchId}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/branches/$BRANCH_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "607f1f77bcf86cd799439022",
+    "business_id": "507f1f77bcf86cd799439011",
+    "name": "Sucursal Central",
+    "commerceId": "COM-001",
+    "status": "active",
+    "assigned_users": [
+      {
+        "user_id": "64a1b2c3d4e5f6a7b8c9d0e1",
+        "email": "maria@example.com",
+        "role": "admin",
+        "assigned_at": "2026-02-17T10:05:00Z"
+      }
+    ],
+    "created_at": "2026-02-17T10:05:00Z",
+    "updated_at": "2026-02-17T10:05:00Z"
+  },
+  "msg": "Branch retrieved successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Branch does not belong to this business | Verify the `branchId` belongs to the specified `businessId` |
+| 401 | Invalid or expired token | Regenerate tokens |
+| 404 | Business or branch not found | Verify both IDs |
+| 422 | Invalid path parameters | Verify `businessId` and `branchId` are valid identifiers |
+| 429 | Rate limit exceeded | Wait and retry |
 
 ---
 
@@ -735,7 +849,9 @@ curl -s -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
 | Send invoice by email | Not implemented | The receptor's `email` field is sent to TribuTax, but there is no explicit endpoint to resend |
 | Re-emit failed invoice | Not implemented | If an invoice was saved with `status: "failed"`, there is no endpoint to retry emission. A new invoice must be created |
 | Assign/unassign users to Branch | Not implemented | Only the creator is automatically assigned. No endpoint exists to manage additional assignments |
-| Update Business or Branch | Not implemented | No PUT/PATCH endpoints exist to modify businesses or branches |
+| Update Business | Not implemented | No PUT/PATCH endpoint exists to modify a business after creation |
+| Update Branch | Not implemented | No PUT/PATCH endpoint exists to modify a branch after creation |
+| List Branches | Not implemented | No endpoint to list all branches for a business |
 | List user's Businesses | Not implemented | No endpoint to list all businesses. The user must know the `businessId` |
 
 ---
@@ -781,7 +897,9 @@ Invoice emission involves an external call to TribuTax with a configurable timeo
 | 0 | `POST` | `/api/v1/auth/token` | Get app token |
 | 1 | `POST` | `/api/v1/users/token` | Get user token |
 | 2 | `POST` | `/api/v1/businesses` | Create business |
-| 2b | `GET` | `/api/v1/businesses/{businessId}` | Get business |
+| 2b | `POST` | `/api/v1/businesses/{businessId}/branches` | Create branch (optional) |
+| 2c | `GET` | `/api/v1/businesses/{businessId}/branches/{branchId}` | Get branch details |
+| 2d | `GET` | `/api/v1/businesses/{businessId}` | Get business |
 | 3 | `POST` | `/api/v1/businesses/{businessId}/invoices` | Create invoice |
 | 4 | `GET` | `/api/v1/businesses/{businessId}/invoices/{invoiceId}` | Get invoice details |
 | 5 | `GET` | `/api/v1/businesses/{businessId}/invoices` | List invoices |
@@ -796,6 +914,7 @@ Invoice emission involves an external call to TribuTax with a configurable timeo
 - [ ] I obtained the App Token (`POST /auth/token`)
 - [ ] I obtained the User Token (`POST /users/token`)
 - [ ] I created the Business or have its ID (`POST /businesses`)
+- [ ] I created a Branch if needed (`POST /businesses/{id}/branches`) (optional)
 - [ ] I have the receptor data (name, NIT, email)
 - [ ] I have at least 1 item with description, unit price, and quantity
 - [ ] I issued the invoice (`POST /businesses/{id}/invoices`)

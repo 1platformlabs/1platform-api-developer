@@ -1,0 +1,1341 @@
+---
+title: "AI Agents"
+description: "Step-by-step flow to browse the agent catalog, create agents via wizard or API, trigger runs, monitor execution, and handle human-in-the-loop actions via the 1Platform API."
+sidebar_position: 9
+---
+
+# Flow: AI Agents
+
+## Overview
+
+This flow documents the complete lifecycle of AI agents through the 1Platform API. Agents are autonomous LLM-powered workers that execute tasks, call tools, and request human approval when needed.
+
+**Use case:** Automate recurring business tasks — content publishing, invoice review, email drafting — by creating agents from templates or custom configurations, scheduling or triggering runs, and consuming pending actions that require human decisions.
+
+**End result:** A configured, active agent that executes tasks autonomously with full observability into runs, metrics, and human-in-the-loop actions.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""        # Obtained in Step 0
+USER_TOKEN=""       # Obtained in Step 1
+TEMPLATE_SLUG=""    # Obtained in Step 2
+SESSION_ID=""       # Obtained in Step 4
+AGENT_ID=""         # Obtained in Step 6 (or Step 8 for direct creation)
+RUN_ID=""           # Obtained in Step 9
+ACTION_ID=""        # Obtained in Step 11
+```
+
+---
+
+## Data required to create an agent
+
+### Agent configuration
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Human-readable agent name (max 200 chars) |
+| `description` | string | Yes | What the agent does (max 1000 chars) |
+| `system_prompt` | string | Yes | System prompt for the LLM (max 10000 chars) |
+| `model` | string | Yes | LLM model: `"claude-sonnet-4-6"` or `"claude-haiku-4-5-20251001"` |
+| `tools` | array | No | Tools available to the agent (see Tool configuration below) |
+| `max_iterations` | integer | No | Maximum agentic loop iterations (1-50, default: `10`) |
+| `schedule` | string | No | Cron expression for scheduled runs (omit to disable) |
+| `webhook_url` | string | No | Webhook URL for run result notifications |
+| `is_active` | boolean | No | Whether the agent is immediately active (default: `true`) |
+| `max_concurrent_runs` | integer | No | Maximum simultaneous runs (1-3, default: `1`) |
+| `template_slug` | string | No | Catalog template slug if created from a template |
+
+### Tool configuration
+
+Each tool in the `tools` array has:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | string | Yes | `"internal"` (platform tool) or `"external"` (HTTP call) |
+| `definition.name` | string | Yes | Unique tool name within the agent |
+| `definition.description` | string | Yes | Natural-language description of what the tool does |
+| `definition.input_schema` | object | Yes | JSON Schema describing tool inputs |
+| `execution_config` | object | No | Required when `type` is `"external"` |
+| `execution_config.base_url` | string | No | Base URL of the external tool endpoint |
+| `execution_config.encrypted_headers` | string | No | Fernet-encrypted JSON string of HTTP headers |
+| `execution_config.timeout` | integer | No | Request timeout in seconds (max 30, default: `30`) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Browse Catalog
+
+**Goal:** List available agent templates to find a starting point for your agent.
+
+**Endpoint:** `GET /api/v1/agents/catalog`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agents/catalog" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "templates": [
+      {
+        "slug": "content-publisher",
+        "name": "Content Publisher",
+        "description": "Generates and publishes blog content on a schedule",
+        "category": "content",
+        "required_tools": ["generate_content", "publish_post"],
+        "wizard_questions": [
+          "What topics should the agent cover?",
+          "How often should it publish?",
+          "Which website should it publish to?"
+        ],
+        "default_schedule": "0 9 * * 1",
+        "default_max_iterations": 15
+      },
+      {
+        "slug": "invoice-reviewer",
+        "name": "Invoice Reviewer",
+        "description": "Reviews pending invoices and flags anomalies for human approval",
+        "category": "finance",
+        "required_tools": ["list_invoices", "flag_invoice"],
+        "wizard_questions": [
+          "What amount threshold should trigger a review?",
+          "Which business should it monitor?"
+        ],
+        "default_schedule": "0 8 * * *",
+        "default_max_iterations": 10
+      }
+    ]
+  },
+  "msg": "Catalog retrieved successfully"
+}
+```
+
+:::note
+Save the `slug` of your chosen template as `$TEMPLATE_SLUG`.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 3 — Get Template Details
+
+**Goal:** Retrieve full details of a specific catalog template.
+
+**Endpoint:** `GET /api/v1/agents/catalog/{slug}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agents/catalog/$TEMPLATE_SLUG" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "slug": "content-publisher",
+    "name": "Content Publisher",
+    "description": "Generates and publishes blog content on a schedule",
+    "category": "content",
+    "required_tools": ["generate_content", "publish_post"],
+    "wizard_questions": [
+      "What topics should the agent cover?",
+      "How often should it publish?",
+      "Which website should it publish to?"
+    ],
+    "default_schedule": "0 9 * * 1",
+    "default_max_iterations": 15
+  },
+  "msg": "Template retrieved"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Template not found | Verify the `slug` from the catalog listing |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 4 — Start Wizard Session
+
+**Goal:** Begin an interactive wizard session that guides you through agent configuration. The wizard asks questions from the template and generates a complete agent configuration.
+
+**Endpoint:** `POST /api/v1/agents/wizard/start`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+# Start from a template
+curl -X POST "$BASE_URL/agents/wizard/start" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_slug": "content-publisher"
+  }'
+```
+
+You can also start without a template by providing an `initial_message`:
+
+```bash
+# Start from scratch
+curl -X POST "$BASE_URL/agents/wizard/start" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "initial_message": "I need an agent that monitors my website SEO rankings daily and alerts me when a keyword drops out of the top 10"
+  }'
+```
+
+:::note
+At least one of `template_slug` or `initial_message` must be provided.
+:::
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60a1b2c3d4e5f6789abcde01",
+    "template_slug": "content-publisher",
+    "status": "in_progress",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "Great! Let's set up your Content Publisher agent. First, what topics should the agent cover?",
+        "timestamp": "2026-03-21T15:00:00Z"
+      }
+    ],
+    "generated_config": null,
+    "expires_at": "2026-03-21T16:00:00Z"
+  },
+  "msg": "Wizard session created"
+}
+```
+
+:::note
+Save `data.id` as `$SESSION_ID`. The session expires at `expires_at` — complete the wizard before then.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Validation error (neither `template_slug` nor `initial_message` provided) | Provide at least one |
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Template not found | Verify the template slug exists in the catalog |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 5 — Respond to Wizard
+
+**Goal:** Answer the wizard's questions to refine the agent configuration. Repeat this step for each question until the wizard status changes to `"completed"`.
+
+**Endpoint:** `POST /api/v1/agents/wizard/{session_id}/respond`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/agents/wizard/$SESSION_ID/respond" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Focus on SEO and content marketing topics. Publish every Monday at 9 AM."
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60a1b2c3d4e5f6789abcde01",
+    "template_slug": "content-publisher",
+    "status": "in_progress",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "Great! Let's set up your Content Publisher agent. First, what topics should the agent cover?",
+        "timestamp": "2026-03-21T15:00:00Z"
+      },
+      {
+        "role": "user",
+        "content": "Focus on SEO and content marketing topics. Publish every Monday at 9 AM.",
+        "timestamp": "2026-03-21T15:01:00Z"
+      },
+      {
+        "role": "assistant",
+        "content": "Got it! Which website should the agent publish to?",
+        "timestamp": "2026-03-21T15:01:01Z"
+      }
+    ],
+    "generated_config": null,
+    "expires_at": "2026-03-21T16:00:00Z"
+  },
+  "msg": "Wizard response processed"
+}
+```
+
+:::tip
+When `status` changes to `"completed"`, the `generated_config` field will contain the full agent configuration. You can then confirm the wizard to create the agent (Step 6).
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Session not found | Verify the `session_id` |
+| 410 | Session expired | Start a new wizard session |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 6 — Confirm Wizard and Create Agent
+
+**Goal:** Finalize the wizard session and create the agent with the generated configuration.
+
+**Endpoint:** `POST /api/v1/agents/wizard/{session_id}/confirm`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/agents/wizard/$SESSION_ID/confirm" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60b1c2d3e4f5a6789bcdef02",
+    "app_id": "507f1f77bcf86cd799439011",
+    "name": "SEO Content Publisher",
+    "description": "Generates and publishes SEO-focused blog content every Monday at 9 AM",
+    "system_prompt": "You are an SEO content publisher agent...",
+    "tools": [
+      {
+        "type": "internal",
+        "definition": {
+          "name": "generate_content",
+          "description": "Generate blog content from a keyword",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "keyword": { "type": "string" },
+              "lang": { "type": "string" }
+            },
+            "required": ["keyword"]
+          }
+        },
+        "execution_config": null
+      }
+    ],
+    "model": "claude-sonnet-4-6",
+    "max_iterations": 15,
+    "schedule": "0 9 * * 1",
+    "webhook_url": null,
+    "is_active": true,
+    "max_concurrent_runs": 1,
+    "template_slug": "content-publisher",
+    "created_at": "2026-03-21T15:05:00Z",
+    "updated_at": "2026-03-21T15:05:00Z"
+  },
+  "msg": "Agent created from wizard"
+}
+```
+
+:::note
+Save `data.id` as `$AGENT_ID`. The agent is now active and will run according to its schedule.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Session not found or no generated config | Complete the wizard conversation first |
+| 410 | Session expired | Start a new wizard session |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 7 — Get Wizard Session (optional)
+
+**Goal:** Retrieve the current state of a wizard session (useful for resuming an in-progress session).
+
+**Endpoint:** `GET /api/v1/agents/wizard/{session_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agents/wizard/$SESSION_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+The response has the same structure as the wizard start/respond responses (see Step 4).
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Session not found | Verify the `session_id` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 8 — Create Agent Directly (alternative to wizard)
+
+**Goal:** Create an agent programmatically without going through the wizard. Use this when you already know the exact configuration.
+
+**Endpoint:** `POST /api/v1/agents`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/agents" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Invoice Anomaly Detector",
+    "description": "Reviews invoices daily and flags amounts above Q50,000 for human approval",
+    "system_prompt": "You are a financial review agent. Examine each invoice and flag any with amounts exceeding Q50,000 or unusual patterns for human review.",
+    "model": "claude-haiku-4-5-20251001",
+    "max_iterations": 10,
+    "schedule": "0 8 * * *",
+    "is_active": true,
+    "max_concurrent_runs": 1
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60c2d3e4f5a6b7890cdef103",
+    "app_id": "507f1f77bcf86cd799439011",
+    "name": "Invoice Anomaly Detector",
+    "description": "Reviews invoices daily and flags amounts above Q50,000 for human approval",
+    "system_prompt": "You are a financial review agent...",
+    "tools": [],
+    "model": "claude-haiku-4-5-20251001",
+    "max_iterations": 10,
+    "schedule": "0 8 * * *",
+    "webhook_url": null,
+    "is_active": true,
+    "max_concurrent_runs": 1,
+    "template_slug": null,
+    "created_at": "2026-03-21T15:10:00Z",
+    "updated_at": "2026-03-21T15:10:00Z"
+  },
+  "msg": "Agent created"
+}
+```
+
+:::note
+Save `data.id` as `$AGENT_ID`.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Validation error | Check required fields: `name`, `description`, `system_prompt`, `model` |
+| 401 | Authentication required | Regenerate tokens |
+| 403 | Tool permission denied | The app does not have permission to use the requested tool type |
+| 429 | Rate limit or quota exceeded | Wait and retry, or check agent quota |
+
+---
+
+### Step 9 — Trigger an Agent Run
+
+**Goal:** Manually trigger an agent run with an optional input message.
+
+**Endpoint:** `POST /api/v1/agents/{agent_id}/run`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/agents/$AGENT_ID/run" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_message": "Review all invoices created today and flag any over Q50,000"
+  }'
+```
+
+**Response (202):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60d3e4f5a6b7c8901def2045",
+    "agent_id": "60c2d3e4f5a6b7890cdef103",
+    "status": "pending",
+    "trigger": "manual",
+    "input_message": "Review all invoices created today and flag any over Q50,000",
+    "result": null,
+    "error": null,
+    "total_tokens": 0,
+    "worker_id": null,
+    "started_at": null,
+    "finished_at": null,
+    "created_at": "2026-03-21T15:15:00Z"
+  },
+  "msg": "Run triggered \u2014 executing in background"
+}
+```
+
+:::note
+Save `data.id` as `$RUN_ID`. The run starts in `"pending"` status and transitions to `"running"`, then `"completed"`, `"failed"`, or `"stopped"`.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Agent not found | Verify the `agent_id` |
+| 409 | Concurrent run limit exceeded | Wait for current runs to complete |
+| 429 | Rate limit or capacity exceeded | Wait and retry |
+| 503 | Agent inactive or global capacity full | Activate the agent or wait for capacity |
+
+---
+
+### Step 10 — Get Run Status
+
+**Goal:** Check the current status and result of an agent run.
+
+**Endpoint:** `GET /api/v1/agents/{agent_id}/runs/{run_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agents/$AGENT_ID/runs/$RUN_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60d3e4f5a6b7c8901def2045",
+    "agent_id": "60c2d3e4f5a6b7890cdef103",
+    "status": "completed",
+    "trigger": "manual",
+    "input_message": "Review all invoices created today and flag any over Q50,000",
+    "result": "Reviewed 12 invoices. Flagged 2 invoices exceeding Q50,000 threshold: INV-2026-0087 (Q75,000) and INV-2026-0091 (Q120,000). Created review actions for both.",
+    "error": null,
+    "total_tokens": 4521,
+    "worker_id": "worker-us-east-01",
+    "started_at": "2026-03-21T15:15:02Z",
+    "finished_at": "2026-03-21T15:16:30Z",
+    "created_at": "2026-03-21T15:15:00Z"
+  },
+  "msg": "Run retrieved"
+}
+```
+
+**Run statuses:**
+
+| Status | Description |
+|---|---|
+| `pending` | Run created, waiting for a worker |
+| `running` | Worker picked up the run, executing |
+| `completed` | Run finished successfully — check `result` |
+| `failed` | Run encountered an error — check `error` |
+| `stopped` | Run was manually stopped |
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Agent or run not found | Verify both IDs |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 11 — List Pending Actions
+
+**Goal:** Retrieve human-in-the-loop actions generated by agent runs that require human decisions.
+
+**Endpoint:** `GET /api/v1/agent-actions`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+# List all pending actions
+curl -X GET "$BASE_URL/agent-actions?status=pending" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+
+# Filter by type and agent
+curl -X GET "$BASE_URL/agent-actions?type=review_invoice&agent_id=$AGENT_ID&status=pending" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `type` | string | — | Filter by action type: `publish_content`, `review_invoice`, `approve_issue`, `send_email` |
+| `status` | string | — | Filter by status: `pending` or `consumed` |
+| `agent_id` | string | — | Filter by agent ID |
+| `skip` | integer | `0` | Number of results to skip |
+| `limit` | integer | `20` | Maximum results to return |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "actions": [
+      {
+        "id": "60e4f5a6b7c8d9012ef34567",
+        "agent_id": "60c2d3e4f5a6b7890cdef103",
+        "run_id": "60d3e4f5a6b7c8901def2045",
+        "type": "review_invoice",
+        "status": "pending",
+        "payload": {
+          "invoice_id": "709f1f77bcf86cd799439033",
+          "amount": 75000.00,
+          "reason": "Amount exceeds Q50,000 threshold",
+          "receptor": "ABC Corporation S.A."
+        },
+        "consume_result": null,
+        "consumed_by": null,
+        "consumed_at": null,
+        "created_at": "2026-03-21T15:16:00Z"
+      }
+    ],
+    "total": 2
+  },
+  "msg": "Actions listed successfully"
+}
+```
+
+:::note
+Save the `id` of any action you want to act on as `$ACTION_ID`.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 12 — Consume an Action
+
+**Goal:** Resolve a pending human-in-the-loop action by providing your decision.
+
+**Endpoint:** `PATCH /api/v1/agent-actions/{action_id}/consume`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PATCH "$BASE_URL/agent-actions/$ACTION_ID/consume" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "result": {
+      "approved": true,
+      "notes": "Verified with finance team. Amount is correct for the annual contract."
+    },
+    "consumed_by": "maria@example.com"
+  }'
+```
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `result` | object | No | Data produced by the human's decision |
+| `consumed_by` | string | No | Identifier of the actor consuming the action |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60e4f5a6b7c8d9012ef34567",
+    "agent_id": "60c2d3e4f5a6b7890cdef103",
+    "run_id": "60d3e4f5a6b7c8901def2045",
+    "type": "review_invoice",
+    "status": "consumed",
+    "payload": {
+      "invoice_id": "709f1f77bcf86cd799439033",
+      "amount": 75000.00,
+      "reason": "Amount exceeds Q50,000 threshold",
+      "receptor": "ABC Corporation S.A."
+    },
+    "consume_result": {
+      "approved": true,
+      "notes": "Verified with finance team. Amount is correct for the annual contract."
+    },
+    "consumed_by": "maria@example.com",
+    "consumed_at": "2026-03-21T15:30:00Z",
+    "created_at": "2026-03-21T15:16:00Z"
+  },
+  "msg": "Action consumed"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Action not found | Verify the `action_id` |
+| 409 | Action already consumed | The action was already resolved |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 13 — List Agent Runs
+
+**Goal:** View the execution history of an agent.
+
+**Endpoint:** `GET /api/v1/agents/{agent_id}/runs`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agents/$AGENT_ID/runs?limit=10" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `status` | string | — | Filter by run status: `pending`, `running`, `completed`, `failed`, `stopped` |
+| `trigger` | string | — | Filter by trigger type: `manual` or `scheduled` |
+| `skip` | integer | `0` | Number of results to skip |
+| `limit` | integer | `20` | Maximum results to return |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "runs": [
+      {
+        "id": "60d3e4f5a6b7c8901def2045",
+        "agent_id": "60c2d3e4f5a6b7890cdef103",
+        "status": "completed",
+        "trigger": "manual",
+        "input_message": "Review all invoices created today",
+        "result": "Reviewed 12 invoices. Flagged 2.",
+        "error": null,
+        "total_tokens": 4521,
+        "worker_id": "worker-us-east-01",
+        "started_at": "2026-03-21T15:15:02Z",
+        "finished_at": "2026-03-21T15:16:30Z",
+        "created_at": "2026-03-21T15:15:00Z"
+      }
+    ],
+    "total": 15
+  },
+  "msg": "Runs listed successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Agent not found | Verify the `agent_id` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 14 — Stop a Running Run
+
+**Goal:** Stop an agent run that is currently in progress.
+
+**Endpoint:** `POST /api/v1/agents/{agent_id}/runs/{run_id}/stop`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/agents/$AGENT_ID/runs/$RUN_ID/stop" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60d3e4f5a6b7c8901def2045",
+    "agent_id": "60c2d3e4f5a6b7890cdef103",
+    "status": "stopped",
+    "trigger": "manual",
+    "input_message": "Review all invoices created today",
+    "result": null,
+    "error": null,
+    "total_tokens": 1200,
+    "worker_id": "worker-us-east-01",
+    "started_at": "2026-03-21T15:15:02Z",
+    "finished_at": "2026-03-21T15:15:45Z",
+    "created_at": "2026-03-21T15:15:00Z"
+  },
+  "msg": "Run stopped successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Agent or run not found | Verify both IDs |
+| 409 | Run cannot be stopped in current status | Only `pending` or `running` runs can be stopped |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 15 — Get Agent Metrics
+
+**Goal:** Retrieve aggregated operational metrics across all agents.
+
+**Endpoint:** `GET /api/v1/agents/metrics`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agents/metrics" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "global_running_runs": 2,
+    "max_global_concurrent_runs": 10,
+    "capacity_percentage": 20.0,
+    "runs_by_status": {
+      "pending": 1,
+      "running": 2,
+      "completed": 150,
+      "failed": 5,
+      "stopped": 3
+    },
+    "active_agents_count": 4,
+    "scheduled_agents_count": 2,
+    "tokens_consumed_today": 45000,
+    "circuit_breaker_states": {}
+  },
+  "msg": "Metrics retrieved"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 403 | Admin privileges required | This endpoint may require admin-level access |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 16 — List Agents
+
+**Goal:** Retrieve all agents for the current app.
+
+**Endpoint:** `GET /api/v1/agents`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agents?limit=20&skip=0" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `skip` | integer | `0` | Number of results to skip |
+| `limit` | integer | `20` | Maximum results to return |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "agents": [
+      {
+        "id": "60c2d3e4f5a6b7890cdef103",
+        "app_id": "507f1f77bcf86cd799439011",
+        "name": "Invoice Anomaly Detector",
+        "description": "Reviews invoices daily and flags amounts above Q50,000",
+        "system_prompt": "You are a financial review agent...",
+        "tools": [],
+        "model": "claude-haiku-4-5-20251001",
+        "max_iterations": 10,
+        "schedule": "0 8 * * *",
+        "webhook_url": null,
+        "is_active": true,
+        "max_concurrent_runs": 1,
+        "template_slug": null,
+        "created_at": "2026-03-21T15:10:00Z",
+        "updated_at": "2026-03-21T15:10:00Z"
+      }
+    ],
+    "total": 4
+  },
+  "msg": "Agents listed successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 17 — Update Agent
+
+**Goal:** Modify an existing agent's configuration. All fields are optional — only send the fields you want to change.
+
+**Endpoint:** `PUT /api/v1/agents/{agent_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PUT "$BASE_URL/agents/$AGENT_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Invoice Anomaly Detector v2",
+    "max_iterations": 15,
+    "schedule": "0 8,14 * * *",
+    "is_active": true
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60c2d3e4f5a6b7890cdef103",
+    "app_id": "507f1f77bcf86cd799439011",
+    "name": "Invoice Anomaly Detector v2",
+    "description": "Reviews invoices daily and flags amounts above Q50,000 for human approval",
+    "system_prompt": "You are a financial review agent...",
+    "tools": [],
+    "model": "claude-haiku-4-5-20251001",
+    "max_iterations": 15,
+    "schedule": "0 8,14 * * *",
+    "webhook_url": null,
+    "is_active": true,
+    "max_concurrent_runs": 1,
+    "template_slug": null,
+    "created_at": "2026-03-21T15:10:00Z",
+    "updated_at": "2026-03-21T15:35:00Z"
+  },
+  "msg": "Agent updated"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Validation error | Check field constraints (e.g., `max_iterations` must be 1-50) |
+| 401 | Authentication required | Regenerate tokens |
+| 403 | Tool permission denied | The app does not have permission to use the requested tool type |
+| 404 | Agent not found | Verify the `agent_id` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 18 — Delete Agent
+
+**Goal:** Permanently delete an agent and its configuration.
+
+**Endpoint:** `DELETE /api/v1/agents/{agent_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/agents/$AGENT_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {},
+  "msg": "Agent deleted"
+}
+```
+
+:::warning
+This action is irreversible. All agent configuration, run history, and pending actions will be removed.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Agent not found | Verify the `agent_id` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+## Full end-to-end example
+
+Complete flow: create an agent via wizard, trigger a run, and consume an action.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: Browse Catalog ===
+curl -s -X GET "$BASE_URL/agents/catalog" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq '.data.templates[] | {slug, name, category}'
+
+# === STEP 3: Create Agent Directly ===
+AGENT_ID=$(curl -s -X POST "$BASE_URL/agents" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Invoice Anomaly Detector",
+    "description": "Reviews invoices and flags high amounts for human approval",
+    "system_prompt": "You are a financial review agent. Examine invoices and flag any with amounts exceeding Q50,000.",
+    "model": "claude-haiku-4-5-20251001",
+    "max_iterations": 10,
+    "is_active": true
+  }' | jq -r '.data.id')
+
+echo "AGENT_ID: $AGENT_ID"
+
+# === STEP 4: Trigger a Run ===
+RUN_ID=$(curl -s -X POST "$BASE_URL/agents/$AGENT_ID/run" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_message": "Review all invoices from today"
+  }' | jq -r '.data.id')
+
+echo "RUN_ID: $RUN_ID"
+
+# === STEP 5: Poll Run Status ===
+sleep 5
+RUN_STATUS=$(curl -s -X GET "$BASE_URL/agents/$AGENT_ID/runs/$RUN_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq -r '.data.status')
+
+echo "Run status: $RUN_STATUS"
+
+# === STEP 6: List Pending Actions ===
+ACTIONS=$(curl -s -X GET "$BASE_URL/agent-actions?agent_id=$AGENT_ID&status=pending" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN")
+
+echo "Pending actions: $(echo $ACTIONS | jq '.data.total')"
+
+ACTION_ID=$(echo $ACTIONS | jq -r '.data.actions[0].id')
+
+# === STEP 7: Consume Action ===
+if [ "$ACTION_ID" != "null" ]; then
+  curl -s -X PATCH "$BASE_URL/agent-actions/$ACTION_ID/consume" \
+    -H "Authorization: Bearer $APP_TOKEN" \
+    -H "x-user-token: $USER_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "result": {"approved": true, "notes": "Verified and approved"},
+      "consumed_by": "maria@example.com"
+    }' | jq .
+fi
+
+# === STEP 8: Check Metrics ===
+curl -s -X GET "$BASE_URL/agents/metrics" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+- Agent creation is **not idempotent** — calling `POST /agents` twice with the same data creates two agents. Check `GET /agents` before retrying.
+- Run triggers are **not idempotent** — each `POST /agents/{id}/run` creates a new run. Check `GET /agents/{id}/runs` before retrying.
+- Action consumption is idempotent in effect — consuming an already-consumed action returns a **409** error.
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout**, verify the resource state before retrying to avoid duplicates.
+- For **401** (expired token), regenerate the token and retry the original request.
+- For **409** on run trigger (concurrent limit), wait for current runs to finish.
+- For **503** (capacity full), wait for global capacity to free up.
+
+### Timeouts
+- Catalog and CRUD endpoints typically respond within **2-5 seconds**.
+- Wizard responses may take **5-15 seconds** as the LLM processes the conversation.
+- Run triggers return immediately (**202**) — the actual execution is asynchronous.
+- Agent runs can take **seconds to minutes** depending on the task complexity and number of iterations.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all agent endpoints.
+
+### Important validations
+- `model` must be one of: `"claude-sonnet-4-6"` or `"claude-haiku-4-5-20251001"`.
+- `max_iterations` must be between 1 and 50.
+- `max_concurrent_runs` must be between 1 and 3.
+- Wizard sessions expire — complete them before `expires_at`.
+- External tools require an `execution_config` with at least a `base_url`.
+- `schedule` follows standard cron expression syntax.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/agents/catalog` | Browse catalog |
+| 3 | `GET` | `/api/v1/agents/catalog/{slug}` | Get template details |
+| 4 | `POST` | `/api/v1/agents/wizard/start` | Start wizard session |
+| 5 | `POST` | `/api/v1/agents/wizard/{session_id}/respond` | Respond to wizard |
+| 6 | `POST` | `/api/v1/agents/wizard/{session_id}/confirm` | Confirm wizard and create agent |
+| 7 | `GET` | `/api/v1/agents/wizard/{session_id}` | Get wizard session |
+| 8 | `POST` | `/api/v1/agents` | Create agent directly |
+| 9 | `POST` | `/api/v1/agents/{agent_id}/run` | Trigger an agent run |
+| 10 | `GET` | `/api/v1/agents/{agent_id}/runs/{run_id}` | Get run status |
+| 11 | `GET` | `/api/v1/agent-actions` | List pending actions |
+| 12 | `PATCH` | `/api/v1/agent-actions/{action_id}/consume` | Consume an action |
+| 13 | `GET` | `/api/v1/agents/{agent_id}/runs` | List agent runs |
+| 14 | `POST` | `/api/v1/agents/{agent_id}/runs/{run_id}/stop` | Stop a running run |
+| 15 | `GET` | `/api/v1/agents/metrics` | Get agent metrics |
+| 16 | `GET` | `/api/v1/agents` | List agents |
+| 17 | `PUT` | `/api/v1/agents/{agent_id}` | Update agent |
+| 18 | `DELETE` | `/api/v1/agents/{agent_id}` | Delete agent |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I browsed the catalog or defined my agent configuration
+- [ ] I created an agent (wizard or direct API)
+- [ ] I triggered a run and received a `202` response
+- [ ] I polled run status until `completed` or `failed`
+- [ ] I checked for pending actions (`GET /agent-actions?status=pending`)
+- [ ] I consumed any required actions
+- [ ] I verified agent metrics for capacity monitoring

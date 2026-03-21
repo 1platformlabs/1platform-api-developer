@@ -8,6 +8,8 @@ const sidebars: SidebarsConfig = {
       items: [
         'flows/generate-invoice',
         'flows/user-onboarding',
+        'flows/activity-logs',
+        'flows/ai-agents',
         'flows/ai-generations',
         'flows/external-integrations',
         'flows/generate-ai-content',

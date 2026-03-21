@@ -27,7 +27,21 @@ const quickLinks = [
     primary: false,
   },
   {
+    icon: '📋',
+    title: 'Activity Logs',
+    description: 'Step-by-step flow to list, inspect, register, and clear API activity logs via the 1Platform API.',
+    href: '/docs/flows/activity-logs',
+    primary: false,
+  },
+  {
     icon: '🤖',
+    title: 'AI Agents',
+    description: 'Step-by-step flow to browse the agent catalog, create agents via wizard or API, trigger runs, monitor execution, and handle human-in-the-loop actions via the 1Platform API.',
+    href: '/docs/flows/ai-agents',
+    primary: false,
+  },
+  {
+    icon: '🎭',
     title: 'AI Generations',
     description: 'Step-by-step flow to generate fictional comments, AI images, and profile cards via the 1Platform API.',
     href: '/docs/flows/ai-generations',

@@ -2320,7 +2320,7 @@
                   "success": true,
                   "data": {
                     "total": 2,
-                    "provider": "openai",
+                    "provider": "default",
                     "images": [
                       {
                         "url": "https://cdn.example.com/img1.png",
@@ -2964,7 +2964,7 @@
           "Businesses & Branches"
         ],
         "summary": "Create a business",
-        "description": "Register a new business entity for invoicing.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- The business is used as the issuing party on invoices\n- Business identifiers (tax ID) must be unique\n- Optionally set `commerceId` for electronic invoicing (FEL) integration",
+        "description": "Register a new business entity for invoicing.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The business is used as the issuing party on invoices\n- Business identifiers (tax ID) must be unique\n- Optionally set `commerceId` for electronic invoicing (FEL) integration",
         "operationId": "create_business_api_v1_businesses_post",
         "security": [
           {
@@ -3064,7 +3064,7 @@
           "Businesses & Branches"
         ],
         "summary": "Get a business",
-        "description": "Retrieve details of a specific business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "description": "Retrieve details of a specific business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
         "operationId": "get_business_api_v1_businesses__businessId__get",
         "security": [
           {
@@ -3162,7 +3162,7 @@
           "Businesses & Branches"
         ],
         "summary": "Create a branch",
-        "description": "Create a new branch for a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- The authenticated user is automatically assigned to the new branch\n- Each branch can issue invoices independently",
+        "description": "Create a new branch for a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The authenticated user is automatically assigned to the new branch\n- Each branch can issue invoices independently",
         "operationId": "create_branch_api_v1_businesses__businessId__branches_post",
         "security": [
           {
@@ -3280,7 +3280,7 @@
           "Businesses & Branches"
         ],
         "summary": "Get a branch",
-        "description": "Retrieve details of a specific branch within a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "description": "Retrieve details of a specific branch within a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
         "operationId": "get_branch_api_v1_businesses__businessId__branches__branchId__get",
         "security": [
           {
@@ -3399,7 +3399,7 @@
           "Electronic Invoicing (FEL)"
         ],
         "summary": "Create an invoice",
-        "description": "Issue a new invoice for a business via electronic invoicing (FEL).\n\n**Flow:**\n1. Authenticate and resolve businessId from the path\n2. Validate business exists\n3. Validate invoice items and receptorInfo\n4. Persist invoice associated to business_id\n5. If `emitOnCreate=true`, emit via FEL using the business NIT\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- The invoice is associated directly to the business (via business_id)\n- The business NIT is used as the emitter for FEL invoicing",
+        "description": "Issue a new invoice for a business via electronic invoicing (FEL).\n\n- **Rate limit:** 20 req/min\n**Flow:**\n1. Authenticate and resolve businessId from the path\n2. Validate business exists\n3. Validate invoice items and receptorInfo\n4. Persist invoice associated to business_id\n5. If `emitOnCreate=true`, emit via FEL using the business NIT\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- The invoice is associated directly to the business (via business_id)\n- The business NIT is used as the emitter for FEL invoicing",
         "operationId": "create_invoice_api_v1_businesses__businessId__invoices_post",
         "security": [
           {
@@ -3515,7 +3515,7 @@
           "Electronic Invoicing (FEL)"
         ],
         "summary": "List invoices",
-        "description": "Retrieve a paginated list of invoices for a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- Supports filtering by status and date range\n- Supports sorting by any field (default: `created_at` desc)\n- Invoices are scoped to the business's commerceId",
+        "description": "Retrieve a paginated list of invoices for a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Supports filtering by status and date range\n- Supports sorting by any field (default: `created_at` desc)\n- Invoices are scoped to the business's commerceId",
         "operationId": "list_invoices_api_v1_businesses__businessId__invoices_get",
         "security": [
           {
@@ -3718,7 +3718,7 @@
           "Electronic Invoicing (FEL)"
         ],
         "summary": "Get invoice detail",
-        "description": "Retrieve full details of a specific invoice.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- The invoice must belong to the specified business\n- FEL report metadata is automatically fetched and cached on first access",
+        "description": "Retrieve full details of a specific invoice.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- The invoice must belong to the specified business\n- FEL report metadata is automatically fetched and cached on first access",
         "operationId": "get_invoice_api_v1_businesses__businessId__invoices__invoiceId__get",
         "security": [
           {
@@ -3825,7 +3825,7 @@
           "Electronic Invoicing (FEL)"
         ],
         "summary": "Cancel an invoice",
-        "description": "Cancel an existing invoice.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- The invoice must belong to the specified business\n- A cancellation reason is required in the request body\n- Already-cancelled invoices cannot be cancelled again\n- If the invoice was emitted, it will be voided via electronic invoicing (FEL)",
+        "description": "Cancel an existing invoice.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The invoice must belong to the specified business\n- A cancellation reason is required in the request body\n- Already-cancelled invoices cannot be cancelled again\n- If the invoice was emitted, it will be voided via electronic invoicing (FEL)",
         "operationId": "cancel_invoice_api_v1_businesses__businessId__invoices__invoiceId__delete",
         "security": [
           {
@@ -3954,7 +3954,7 @@
           "Activity Logs"
         ],
         "summary": "List API logs",
-        "description": "Retrieve paginated API logs for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 50 req/min\n- Supports filtering by website, provider, status, error type, etc.",
+        "description": "Retrieve paginated API logs for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Optional:** `x-user-token` — when present, returns only logs for that user\n- **Rate limit:** 50 req/min\n- Supports filtering by website, provider, status, error type, etc.",
         "operationId": "list_logs_api_v1_logs__get",
         "security": [
           {
@@ -4170,6 +4170,22 @@
               "title": "Page Size"
             },
             "description": "Items per page"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
           }
         ],
         "responses": {
@@ -4492,10 +4508,2314 @@
           }
         }
       }
+    },
+    "/api/v1/agents/catalog": {
+      "get": {
+        "tags": [
+          "Agents - Catalog"
+        ],
+        "summary": "List agent catalog templates",
+        "description": "Return the full agent template catalog.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "list_catalog_api_v1_agents_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Catalog retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_CatalogListResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/catalog/{slug}": {
+      "get": {
+        "tags": [
+          "Agents - Catalog"
+        ],
+        "summary": "Get a catalog template by slug",
+        "description": "Return a single agent template from the catalog.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "get_catalog_template_api_v1_agents_catalog__slug__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Template slug",
+              "title": "Slug"
+            },
+            "description": "Template slug"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_CatalogTemplateResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/wizard/start": {
+      "post": {
+        "tags": [
+          "Agents - Wizard"
+        ],
+        "summary": "Start a wizard session",
+        "description": "Start a new guided wizard session for agent creation.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires Anthropic API key configured",
+        "operationId": "start_wizard_api_v1_agents_wizard_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WizardStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Wizard session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_WizardSessionResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/wizard/{session_id}/respond": {
+      "post": {
+        "tags": [
+          "Agents - Wizard"
+        ],
+        "summary": "Respond to wizard session",
+        "description": "Continue an active wizard session with a user reply.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires Anthropic API key configured",
+        "operationId": "respond_wizard_api_v1_agents_wizard__session_id__respond_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Wizard session ID",
+              "title": "Session Id"
+            },
+            "description": "Wizard session ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WizardRespondRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Wizard response processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_WizardSessionResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/wizard/{session_id}/confirm": {
+      "post": {
+        "tags": [
+          "Agents - Wizard"
+        ],
+        "summary": "Confirm wizard and create agent",
+        "description": "Confirm a wizard session and create the agent from the generated configuration.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min",
+        "operationId": "confirm_wizard_api_v1_agents_wizard__session_id__confirm_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Wizard session ID",
+              "title": "Session Id"
+            },
+            "description": "Wizard session ID"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Agent created from wizard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found or no config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/wizard/{session_id}": {
+      "get": {
+        "tags": [
+          "Agents - Wizard"
+        ],
+        "summary": "Get wizard session",
+        "description": "Retrieve an existing wizard session by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "get_wizard_session_api_v1_agents_wizard__session_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Wizard session ID",
+              "title": "Session Id"
+            },
+            "description": "Wizard session ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_WizardSessionResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents": {
+      "post": {
+        "tags": [
+          "Agents - CRUD"
+        ],
+        "summary": "Create an agent",
+        "description": "Create a new agent definition.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Maximum 50 agents per app\n- Cron schedules must have at least 15-minute intervals",
+        "operationId": "create_agent_api_v1_agents_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Agent created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Tool permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded or quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Agents - CRUD"
+        ],
+        "summary": "List agents",
+        "description": "List agents for the authenticated app with pagination.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "list_agents_api_v1_agents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of agents to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of agents to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum agents to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum agents to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agents listed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentListResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/metrics": {
+      "get": {
+        "tags": [
+          "Agents - Metrics"
+        ],
+        "summary": "Get agent metrics",
+        "description": "Return aggregated operational metrics for the agent domain.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Admin-level visibility into platform capacity and usage",
+        "operationId": "get_metrics_api_v1_agents_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Metrics retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentMetricsResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin privileges required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{agent_id}": {
+      "get": {
+        "tags": [
+          "Agents - CRUD"
+        ],
+        "summary": "Get an agent",
+        "description": "Retrieve an agent definition by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "get_agent_api_v1_agents__agent_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent ID",
+              "title": "Agent Id"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Agents - CRUD"
+        ],
+        "summary": "Update an agent",
+        "description": "Update an existing agent definition. All fields are optional.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "update_agent_api_v1_agents__agent_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent ID",
+              "title": "Agent Id"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Tool permission denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Agents - CRUD"
+        ],
+        "summary": "Delete an agent",
+        "description": "Delete an agent definition.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "delete_agent_api_v1_agents__agent_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent ID",
+              "title": "Agent Id"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/run": {
+      "post": {
+        "tags": [
+          "Agents - Execution"
+        ],
+        "summary": "Trigger an agent run",
+        "description": "Trigger a new agent run. Returns immediately with the run in PENDING status.\nThe run executes asynchronously in the background.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Requires Anthropic API key configured\n- Agent must be active\n- Subject to per-agent and global concurrency limits",
+        "operationId": "trigger_run_api_v1_agents__agent_id__run_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent ID",
+              "title": "Agent Id"
+            },
+            "description": "Agent ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Run triggered — executing in background",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentRunResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent run limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit or capacity exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Agent inactive or global capacity full",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/runs": {
+      "get": {
+        "tags": [
+          "Agents - Execution"
+        ],
+        "summary": "List agent runs",
+        "description": "List execution runs for a specific agent with optional filters.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Filter by status: pending, running, completed, failed\n- Filter by trigger: manual, scheduled",
+        "operationId": "list_runs_api_v1_agents__agent_id__runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent ID",
+              "title": "Agent Id"
+            },
+            "description": "Agent ID"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by run status",
+              "title": "Status"
+            },
+            "description": "Filter by run status"
+          },
+          {
+            "name": "trigger",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by trigger type",
+              "title": "Trigger"
+            },
+            "description": "Filter by trigger type"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of runs to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of runs to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum runs to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum runs to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runs listed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentRunListResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "Agents - Execution"
+        ],
+        "summary": "Get a specific run",
+        "description": "Retrieve details of a specific agent run.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "get_run_api_v1_agents__agent_id__runs__run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent ID",
+              "title": "Agent Id"
+            },
+            "description": "Agent ID"
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Run ID",
+              "title": "Run Id"
+            },
+            "description": "Run ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentRunResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent or run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/runs/{run_id}/stop": {
+      "post": {
+        "tags": [
+          "Agents - Execution"
+        ],
+        "summary": "Stop a running agent run",
+        "description": "Stop a running or pending agent run.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Only runs in PENDING or RUNNING status can be stopped",
+        "operationId": "stop_run_api_v1_agents__agent_id__runs__run_id__stop_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent ID",
+              "title": "Agent Id"
+            },
+            "description": "Agent ID"
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Run ID",
+              "title": "Run Id"
+            },
+            "description": "Run ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run stopped successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentRunResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent or run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run cannot be stopped in current status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-actions": {
+      "get": {
+        "tags": [
+          "Agents - Actions"
+        ],
+        "summary": "List agent actions",
+        "description": "List human-in-the-loop actions for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Filter by type, status, or agent_id",
+        "operationId": "list_actions_api_v1_agent_actions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by action type",
+              "title": "Type"
+            },
+            "description": "Filter by action type"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by action status",
+              "title": "Status"
+            },
+            "description": "Filter by action status"
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by agent ID",
+              "title": "Agent Id"
+            },
+            "description": "Filter by agent ID"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of actions to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of actions to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum actions to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum actions to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Actions listed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentActionListResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-actions/{action_id}": {
+      "get": {
+        "tags": [
+          "Agents - Actions"
+        ],
+        "summary": "Get an action",
+        "description": "Retrieve a specific agent action by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
+        "operationId": "get_action_api_v1_agent_actions__action_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Action ID",
+              "title": "Action Id"
+            },
+            "description": "Action ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Action retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentActionResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Action not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-actions/{action_id}/consume": {
+      "patch": {
+        "tags": [
+          "Agents - Actions"
+        ],
+        "summary": "Consume an action",
+        "description": "Consume a pending human-in-the-loop action.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Action must be in PENDING status",
+        "operationId": "consume_action_api_v1_agent_actions__action_id__consume_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Action ID",
+              "title": "Action Id"
+            },
+            "description": "Action ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsumeActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action consumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentActionResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Action not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Action already consumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActionStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "consumed"
+        ],
+        "title": "ActionStatus",
+        "description": "Whether a human-in-the-loop action has been acted on."
+      },
+      "ActionType": {
+        "type": "string",
+        "enum": [
+          "publish_content",
+          "review_invoice",
+          "approve_issue",
+          "send_email"
+        ],
+        "title": "ActionType",
+        "description": "Category of human action requested by an agent."
+      },
+      "AgentActionListResponse": {
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentActionResponse"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actions",
+          "total"
+        ],
+        "title": "AgentActionListResponse",
+        "description": "Paginated list of agent actions."
+      },
+      "AgentActionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Action document ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ActionStatus"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "consume_result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consume Result"
+          },
+          "consumed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumed By"
+          },
+          "consumed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "run_id",
+          "type",
+          "status",
+          "payload",
+          "consume_result",
+          "consumed_by",
+          "consumed_at",
+          "created_at"
+        ],
+        "title": "AgentActionResponse",
+        "description": "Serialized AgentAction for API responses."
+      },
+      "AgentListResponse": {
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentResponse"
+            },
+            "type": "array",
+            "title": "Agents"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agents",
+          "total"
+        ],
+        "title": "AgentListResponse",
+        "description": "Paginated list of agents."
+      },
+      "AgentMetricsResponse": {
+        "properties": {
+          "global_running_runs": {
+            "type": "integer",
+            "title": "Global Running Runs",
+            "description": "Currently active (RUNNING) runs across all agents"
+          },
+          "max_global_concurrent_runs": {
+            "type": "integer",
+            "title": "Max Global Concurrent Runs",
+            "description": "Platform-wide concurrency ceiling"
+          },
+          "capacity_percentage": {
+            "type": "number",
+            "title": "Capacity Percentage",
+            "description": "global_running_runs / max_global_concurrent_runs * 100"
+          },
+          "runs_by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Runs By Status",
+            "description": "Run count per AgentRunStatus value"
+          },
+          "active_agents_count": {
+            "type": "integer",
+            "title": "Active Agents Count",
+            "description": "Number of agents with is_active=True"
+          },
+          "scheduled_agents_count": {
+            "type": "integer",
+            "title": "Scheduled Agents Count",
+            "description": "Number of active agents with a cron schedule"
+          },
+          "tokens_consumed_today": {
+            "type": "integer",
+            "title": "Tokens Consumed Today",
+            "description": "Total tokens used across all runs today (UTC)"
+          },
+          "circuit_breaker_states": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Circuit Breaker States",
+            "description": "Per-agent circuit breaker state — keyed by agent_id string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "global_running_runs",
+          "max_global_concurrent_runs",
+          "capacity_percentage",
+          "runs_by_status",
+          "active_agents_count",
+          "scheduled_agents_count",
+          "tokens_consumed_today",
+          "circuit_breaker_states"
+        ],
+        "title": "AgentMetricsResponse",
+        "description": "Aggregated operational metrics for the agents domain."
+      },
+      "AgentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Agent document ID"
+          },
+          "app_id": {
+            "type": "string",
+            "title": "App Id",
+            "description": "Owning App ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/AgentToolConfig-Output"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "model": {
+            "$ref": "#/components/schemas/AllowedModel"
+          },
+          "max_iterations": {
+            "type": "integer",
+            "title": "Max Iterations"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Url"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "max_concurrent_runs": {
+            "type": "integer",
+            "title": "Max Concurrent Runs"
+          },
+          "template_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Slug"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "app_id",
+          "name",
+          "description",
+          "system_prompt",
+          "tools",
+          "model",
+          "max_iterations",
+          "schedule",
+          "webhook_url",
+          "is_active",
+          "max_concurrent_runs",
+          "template_slug",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentResponse",
+        "description": "Serialized Agent for API responses."
+      },
+      "AgentRunListResponse": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRunResponse"
+            },
+            "type": "array",
+            "title": "Runs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs",
+          "total"
+        ],
+        "title": "AgentRunListResponse",
+        "description": "Paginated list of agent runs."
+      },
+      "AgentRunResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Run document ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentRunStatus"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/AgentRunTrigger"
+          },
+          "input_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Message"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens"
+          },
+          "worker_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Id"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "status",
+          "trigger",
+          "input_message",
+          "result",
+          "error",
+          "total_tokens",
+          "worker_id",
+          "started_at",
+          "finished_at",
+          "created_at"
+        ],
+        "title": "AgentRunResponse",
+        "description": "Serialized AgentRun for API responses."
+      },
+      "AgentRunStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "completed",
+          "failed",
+          "stopped"
+        ],
+        "title": "AgentRunStatus",
+        "description": "Lifecycle status of a single agent run."
+      },
+      "AgentRunTrigger": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "scheduled"
+        ],
+        "title": "AgentRunTrigger",
+        "description": "How an agent run was initiated."
+      },
+      "AgentToolConfig-Input": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ToolType",
+            "description": "Execution context: internal platform tool or external HTTP call"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ToolDefinition",
+            "description": "Tool name, description, and input schema"
+          },
+          "execution_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolExecutionConfig-Input"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when type=EXTERNAL; omit for internal tools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "definition"
+        ],
+        "title": "AgentToolConfig",
+        "description": "Full configuration for a single agent tool."
+      },
+      "AgentToolConfig-Output": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ToolType",
+            "description": "Execution context: internal platform tool or external HTTP call"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ToolDefinition",
+            "description": "Tool name, description, and input schema"
+          },
+          "execution_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolExecutionConfig-Output"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when type=EXTERNAL; omit for internal tools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "definition"
+        ],
+        "title": "AgentToolConfig",
+        "description": "Full configuration for a single agent tool."
+      },
+      "AllowedModel": {
+        "type": "string",
+        "enum": [
+          "claude-sonnet-4-6",
+          "claude-haiku-4-5-20251001"
+        ],
+        "title": "AllowedModel",
+        "description": "LLM models permitted for agent execution."
+      },
       "AssignedUserResponse": {
         "properties": {
           "user_id": {
@@ -4733,6 +7053,90 @@
         "example": {
           "reason": "Invoice issued with incorrect receptor information"
         }
+      },
+      "CatalogListResponse": {
+        "properties": {
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogTemplateResponse"
+            },
+            "type": "array",
+            "title": "Templates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templates"
+        ],
+        "title": "CatalogListResponse",
+        "description": "Full agent template catalog."
+      },
+      "CatalogTemplateResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Unique template identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What this template creates"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Grouping category for UI presentation"
+          },
+          "required_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Tools",
+            "description": "Tool names this template requires"
+          },
+          "wizard_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Wizard Questions",
+            "description": "Ordered questions the wizard asks"
+          },
+          "default_schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Schedule",
+            "description": "Default cron schedule if applicable"
+          },
+          "default_max_iterations": {
+            "type": "integer",
+            "title": "Default Max Iterations",
+            "description": "Recommended max_iterations for this template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "description",
+          "category",
+          "default_max_iterations"
+        ],
+        "title": "CatalogTemplateResponse",
+        "description": "A single entry in the agent template catalog."
       },
       "CategoryPublicResponse": {
         "properties": {
@@ -5128,6 +7532,38 @@
         "title": "CommentItem",
         "description": "A single generated comment."
       },
+      "ConsumeActionRequest": {
+        "properties": {
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "Data produced by the human's decision"
+          },
+          "consumed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumed By",
+            "description": "Identifier of the actor consuming the action"
+          }
+        },
+        "type": "object",
+        "title": "ConsumeActionRequest",
+        "description": "Payload for consuming a pending human action."
+      },
       "ContentGenerationRequest": {
         "properties": {
           "keyword": {
@@ -5192,6 +7628,107 @@
           "keyword": "sustainable gardening tips",
           "lang": "en"
         }
+      },
+      "CreateAgentRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name",
+            "description": "Human-readable agent name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Description",
+            "description": "What the agent does"
+          },
+          "system_prompt": {
+            "type": "string",
+            "maxLength": 10000,
+            "title": "System Prompt",
+            "description": "System prompt for the LLM"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/AgentToolConfig-Input"
+            },
+            "type": "array",
+            "title": "Tools",
+            "description": "Tools available to the agent"
+          },
+          "model": {
+            "$ref": "#/components/schemas/AllowedModel",
+            "description": "LLM model to use"
+          },
+          "max_iterations": {
+            "type": "integer",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Max Iterations",
+            "description": "Maximum agentic loop iterations",
+            "default": 10
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule",
+            "description": "Cron expression — omit to disable scheduling"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Url",
+            "description": "Webhook URL for run result notifications"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "Whether the agent is immediately active",
+            "default": true
+          },
+          "max_concurrent_runs": {
+            "type": "integer",
+            "maximum": 3,
+            "minimum": 1,
+            "title": "Max Concurrent Runs",
+            "description": "Maximum simultaneous runs",
+            "default": 1
+          },
+          "template_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Slug",
+            "description": "Catalog template slug if created from a template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "system_prompt",
+          "model"
+        ],
+        "title": "CreateAgentRequest",
+        "description": "Payload for creating a new agent."
       },
       "CreateBranchRequest": {
         "properties": {
@@ -7393,6 +9930,26 @@
         ],
         "title": "ReceptorInfo"
       },
+      "RunAgentRequest": {
+        "properties": {
+          "input_message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Message",
+            "description": "Optional message to pass as the initial user turn"
+          }
+        },
+        "type": "object",
+        "title": "RunAgentRequest",
+        "description": "Payload for triggering a manual agent run."
+      },
       "SearchConsoleActionRequest": {
         "properties": {
           "action": {
@@ -7601,6 +10158,188 @@
         "title": "SubscriptionStatus",
         "description": "Subscription status enum"
       },
+      "SuccessResponse_AgentActionListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentActionListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentActionListResponse]"
+      },
+      "SuccessResponse_AgentActionResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentActionResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentActionResponse]"
+      },
+      "SuccessResponse_AgentListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentListResponse]"
+      },
+      "SuccessResponse_AgentMetricsResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentMetricsResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentMetricsResponse]"
+      },
+      "SuccessResponse_AgentResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentResponse]"
+      },
+      "SuccessResponse_AgentRunListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentRunListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentRunListResponse]"
+      },
+      "SuccessResponse_AgentRunResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentRunResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentRunResponse]"
+      },
       "SuccessResponse_BranchResponse_": {
         "properties": {
           "success": {
@@ -7652,6 +10391,58 @@
           "msg"
         ],
         "title": "SuccessResponse[BusinessResponse]"
+      },
+      "SuccessResponse_CatalogListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CatalogListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[CatalogListResponse]"
+      },
+      "SuccessResponse_CatalogTemplateResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CatalogTemplateResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[CatalogTemplateResponse]"
       },
       "SuccessResponse_ClientLogBatchResponse_": {
         "properties": {
@@ -8148,6 +10939,32 @@
         ],
         "title": "SuccessResponse[WebsiteResponse]"
       },
+      "SuccessResponse_WizardSessionResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/WizardSessionResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[WizardSessionResponse]"
+      },
       "SuccessResponse_dict_": {
         "properties": {
           "success": {
@@ -8250,6 +11067,107 @@
           "expires_in"
         ],
         "title": "TokenResponse"
+      },
+      "ToolDefinition": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Tool name — must be unique within the agent"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Natural-language description of what the tool does"
+          },
+          "input_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Schema",
+            "description": "JSON Schema object describing the tool inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "input_schema"
+        ],
+        "title": "ToolDefinition",
+        "description": "Anthropic-compatible tool definition schema."
+      },
+      "ToolExecutionConfig-Input": {
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url",
+            "description": "Base URL of the external tool endpoint"
+          },
+          "encrypted_headers": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encrypted Headers",
+            "description": "Fernet-encrypted JSON string of HTTP headers (API keys, tokens)"
+          },
+          "timeout": {
+            "type": "integer",
+            "maximum": 30,
+            "title": "Timeout",
+            "description": "Request timeout in seconds — maximum 30",
+            "default": 30
+          }
+        },
+        "type": "object",
+        "title": "ToolExecutionConfig",
+        "description": "Runtime configuration for external tool execution."
+      },
+      "ToolExecutionConfig-Output": {
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url",
+            "description": "Base URL of the external tool endpoint"
+          },
+          "timeout": {
+            "type": "integer",
+            "maximum": 30,
+            "title": "Timeout",
+            "description": "Request timeout in seconds — maximum 30",
+            "default": 30
+          }
+        },
+        "type": "object",
+        "title": "ToolExecutionConfig",
+        "description": "Runtime configuration for external tool execution."
+      },
+      "ToolType": {
+        "type": "string",
+        "enum": [
+          "internal",
+          "external"
+        ],
+        "title": "ToolType",
+        "description": "Where a tool is executed."
       },
       "TransactionCreateRequest": {
         "properties": {
@@ -8466,6 +11384,143 @@
         ],
         "title": "TransactionStatus",
         "description": "Transaction status enum matching Migo payment statuses.\n\nState machine:\n- CREATED (initial) can transition to any terminal state\n- Terminal states (APPROVED, DENIED, etc.) cannot transition\n- Idempotent: same status → same status is allowed"
+      },
+      "UpdateAgentRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentToolConfig-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AllowedModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_iterations": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Iterations"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule"
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Url"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "max_concurrent_runs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Concurrent Runs"
+          },
+          "template_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Slug"
+          }
+        },
+        "type": "object",
+        "title": "UpdateAgentRequest",
+        "description": "Partial update payload — all fields are optional."
       },
       "UserBillingResponse": {
         "properties": {
@@ -9035,6 +12090,149 @@
           "site_description": "Updated description",
           "site_name": "Updated Name"
         }
+      },
+      "WizardMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "Message author — 'user' or 'assistant'"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Message text"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "UTC timestamp of the message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "WizardMessage",
+        "description": "A single turn in a wizard conversation."
+      },
+      "WizardRespondRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Message",
+            "description": "User message to continue the wizard conversation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "WizardRespondRequest",
+        "description": "User reply within an active wizard session."
+      },
+      "WizardSessionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Session document ID"
+          },
+          "template_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Slug"
+          },
+          "status": {
+            "$ref": "#/components/schemas/WizardStatus"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/WizardMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "generated_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated Config"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "template_slug",
+          "status",
+          "messages",
+          "generated_config",
+          "expires_at"
+        ],
+        "title": "WizardSessionResponse",
+        "description": "Serialized WizardSession for API responses."
+      },
+      "WizardStartRequest": {
+        "properties": {
+          "template_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Slug",
+            "description": "Catalog template to start from"
+          },
+          "initial_message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Message",
+            "description": "Opening message from the user if not starting from a template"
+          }
+        },
+        "type": "object",
+        "title": "WizardStartRequest",
+        "description": "Payload for starting a wizard session.\n\nAt least one of template_slug or initial_message must be provided."
+      },
+      "WizardStatus": {
+        "type": "string",
+        "enum": [
+          "in_progress",
+          "completed",
+          "expired"
+        ],
+        "title": "WizardStatus",
+        "description": "Status of an agent creation wizard session."
       }
     },
     "securitySchemes": {
@@ -9122,6 +12320,30 @@
     {
       "name": "Activity Logs",
       "description": "View, filter, and clear API activity logs. Also ingest client-side log entries for centralized observability."
+    },
+    {
+      "name": "Agents - Catalog",
+      "description": "Browse the agent template catalog to discover pre-built automation recipes."
+    },
+    {
+      "name": "Agents - Wizard",
+      "description": "Create agents interactively using a guided wizard powered by AI. Start a session, answer questions, and confirm to deploy."
+    },
+    {
+      "name": "Agents - CRUD",
+      "description": "Create, list, read, update, and delete agent definitions."
+    },
+    {
+      "name": "Agents - Execution",
+      "description": "Trigger agent runs, list execution history, inspect run details, and stop running or pending executions."
+    },
+    {
+      "name": "Agents - Metrics",
+      "description": "View aggregated operational metrics for the agent platform (admin-level)."
+    },
+    {
+      "name": "Agents - Actions",
+      "description": "List, inspect, and consume human-in-the-loop actions generated by agent runs. Actions require manual approval before the agent proceeds."
     }
   ]
 }

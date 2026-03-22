@@ -7186,6 +7186,11 @@
             "title": "Status",
             "description": "Category status"
           },
+          "recommended_theme": {
+            "type": "string",
+            "title": "Recommended Theme",
+            "description": "Resolved WordPress theme slug (weighted random)"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -7199,10 +7204,11 @@
           "title",
           "slug",
           "status",
+          "recommended_theme",
           "created_at"
         ],
         "title": "CategoryResponse",
-        "description": "Category response model"
+        "description": "Category response model — recommended_theme is resolved via weighted random"
       },
       "CategoryTitle": {
         "properties": {
@@ -12011,6 +12017,19 @@
             ],
             "title": "Site Description",
             "description": "Website description"
+          },
+          "theme": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme",
+            "description": "Theme slug installed on this site"
           }
         },
         "type": "object",
@@ -12080,6 +12099,20 @@
             ],
             "title": "Lang",
             "description": "Website language: es or en"
+          },
+          "theme": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z0-9-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme",
+            "description": "Theme slug installed on this site"
           }
         },
         "type": "object",
@@ -12088,7 +12121,8 @@
           "category_id": "65a1b2c3d4e5f6789abcdef0",
           "lang": "en",
           "site_description": "Updated description",
-          "site_name": "Updated Name"
+          "site_name": "Updated Name",
+          "theme": "astra"
         }
       },
       "WizardMessage": {

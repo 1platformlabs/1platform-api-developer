@@ -23,7 +23,7 @@
         ],
         "summary": "Check service health",
         "description": "Returns the current health status of the API and its dependencies (database connectivity, etc.).\n\n- **Auth:** None required\n- **Rate limit:** 100 req/min",
-        "operationId": "health_check_api_v1_health__get",
+        "operationId": "checkHealth",
         "responses": {
           "200": {
             "description": "Service is healthy",
@@ -77,7 +77,7 @@
         ],
         "summary": "Generate app token",
         "description": "Authenticate with an App API key and receive a JWT app token.\n\n- **Auth:** None — this is the entry point for obtaining tokens\n- **Rate limit:** 10 req/min\n- The returned `access_token` must be sent as `Authorization: Bearer <token>` on all protected endpoints\n- Token expires after the time indicated in `expires_in` (seconds)",
-        "operationId": "get_token_api_v1_auth_token_post",
+        "operationId": "generateAppToken",
         "requestBody": {
           "content": {
             "application/json": {
@@ -152,7 +152,7 @@
         ],
         "summary": "Extract keywords from a domain",
         "description": "Analyze a domain and extract SEO keywords using AI-powered search analysis.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n- Requires an active App with AI provider configured\n\n**Process:**\n1. Analyzes domain content and structure\n2. Extracts relevant keywords via search providers\n3. Uses 1Platform AI to detect keyword cannibalization\n4. Categorizes keywords by search intent and volume\n5. Returns structured keyword data with metrics\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/keywords/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"domain\": \"example.com\", \"country\": \"es\", \"lang\": \"en\"}'\n```",
-        "operationId": "generate_keywords_api_v1_posts_keywords__post",
+        "operationId": "extractKeywords",
         "security": [
           {
             "HTTPBearer": []
@@ -276,6 +276,123 @@
         }
       }
     },
+    "/api/v1/posts/keywords/topic/": {
+      "post": {
+        "tags": [
+          "Keywords, Content & Indexing"
+        ],
+        "summary": "Extract keywords by topic",
+        "description": "Discover SEO keywords for a topic/theme using Google search analysis.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n\n**Process:**\n1. Searches topic in Google to discover top niche domains\n2. Analyzes each domain for topic-relevant pages\n3. Extracts main keyword from each page title via AI\n4. Removes semantic duplicates (cannibalization)\n5. Returns structured keyword data with estimated volume",
+        "operationId": "extractKeywordsByTopic",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeywordTopicRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Keywords extracted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_KeywordExtractResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid topic or validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed — invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Search provider unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Keyword extraction timed out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/posts/content/": {
       "post": {
         "tags": [
@@ -283,7 +400,7 @@
         ],
         "summary": "Submit content generation job",
         "description": "Submit an async content generation job for a target keyword.\n\nReturns immediately with a job ID. Use `GET /content/jobs/{job_id}` to poll status.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min (AI-intensive)\n- Requires AI and image provider keys in the App configuration\n\n**Process (runs in background):**\n1. Generates title variations via 1Platform AI\n2. Searches related content using search providers\n3. Produces structured article with headings and paragraphs\n4. Fetches relevant images from the configured image library\n5. Creates a URL-friendly slug\n6. Classifies content into provided categories\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/content/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"keyword\": \"best running shoes\", \"lang\": \"en\", \"image_provider\": \"default\", \"categories\": [\"sports\"]}'\n```",
-        "operationId": "generate_content_api_v1_posts_content__post",
+        "operationId": "submitContentJob",
         "security": [
           {
             "HTTPBearer": []
@@ -395,7 +512,7 @@
         ],
         "summary": "Get content generation job status",
         "description": "Poll the status of an async content generation job.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- Returns job status: `pending`, `processing`, `completed`, or `failed`\n- On completion, includes the full content generation result in `data.result`\n- On failure, includes error details in `data.error`\n\n**Recommended polling interval:** 5 seconds\n\n**cURL example:**\n```bash\ncurl https://api.1platform.pro/api/v1/posts/content/jobs/JOB_ID \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
-        "operationId": "get_content_job_api_v1_posts_content_jobs__job_id__get",
+        "operationId": "getContentJob",
         "security": [
           {
             "HTTPBearer": []
@@ -528,7 +645,7 @@
         ],
         "summary": "Submit URL for Google indexing",
         "description": "Submit a URL to the Google Indexing API for faster crawling.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The URL must belong to a website verified in Google Search Console\n- A service account with Search Console access is required\n- The URL must be publicly accessible\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/indexing/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"url\": \"https://example.com/new-page\"}'\n```",
-        "operationId": "submit_url_for_indexing_api_v1_posts_indexing__post",
+        "operationId": "submitUrlForIndexing",
         "security": [
           {
             "HTTPBearer": []
@@ -643,7 +760,7 @@
         ],
         "summary": "Generate user token",
         "description": "Authenticate with a user API key and receive a JWT user token.\n\n- **Auth:** `Authorization: Bearer <app_token>` only (no user token needed)\n- **Rate limit:** 10 req/min\n- The returned token must be sent as the `x-user-token` header on all user-scoped requests\n- Token expires after the time indicated in `expires_in` (seconds)\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n```",
-        "operationId": "get_user_token_api_v1_users_token_post",
+        "operationId": "generateUserToken",
         "requestBody": {
           "content": {
             "application/json": {
@@ -723,7 +840,7 @@
         ],
         "summary": "Create a new user",
         "description": "Register a new user with automatic billing and subscription setup.\n\n- **Auth:** `Authorization: Bearer <app_token>` only (no user token needed)\n- **Rate limit:** 20 req/min\n- Creates a User, Billing (balance=0 USD), and Subscription (Free Plan)\n- Returns the user's `api_key` used to obtain user tokens via `POST /api/v1/users/token`\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"email\": \"user@example.com\"}'\n```",
-        "operationId": "create_user_api_v1_users_post",
+        "operationId": "createUser",
         "requestBody": {
           "content": {
             "application/json": {
@@ -760,6 +877,16 @@
           },
           "400": {
             "description": "Invalid email format or validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required (app token)",
             "content": {
               "application/json": {
                 "schema": {
@@ -827,7 +954,7 @@
         ],
         "summary": "Get current user profile",
         "description": "Retrieve the authenticated user's profile information.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns id, username, email, is_active, and created_at",
-        "operationId": "get_user_profile_api_v1_users_profile_get",
+        "operationId": "getUserProfile",
         "security": [
           {
             "HTTPBearer": []
@@ -915,7 +1042,7 @@
         ],
         "summary": "Get current user billing info",
         "description": "Retrieve billing balance and active subscription data for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns balance, currency, and active subscription details",
-        "operationId": "get_user_billing_api_v1_users_billing_get",
+        "operationId": "getUserBilling",
         "security": [
           {
             "HTTPBearer": []
@@ -1023,7 +1150,7 @@
         ],
         "summary": "List available categories",
         "description": "Retrieve available website categories for content classification.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Filter by status: `active` (default), `inactive`, or `all`",
-        "operationId": "get_categories_api_v1_users_categories_get",
+        "operationId": "listCategories",
         "security": [
           {
             "HTTPBearer": []
@@ -1128,7 +1255,7 @@
         ],
         "summary": "Add a website",
         "description": "Register a new website for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Validates URL uniqueness per user\n- Optionally enriches the website with an AI-generated description\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/websites \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"url\": \"https://myblog.com\", \"category_id\": \"<objectId>\", \"lang\": \"es\"}'\n```",
-        "operationId": "create_user_website_api_v1_users_websites_post",
+        "operationId": "createWebsite",
         "security": [
           {
             "HTTPBearer": []
@@ -1261,7 +1388,7 @@
         ],
         "summary": "Find website by URL",
         "description": "Search for a website by its URL among the authenticated user's websites.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Pass the URL as a query parameter: `?url=https://example.com`",
-        "operationId": "get_user_website_by_url_api_v1_users_websites_get",
+        "operationId": "findWebsiteByUrl",
         "security": [
           {
             "HTTPBearer": []
@@ -1387,7 +1514,7 @@
         ],
         "summary": "Update a website",
         "description": "Update an existing website for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Only the website owner can update it\n- All fields are optional (partial update)\n- Use this endpoint to set or update the `category_id`\n\n**cURL example:**\n```bash\ncurl -X PATCH https://api.1platform.pro/api/v1/users/websites/<WEBSITE_ID> \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"category_id\": \"<objectId>\", \"site_name\": \"Updated Name\"}'\n```",
-        "operationId": "update_user_website_api_v1_users_websites__website_id__patch",
+        "operationId": "updateWebsite",
         "security": [
           {
             "HTTPBearer": []
@@ -1521,7 +1648,7 @@
         ],
         "summary": "Get website by ID",
         "description": "Retrieve details of a specific website by its ID.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Only returns websites owned by the authenticated user",
-        "operationId": "get_user_website_by_id_api_v1_users_websites__website_id__get",
+        "operationId": "getWebsiteById",
         "security": [
           {
             "HTTPBearer": []
@@ -1645,7 +1772,7 @@
         ],
         "summary": "Delete a website",
         "description": "Remove a website from the authenticated user's account.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Only the website owner can delete it\n- This action is irreversible",
-        "operationId": "delete_user_website_api_v1_users_websites__website_id__delete",
+        "operationId": "deleteWebsite",
         "security": [
           {
             "HTTPBearer": []
@@ -1747,7 +1874,7 @@
         ],
         "summary": "Manage link-building integration",
         "description": "Add or verify a website in the link-building marketplace.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- **Actions:** `add` (register website) or `verify` (confirm ownership)\n- The user must have marketplace credentials configured\n- After adding, verify ownership to activate the listing",
-        "operationId": "manage_publisuites_website_api_v1_users_websites__website_id__publisuites_post",
+        "operationId": "manageLinkBuilding",
         "security": [
           {
             "HTTPBearer": []
@@ -1883,7 +2010,7 @@
         ],
         "summary": "Manage Search Console integration",
         "description": "Add, verify, delete a website or manage sitemaps in Google Search Console.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- **Actions:** `add`, `verify`, `delete`, `sitemaps`\n- The website must be registered in the platform before adding to Search Console\n- For `sitemaps` action, include a `payload.sitemaps` array with sitemap URLs\n- Requires a Google service account with Search Console access",
-        "operationId": "manage_search_console_website_api_v1_users_websites__website_id__searchconsole_post",
+        "operationId": "manageSearchConsole",
         "security": [
           {
             "HTTPBearer": []
@@ -2019,7 +2146,7 @@
         ],
         "summary": "Generate legal pages for a website",
         "description": "Generate all legal pages for a website: privacy policy, cookie policy, legal notice, contact page, and about-me page.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Template-based pages use static HTML with variable substitution\n- Contact and about-me pages are generated via 1Platform AI\n- Requires an active App with AI provider configured",
-        "operationId": "generate_legal_pages_api_v1_users_websites__website_id__legal_post",
+        "operationId": "generateLegalPages",
         "security": [
           {
             "HTTPBearer": []
@@ -2160,7 +2287,7 @@
         ],
         "summary": "Generate fictional comments",
         "description": "Generate realistic fictional comments using AI for website content seeding.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min\n- Each comment includes a fictional author name and content text\n- All comments are generated in a single AI request\n- Requires an active App with AI provider configured\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/generations/comments \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"count\": 5, \"lang\": \"es\", \"context\": \"Blog de tecnología\"}'\n```",
-        "operationId": "generate_comments_api_v1_users_generations_comments_post",
+        "operationId": "generateComments",
         "security": [
           {
             "HTTPBearer": []
@@ -2272,7 +2399,7 @@
         ],
         "summary": "Generate AI images",
         "description": "Generate images using a configurable AI provider.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min\n- Each image is generated individually; partial results are returned if some attempts fail\n- Image metadata is persisted for each generation\n- Requires an active App with AI provider configured",
-        "operationId": "generate_user_images_api_v1_users_generations_images_post",
+        "operationId": "generateImages",
         "security": [
           {
             "HTTPBearer": []
@@ -2383,7 +2510,7 @@
         ],
         "summary": "Generate a profile card",
         "description": "Generate a complete profile card for a person using AI.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min\n- Includes gender detection, bio generation, social media discovery, and profile image retrieval\n- Provide the person's name as `owner`; optional `context` enriches the bio\n- Requires AI, search, and image provider keys in the App configuration",
-        "operationId": "generate_profile_api_v1_users_generations_profile_post",
+        "operationId": "generateProfile",
         "security": [
           {
             "HTTPBearer": []
@@ -2490,7 +2617,7 @@
         ],
         "summary": "Create a payment transaction",
         "description": "Create a new payment transaction and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Payment is processed via the integrated payment service\n- Returns a `payment_url` where the user completes checkout\n- Transaction starts with status `CREATED`; status updates arrive via webhook\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 25.00, \"currency\": \"USD\", \"description\": \"Credit purchase\"}'\n```",
-        "operationId": "create_transaction_api_v1_users_transactions_post",
+        "operationId": "createTransaction",
         "security": [
           {
             "HTTPBearer": []
@@ -2598,7 +2725,7 @@
         ],
         "summary": "Get transaction history",
         "description": "Retrieve paginated transaction history for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- `limit`: max transactions to return (default: 50, max: 100)\n- `skip`: offset for pagination (default: 0)",
-        "operationId": "get_transaction_history_api_v1_users_transactions_get",
+        "operationId": "getTransactionHistory",
         "security": [
           {
             "HTTPBearer": []
@@ -2712,7 +2839,7 @@
         ],
         "summary": "Get subscription details",
         "description": "Retrieve details of a specific subscription for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Note:** This endpoint currently returns a preview response — full subscription management will be available in a future release",
-        "operationId": "get_subscription_api_v1_users_subscriptions__subscription_id__get",
+        "operationId": "getSubscription",
         "security": [
           {
             "HTTPBearer": []
@@ -2810,7 +2937,7 @@
         ],
         "summary": "Process payment webhook",
         "description": "Receive transaction status updates from the payment service.\n\n- **Auth:** None — this endpoint is called by the external payment provider\n- **Idempotent:** Duplicate webhooks are safely ignored (prevents double-charging)\n- **Always returns HTTP 200** to prevent aggressive retries from the provider\n\n- Webhook authenticity is verified via HMAC signature validation\n**Flow:**\n1. Extract `customKeys.externalId` to find the local transaction\n2. Check idempotency (if status unchanged, return success)\n3. Validate status transition\n4. Update transaction status\n5. If approved, credit the user's balance\n\n**Response format** (simple JSON, not ResponseWrapper):\n```json\n{\"status\": \"success\", \"message\": \"Processed\"}\n```",
-        "operationId": "process_transaction_webhook_api_v1_webhooks_transactions_post",
+        "operationId": "processPaymentWebhook",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2819,7 +2946,7 @@
                   "transaction_id": {
                     "type": "string",
                     "title": "Transaction Id",
-                    "description": "Migo transaction ID (external_transaction_id)"
+                    "description": "Payment service transaction ID (external_transaction_id)"
                   },
                   "status": {
                     "type": "string",
@@ -2847,7 +2974,7 @@
                       }
                     ],
                     "title": "Reference",
-                    "description": "Migo internal reference"
+                    "description": "Payment service internal reference"
                   },
                   "timestamp": {
                     "anyOf": [
@@ -2920,17 +3047,17 @@
                   "currency"
                 ],
                 "title": "WebhookPayload",
-                "description": "Webhook payload from Migo payment provider.\n\nUsed by POST /api/v1/webhooks/transactions endpoint.\nField names match Migo's webhook format.",
+                "description": "Webhook payload from payment service.\n\nUsed by POST /api/v1/webhooks/transactions endpoint.\nField names match payment service's webhook format.",
                 "example": {
                   "amount": 78,
                   "currency": "GTQ",
                   "customKeys": {
                     "externalId": "65a1b2c3d4e5f6789abcdef0"
                   },
-                  "reference": "MIGOGT123456",
+                  "reference": "GT123456",
                   "status": "approved",
                   "timestamp": "2024-01-01T12:00:00Z",
-                  "transaction_id": "migo_tx_abc123"
+                  "transaction_id": "tx_abc123"
                 }
               }
             }
@@ -2965,7 +3092,7 @@
         ],
         "summary": "Create a business",
         "description": "Register a new business entity for invoicing.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The business is used as the issuing party on invoices\n- Business identifiers (tax ID) must be unique\n- Optionally set `commerceId` for electronic invoicing (FEL) integration",
-        "operationId": "create_business_api_v1_businesses_post",
+        "operationId": "createBusiness",
         "security": [
           {
             "HTTPBearer": []
@@ -3065,7 +3192,7 @@
         ],
         "summary": "Get a business",
         "description": "Retrieve details of a specific business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
-        "operationId": "get_business_api_v1_businesses__businessId__get",
+        "operationId": "getBusiness",
         "security": [
           {
             "HTTPBearer": []
@@ -3163,7 +3290,7 @@
         ],
         "summary": "Create a branch",
         "description": "Create a new branch for a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The authenticated user is automatically assigned to the new branch\n- Each branch can issue invoices independently",
-        "operationId": "create_branch_api_v1_businesses__businessId__branches_post",
+        "operationId": "createBranch",
         "security": [
           {
             "HTTPBearer": []
@@ -3281,7 +3408,7 @@
         ],
         "summary": "Get a branch",
         "description": "Retrieve details of a specific branch within a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
-        "operationId": "get_branch_api_v1_businesses__businessId__branches__branchId__get",
+        "operationId": "getBranch",
         "security": [
           {
             "HTTPBearer": []
@@ -3400,7 +3527,7 @@
         ],
         "summary": "Create an invoice",
         "description": "Issue a new invoice for a business via electronic invoicing (FEL).\n\n- **Rate limit:** 20 req/min\n**Flow:**\n1. Authenticate and resolve businessId from the path\n2. Validate business exists\n3. Validate invoice items and receptorInfo\n4. Persist invoice associated to business_id\n5. If `emitOnCreate=true`, emit via FEL using the business NIT\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- The invoice is associated directly to the business (via business_id)\n- The business NIT is used as the emitter for FEL invoicing",
-        "operationId": "create_invoice_api_v1_businesses__businessId__invoices_post",
+        "operationId": "createInvoice",
         "security": [
           {
             "HTTPBearer": []
@@ -3516,7 +3643,7 @@
         ],
         "summary": "List invoices",
         "description": "Retrieve a paginated list of invoices for a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Supports filtering by status and date range\n- Supports sorting by any field (default: `created_at` desc)\n- Invoices are scoped to the business's commerceId",
-        "operationId": "list_invoices_api_v1_businesses__businessId__invoices_get",
+        "operationId": "listInvoices",
         "security": [
           {
             "HTTPBearer": []
@@ -3719,7 +3846,7 @@
         ],
         "summary": "Get invoice detail",
         "description": "Retrieve full details of a specific invoice.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- The invoice must belong to the specified business\n- FEL report metadata is automatically fetched and cached on first access",
-        "operationId": "get_invoice_api_v1_businesses__businessId__invoices__invoiceId__get",
+        "operationId": "getInvoice",
         "security": [
           {
             "HTTPBearer": []
@@ -3826,7 +3953,7 @@
         ],
         "summary": "Cancel an invoice",
         "description": "Cancel an existing invoice.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The invoice must belong to the specified business\n- A cancellation reason is required in the request body\n- Already-cancelled invoices cannot be cancelled again\n- If the invoice was emitted, it will be voided via electronic invoicing (FEL)",
-        "operationId": "cancel_invoice_api_v1_businesses__businessId__invoices__invoiceId__delete",
+        "operationId": "cancelInvoice",
         "security": [
           {
             "HTTPBearer": []
@@ -3955,7 +4082,7 @@
         ],
         "summary": "List API logs",
         "description": "Retrieve paginated API logs for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Optional:** `x-user-token` — when present, returns only logs for that user\n- **Rate limit:** 50 req/min\n- Supports filtering by website, provider, status, error type, etc.",
-        "operationId": "list_logs_api_v1_logs__get",
+        "operationId": "listLogs",
         "security": [
           {
             "HTTPBearer": []
@@ -4247,7 +4374,7 @@
         ],
         "summary": "Clear logs",
         "description": "Delete API logs matching the given filters.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- An audit log entry is created before deletion",
-        "operationId": "clear_logs_api_v1_logs__delete",
+        "operationId": "clearLogs",
         "security": [
           {
             "HTTPBearer": []
@@ -4338,7 +4465,7 @@
         ],
         "summary": "Get log detail",
         "description": "Retrieve full details of a specific API log entry.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 50 req/min",
-        "operationId": "get_log_detail_api_v1_logs__log_id__get",
+        "operationId": "getLogDetail",
         "security": [
           {
             "HTTPBearer": []
@@ -4428,7 +4555,7 @@
         ],
         "summary": "Register client-side logs",
         "description": "Ingest a batch of client-side log entries.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Maximum 50 entries per batch\n- Timestamps must be within 7 days in the past and 5 minutes in the future",
-        "operationId": "register_client_logs_api_v1_logs_client_post",
+        "operationId": "registerClientLogs",
         "security": [
           {
             "HTTPBearer": []
@@ -4516,7 +4643,7 @@
         ],
         "summary": "List agent catalog templates",
         "description": "Return the full agent template catalog.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "list_catalog_api_v1_agents_catalog_get",
+        "operationId": "listAgentCatalog",
         "responses": {
           "200": {
             "description": "Catalog retrieved successfully",
@@ -4563,7 +4690,7 @@
         ],
         "summary": "Get a catalog template by slug",
         "description": "Return a single agent template from the catalog.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "get_catalog_template_api_v1_agents_catalog__slug__get",
+        "operationId": "getCatalogTemplate",
         "security": [
           {
             "HTTPBearer": []
@@ -4643,7 +4770,7 @@
         ],
         "summary": "Start a wizard session",
         "description": "Start a new guided wizard session for agent creation.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires Anthropic API key configured",
-        "operationId": "start_wizard_api_v1_agents_wizard_start_post",
+        "operationId": "startWizard",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4730,7 +4857,7 @@
         ],
         "summary": "Respond to wizard session",
         "description": "Continue an active wizard session with a user reply.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires Anthropic API key configured",
-        "operationId": "respond_wizard_api_v1_agents_wizard__session_id__respond_post",
+        "operationId": "respondToWizard",
         "security": [
           {
             "HTTPBearer": []
@@ -4830,7 +4957,7 @@
         ],
         "summary": "Confirm wizard and create agent",
         "description": "Confirm a wizard session and create the agent from the generated configuration.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min",
-        "operationId": "confirm_wizard_api_v1_agents_wizard__session_id__confirm_post",
+        "operationId": "confirmWizard",
         "security": [
           {
             "HTTPBearer": []
@@ -4920,7 +5047,7 @@
         ],
         "summary": "Get wizard session",
         "description": "Retrieve an existing wizard session by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "get_wizard_session_api_v1_agents_wizard__session_id__get",
+        "operationId": "getWizardSession",
         "security": [
           {
             "HTTPBearer": []
@@ -5000,7 +5127,7 @@
         ],
         "summary": "Create an agent",
         "description": "Create a new agent definition.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Maximum 50 agents per app\n- Cron schedules must have at least 15-minute intervals",
-        "operationId": "create_agent_api_v1_agents_post",
+        "operationId": "createAgent",
         "security": [
           {
             "HTTPBearer": []
@@ -5085,7 +5212,7 @@
         ],
         "summary": "List agents",
         "description": "List agents for the authenticated app with pagination.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "list_agents_api_v1_agents_get",
+        "operationId": "listAgents",
         "security": [
           {
             "HTTPBearer": []
@@ -5171,7 +5298,7 @@
         ],
         "summary": "Get agent metrics",
         "description": "Return aggregated operational metrics for the agent domain.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Admin-level visibility into platform capacity and usage",
-        "operationId": "get_metrics_api_v1_agents_metrics_get",
+        "operationId": "getAgentMetrics",
         "responses": {
           "200": {
             "description": "Metrics retrieved",
@@ -5228,7 +5355,7 @@
         ],
         "summary": "Get an agent",
         "description": "Retrieve an agent definition by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "get_agent_api_v1_agents__agent_id__get",
+        "operationId": "getAgent",
         "security": [
           {
             "HTTPBearer": []
@@ -5306,7 +5433,7 @@
         ],
         "summary": "Update an agent",
         "description": "Update an existing agent definition. All fields are optional.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "update_agent_api_v1_agents__agent_id__put",
+        "operationId": "updateAgent",
         "security": [
           {
             "HTTPBearer": []
@@ -5414,7 +5541,7 @@
         ],
         "summary": "Delete an agent",
         "description": "Delete an agent definition.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "delete_agent_api_v1_agents__agent_id__delete",
+        "operationId": "deleteAgent",
         "security": [
           {
             "HTTPBearer": []
@@ -5494,7 +5621,7 @@
         ],
         "summary": "Trigger an agent run",
         "description": "Trigger a new agent run. Returns immediately with the run in PENDING status.\nThe run executes asynchronously in the background.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Requires Anthropic API key configured\n- Agent must be active\n- Subject to per-agent and global concurrency limits",
-        "operationId": "trigger_run_api_v1_agents__agent_id__run_post",
+        "operationId": "triggerAgentRun",
         "security": [
           {
             "HTTPBearer": []
@@ -5619,7 +5746,7 @@
         ],
         "summary": "List agent runs",
         "description": "List execution runs for a specific agent with optional filters.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Filter by status: pending, running, completed, failed\n- Filter by trigger: manual, scheduled",
-        "operationId": "list_runs_api_v1_agents__agent_id__runs_get",
+        "operationId": "listAgentRuns",
         "security": [
           {
             "HTTPBearer": []
@@ -5762,7 +5889,7 @@
         ],
         "summary": "Get a specific run",
         "description": "Retrieve details of a specific agent run.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "get_run_api_v1_agents__agent_id__runs__run_id__get",
+        "operationId": "getAgentRun",
         "security": [
           {
             "HTTPBearer": []
@@ -5853,7 +5980,7 @@
         ],
         "summary": "Stop a running agent run",
         "description": "Stop a running or pending agent run.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Only runs in PENDING or RUNNING status can be stopped",
-        "operationId": "stop_run_api_v1_agents__agent_id__runs__run_id__stop_post",
+        "operationId": "stopAgentRun",
         "security": [
           {
             "HTTPBearer": []
@@ -5954,7 +6081,7 @@
         ],
         "summary": "List agent actions",
         "description": "List human-in-the-loop actions for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Filter by type, status, or agent_id",
-        "operationId": "list_actions_api_v1_agent_actions_get",
+        "operationId": "listAgentActions",
         "security": [
           {
             "HTTPBearer": []
@@ -6094,7 +6221,7 @@
         ],
         "summary": "Get an action",
         "description": "Retrieve a specific agent action by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
-        "operationId": "get_action_api_v1_agent_actions__action_id__get",
+        "operationId": "getAgentAction",
         "security": [
           {
             "HTTPBearer": []
@@ -6174,7 +6301,7 @@
         ],
         "summary": "Consume an action",
         "description": "Consume a pending human-in-the-loop action.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Action must be in PENDING status",
-        "operationId": "consume_action_api_v1_agent_actions__action_id__consume_patch",
+        "operationId": "consumeAgentAction",
         "security": [
           {
             "HTTPBearer": []
@@ -6929,7 +7056,7 @@
           "commerceId": {
             "type": "string",
             "title": "Commerceid",
-            "description": "Commerce ID for TribuTax"
+            "description": "Commerce ID for FEL"
           },
           "status": {
             "type": "string",
@@ -7607,7 +7734,7 @@
               "pexels"
             ],
             "title": "Image Provider",
-            "description": "Image provider to use",
+            "description": "Image library to use for article illustrations",
             "default": "pixabay"
           },
           "categories": {
@@ -7749,7 +7876,7 @@
             "type": "string",
             "minLength": 1,
             "title": "Commerceid",
-            "description": "Commerce ID for TribuTax integration"
+            "description": "Commerce ID for FEL integration"
           }
         },
         "type": "object",
@@ -7842,7 +7969,7 @@
           "emitOnCreate": {
             "type": "boolean",
             "title": "Emitoncreate",
-            "description": "Whether to emit via TribuTax on creation",
+            "description": "Whether to emit via FEL on creation",
             "default": true
           },
           "currency": {
@@ -8763,7 +8890,7 @@
               }
             ],
             "title": "Externalid",
-            "description": "TribuTax ID"
+            "description": "FEL ID"
           },
           "uid": {
             "anyOf": [
@@ -8775,7 +8902,7 @@
               }
             ],
             "title": "Uid",
-            "description": "TribuTax UUID"
+            "description": "FEL UUID"
           },
           "invoiceUrl": {
             "anyOf": [
@@ -8799,7 +8926,7 @@
               }
             ],
             "title": "Seriefel",
-            "description": "TribuTax serie FEL"
+            "description": "FEL serie"
           },
           "numeroFEL": {
             "anyOf": [
@@ -8811,7 +8938,7 @@
               }
             ],
             "title": "Numerofel",
-            "description": "TribuTax numero FEL"
+            "description": "FEL number"
           },
           "amount": {
             "anyOf": [
@@ -8895,7 +9022,7 @@
               }
             ],
             "title": "Externalid",
-            "description": "TribuTax invoice ID"
+            "description": "FEL invoice ID"
           },
           "uid": {
             "anyOf": [
@@ -8907,7 +9034,7 @@
               }
             ],
             "title": "Uid",
-            "description": "TribuTax UUID"
+            "description": "FEL UUID"
           },
           "invoiceUrl": {
             "anyOf": [
@@ -8931,7 +9058,7 @@
               }
             ],
             "title": "Seriefel",
-            "description": "TribuTax serie FEL"
+            "description": "FEL serie"
           },
           "numeroFEL": {
             "anyOf": [
@@ -8943,7 +9070,7 @@
               }
             ],
             "title": "Numerofel",
-            "description": "TribuTax numero FEL"
+            "description": "FEL number"
           },
           "items": {
             "items": {
@@ -9481,6 +9608,43 @@
           "lang": "en"
         }
       },
+      "KeywordTopicRequest": {
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Topic",
+            "description": "Topic or theme to research keywords for"
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Country",
+            "description": "Country code (e.g., 'es', 'en', 'fr')",
+            "default": "es"
+          },
+          "lang": {
+            "type": "string",
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Lang",
+            "description": "Language code for categorization (e.g., 'en', 'es', 'fr')",
+            "default": "en"
+          }
+        },
+        "type": "object",
+        "required": [
+          "topic"
+        ],
+        "title": "KeywordTopicRequest",
+        "description": "Request model for topic-based keyword extraction (used by POST /posts/keywords/topic/)",
+        "example": {
+          "country": "es",
+          "lang": "es",
+          "topic": "plantas de interior"
+        }
+      },
       "LegalPageData": {
         "properties": {
           "lang": {
@@ -9836,7 +10000,7 @@
               }
             ],
             "title": "Publisuites Id",
-            "description": "Publisuites website ID"
+            "description": "Link-building marketplace website ID"
           },
           "method": {
             "type": "string",
@@ -11324,7 +11488,7 @@
               }
             ],
             "title": "Reference",
-            "description": "Migo internal reference"
+            "description": "Payment service internal reference"
           },
           "description": {
             "anyOf": [
@@ -11370,8 +11534,8 @@
           "currency_provider": "GTQ",
           "description": "Account top-up",
           "id": "65a1b2c3d4e5f6789abcdef0",
-          "payment_url": "https://sb-mw.migopayments.com/checkout/abc123",
-          "reference": "MIGOGT123456",
+          "payment_url": "https://checkout.example.com/pay/abc123",
+          "reference": "GT123456",
           "status": "created",
           "updated_at": "2024-01-01T12:00:00Z",
           "usd_amount": 10,
@@ -11389,7 +11553,7 @@
           "dismiss"
         ],
         "title": "TransactionStatus",
-        "description": "Transaction status enum matching Migo payment statuses.\n\nState machine:\n- CREATED (initial) can transition to any terminal state\n- Terminal states (APPROVED, DENIED, etc.) cannot transition\n- Idempotent: same status → same status is allowed"
+        "description": "Transaction status enum matching payment service statuses.\n\nState machine:\n- CREATED (initial) can transition to any terminal state\n- Terminal states (APPROVED, DENIED, etc.) cannot transition\n- Idempotent: same status → same status is allowed"
       },
       "UpdateAgentRequest": {
         "properties": {

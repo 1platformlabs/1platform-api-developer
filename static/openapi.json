@@ -2610,6 +2610,91 @@
         }
       }
     },
+    "/api/v1/users/revoke-tokens": {
+      "post": {
+        "tags": [
+          "Users & Tokens"
+        ],
+        "summary": "Revoke all user tokens",
+        "description": "Revoke all existing JWT tokens for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n- Increments the user's `token_version`, invalidating all previously issued tokens\n- After calling this endpoint, the user must obtain a new token via `POST /api/v1/users/token`\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/revoke-tokens \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
+        "operationId": "revokeUserTokens",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All tokens revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_RevokeTokensResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "message": "All tokens revoked successfully",
+                    "token_version": 2
+                  },
+                  "msg": "All tokens revoked successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/transactions": {
       "post": {
         "tags": [
@@ -2946,23 +3031,35 @@
                   "transaction_id": {
                     "type": "string",
                     "title": "Transaction Id",
-                    "description": "Payment service transaction ID (external_transaction_id)"
+                    "description": "Payment service transaction ID (external_transaction_id)",
+                    "examples": [
+                      "tx_abc123"
+                    ]
                   },
                   "status": {
                     "type": "string",
                     "title": "Status",
-                    "description": "Transaction status (will be mapped to TransactionStatus enum)"
+                    "description": "Transaction status (will be mapped to TransactionStatus enum)",
+                    "examples": [
+                      "approved"
+                    ]
                   },
                   "amount": {
                     "type": "number",
                     "exclusiveMinimum": 0,
                     "title": "Amount",
-                    "description": "Transaction amount in GTQ"
+                    "description": "Transaction amount in GTQ",
+                    "examples": [
+                      78
+                    ]
                   },
                   "currency": {
                     "type": "string",
                     "title": "Currency",
-                    "description": "Currency code"
+                    "description": "Currency code",
+                    "examples": [
+                      "GTQ"
+                    ]
                   },
                   "reference": {
                     "anyOf": [
@@ -2974,7 +3071,10 @@
                       }
                     ],
                     "title": "Reference",
-                    "description": "Payment service internal reference"
+                    "description": "Payment service internal reference",
+                    "examples": [
+                      "GT123456"
+                    ]
                   },
                   "timestamp": {
                     "anyOf": [
@@ -2987,7 +3087,10 @@
                       }
                     ],
                     "title": "Timestamp",
-                    "description": "Webhook timestamp"
+                    "description": "Webhook timestamp",
+                    "examples": [
+                      "2024-01-15T10:30:00Z"
+                    ]
                   },
                   "country": {
                     "anyOf": [
@@ -2999,7 +3102,10 @@
                       }
                     ],
                     "title": "Country",
-                    "description": "Country code"
+                    "description": "Country code",
+                    "examples": [
+                      "GT"
+                    ]
                   },
                   "channel": {
                     "anyOf": [
@@ -3011,7 +3117,10 @@
                       }
                     ],
                     "title": "Channel",
-                    "description": "Payment channel"
+                    "description": "Payment channel",
+                    "examples": [
+                      "web"
+                    ]
                   },
                   "externalId": {
                     "anyOf": [
@@ -3023,7 +3132,10 @@
                       }
                     ],
                     "title": "Externalid",
-                    "description": "External identifier"
+                    "description": "External identifier",
+                    "examples": [
+                      "507f1f77bcf86cd799439011"
+                    ]
                   },
                   "customKeys": {
                     "anyOf": [
@@ -6428,7 +6540,10 @@
           },
           "total": {
             "type": "integer",
-            "title": "Total"
+            "title": "Total",
+            "examples": [
+              5
+            ]
           }
         },
         "type": "object",
@@ -6444,21 +6559,36 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Action document ID"
+            "description": "Action document ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "agent_id": {
             "type": "string",
-            "title": "Agent Id"
+            "title": "Agent Id",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "run_id": {
             "type": "string",
-            "title": "Run Id"
+            "title": "Run Id",
+            "examples": [
+              "507f1f77bcf86cd799439013"
+            ]
           },
           "type": {
-            "$ref": "#/components/schemas/ActionType"
+            "$ref": "#/components/schemas/ActionType",
+            "examples": [
+              "publish_content"
+            ]
           },
           "status": {
-            "$ref": "#/components/schemas/ActionStatus"
+            "$ref": "#/components/schemas/ActionStatus",
+            "examples": [
+              "pending"
+            ]
           },
           "payload": {
             "additionalProperties": true,
@@ -6486,7 +6616,10 @@
                 "type": "null"
               }
             ],
-            "title": "Consumed By"
+            "title": "Consumed By",
+            "examples": [
+              "admin@example.com"
+            ]
           },
           "consumed_at": {
             "anyOf": [
@@ -6498,12 +6631,18 @@
                 "type": "null"
               }
             ],
-            "title": "Consumed At"
+            "title": "Consumed At",
+            "examples": [
+              "2024-01-15T11:00:00Z"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -6514,9 +6653,6 @@
           "type",
           "status",
           "payload",
-          "consume_result",
-          "consumed_by",
-          "consumed_at",
           "created_at"
         ],
         "title": "AgentActionResponse",
@@ -6533,7 +6669,10 @@
           },
           "total": {
             "type": "integer",
-            "title": "Total"
+            "title": "Total",
+            "examples": [
+              10
+            ]
           }
         },
         "type": "object",
@@ -6549,17 +6688,26 @@
           "global_running_runs": {
             "type": "integer",
             "title": "Global Running Runs",
-            "description": "Currently active (RUNNING) runs across all agents"
+            "description": "Currently active (RUNNING) runs across all agents",
+            "examples": [
+              3
+            ]
           },
           "max_global_concurrent_runs": {
             "type": "integer",
             "title": "Max Global Concurrent Runs",
-            "description": "Platform-wide concurrency ceiling"
+            "description": "Platform-wide concurrency ceiling",
+            "examples": [
+              10
+            ]
           },
           "capacity_percentage": {
             "type": "number",
             "title": "Capacity Percentage",
-            "description": "global_running_runs / max_global_concurrent_runs * 100"
+            "description": "global_running_runs / max_global_concurrent_runs * 100",
+            "examples": [
+              30
+            ]
           },
           "runs_by_status": {
             "additionalProperties": {
@@ -6572,17 +6720,26 @@
           "active_agents_count": {
             "type": "integer",
             "title": "Active Agents Count",
-            "description": "Number of agents with is_active=True"
+            "description": "Number of agents with is_active=True",
+            "examples": [
+              15
+            ]
           },
           "scheduled_agents_count": {
             "type": "integer",
             "title": "Scheduled Agents Count",
-            "description": "Number of active agents with a cron schedule"
+            "description": "Number of active agents with a cron schedule",
+            "examples": [
+              5
+            ]
           },
           "tokens_consumed_today": {
             "type": "integer",
             "title": "Tokens Consumed Today",
-            "description": "Total tokens used across all runs today (UTC)"
+            "description": "Total tokens used across all runs today (UTC)",
+            "examples": [
+              150000
+            ]
           },
           "circuit_breaker_states": {
             "additionalProperties": {
@@ -6612,24 +6769,39 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Agent document ID"
+            "description": "Agent document ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "app_id": {
             "type": "string",
             "title": "App Id",
-            "description": "Owning App ID"
+            "description": "Owning App ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "examples": [
+              "SEO Content Agent"
+            ]
           },
           "description": {
             "type": "string",
-            "title": "Description"
+            "title": "Description",
+            "examples": [
+              "Generates SEO-optimized content for websites"
+            ]
           },
           "system_prompt": {
             "type": "string",
-            "title": "System Prompt"
+            "title": "System Prompt",
+            "examples": [
+              "You are an SEO content specialist..."
+            ]
           },
           "tools": {
             "items": {
@@ -6729,7 +6901,10 @@
           },
           "total": {
             "type": "integer",
-            "title": "Total"
+            "title": "Total",
+            "examples": [
+              25
+            ]
           }
         },
         "type": "object",
@@ -6745,17 +6920,29 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Run document ID"
+            "description": "Run document ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "agent_id": {
             "type": "string",
-            "title": "Agent Id"
+            "title": "Agent Id",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "status": {
-            "$ref": "#/components/schemas/AgentRunStatus"
+            "$ref": "#/components/schemas/AgentRunStatus",
+            "examples": [
+              "completed"
+            ]
           },
           "trigger": {
-            "$ref": "#/components/schemas/AgentRunTrigger"
+            "$ref": "#/components/schemas/AgentRunTrigger",
+            "examples": [
+              "manual"
+            ]
           },
           "input_message": {
             "anyOf": [
@@ -6766,7 +6953,10 @@
                 "type": "null"
               }
             ],
-            "title": "Input Message"
+            "title": "Input Message",
+            "examples": [
+              "Generate content for my website"
+            ]
           },
           "result": {
             "anyOf": [
@@ -6777,7 +6967,10 @@
                 "type": "null"
               }
             ],
-            "title": "Result"
+            "title": "Result",
+            "examples": [
+              "Successfully generated 3 articles"
+            ]
           },
           "error": {
             "anyOf": [
@@ -6788,11 +6981,18 @@
                 "type": "null"
               }
             ],
-            "title": "Error"
+            "title": "Error",
+            "examples": [
+              "Rate limit exceeded"
+            ]
           },
           "total_tokens": {
             "type": "integer",
-            "title": "Total Tokens"
+            "title": "Total Tokens",
+            "default": 0,
+            "examples": [
+              5000
+            ]
           },
           "worker_id": {
             "anyOf": [
@@ -6803,7 +7003,10 @@
                 "type": "null"
               }
             ],
-            "title": "Worker Id"
+            "title": "Worker Id",
+            "examples": [
+              "worker-01"
+            ]
           },
           "started_at": {
             "anyOf": [
@@ -6815,7 +7018,10 @@
                 "type": "null"
               }
             ],
-            "title": "Started At"
+            "title": "Started At",
+            "examples": [
+              "2024-01-15T10:30:05Z"
+            ]
           },
           "finished_at": {
             "anyOf": [
@@ -6827,12 +7033,18 @@
                 "type": "null"
               }
             ],
-            "title": "Finished At"
+            "title": "Finished At",
+            "examples": [
+              "2024-01-15T10:35:00Z"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -6841,13 +7053,6 @@
           "agent_id",
           "status",
           "trigger",
-          "input_message",
-          "result",
-          "error",
-          "total_tokens",
-          "worker_id",
-          "started_at",
-          "finished_at",
           "created_at"
         ],
         "title": "AgentRunResponse",
@@ -6878,7 +7083,10 @@
         "properties": {
           "type": {
             "$ref": "#/components/schemas/ToolType",
-            "description": "Execution context: internal platform tool or external HTTP call"
+            "description": "Execution context: internal platform tool or external HTTP call",
+            "examples": [
+              "internal"
+            ]
           },
           "definition": {
             "$ref": "#/components/schemas/ToolDefinition",
@@ -6908,7 +7116,10 @@
         "properties": {
           "type": {
             "$ref": "#/components/schemas/ToolType",
-            "description": "Execution context: internal platform tool or external HTTP call"
+            "description": "Execution context: internal platform tool or external HTTP call",
+            "examples": [
+              "internal"
+            ]
           },
           "definition": {
             "$ref": "#/components/schemas/ToolDefinition",
@@ -6948,23 +7159,35 @@
           "user_id": {
             "type": "string",
             "title": "User Id",
-            "description": "User ID"
+            "description": "User ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "email": {
             "type": "string",
             "title": "Email",
-            "description": "User email"
+            "description": "User email",
+            "examples": [
+              "user@example.com"
+            ]
           },
           "role": {
             "type": "string",
             "title": "Role",
-            "description": "User role in branch"
+            "description": "User role in branch",
+            "examples": [
+              "admin"
+            ]
           },
           "assigned_at": {
             "type": "string",
             "format": "date-time",
             "title": "Assigned At",
-            "description": "Assignment timestamp"
+            "description": "Assignment timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -6981,22 +7204,34 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Billing ID"
+            "description": "Billing ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "user_id": {
             "type": "string",
             "title": "User Id",
-            "description": "User ID"
+            "description": "User ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "balance": {
             "type": "number",
             "title": "Balance",
-            "description": "Current balance"
+            "description": "Current balance",
+            "examples": [
+              250.5
+            ]
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "description": "Currency code"
+            "description": "Currency code",
+            "examples": [
+              "USD"
+            ]
           },
           "payment_gateway_id": {
             "anyOf": [
@@ -7008,13 +7243,19 @@
               }
             ],
             "title": "Payment Gateway Id",
-            "description": "Reference to PaymentGateway ID"
+            "description": "Reference to PaymentGateway ID",
+            "examples": [
+              "507f1f77bcf86cd799439013"
+            ]
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp"
+            "description": "Last update timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -7041,27 +7282,42 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Branch ID"
+            "description": "Branch ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "business_id": {
             "type": "string",
             "title": "Business Id",
-            "description": "Business ID"
+            "description": "Business ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Branch display name"
+            "description": "Branch display name",
+            "examples": [
+              "Sucursal Central"
+            ]
           },
           "commerceId": {
             "type": "string",
             "title": "Commerceid",
-            "description": "Commerce ID for FEL"
+            "description": "Commerce ID for FEL",
+            "examples": [
+              "COM-001"
+            ]
           },
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "Branch status"
+            "description": "Branch status",
+            "examples": [
+              "active"
+            ]
           },
           "assigned_users": {
             "items": {
@@ -7075,13 +7331,19 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp"
+            "description": "Creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp"
+            "description": "Last update timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -7101,44 +7363,68 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Business ID"
+            "description": "Business ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Business display name"
+            "description": "Business display name",
+            "examples": [
+              "Mi Empresa S.A."
+            ]
           },
           "documentType": {
             "type": "string",
             "title": "Documenttype",
-            "description": "Document type"
+            "description": "Document type",
+            "examples": [
+              "NIT"
+            ]
           },
           "documentNumber": {
             "type": "string",
             "title": "Documentnumber",
-            "description": "Document number"
+            "description": "Document number",
+            "examples": [
+              "12345678-9"
+            ]
           },
           "address": {
             "type": "string",
             "title": "Address",
-            "description": "Business address"
+            "description": "Business address",
+            "examples": [
+              "4a Avenida, Zona 1, Guatemala"
+            ]
           },
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "Business status"
+            "description": "Business status",
+            "examples": [
+              "active"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp"
+            "description": "Creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp"
+            "description": "Last update timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -7169,7 +7455,10 @@
             "maxLength": 500,
             "minLength": 1,
             "title": "Reason",
-            "description": "Cancellation reason"
+            "description": "Cancellation reason",
+            "examples": [
+              "Datos incorrectos del receptor"
+            ]
           }
         },
         "type": "object",
@@ -7203,22 +7492,34 @@
           "slug": {
             "type": "string",
             "title": "Slug",
-            "description": "Unique template identifier"
+            "description": "Unique template identifier",
+            "examples": [
+              "seo-content-writer"
+            ]
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Display name"
+            "description": "Display name",
+            "examples": [
+              "SEO Content Writer"
+            ]
           },
           "description": {
             "type": "string",
             "title": "Description",
-            "description": "What this template creates"
+            "description": "What this template creates",
+            "examples": [
+              "An agent that generates SEO-optimized blog posts"
+            ]
           },
           "category": {
             "type": "string",
             "title": "Category",
-            "description": "Grouping category for UI presentation"
+            "description": "Grouping category for UI presentation",
+            "examples": [
+              "Content"
+            ]
           },
           "required_tools": {
             "items": {
@@ -7246,12 +7547,18 @@
               }
             ],
             "title": "Default Schedule",
-            "description": "Default cron schedule if applicable"
+            "description": "Default cron schedule if applicable",
+            "examples": [
+              "0 9 * * 1"
+            ]
           },
           "default_max_iterations": {
             "type": "integer",
             "title": "Default Max Iterations",
-            "description": "Recommended max_iterations for this template"
+            "description": "Recommended max_iterations for this template",
+            "examples": [
+              10
+            ]
           }
         },
         "type": "object",
@@ -7270,17 +7577,26 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Category ID"
+            "description": "Category ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "title": {
             "type": "string",
             "title": "Title",
-            "description": "Category title (localized)"
+            "description": "Category title (localized)",
+            "examples": [
+              "Technology"
+            ]
           },
           "slug": {
             "type": "string",
             "title": "Slug",
-            "description": "Category slug"
+            "description": "Category slug",
+            "examples": [
+              "technology"
+            ]
           }
         },
         "type": "object",
@@ -7297,7 +7613,10 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Category ID"
+            "description": "Category ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "title": {
             "$ref": "#/components/schemas/CategoryTitle",
@@ -7306,23 +7625,35 @@
           "slug": {
             "type": "string",
             "title": "Slug",
-            "description": "Category slug"
+            "description": "Category slug",
+            "examples": [
+              "technology"
+            ]
           },
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "Category status"
+            "description": "Category status",
+            "examples": [
+              "active"
+            ]
           },
           "recommended_theme": {
             "type": "string",
             "title": "Recommended Theme",
-            "description": "Resolved WordPress theme slug (weighted random)"
+            "description": "Resolved WordPress theme slug (weighted random)",
+            "examples": [
+              "astra"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp"
+            "description": "Creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -7342,12 +7673,18 @@
           "es": {
             "type": "string",
             "title": "Es",
-            "description": "Spanish title"
+            "description": "Spanish title",
+            "examples": [
+              "Tecnología"
+            ]
           },
           "en": {
             "type": "string",
             "title": "En",
-            "description": "English title"
+            "description": "English title",
+            "examples": [
+              "Technology"
+            ]
           }
         },
         "type": "object",
@@ -7576,7 +7913,10 @@
             "maximum": 50,
             "exclusiveMinimum": 0,
             "title": "Count",
-            "description": "Number of comments to generate (1-50)"
+            "description": "Number of comments to generate (1-50)",
+            "examples": [
+              5
+            ]
           },
           "lang": {
             "type": "string",
@@ -7585,13 +7925,19 @@
               "en"
             ],
             "title": "Lang",
-            "description": "Language for generated comments ('es' or 'en')"
+            "description": "Language for generated comments ('es' or 'en')",
+            "examples": [
+              "en"
+            ]
           },
           "context": {
             "type": "string",
             "minLength": 5,
             "title": "Context",
-            "description": "Context to orient comment content (min 5 chars)"
+            "description": "Context to orient comment content (min 5 chars)",
+            "examples": [
+              "Article about sustainable gardening tips"
+            ]
           }
         },
         "type": "object",
@@ -7613,17 +7959,26 @@
           "user_id": {
             "type": "string",
             "title": "User Id",
-            "description": "User ID that requested the generation"
+            "description": "User ID that requested the generation",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "lang": {
             "type": "string",
             "title": "Lang",
-            "description": "Language of generated comments"
+            "description": "Language of generated comments",
+            "examples": [
+              "en"
+            ]
           },
           "count": {
             "type": "integer",
             "title": "Count",
-            "description": "Number of comments generated"
+            "description": "Number of comments generated",
+            "examples": [
+              5
+            ]
           },
           "comments": {
             "items": {
@@ -7649,12 +8004,18 @@
           "full_name": {
             "type": "string",
             "title": "Full Name",
-            "description": "Fictional full name (first + last)"
+            "description": "Fictional full name (first + last)",
+            "examples": [
+              "Maria Garcia"
+            ]
           },
           "content": {
             "type": "string",
             "title": "Content",
-            "description": "Comment content text"
+            "description": "Comment content text",
+            "examples": [
+              "Great article! Very informative and well-written."
+            ]
           }
         },
         "type": "object",
@@ -7690,7 +8051,10 @@
               }
             ],
             "title": "Consumed By",
-            "description": "Identifier of the actor consuming the action"
+            "description": "Identifier of the actor consuming the action",
+            "examples": [
+              "admin@example.com"
+            ]
           }
         },
         "type": "object",
@@ -7703,7 +8067,10 @@
             "type": "string",
             "minLength": 3,
             "title": "Keyword",
-            "description": "Keyword to generate content for"
+            "description": "Keyword to generate content for",
+            "examples": [
+              "best running shoes 2024"
+            ]
           },
           "lang": {
             "type": "string",
@@ -7711,7 +8078,10 @@
             "minLength": 2,
             "title": "Lang",
             "description": "Language code (e.g., 'en', 'es', 'fr')",
-            "default": "en"
+            "default": "en",
+            "examples": [
+              "en"
+            ]
           },
           "country": {
             "anyOf": [
@@ -7725,7 +8095,10 @@
               }
             ],
             "title": "Country",
-            "description": "Country code (e.g., 'us', 'mx', 'es')"
+            "description": "Country code (e.g., 'us', 'mx', 'es')",
+            "examples": [
+              "us"
+            ]
           },
           "image_provider": {
             "type": "string",
@@ -7735,7 +8108,10 @@
             ],
             "title": "Image Provider",
             "description": "Image library to use for article illustrations",
-            "default": "pixabay"
+            "default": "pixabay",
+            "examples": [
+              "pixabay"
+            ]
           },
           "categories": {
             "items": {
@@ -7768,19 +8144,28 @@
             "type": "string",
             "maxLength": 200,
             "title": "Name",
-            "description": "Human-readable agent name"
+            "description": "Human-readable agent name",
+            "examples": [
+              "SEO Content Agent"
+            ]
           },
           "description": {
             "type": "string",
             "maxLength": 1000,
             "title": "Description",
-            "description": "What the agent does"
+            "description": "What the agent does",
+            "examples": [
+              "Generates SEO-optimized content for websites"
+            ]
           },
           "system_prompt": {
             "type": "string",
             "maxLength": 10000,
             "title": "System Prompt",
-            "description": "System prompt for the LLM"
+            "description": "System prompt for the LLM",
+            "examples": [
+              "You are an SEO content specialist..."
+            ]
           },
           "tools": {
             "items": {
@@ -7792,7 +8177,10 @@
           },
           "model": {
             "$ref": "#/components/schemas/AllowedModel",
-            "description": "LLM model to use"
+            "description": "LLM model to use",
+            "examples": [
+              "claude-sonnet-4-6"
+            ]
           },
           "max_iterations": {
             "type": "integer",
@@ -7800,7 +8188,10 @@
             "minimum": 1,
             "title": "Max Iterations",
             "description": "Maximum agentic loop iterations",
-            "default": 10
+            "default": 10,
+            "examples": [
+              10
+            ]
           },
           "schedule": {
             "anyOf": [
@@ -7812,7 +8203,10 @@
               }
             ],
             "title": "Schedule",
-            "description": "Cron expression — omit to disable scheduling"
+            "description": "Cron expression — omit to disable scheduling",
+            "examples": [
+              "0 9 * * 1"
+            ]
           },
           "webhook_url": {
             "anyOf": [
@@ -7824,13 +8218,19 @@
               }
             ],
             "title": "Webhook Url",
-            "description": "Webhook URL for run result notifications"
+            "description": "Webhook URL for run result notifications",
+            "examples": [
+              "https://example.com/webhooks/agent-result"
+            ]
           },
           "is_active": {
             "type": "boolean",
             "title": "Is Active",
             "description": "Whether the agent is immediately active",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "max_concurrent_runs": {
             "type": "integer",
@@ -7838,7 +8238,10 @@
             "minimum": 1,
             "title": "Max Concurrent Runs",
             "description": "Maximum simultaneous runs",
-            "default": 1
+            "default": 1,
+            "examples": [
+              1
+            ]
           },
           "template_slug": {
             "anyOf": [
@@ -7850,7 +8253,10 @@
               }
             ],
             "title": "Template Slug",
-            "description": "Catalog template slug if created from a template"
+            "description": "Catalog template slug if created from a template",
+            "examples": [
+              "seo-content-writer"
+            ]
           }
         },
         "type": "object",
@@ -7870,13 +8276,19 @@
             "maxLength": 255,
             "minLength": 1,
             "title": "Name",
-            "description": "Branch display name"
+            "description": "Branch display name",
+            "examples": [
+              "Sucursal Central"
+            ]
           },
           "commerceId": {
             "type": "string",
             "minLength": 1,
             "title": "Commerceid",
-            "description": "Commerce ID for FEL integration"
+            "description": "Commerce ID for FEL integration",
+            "examples": [
+              "COM-001"
+            ]
           }
         },
         "type": "object",
@@ -7897,30 +8309,45 @@
             "maxLength": 255,
             "minLength": 1,
             "title": "Name",
-            "description": "Business display name"
+            "description": "Business display name",
+            "examples": [
+              "Mi Empresa S.A."
+            ]
           },
           "documentType": {
             "type": "string",
             "title": "Documenttype",
-            "description": "Document type (e.g. NIT)"
+            "description": "Document type (e.g. NIT)",
+            "examples": [
+              "NIT"
+            ]
           },
           "documentNumber": {
             "type": "string",
             "minLength": 1,
             "title": "Documentnumber",
-            "description": "Unique document number"
+            "description": "Unique document number",
+            "examples": [
+              "12345678-9"
+            ]
           },
           "address": {
             "type": "string",
             "maxLength": 500,
             "minLength": 1,
             "title": "Address",
-            "description": "Business address"
+            "description": "Business address",
+            "examples": [
+              "4a Avenida, Zona 1, Guatemala"
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/BusinessStatus",
             "description": "Business status",
-            "default": "active"
+            "default": "active",
+            "examples": [
+              "active"
+            ]
           }
         },
         "type": "object",
@@ -7964,19 +8391,28 @@
               }
             ],
             "title": "Date",
-            "description": "Invoice date (YYYY-MM-DD)"
+            "description": "Invoice date (YYYY-MM-DD)",
+            "examples": [
+              "2024-01-15"
+            ]
           },
           "emitOnCreate": {
             "type": "boolean",
             "title": "Emitoncreate",
             "description": "Whether to emit via FEL on creation",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "currency": {
             "type": "string",
             "title": "Currency",
             "description": "Invoice currency",
-            "default": "GTQ"
+            "default": "GTQ",
+            "examples": [
+              "GTQ"
+            ]
           },
           "description": {
             "anyOf": [
@@ -7988,7 +8424,10 @@
               }
             ],
             "title": "Description",
-            "description": "Invoice description"
+            "description": "Invoice description",
+            "examples": [
+              "Servicios profesionales enero 2024"
+            ]
           }
         },
         "type": "object",
@@ -8005,13 +8444,19 @@
             "type": "string",
             "minLength": 5,
             "title": "Email",
-            "description": "User email address (required, unique)"
+            "description": "User email address (required, unique)",
+            "examples": [
+              "user@example.com"
+            ]
           },
           "currency": {
             "type": "string",
             "title": "Currency",
             "description": "Billing currency (e.g. USD, GTQ)",
-            "default": "USD"
+            "default": "USD",
+            "examples": [
+              "GTQ"
+            ]
           }
         },
         "type": "object",
@@ -8032,7 +8477,10 @@
             "const": false,
             "title": "Success",
             "description": "Always false for error responses",
-            "default": false
+            "default": false,
+            "examples": [
+              false
+            ]
           },
           "data": {
             "anyOf": [
@@ -8047,7 +8495,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Error message"
+            "description": "Error message",
+            "examples": [
+              "Operation failed"
+            ]
           }
         },
         "type": "object",
@@ -8072,7 +8523,10 @@
                 "type": "null"
               }
             ],
-            "title": "Document"
+            "title": "Document",
+            "examples": [
+              "Referencia interna: ORD-2024-001"
+            ]
           }
         },
         "type": "object",
@@ -8083,7 +8537,10 @@
           "is_cancelled": {
             "type": "boolean",
             "title": "Is Cancelled",
-            "default": false
+            "default": false,
+            "examples": [
+              true
+            ]
           },
           "cancelled_at": {
             "anyOf": [
@@ -8094,7 +8551,10 @@
                 "type": "null"
               }
             ],
-            "title": "Cancelled At"
+            "title": "Cancelled At",
+            "examples": [
+              "2024-01-20T14:00:00Z"
+            ]
           },
           "cancellation_reason": {
             "anyOf": [
@@ -8105,7 +8565,10 @@
                 "type": "null"
               }
             ],
-            "title": "Cancellation Reason"
+            "title": "Cancellation Reason",
+            "examples": [
+              "Datos incorrectos del receptor"
+            ]
           }
         },
         "type": "object",
@@ -8122,7 +8585,10 @@
                 "type": "null"
               }
             ],
-            "title": "Certifier Tax Id"
+            "title": "Certifier Tax Id",
+            "examples": [
+              "12345678-9"
+            ]
           },
           "certifier_name": {
             "anyOf": [
@@ -8133,7 +8599,10 @@
                 "type": "null"
               }
             ],
-            "title": "Certifier Name"
+            "title": "Certifier Name",
+            "examples": [
+              "Certificador Autorizado S.A."
+            ]
           },
           "authorization_number": {
             "anyOf": [
@@ -8144,7 +8613,10 @@
                 "type": "null"
               }
             ],
-            "title": "Authorization Number"
+            "title": "Authorization Number",
+            "examples": [
+              "A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+            ]
           },
           "series": {
             "anyOf": [
@@ -8155,7 +8627,10 @@
                 "type": "null"
               }
             ],
-            "title": "Series"
+            "title": "Series",
+            "examples": [
+              "A"
+            ]
           },
           "certified_number": {
             "anyOf": [
@@ -8166,7 +8641,10 @@
                 "type": "null"
               }
             ],
-            "title": "Certified Number"
+            "title": "Certified Number",
+            "examples": [
+              "123456789"
+            ]
           },
           "certified_at": {
             "anyOf": [
@@ -8177,7 +8655,10 @@
                 "type": "null"
               }
             ],
-            "title": "Certified At"
+            "title": "Certified At",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -8194,7 +8675,10 @@
                 "type": "null"
               }
             ],
-            "title": "Tax Short Name"
+            "title": "Tax Short Name",
+            "examples": [
+              "IVA"
+            ]
           },
           "tax_amount": {
             "anyOf": [
@@ -8205,7 +8689,10 @@
                 "type": "null"
               }
             ],
-            "title": "Tax Amount"
+            "title": "Tax Amount",
+            "examples": [
+              120
+            ]
           }
         },
         "type": "object",
@@ -8222,7 +8709,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Tax Id"
+            "title": "Issuer Tax Id",
+            "examples": [
+              "98765432-1"
+            ]
           },
           "issuer_name": {
             "anyOf": [
@@ -8233,7 +8723,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Name"
+            "title": "Issuer Name",
+            "examples": [
+              "Mi Empresa S.A."
+            ]
           },
           "issuer_trade_name": {
             "anyOf": [
@@ -8244,7 +8737,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Trade Name"
+            "title": "Issuer Trade Name",
+            "examples": [
+              "Mi Empresa"
+            ]
           },
           "issuer_vat_affiliation": {
             "anyOf": [
@@ -8255,7 +8751,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Vat Affiliation"
+            "title": "Issuer Vat Affiliation",
+            "examples": [
+              "GEN"
+            ]
           },
           "issuer_address": {
             "anyOf": [
@@ -8266,7 +8765,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Address"
+            "title": "Issuer Address",
+            "examples": [
+              "6a Calle 5-20, Zona 1"
+            ]
           },
           "issuer_city": {
             "anyOf": [
@@ -8277,7 +8779,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer City"
+            "title": "Issuer City",
+            "examples": [
+              "Guatemala"
+            ]
           },
           "issuer_state": {
             "anyOf": [
@@ -8288,7 +8793,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer State"
+            "title": "Issuer State",
+            "examples": [
+              "Guatemala"
+            ]
           },
           "issuer_country": {
             "anyOf": [
@@ -8299,7 +8807,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Country"
+            "title": "Issuer Country",
+            "examples": [
+              "GT"
+            ]
           },
           "issuer_phone": {
             "anyOf": [
@@ -8310,7 +8821,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Phone"
+            "title": "Issuer Phone",
+            "examples": [
+              "50298765432"
+            ]
           },
           "issuer_email": {
             "anyOf": [
@@ -8321,7 +8835,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Email"
+            "title": "Issuer Email",
+            "examples": [
+              "facturacion@miempresa.com"
+            ]
           },
           "issuer_establishment_code": {
             "anyOf": [
@@ -8332,7 +8849,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Establishment Code"
+            "title": "Issuer Establishment Code",
+            "examples": [
+              "1"
+            ]
           },
           "issuer_currency": {
             "anyOf": [
@@ -8343,7 +8863,10 @@
                 "type": "null"
               }
             ],
-            "title": "Issuer Currency"
+            "title": "Issuer Currency",
+            "examples": [
+              "GTQ"
+            ]
           }
         },
         "type": "object",
@@ -8360,7 +8883,10 @@
                 "type": "null"
               }
             ],
-            "title": "Quantity"
+            "title": "Quantity",
+            "examples": [
+              2
+            ]
           },
           "description": {
             "anyOf": [
@@ -8371,7 +8897,10 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "examples": [
+              "Servicio de consultoría mensual"
+            ]
           },
           "unit_price": {
             "anyOf": [
@@ -8382,7 +8911,10 @@
                 "type": "null"
               }
             ],
-            "title": "Unit Price"
+            "title": "Unit Price",
+            "examples": [
+              500
+            ]
           },
           "discount": {
             "anyOf": [
@@ -8393,7 +8925,10 @@
                 "type": "null"
               }
             ],
-            "title": "Discount"
+            "title": "Discount",
+            "examples": [
+              0
+            ]
           },
           "price": {
             "anyOf": [
@@ -8404,7 +8939,10 @@
                 "type": "null"
               }
             ],
-            "title": "Price"
+            "title": "Price",
+            "examples": [
+              1000
+            ]
           },
           "line_total": {
             "anyOf": [
@@ -8415,7 +8953,10 @@
                 "type": "null"
               }
             ],
-            "title": "Line Total"
+            "title": "Line Total",
+            "examples": [
+              1000
+            ]
           },
           "unit_measure": {
             "anyOf": [
@@ -8426,7 +8967,10 @@
                 "type": "null"
               }
             ],
-            "title": "Unit Measure"
+            "title": "Unit Measure",
+            "examples": [
+              "UNI"
+            ]
           },
           "item_kind": {
             "anyOf": [
@@ -8437,14 +8981,18 @@
                 "type": "null"
               }
             ],
-            "title": "Item Kind"
+            "title": "Item Kind",
+            "examples": [
+              "S"
+            ]
           },
           "taxes": {
             "items": {
               "$ref": "#/components/schemas/FelTax"
             },
             "type": "array",
-            "title": "Taxes"
+            "title": "Taxes",
+            "examples": []
           }
         },
         "type": "object",
@@ -8461,7 +9009,10 @@
                 "type": "null"
               }
             ],
-            "title": "Phrase Type"
+            "title": "Phrase Type",
+            "examples": [
+              "1"
+            ]
           },
           "scenario_code": {
             "anyOf": [
@@ -8472,7 +9023,10 @@
                 "type": "null"
               }
             ],
-            "title": "Scenario Code"
+            "title": "Scenario Code",
+            "examples": [
+              "1"
+            ]
           },
           "description": {
             "anyOf": [
@@ -8483,7 +9037,10 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "examples": [
+              "Sujeto a pagos trimestrales"
+            ]
           }
         },
         "type": "object",
@@ -8500,7 +9057,10 @@
                 "type": "null"
               }
             ],
-            "title": "Receiver Tax Id"
+            "title": "Receiver Tax Id",
+            "examples": [
+              "12345678-9"
+            ]
           },
           "receiver_name": {
             "anyOf": [
@@ -8511,7 +9071,10 @@
                 "type": "null"
               }
             ],
-            "title": "Receiver Name"
+            "title": "Receiver Name",
+            "examples": [
+              "Juan Pérez"
+            ]
           },
           "receiver_address": {
             "anyOf": [
@@ -8522,7 +9085,10 @@
                 "type": "null"
               }
             ],
-            "title": "Receiver Address"
+            "title": "Receiver Address",
+            "examples": [
+              "4a Avenida 12-30, Zona 10"
+            ]
           },
           "receiver_city": {
             "anyOf": [
@@ -8533,7 +9099,10 @@
                 "type": "null"
               }
             ],
-            "title": "Receiver City"
+            "title": "Receiver City",
+            "examples": [
+              "Guatemala"
+            ]
           },
           "receiver_state": {
             "anyOf": [
@@ -8544,7 +9113,10 @@
                 "type": "null"
               }
             ],
-            "title": "Receiver State"
+            "title": "Receiver State",
+            "examples": [
+              "Guatemala"
+            ]
           },
           "receiver_country": {
             "anyOf": [
@@ -8555,7 +9127,10 @@
                 "type": "null"
               }
             ],
-            "title": "Receiver Country"
+            "title": "Receiver Country",
+            "examples": [
+              "GT"
+            ]
           },
           "receiver_phone": {
             "anyOf": [
@@ -8566,7 +9141,10 @@
                 "type": "null"
               }
             ],
-            "title": "Receiver Phone"
+            "title": "Receiver Phone",
+            "examples": [
+              "50212345678"
+            ]
           },
           "receiver_email": {
             "anyOf": [
@@ -8577,7 +9155,10 @@
                 "type": "null"
               }
             ],
-            "title": "Receiver Email"
+            "title": "Receiver Email",
+            "examples": [
+              "juan@ejemplo.com"
+            ]
           }
         },
         "type": "object",
@@ -8594,7 +9175,10 @@
                 "type": "null"
               }
             ],
-            "title": "Tax Short Name"
+            "title": "Tax Short Name",
+            "examples": [
+              "IVA"
+            ]
           },
           "taxable_amount": {
             "anyOf": [
@@ -8605,7 +9189,10 @@
                 "type": "null"
               }
             ],
-            "title": "Taxable Amount"
+            "title": "Taxable Amount",
+            "examples": [
+              100
+            ]
           },
           "tax_amount": {
             "anyOf": [
@@ -8616,7 +9203,10 @@
                 "type": "null"
               }
             ],
-            "title": "Tax Amount"
+            "title": "Tax Amount",
+            "examples": [
+              12
+            ]
           }
         },
         "type": "object",
@@ -8629,13 +9219,19 @@
             "maximum": 10,
             "exclusiveMinimum": 0,
             "title": "Count",
-            "description": "Number of images to generate (1-10)"
+            "description": "Number of images to generate (1-10)",
+            "examples": [
+              3
+            ]
           },
           "context": {
             "type": "string",
             "minLength": 3,
             "title": "Context",
-            "description": "Context to orient image generation (min 3 chars)"
+            "description": "Context to orient image generation (min 3 chars)",
+            "examples": [
+              "Professional headshot for LinkedIn"
+            ]
           }
         },
         "type": "object",
@@ -8655,12 +9251,18 @@
           "total": {
             "type": "integer",
             "title": "Total",
-            "description": "Number of images successfully generated"
+            "description": "Number of images successfully generated",
+            "examples": [
+              3
+            ]
           },
           "provider": {
             "type": "string",
             "title": "Provider",
-            "description": "AI provider used for generation"
+            "description": "AI provider used for generation",
+            "examples": [
+              "1platform"
+            ]
           },
           "images": {
             "items": {
@@ -8685,12 +9287,18 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "URL of the generated image"
+            "description": "URL of the generated image",
+            "examples": [
+              "https://example.com/generated-image.png"
+            ]
           },
           "prompt": {
             "type": "string",
             "title": "Prompt",
-            "description": "Prompt used to generate this image"
+            "description": "Prompt used to generate this image",
+            "examples": [
+              "Professional headshot, studio lighting, neutral background"
+            ]
           }
         },
         "type": "object",
@@ -8719,12 +9327,18 @@
           "service": {
             "type": "string",
             "title": "Service",
-            "description": "Service status"
+            "description": "Service status",
+            "examples": [
+              "ok"
+            ]
           },
           "database": {
             "type": "string",
             "title": "Database",
-            "description": "Database connection status"
+            "description": "Database connection status",
+            "examples": [
+              "ok"
+            ]
           }
         },
         "type": "object",
@@ -8744,7 +9358,10 @@
             "type": "string",
             "minLength": 3,
             "title": "Url",
-            "description": "URL to submit for indexing"
+            "description": "URL to submit for indexing",
+            "examples": [
+              "https://example.com/new-article"
+            ]
           }
         },
         "type": "object",
@@ -8762,29 +9379,44 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Invoice ID"
+            "description": "Invoice ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "Invoice status"
+            "description": "Invoice status",
+            "examples": [
+              "cancelled"
+            ]
           },
           "cancellation_reason": {
             "type": "string",
             "title": "Cancellation Reason",
-            "description": "Cancellation reason"
+            "description": "Cancellation reason",
+            "examples": [
+              "Datos incorrectos del receptor"
+            ]
           },
           "cancelled_at": {
             "type": "string",
             "format": "date-time",
             "title": "Cancelled At",
-            "description": "Cancellation timestamp"
+            "description": "Cancellation timestamp",
+            "examples": [
+              "2024-01-20T14:00:00Z"
+            ]
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp"
+            "description": "Last update timestamp",
+            "examples": [
+              "2024-01-20T14:00:00Z"
+            ]
           }
         },
         "type": "object",
@@ -8802,26 +9434,38 @@
           "description": {
             "type": "string",
             "title": "Description",
-            "description": "Item description"
+            "description": "Item description",
+            "examples": [
+              "Servicio de consultoría mensual"
+            ]
           },
           "unit_price": {
             "type": "number",
             "exclusiveMinimum": 0,
             "title": "Unit Price",
-            "description": "Unit price"
+            "description": "Unit price",
+            "examples": [
+              500
+            ]
           },
           "quantity": {
             "type": "integer",
             "exclusiveMinimum": 0,
             "title": "Quantity",
-            "description": "Quantity"
+            "description": "Quantity",
+            "examples": [
+              2
+            ]
           },
           "discounts": {
             "type": "number",
             "minimum": 0,
             "title": "Discounts",
             "description": "Discounts applied",
-            "default": 0
+            "default": 0,
+            "examples": [
+              0
+            ]
           },
           "type": {
             "type": "string",
@@ -8831,7 +9475,10 @@
             ],
             "title": "Type",
             "description": "Item type (S=Service, B=Good)",
-            "default": "S"
+            "default": "S",
+            "examples": [
+              "S"
+            ]
           }
         },
         "type": "object",
@@ -8870,12 +9517,18 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Invoice ID"
+            "description": "Invoice ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "business_id": {
             "type": "string",
             "title": "Business Id",
-            "description": "Business ID"
+            "description": "Business ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "externalId": {
             "anyOf": [
@@ -8890,7 +9543,10 @@
               }
             ],
             "title": "Externalid",
-            "description": "FEL ID"
+            "description": "FEL ID",
+            "examples": [
+              "98765"
+            ]
           },
           "uid": {
             "anyOf": [
@@ -8902,7 +9558,10 @@
               }
             ],
             "title": "Uid",
-            "description": "FEL UUID"
+            "description": "FEL UUID",
+            "examples": [
+              "A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+            ]
           },
           "invoiceUrl": {
             "anyOf": [
@@ -8914,7 +9573,10 @@
               }
             ],
             "title": "Invoiceurl",
-            "description": "URL to view the invoice on FEEL"
+            "description": "URL to view the invoice on FEEL",
+            "examples": [
+              "https://report.feel.com.gt/ingfacereloaded/paginas/FEL/anaborrador.jsp?uuid=A1B2C3D4"
+            ]
           },
           "serieFEL": {
             "anyOf": [
@@ -8926,7 +9588,10 @@
               }
             ],
             "title": "Seriefel",
-            "description": "FEL serie"
+            "description": "FEL serie",
+            "examples": [
+              "A"
+            ]
           },
           "numeroFEL": {
             "anyOf": [
@@ -8938,7 +9603,10 @@
               }
             ],
             "title": "Numerofel",
-            "description": "FEL number"
+            "description": "FEL number",
+            "examples": [
+              "123456789"
+            ]
           },
           "amount": {
             "anyOf": [
@@ -8950,17 +9618,26 @@
               }
             ],
             "title": "Amount",
-            "description": "Invoice amount"
+            "description": "Invoice amount",
+            "examples": [
+              1000
+            ]
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "description": "Invoice currency"
+            "description": "Invoice currency",
+            "examples": [
+              "GTQ"
+            ]
           },
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "Invoice status"
+            "description": "Invoice status",
+            "examples": [
+              "issued"
+            ]
           },
           "issued_at": {
             "anyOf": [
@@ -8973,13 +9650,19 @@
               }
             ],
             "title": "Issued At",
-            "description": "Issue timestamp"
+            "description": "Issue timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp"
+            "description": "Creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -8997,17 +9680,26 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Invoice ID"
+            "description": "Invoice ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "business_id": {
             "type": "string",
             "title": "Business Id",
-            "description": "Business ID"
+            "description": "Business ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "created_by": {
             "type": "string",
             "title": "Created By",
-            "description": "Creator user ID"
+            "description": "Creator user ID",
+            "examples": [
+              "507f1f77bcf86cd799439013"
+            ]
           },
           "externalId": {
             "anyOf": [
@@ -9022,7 +9714,10 @@
               }
             ],
             "title": "Externalid",
-            "description": "FEL invoice ID"
+            "description": "FEL invoice ID",
+            "examples": [
+              "98765"
+            ]
           },
           "uid": {
             "anyOf": [
@@ -9034,7 +9729,10 @@
               }
             ],
             "title": "Uid",
-            "description": "FEL UUID"
+            "description": "FEL UUID",
+            "examples": [
+              "A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+            ]
           },
           "invoiceUrl": {
             "anyOf": [
@@ -9046,7 +9744,10 @@
               }
             ],
             "title": "Invoiceurl",
-            "description": "URL to view the invoice on FEEL"
+            "description": "URL to view the invoice on FEEL",
+            "examples": [
+              "https://report.feel.com.gt/ingfacereloaded/paginas/FEL/anaborrador.jsp?uuid=A1B2C3D4"
+            ]
           },
           "serieFEL": {
             "anyOf": [
@@ -9058,7 +9759,10 @@
               }
             ],
             "title": "Seriefel",
-            "description": "FEL serie"
+            "description": "FEL serie",
+            "examples": [
+              "A"
+            ]
           },
           "numeroFEL": {
             "anyOf": [
@@ -9070,7 +9774,10 @@
               }
             ],
             "title": "Numerofel",
-            "description": "FEL number"
+            "description": "FEL number",
+            "examples": [
+              "123456789"
+            ]
           },
           "items": {
             "items": {
@@ -9090,7 +9797,10 @@
               }
             ],
             "title": "Amount",
-            "description": "Invoice total amount"
+            "description": "Invoice total amount",
+            "examples": [
+              1000
+            ]
           },
           "description": {
             "anyOf": [
@@ -9102,7 +9812,10 @@
               }
             ],
             "title": "Description",
-            "description": "Invoice description"
+            "description": "Invoice description",
+            "examples": [
+              "Servicios profesionales enero 2024"
+            ]
           },
           "receptorInfo": {
             "anyOf": [
@@ -9118,12 +9831,18 @@
           "currency": {
             "type": "string",
             "title": "Currency",
-            "description": "Invoice currency"
+            "description": "Invoice currency",
+            "examples": [
+              "GTQ"
+            ]
           },
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "Invoice status"
+            "description": "Invoice status",
+            "examples": [
+              "issued"
+            ]
           },
           "issued_at": {
             "anyOf": [
@@ -9136,7 +9855,10 @@
               }
             ],
             "title": "Issued At",
-            "description": "Issue timestamp"
+            "description": "Issue timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "cancelled_at": {
             "anyOf": [
@@ -9149,7 +9871,10 @@
               }
             ],
             "title": "Cancelled At",
-            "description": "Cancellation timestamp"
+            "description": "Cancellation timestamp",
+            "examples": [
+              "2024-01-20T14:00:00Z"
+            ]
           },
           "cancellation_reason": {
             "anyOf": [
@@ -9161,13 +9886,19 @@
               }
             ],
             "title": "Cancellation Reason",
-            "description": "Cancellation reason"
+            "description": "Cancellation reason",
+            "examples": [
+              "Datos incorrectos del receptor"
+            ]
           },
           "fel_synced": {
             "type": "boolean",
             "title": "Fel Synced",
             "description": "Whether FEL data has been fetched",
-            "default": false
+            "default": false,
+            "examples": [
+              true
+            ]
           },
           "document_type": {
             "anyOf": [
@@ -9179,7 +9910,10 @@
               }
             ],
             "title": "Document Type",
-            "description": "FEL document type"
+            "description": "FEL document type",
+            "examples": [
+              "FACT"
+            ]
           },
           "total_in_words_es": {
             "anyOf": [
@@ -9191,7 +9925,10 @@
               }
             ],
             "title": "Total In Words Es",
-            "description": "Total in words (Spanish)"
+            "description": "Total in words (Spanish)",
+            "examples": [
+              "Mil quetzales exactos"
+            ]
           },
           "total_in_words_en": {
             "anyOf": [
@@ -9203,7 +9940,10 @@
               }
             ],
             "title": "Total In Words En",
-            "description": "Total in words (English)"
+            "description": "Total in words (English)",
+            "examples": [
+              "One thousand quetzales exactly"
+            ]
           },
           "fel_receiver": {
             "anyOf": [
@@ -9288,13 +10028,19 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp"
+            "description": "Creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp"
+            "description": "Last update timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -9314,15 +10060,24 @@
           "job_id": {
             "type": "string",
             "title": "Job Id",
-            "description": "Job unique identifier"
+            "description": "Job unique identifier",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "type": {
             "$ref": "#/components/schemas/JobType",
-            "description": "Job type discriminator"
+            "description": "Job type discriminator",
+            "examples": [
+              "content"
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/JobStatus",
-            "description": "Current job status"
+            "description": "Current job status",
+            "examples": [
+              "completed"
+            ]
           },
           "input": {
             "additionalProperties": true,
@@ -9353,7 +10108,10 @@
               }
             ],
             "title": "Error",
-            "description": "Error message on failure"
+            "description": "Error message on failure",
+            "examples": [
+              "Content generation failed"
+            ]
           },
           "timing": {
             "anyOf": [
@@ -9370,7 +10128,10 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Job creation timestamp"
+            "description": "Job creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "started_at": {
             "anyOf": [
@@ -9383,7 +10144,10 @@
               }
             ],
             "title": "Started At",
-            "description": "Job start timestamp"
+            "description": "Job start timestamp",
+            "examples": [
+              "2024-01-15T10:30:05Z"
+            ]
           },
           "completed_at": {
             "anyOf": [
@@ -9396,7 +10160,10 @@
               }
             ],
             "title": "Completed At",
-            "description": "Job completion timestamp"
+            "description": "Job completion timestamp",
+            "examples": [
+              "2024-01-15T10:30:10Z"
+            ]
           }
         },
         "type": "object",
@@ -9432,7 +10199,10 @@
               }
             ],
             "title": "Total Ms",
-            "description": "Total execution time in milliseconds"
+            "description": "Total execution time in milliseconds",
+            "examples": [
+              4523
+            ]
           }
         },
         "type": "object",
@@ -9452,34 +10222,52 @@
           "keyword": {
             "type": "string",
             "title": "Keyword",
-            "description": "The keyword term"
+            "description": "The keyword term",
+            "examples": [
+              "best running shoes 2024"
+            ]
           },
           "title": {
             "type": "string",
             "title": "Title",
-            "description": "Article or page title"
+            "description": "Article or page title",
+            "examples": [
+              "Best Running Shoes 2024: Complete Guide"
+            ]
           },
           "original_title": {
             "type": "string",
             "title": "Original Title",
             "description": "Original article or page title",
-            "default": ""
+            "default": "",
+            "examples": [
+              "Mejores zapatillas para correr 2024"
+            ]
           },
           "original_keyword": {
             "type": "string",
             "title": "Original Keyword",
             "description": "Original keyword term",
-            "default": ""
+            "default": "",
+            "examples": [
+              "mejores zapatillas correr"
+            ]
           },
           "volume": {
             "type": "integer",
             "title": "Volume",
-            "description": "Search volume for this keyword"
+            "description": "Search volume for this keyword",
+            "examples": [
+              20000
+            ]
           },
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "URL where this keyword appears"
+            "description": "URL where this keyword appears",
+            "examples": [
+              "https://example.com/best-running-shoes"
+            ]
           }
         },
         "type": "object",
@@ -9497,7 +10285,10 @@
           "total": {
             "type": "integer",
             "title": "Total",
-            "description": "Total number of keywords extracted"
+            "description": "Total number of keywords extracted",
+            "examples": [
+              25
+            ]
           },
           "categories": {
             "items": {
@@ -9518,17 +10309,26 @@
           "country": {
             "type": "string",
             "title": "Country",
-            "description": "Country code used for extraction"
+            "description": "Country code used for extraction",
+            "examples": [
+              "es"
+            ]
           },
           "lookup_key": {
             "type": "string",
             "title": "Lookup Key",
-            "description": "Cache key: domain slug or topic slug"
+            "description": "Cache key: domain slug or topic slug",
+            "examples": [
+              "ecologiaverde-com"
+            ]
           },
           "lang": {
             "type": "string",
             "title": "Lang",
-            "description": "Language code used for categorization"
+            "description": "Language code used for categorization",
+            "examples": [
+              "en"
+            ]
           }
         },
         "type": "object",
@@ -9577,7 +10377,10 @@
             "type": "string",
             "minLength": 3,
             "title": "Domain",
-            "description": "Domain URL to extract keywords from"
+            "description": "Domain URL to extract keywords from",
+            "examples": [
+              "ecologiaverde.com"
+            ]
           },
           "country": {
             "type": "string",
@@ -9585,7 +10388,10 @@
             "minLength": 2,
             "title": "Country",
             "description": "Country code (e.g., 'es', 'en', 'fr')",
-            "default": "es"
+            "default": "es",
+            "examples": [
+              "es"
+            ]
           },
           "lang": {
             "type": "string",
@@ -9593,7 +10399,10 @@
             "minLength": 2,
             "title": "Lang",
             "description": "Language code for categorization (e.g., 'en', 'es', 'fr')",
-            "default": "en"
+            "default": "en",
+            "examples": [
+              "en"
+            ]
           }
         },
         "type": "object",
@@ -9614,7 +10423,10 @@
             "type": "string",
             "minLength": 2,
             "title": "Topic",
-            "description": "Topic or theme to research keywords for"
+            "description": "Topic or theme to research keywords for",
+            "examples": [
+              "plantas de interior"
+            ]
           },
           "country": {
             "type": "string",
@@ -9622,7 +10434,10 @@
             "minLength": 2,
             "title": "Country",
             "description": "Country code (e.g., 'es', 'en', 'fr')",
-            "default": "es"
+            "default": "es",
+            "examples": [
+              "es"
+            ]
           },
           "lang": {
             "type": "string",
@@ -9630,7 +10445,10 @@
             "minLength": 2,
             "title": "Lang",
             "description": "Language code for categorization (e.g., 'en', 'es', 'fr')",
-            "default": "en"
+            "default": "en",
+            "examples": [
+              "es"
+            ]
           }
         },
         "type": "object",
@@ -9654,7 +10472,10 @@
               "en"
             ],
             "title": "Lang",
-            "description": "Language of generated content"
+            "description": "Language of generated content",
+            "examples": [
+              "en"
+            ]
           },
           "pages": {
             "additionalProperties": {
@@ -9698,7 +10519,10 @@
               }
             ],
             "title": "Generated Owner",
-            "description": "AI-generated owner name (only present if owner was auto-generated)"
+            "description": "AI-generated owner name (only present if owner was auto-generated)",
+            "examples": [
+              "Empresa Tecnología S.A."
+            ]
           },
           "generated_address": {
             "anyOf": [
@@ -9710,7 +10534,10 @@
               }
             ],
             "title": "Generated Address",
-            "description": "AI-generated address (only present if address was auto-generated)"
+            "description": "AI-generated address (only present if address was auto-generated)",
+            "examples": [
+              "6a Calle 5-20, Zona 1, Guatemala"
+            ]
           }
         },
         "type": "object",
@@ -9725,12 +10552,18 @@
           "title": {
             "type": "string",
             "title": "Title",
-            "description": "Page title"
+            "description": "Page title",
+            "examples": [
+              "Privacy Policy"
+            ]
           },
           "content": {
             "type": "string",
             "title": "Content",
-            "description": "HTML content of the page"
+            "description": "HTML content of the page",
+            "examples": [
+              "<h1>Privacy Policy</h1><p>This privacy policy describes...</p>"
+            ]
           }
         },
         "type": "object",
@@ -9747,31 +10580,46 @@
             "type": "string",
             "title": "Legal Owner",
             "description": "Legal owner name (person or organization)",
-            "default": ""
+            "default": "",
+            "examples": [
+              "Empresa S.A."
+            ]
           },
           "legal_email": {
             "type": "string",
             "minLength": 5,
             "title": "Legal Email",
-            "description": "Contact email address"
+            "description": "Contact email address",
+            "examples": [
+              "legal@empresa.com"
+            ]
           },
           "legal_address": {
             "type": "string",
             "title": "Legal Address",
             "description": "Fiscal/business address",
-            "default": ""
+            "default": "",
+            "examples": [
+              "4a Avenida, Zona 1"
+            ]
           },
           "legal_activity": {
             "type": "string",
             "title": "Legal Activity",
             "description": "Business activity description",
-            "default": ""
+            "default": "",
+            "examples": [
+              "E-commerce"
+            ]
           },
           "site_topic": {
             "type": "string",
             "title": "Site Topic",
             "description": "Website topic/theme for AI-generated pages",
-            "default": ""
+            "default": "",
+            "examples": [
+              "Technology blog"
+            ]
           }
         },
         "type": "object",
@@ -9793,22 +10641,34 @@
           "page": {
             "type": "integer",
             "title": "Page",
-            "description": "Current page number"
+            "description": "Current page number",
+            "examples": [
+              1
+            ]
           },
           "limit": {
             "type": "integer",
             "title": "Limit",
-            "description": "Items per page"
+            "description": "Items per page",
+            "examples": [
+              20
+            ]
           },
           "total_items": {
             "type": "integer",
             "title": "Total Items",
-            "description": "Total items matching filters"
+            "description": "Total items matching filters",
+            "examples": [
+              50
+            ]
           },
           "total_pages": {
             "type": "integer",
             "title": "Total Pages",
-            "description": "Total number of pages"
+            "description": "Total number of pages",
+            "examples": [
+              3
+            ]
           }
         },
         "type": "object",
@@ -9825,37 +10685,58 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Plan document ID"
+            "description": "Plan document ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "plan_id": {
             "type": "string",
             "title": "Plan Id",
-            "description": "Plan unique identifier"
+            "description": "Plan unique identifier",
+            "examples": [
+              "plan_payg"
+            ]
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Plan display name"
+            "description": "Plan display name",
+            "examples": [
+              "Pay-as-you-go"
+            ]
           },
           "type": {
             "type": "string",
             "title": "Type",
-            "description": "Plan type"
+            "description": "Plan type",
+            "examples": [
+              "basic"
+            ]
           },
           "price": {
             "type": "number",
             "title": "Price",
-            "description": "Plan price"
+            "description": "Plan price",
+            "examples": [
+              0
+            ]
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "description": "Currency code"
+            "description": "Currency code",
+            "examples": [
+              "USD"
+            ]
           },
           "billing_cycle_days": {
             "type": "integer",
             "title": "Billing Cycle Days",
-            "description": "Billing cycle in days"
+            "description": "Billing cycle in days",
+            "examples": [
+              30
+            ]
           }
         },
         "type": "object",
@@ -9886,13 +10767,19 @@
             "type": "string",
             "minLength": 1,
             "title": "Owner",
-            "description": "Person's full name (required)"
+            "description": "Person's full name (required)",
+            "examples": [
+              "Maria Garcia"
+            ]
           },
           "context": {
             "type": "string",
             "title": "Context",
             "description": "Additional context to influence bio generation",
-            "default": ""
+            "default": "",
+            "examples": [
+              "Software engineer specializing in AI"
+            ]
           },
           "lang": {
             "type": "string",
@@ -9901,7 +10788,10 @@
               "en"
             ],
             "title": "Lang",
-            "description": "Language for generated content ('es' or 'en')"
+            "description": "Language for generated content ('es' or 'en')",
+            "examples": [
+              "en"
+            ]
           }
         },
         "type": "object",
@@ -9922,29 +10812,44 @@
           "fullname": {
             "type": "string",
             "title": "Fullname",
-            "description": "Cleaned full name"
+            "description": "Cleaned full name",
+            "examples": [
+              "Maria Garcia"
+            ]
           },
           "gender": {
             "type": "string",
             "title": "Gender",
-            "description": "Detected gender: male, female, or neutral"
+            "description": "Detected gender: male, female, or neutral",
+            "examples": [
+              "female"
+            ]
           },
           "bio": {
             "type": "string",
             "title": "Bio",
-            "description": "HTML paragraph with generated bio"
+            "description": "HTML paragraph with generated bio",
+            "examples": [
+              "<p>Maria Garcia is a software engineer specializing in AI...</p>"
+            ]
           },
           "rrss": {
             "type": "string",
             "title": "Rrss",
             "description": "HTML string with social media links",
-            "default": ""
+            "default": "",
+            "examples": [
+              "<a href='https://twitter.com/mariagarcia'>Twitter</a>"
+            ]
           },
           "profile_image_url": {
             "type": "string",
             "title": "Profile Image Url",
             "description": "Final profile image URL",
-            "default": ""
+            "default": "",
+            "examples": [
+              "https://example.com/profiles/maria-garcia.jpg"
+            ]
           }
         },
         "type": "object",
@@ -9965,7 +10870,10 @@
               "verify"
             ],
             "title": "Action",
-            "description": "Action to perform: add or verify"
+            "description": "Action to perform: add or verify",
+            "examples": [
+              "add"
+            ]
           }
         },
         "type": "object",
@@ -10000,13 +10908,19 @@
               }
             ],
             "title": "Publisuites Id",
-            "description": "Link-building marketplace website ID"
+            "description": "Link-building marketplace website ID",
+            "examples": [
+              12345
+            ]
           },
           "method": {
             "type": "string",
             "title": "Method",
             "description": "Verification method",
-            "default": "FILE"
+            "default": "FILE",
+            "examples": [
+              "FILE"
+            ]
           },
           "file_name": {
             "anyOf": [
@@ -10018,7 +10932,10 @@
               }
             ],
             "title": "File Name",
-            "description": "Verification file name"
+            "description": "Verification file name",
+            "examples": [
+              "verify-abc123.html"
+            ]
           },
           "file_content": {
             "anyOf": [
@@ -10030,13 +10947,19 @@
               }
             ],
             "title": "File Content",
-            "description": "Verification file content"
+            "description": "Verification file content",
+            "examples": [
+              "verification-content-abc123"
+            ]
           },
           "verified": {
             "type": "boolean",
             "title": "Verified",
             "description": "Verification status",
-            "default": false
+            "default": false,
+            "examples": [
+              true
+            ]
           },
           "verified_at": {
             "anyOf": [
@@ -10049,7 +10972,10 @@
               }
             ],
             "title": "Verified At",
-            "description": "Verification timestamp"
+            "description": "Verification timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -10060,22 +10986,34 @@
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Receptor name"
+            "description": "Receptor name",
+            "examples": [
+              "Juan Pérez"
+            ]
           },
           "documentType": {
             "type": "string",
             "title": "Documenttype",
-            "description": "Document type (e.g. NIT)"
+            "description": "Document type (e.g. NIT)",
+            "examples": [
+              "NIT"
+            ]
           },
           "documentNumber": {
             "type": "string",
             "title": "Documentnumber",
-            "description": "Document number"
+            "description": "Document number",
+            "examples": [
+              "12345678-9"
+            ]
           },
           "email": {
             "type": "string",
             "title": "Email",
-            "description": "Receptor email"
+            "description": "Receptor email",
+            "examples": [
+              "juan@example.com"
+            ]
           },
           "address": {
             "anyOf": [
@@ -10088,7 +11026,10 @@
             ],
             "title": "Address",
             "description": "Receptor address",
-            "default": "Ciudad"
+            "default": "Ciudad",
+            "examples": [
+              "4a Avenida, Zona 1, Guatemala"
+            ]
           }
         },
         "type": "object",
@@ -10099,6 +11040,33 @@
           "email"
         ],
         "title": "ReceptorInfo"
+      },
+      "RevokeTokensResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Revocation result message",
+            "examples": [
+              "All tokens revoked successfully"
+            ]
+          },
+          "token_version": {
+            "type": "integer",
+            "title": "Token Version",
+            "description": "New token version after revocation",
+            "examples": [
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "token_version"
+        ],
+        "title": "RevokeTokensResponse",
+        "description": "Response after revoking all user tokens."
       },
       "RunAgentRequest": {
         "properties": {
@@ -10113,7 +11081,10 @@
               }
             ],
             "title": "Input Message",
-            "description": "Optional message to pass as the initial user turn"
+            "description": "Optional message to pass as the initial user turn",
+            "examples": [
+              "Generate content about best running shoes 2024"
+            ]
           }
         },
         "type": "object",
@@ -10131,7 +11102,10 @@
               "sitemaps"
             ],
             "title": "Action",
-            "description": "Action to perform: add, verify, delete, or sitemaps"
+            "description": "Action to perform: add, verify, delete, or sitemaps",
+            "examples": [
+              "sitemaps"
+            ]
           },
           "payload": {
             "anyOf": [
@@ -10189,7 +11163,12 @@
             "type": "array",
             "minItems": 1,
             "title": "Sitemaps",
-            "description": "List of sitemap URLs (http/https)"
+            "description": "List of sitemap URLs (http/https)",
+            "examples": [
+              [
+                "https://example.com/sitemap.xml"
+              ]
+            ]
           }
         },
         "type": "object",
@@ -10203,13 +11182,19 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "Sitemap URL"
+            "description": "Sitemap URL",
+            "examples": [
+              "https://example.com/sitemap.xml"
+            ]
           },
           "submitted": {
             "type": "boolean",
             "title": "Submitted",
             "description": "Whether sitemap was submitted to Search Console",
-            "default": false
+            "default": false,
+            "examples": [
+              true
+            ]
           },
           "submitted_at": {
             "anyOf": [
@@ -10222,7 +11207,10 @@
               }
             ],
             "title": "Submitted At",
-            "description": "Submission timestamp"
+            "description": "Submission timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -10236,27 +11224,42 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Subscription ID"
+            "description": "Subscription ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "user_id": {
             "type": "string",
             "title": "User Id",
-            "description": "User ID"
+            "description": "User ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "plan_id": {
             "type": "string",
             "title": "Plan Id",
-            "description": "Plan identifier"
+            "description": "Plan identifier",
+            "examples": [
+              "plan_payg"
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/SubscriptionStatus",
-            "description": "Subscription status"
+            "description": "Subscription status",
+            "examples": [
+              "active"
+            ]
           },
           "start_date": {
             "type": "string",
             "format": "date-time",
             "title": "Start Date",
-            "description": "Subscription start date"
+            "description": "Subscription start date",
+            "examples": [
+              "2024-01-01T00:00:00Z"
+            ]
           },
           "end_date": {
             "anyOf": [
@@ -10269,12 +11272,18 @@
               }
             ],
             "title": "End Date",
-            "description": "Subscription end date (null for active)"
+            "description": "Subscription end date (null for active)",
+            "examples": [
+              "2024-02-01T00:00:00Z"
+            ]
           },
           "auto_renew": {
             "type": "boolean",
             "title": "Auto Renew",
-            "description": "Auto-renewal enabled"
+            "description": "Auto-renewal enabled",
+            "examples": [
+              false
+            ]
           },
           "plan": {
             "anyOf": [
@@ -10335,7 +11344,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/AgentActionListResponse",
@@ -10344,7 +11356,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10361,7 +11376,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/AgentActionResponse",
@@ -10370,7 +11388,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10387,7 +11408,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/AgentListResponse",
@@ -10396,7 +11420,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10413,7 +11440,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/AgentMetricsResponse",
@@ -10422,7 +11452,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10439,7 +11472,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/AgentResponse",
@@ -10448,7 +11484,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10465,7 +11504,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/AgentRunListResponse",
@@ -10474,7 +11516,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10491,7 +11536,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/AgentRunResponse",
@@ -10500,7 +11548,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10517,7 +11568,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/BranchResponse",
@@ -10526,7 +11580,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10543,7 +11600,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/BusinessResponse",
@@ -10552,7 +11612,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10569,7 +11632,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/CatalogListResponse",
@@ -10578,7 +11644,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10595,7 +11664,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/CatalogTemplateResponse",
@@ -10604,7 +11676,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10621,7 +11696,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/ClientLogBatchResponse",
@@ -10630,7 +11708,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10647,7 +11728,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/CommentGenerationResponse",
@@ -10656,7 +11740,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10673,7 +11760,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/GenerateUserImagesResponse",
@@ -10682,7 +11772,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10699,7 +11792,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/HealthStatus",
@@ -10708,7 +11804,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10725,7 +11824,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/InvoiceCancelResponse",
@@ -10734,7 +11836,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10751,7 +11856,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/InvoiceListData",
@@ -10760,7 +11868,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10777,7 +11888,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/InvoiceResponse",
@@ -10786,7 +11900,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10803,7 +11920,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/JobResponse",
@@ -10812,7 +11932,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10829,7 +11952,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/KeywordExtractResponse",
@@ -10838,7 +11964,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10855,7 +11984,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/LegalPageData",
@@ -10864,7 +11996,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10881,7 +12016,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "type": "null",
@@ -10891,7 +12029,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10908,7 +12049,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/ProfileGenerationResponse",
@@ -10917,7 +12061,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10927,6 +12074,38 @@
         ],
         "title": "SuccessResponse[ProfileGenerationResponse]"
       },
+      "SuccessResponse_RevokeTokensResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/RevokeTokensResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[RevokeTokensResponse]"
+      },
       "SuccessResponse_TokenResponse_": {
         "properties": {
           "success": {
@@ -10934,7 +12113,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/TokenResponse",
@@ -10943,7 +12125,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10960,7 +12145,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/TransactionHistoryResponse",
@@ -10969,7 +12157,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -10986,7 +12177,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/TransactionResponse",
@@ -10995,7 +12189,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -11012,7 +12209,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/UserBillingResponse",
@@ -11021,7 +12221,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -11038,7 +12241,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/UserProfileResponse",
@@ -11047,7 +12253,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -11064,7 +12273,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/UserResponse",
@@ -11073,7 +12285,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -11090,7 +12305,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/WebsiteResponse",
@@ -11099,7 +12317,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -11116,7 +12337,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "$ref": "#/components/schemas/WizardSessionResponse",
@@ -11125,7 +12349,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -11142,7 +12369,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "additionalProperties": true,
@@ -11153,7 +12383,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -11170,7 +12403,10 @@
             "const": true,
             "title": "Success",
             "description": "Always true for success responses",
-            "default": true
+            "default": true,
+            "examples": [
+              true
+            ]
           },
           "data": {
             "items": {
@@ -11183,7 +12419,10 @@
           "msg": {
             "type": "string",
             "title": "Msg",
-            "description": "Response message"
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
           }
         },
         "type": "object",
@@ -11199,7 +12438,10 @@
             "type": "string",
             "minLength": 1,
             "title": "Apikey",
-            "description": "API key for authentication"
+            "description": "API key for authentication",
+            "examples": [
+              "ak-your-app-api-key-here"
+            ]
           }
         },
         "type": "object",
@@ -11217,18 +12459,27 @@
           "access_token": {
             "type": "string",
             "title": "Access Token",
-            "description": "JWT access token"
+            "description": "JWT access token",
+            "examples": [
+              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            ]
           },
           "token_type": {
             "type": "string",
             "title": "Token Type",
             "description": "Token type",
-            "default": "bearer"
+            "default": "bearer",
+            "examples": [
+              "bearer"
+            ]
           },
           "expires_in": {
             "type": "integer",
             "title": "Expires In",
-            "description": "Token expiration time in seconds"
+            "description": "Token expiration time in seconds",
+            "examples": [
+              3600
+            ]
           }
         },
         "type": "object",
@@ -11243,12 +12494,18 @@
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Tool name — must be unique within the agent"
+            "description": "Tool name — must be unique within the agent",
+            "examples": [
+              "get_keywords"
+            ]
           },
           "description": {
             "type": "string",
             "title": "Description",
-            "description": "Natural-language description of what the tool does"
+            "description": "Natural-language description of what the tool does",
+            "examples": [
+              "Extracts keywords from a given domain"
+            ]
           },
           "input_schema": {
             "additionalProperties": true,
@@ -11278,7 +12535,10 @@
               }
             ],
             "title": "Base Url",
-            "description": "Base URL of the external tool endpoint"
+            "description": "Base URL of the external tool endpoint",
+            "examples": [
+              "https://api.example.com/v1"
+            ]
           },
           "encrypted_headers": {
             "anyOf": [
@@ -11290,14 +12550,20 @@
               }
             ],
             "title": "Encrypted Headers",
-            "description": "Fernet-encrypted JSON string of HTTP headers (API keys, tokens)"
+            "description": "Fernet-encrypted JSON string of HTTP headers (API keys, tokens)",
+            "examples": [
+              "gAAAAABh...encrypted..."
+            ]
           },
           "timeout": {
             "type": "integer",
             "maximum": 30,
             "title": "Timeout",
             "description": "Request timeout in seconds — maximum 30",
-            "default": 30
+            "default": 30,
+            "examples": [
+              30
+            ]
           }
         },
         "type": "object",
@@ -11316,14 +12582,20 @@
               }
             ],
             "title": "Base Url",
-            "description": "Base URL of the external tool endpoint"
+            "description": "Base URL of the external tool endpoint",
+            "examples": [
+              "https://api.example.com/v1"
+            ]
           },
           "timeout": {
             "type": "integer",
             "maximum": 30,
             "title": "Timeout",
             "description": "Request timeout in seconds — maximum 30",
-            "default": 30
+            "default": 30,
+            "examples": [
+              30
+            ]
           }
         },
         "type": "object",
@@ -11345,7 +12617,10 @@
             "type": "number",
             "exclusiveMinimum": 0,
             "title": "Amount",
-            "description": "Transaction amount in merchant's configured currency (must be positive)"
+            "description": "Transaction amount in merchant's configured currency (must be positive)",
+            "examples": [
+              10
+            ]
           },
           "description": {
             "anyOf": [
@@ -11358,7 +12633,10 @@
               }
             ],
             "title": "Description",
-            "description": "Transaction description"
+            "description": "Transaction description",
+            "examples": [
+              "Account top-up"
+            ]
           },
           "metadata": {
             "additionalProperties": true,
@@ -11387,7 +12665,10 @@
           "total": {
             "type": "integer",
             "title": "Total",
-            "description": "Total number of transactions for user"
+            "description": "Total number of transactions for user",
+            "examples": [
+              25
+            ]
           },
           "transactions": {
             "items": {
@@ -11427,12 +12708,18 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Internal transaction ID"
+            "description": "Internal transaction ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "user_id": {
             "type": "string",
             "title": "User Id",
-            "description": "User ID"
+            "description": "User ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "usd_amount": {
             "anyOf": [
@@ -11444,27 +12731,42 @@
               }
             ],
             "title": "Usd Amount",
-            "description": "Original amount in merchant currency"
+            "description": "Original amount in merchant currency",
+            "examples": [
+              10
+            ]
           },
           "amount": {
             "type": "number",
             "title": "Amount",
-            "description": "Amount sent to payment provider"
+            "description": "Amount sent to payment provider",
+            "examples": [
+              78
+            ]
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "description": "Merchant currency (ISO 4217)"
+            "description": "Merchant currency (ISO 4217)",
+            "examples": [
+              "USD"
+            ]
           },
           "currency_provider": {
             "type": "string",
             "title": "Currency Provider",
             "description": "Payment provider currency (ISO 4217)",
-            "default": "GTQ"
+            "default": "GTQ",
+            "examples": [
+              "GTQ"
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/TransactionStatus",
-            "description": "Current transaction status"
+            "description": "Current transaction status",
+            "examples": [
+              "created"
+            ]
           },
           "payment_url": {
             "anyOf": [
@@ -11476,7 +12778,10 @@
               }
             ],
             "title": "Payment Url",
-            "description": "Payment URL where user completes checkout"
+            "description": "Payment URL where user completes checkout",
+            "examples": [
+              "https://checkout.example.com/pay/abc123"
+            ]
           },
           "reference": {
             "anyOf": [
@@ -11488,7 +12793,10 @@
               }
             ],
             "title": "Reference",
-            "description": "Payment service internal reference"
+            "description": "Payment service internal reference",
+            "examples": [
+              "GT123456"
+            ]
           },
           "description": {
             "anyOf": [
@@ -11500,19 +12808,28 @@
               }
             ],
             "title": "Description",
-            "description": "Transaction description"
+            "description": "Transaction description",
+            "examples": [
+              "Account top-up"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Transaction creation timestamp"
+            "description": "Transaction creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Transaction last update timestamp"
+            "description": "Transaction last update timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -11567,7 +12884,10 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "Name",
+            "examples": [
+              "SEO Content Agent"
+            ]
           },
           "description": {
             "anyOf": [
@@ -11579,7 +12899,10 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "examples": [
+              "Generates SEO-optimized content for websites"
+            ]
           },
           "system_prompt": {
             "anyOf": [
@@ -11591,7 +12914,10 @@
                 "type": "null"
               }
             ],
-            "title": "System Prompt"
+            "title": "System Prompt",
+            "examples": [
+              "You are an SEO content specialist..."
+            ]
           },
           "tools": {
             "anyOf": [
@@ -11615,6 +12941,9 @@
               {
                 "type": "null"
               }
+            ],
+            "examples": [
+              "claude-sonnet-4-6"
             ]
           },
           "max_iterations": {
@@ -11628,7 +12957,10 @@
                 "type": "null"
               }
             ],
-            "title": "Max Iterations"
+            "title": "Max Iterations",
+            "examples": [
+              10
+            ]
           },
           "schedule": {
             "anyOf": [
@@ -11639,7 +12971,10 @@
                 "type": "null"
               }
             ],
-            "title": "Schedule"
+            "title": "Schedule",
+            "examples": [
+              "0 9 * * 1"
+            ]
           },
           "webhook_url": {
             "anyOf": [
@@ -11650,7 +12985,10 @@
                 "type": "null"
               }
             ],
-            "title": "Webhook Url"
+            "title": "Webhook Url",
+            "examples": [
+              "https://example.com/webhooks/agent-result"
+            ]
           },
           "is_active": {
             "anyOf": [
@@ -11661,7 +12999,10 @@
                 "type": "null"
               }
             ],
-            "title": "Is Active"
+            "title": "Is Active",
+            "examples": [
+              true
+            ]
           },
           "max_concurrent_runs": {
             "anyOf": [
@@ -11674,7 +13015,10 @@
                 "type": "null"
               }
             ],
-            "title": "Max Concurrent Runs"
+            "title": "Max Concurrent Runs",
+            "examples": [
+              1
+            ]
           },
           "template_slug": {
             "anyOf": [
@@ -11685,7 +13029,10 @@
                 "type": "null"
               }
             ],
-            "title": "Template Slug"
+            "title": "Template Slug",
+            "examples": [
+              "seo-content-writer"
+            ]
           }
         },
         "type": "object",
@@ -11743,22 +13090,34 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "User ID"
+            "description": "User ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "username": {
             "type": "string",
             "title": "Username",
-            "description": "Username"
+            "description": "Username",
+            "examples": [
+              "johndoe"
+            ]
           },
           "email": {
             "type": "string",
             "title": "Email",
-            "description": "User email address"
+            "description": "User email address",
+            "examples": [
+              "user@example.com"
+            ]
           },
           "is_active": {
             "type": "boolean",
             "title": "Is Active",
-            "description": "User account status"
+            "description": "User account status",
+            "examples": [
+              true
+            ]
           },
           "created_at": {
             "anyOf": [
@@ -11770,7 +13129,10 @@
               }
             ],
             "title": "Created At",
-            "description": "User creation timestamp (ISO format)"
+            "description": "User creation timestamp (ISO format)",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -11788,27 +13150,42 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "User ID"
+            "description": "User ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "email": {
             "type": "string",
             "title": "Email",
-            "description": "User email address"
+            "description": "User email address",
+            "examples": [
+              "user@example.com"
+            ]
           },
           "username": {
             "type": "string",
             "title": "Username",
-            "description": "Username"
+            "description": "Username",
+            "examples": [
+              "johndoe"
+            ]
           },
           "api_key": {
             "type": "string",
             "title": "Api Key",
-            "description": "API key for authentication"
+            "description": "API key for authentication",
+            "examples": [
+              "sk-abc123def456"
+            ]
           },
           "is_active": {
             "type": "boolean",
             "title": "Is Active",
-            "description": "User account status"
+            "description": "User account status",
+            "examples": [
+              true
+            ]
           },
           "billing_id": {
             "anyOf": [
@@ -11820,13 +13197,19 @@
               }
             ],
             "title": "Billing Id",
-            "description": "Associated billing ID"
+            "description": "Associated billing ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "User creation timestamp"
+            "description": "User creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -11886,13 +13269,19 @@
               }
             ],
             "title": "Token",
-            "description": "Verification token from Search Console"
+            "description": "Verification token from Search Console",
+            "examples": [
+              "google-site-verification-abc123"
+            ]
           },
           "method": {
             "type": "string",
             "title": "Method",
             "description": "Verification method (FILE, META_TAG, DNS)",
-            "default": "FILE"
+            "default": "FILE",
+            "examples": [
+              "FILE"
+            ]
           },
           "file_name": {
             "anyOf": [
@@ -11904,7 +13293,10 @@
               }
             ],
             "title": "File Name",
-            "description": "Verification file name"
+            "description": "Verification file name",
+            "examples": [
+              "google-abc123.html"
+            ]
           },
           "file_content": {
             "anyOf": [
@@ -11916,7 +13308,10 @@
               }
             ],
             "title": "File Content",
-            "description": "Verification file content"
+            "description": "Verification file content",
+            "examples": [
+              "google-site-verification: google-abc123.html"
+            ]
           },
           "meta_tag": {
             "anyOf": [
@@ -11928,7 +13323,10 @@
               }
             ],
             "title": "Meta Tag",
-            "description": "HTML meta tag for verification"
+            "description": "HTML meta tag for verification",
+            "examples": [
+              "<meta name='google-site-verification' content='abc123' />"
+            ]
           },
           "dns_record": {
             "anyOf": [
@@ -11940,13 +13338,19 @@
               }
             ],
             "title": "Dns Record",
-            "description": "DNS TXT record for verification"
+            "description": "DNS TXT record for verification",
+            "examples": [
+              "google-site-verification=abc123"
+            ]
           },
           "verified": {
             "type": "boolean",
             "title": "Verified",
             "description": "Whether ownership is verified",
-            "default": false
+            "default": false,
+            "examples": [
+              true
+            ]
           },
           "verified_at": {
             "anyOf": [
@@ -11959,7 +13363,10 @@
               }
             ],
             "title": "Verified At",
-            "description": "Verification timestamp"
+            "description": "Verification timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -11970,12 +13377,18 @@
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "Processing status: 'success' or 'error'"
+            "description": "Processing status: 'success' or 'error'",
+            "examples": [
+              "success"
+            ]
           },
           "message": {
             "type": "string",
             "title": "Message",
-            "description": "Processing result description"
+            "description": "Processing result description",
+            "examples": [
+              "Webhook processed successfully"
+            ]
           }
         },
         "type": "object",
@@ -12003,7 +13416,10 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "Website URL to add"
+            "description": "Website URL to add",
+            "examples": [
+              "https://example.com"
+            ]
           },
           "category_id": {
             "anyOf": [
@@ -12015,7 +13431,10 @@
               }
             ],
             "title": "Category Id",
-            "description": "Category ID (optional)"
+            "description": "Category ID (optional)",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "lang": {
             "type": "string",
@@ -12025,12 +13444,18 @@
             ],
             "title": "Lang",
             "description": "Website language: es or en (defaults to 'es')",
-            "default": "es"
+            "default": "es",
+            "examples": [
+              "es"
+            ]
           },
           "site_name": {
             "type": "string",
             "title": "Site Name",
-            "description": "Website display name"
+            "description": "Website display name",
+            "examples": [
+              "My Website"
+            ]
           },
           "site_description": {
             "anyOf": [
@@ -12042,7 +13467,10 @@
               }
             ],
             "title": "Site Description",
-            "description": "Website description (generated via AI when empty)"
+            "description": "Website description (generated via AI when empty)",
+            "examples": [
+              "A tech blog about Python"
+            ]
           }
         },
         "type": "object",
@@ -12064,27 +13492,42 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Website ID"
+            "description": "Website ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "Website URL"
+            "description": "Website URL",
+            "examples": [
+              "https://example.com"
+            ]
           },
           "slug": {
             "type": "string",
             "title": "Slug",
-            "description": "URL slug"
+            "description": "URL slug",
+            "examples": [
+              "example-com"
+            ]
           },
           "active": {
             "type": "boolean",
             "title": "Active",
-            "description": "Active status"
+            "description": "Active status",
+            "examples": [
+              true
+            ]
           },
           "user_id": {
             "type": "string",
             "title": "User Id",
-            "description": "Owner user ID"
+            "description": "Owner user ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           },
           "category_id": {
             "anyOf": [
@@ -12096,7 +13539,10 @@
               }
             ],
             "title": "Category Id",
-            "description": "Category reference ID"
+            "description": "Category reference ID",
+            "examples": [
+              "507f1f77bcf86cd799439013"
+            ]
           },
           "category": {
             "anyOf": [
@@ -12116,18 +13562,27 @@
               "en"
             ],
             "title": "Lang",
-            "description": "Website language"
+            "description": "Website language",
+            "examples": [
+              "es"
+            ]
           },
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "Website status"
+            "description": "Website status",
+            "examples": [
+              "active"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp"
+            "description": "Creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "updated_at": {
             "anyOf": [
@@ -12140,7 +13595,10 @@
               }
             ],
             "title": "Updated At",
-            "description": "Last update timestamp"
+            "description": "Last update timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "actions": {
             "$ref": "#/components/schemas/WebsiteActions",
@@ -12156,7 +13614,10 @@
               }
             ],
             "title": "Domain",
-            "description": "Domain name"
+            "description": "Domain name",
+            "examples": [
+              "example.com"
+            ]
           },
           "site_name": {
             "anyOf": [
@@ -12168,7 +13629,10 @@
               }
             ],
             "title": "Site Name",
-            "description": "Website display name"
+            "description": "Website display name",
+            "examples": [
+              "My Website"
+            ]
           },
           "site_description": {
             "anyOf": [
@@ -12180,7 +13644,10 @@
               }
             ],
             "title": "Site Description",
-            "description": "Website description"
+            "description": "Website description",
+            "examples": [
+              "A tech blog about Python"
+            ]
           },
           "theme": {
             "anyOf": [
@@ -12193,7 +13660,10 @@
               }
             ],
             "title": "Theme",
-            "description": "Theme slug installed on this site"
+            "description": "Theme slug installed on this site",
+            "examples": [
+              "astra"
+            ]
           }
         },
         "type": "object",
@@ -12222,7 +13692,10 @@
               }
             ],
             "title": "Site Name",
-            "description": "Website display name"
+            "description": "Website display name",
+            "examples": [
+              "Updated Name"
+            ]
           },
           "site_description": {
             "anyOf": [
@@ -12234,7 +13707,10 @@
               }
             ],
             "title": "Site Description",
-            "description": "Website description"
+            "description": "Website description",
+            "examples": [
+              "Updated description"
+            ]
           },
           "category_id": {
             "anyOf": [
@@ -12246,7 +13722,10 @@
               }
             ],
             "title": "Category Id",
-            "description": "Category ID"
+            "description": "Category ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "lang": {
             "anyOf": [
@@ -12262,7 +13741,10 @@
               }
             ],
             "title": "Lang",
-            "description": "Website language: es or en"
+            "description": "Website language: es or en",
+            "examples": [
+              "en"
+            ]
           },
           "theme": {
             "anyOf": [
@@ -12276,7 +13758,10 @@
               }
             ],
             "title": "Theme",
-            "description": "Theme slug installed on this site"
+            "description": "Theme slug installed on this site",
+            "examples": [
+              "astra"
+            ]
           }
         },
         "type": "object",
@@ -12294,18 +13779,27 @@
           "role": {
             "type": "string",
             "title": "Role",
-            "description": "Message author — 'user' or 'assistant'"
+            "description": "Message author — 'user' or 'assistant'",
+            "examples": [
+              "user"
+            ]
           },
           "content": {
             "type": "string",
             "title": "Content",
-            "description": "Message text"
+            "description": "Message text",
+            "examples": [
+              "I want to create an agent that monitors my website SEO"
+            ]
           },
           "timestamp": {
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "description": "UTC timestamp of the message"
+            "description": "UTC timestamp of the message",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -12322,7 +13816,10 @@
             "type": "string",
             "maxLength": 2000,
             "title": "Message",
-            "description": "User message to continue the wizard conversation"
+            "description": "User message to continue the wizard conversation",
+            "examples": [
+              "Yes, I want the agent to run daily at 9 AM"
+            ]
           }
         },
         "type": "object",
@@ -12337,7 +13834,10 @@
           "id": {
             "type": "string",
             "title": "Id",
-            "description": "Session document ID"
+            "description": "Session document ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "template_slug": {
             "anyOf": [
@@ -12348,10 +13848,16 @@
                 "type": "null"
               }
             ],
-            "title": "Template Slug"
+            "title": "Template Slug",
+            "examples": [
+              "seo-content-writer"
+            ]
           },
           "status": {
-            "$ref": "#/components/schemas/WizardStatus"
+            "$ref": "#/components/schemas/WizardStatus",
+            "examples": [
+              "in_progress"
+            ]
           },
           "messages": {
             "items": {
@@ -12375,16 +13881,17 @@
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Expires At"
+            "title": "Expires At",
+            "examples": [
+              "2024-01-16T10:30:00Z"
+            ]
           }
         },
         "type": "object",
         "required": [
           "id",
-          "template_slug",
           "status",
           "messages",
-          "generated_config",
           "expires_at"
         ],
         "title": "WizardSessionResponse",
@@ -12402,7 +13909,10 @@
               }
             ],
             "title": "Template Slug",
-            "description": "Catalog template to start from"
+            "description": "Catalog template to start from",
+            "examples": [
+              "seo-content-writer"
+            ]
           },
           "initial_message": {
             "anyOf": [
@@ -12415,7 +13925,10 @@
               }
             ],
             "title": "Initial Message",
-            "description": "Opening message from the user if not starting from a template"
+            "description": "Opening message from the user if not starting from a template",
+            "examples": [
+              "I want to create an agent that writes blog posts about technology"
+            ]
           }
         },
         "type": "object",

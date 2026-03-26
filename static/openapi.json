@@ -6536,11 +6536,13 @@
               "$ref": "#/components/schemas/AgentActionResponse"
             },
             "type": "array",
-            "title": "Actions"
+            "title": "Actions",
+            "description": "List of action objects"
           },
           "total": {
             "type": "integer",
             "title": "Total",
+            "description": "Total number of actions matching the query",
             "examples": [
               5
             ]
@@ -6567,6 +6569,7 @@
           "agent_id": {
             "type": "string",
             "title": "Agent Id",
+            "description": "Agent that generated this action",
             "examples": [
               "507f1f77bcf86cd799439012"
             ]
@@ -6574,18 +6577,21 @@
           "run_id": {
             "type": "string",
             "title": "Run Id",
+            "description": "Run that generated this action",
             "examples": [
               "507f1f77bcf86cd799439013"
             ]
           },
           "type": {
             "$ref": "#/components/schemas/ActionType",
+            "description": "Action type (publish_content, send_email)",
             "examples": [
               "publish_content"
             ]
           },
           "status": {
             "$ref": "#/components/schemas/ActionStatus",
+            "description": "Action status (pending, consumed, expired)",
             "examples": [
               "pending"
             ]
@@ -6593,7 +6599,8 @@
           "payload": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Payload"
+            "title": "Payload",
+            "description": "Action-specific data (varies by type)"
           },
           "consume_result": {
             "anyOf": [
@@ -6605,7 +6612,8 @@
                 "type": "null"
               }
             ],
-            "title": "Consume Result"
+            "title": "Consume Result",
+            "description": "Result after the action was consumed"
           },
           "consumed_by": {
             "anyOf": [
@@ -6617,6 +6625,7 @@
               }
             ],
             "title": "Consumed By",
+            "description": "User who consumed the action",
             "examples": [
               "admin@example.com"
             ]
@@ -6632,6 +6641,7 @@
               }
             ],
             "title": "Consumed At",
+            "description": "When the action was consumed",
             "examples": [
               "2024-01-15T11:00:00Z"
             ]
@@ -6640,6 +6650,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At",
+            "description": "When the action was created",
             "examples": [
               "2024-01-15T10:30:00Z"
             ]
@@ -6665,11 +6676,13 @@
               "$ref": "#/components/schemas/AgentResponse"
             },
             "type": "array",
-            "title": "Agents"
+            "title": "Agents",
+            "description": "List of agent objects"
           },
           "total": {
             "type": "integer",
             "title": "Total",
+            "description": "Total number of agents matching the query",
             "examples": [
               10
             ]
@@ -6785,6 +6798,7 @@
           "name": {
             "type": "string",
             "title": "Name",
+            "description": "Agent display name",
             "examples": [
               "SEO Content Agent"
             ]
@@ -6792,6 +6806,7 @@
           "description": {
             "type": "string",
             "title": "Description",
+            "description": "What this agent does",
             "examples": [
               "Generates SEO-optimized content for websites"
             ]
@@ -6799,6 +6814,7 @@
           "system_prompt": {
             "type": "string",
             "title": "System Prompt",
+            "description": "System prompt sent to the AI model",
             "examples": [
               "You are an SEO content specialist..."
             ]
@@ -6808,14 +6824,20 @@
               "$ref": "#/components/schemas/AgentToolConfig-Output"
             },
             "type": "array",
-            "title": "Tools"
+            "title": "Tools",
+            "description": "Tools available to the agent"
           },
           "model": {
-            "$ref": "#/components/schemas/AllowedModel"
+            "$ref": "#/components/schemas/AllowedModel",
+            "description": "AI model used for execution"
           },
           "max_iterations": {
             "type": "integer",
-            "title": "Max Iterations"
+            "title": "Max Iterations",
+            "description": "Maximum reasoning iterations per run",
+            "examples": [
+              10
+            ]
           },
           "schedule": {
             "anyOf": [
@@ -6826,7 +6848,11 @@
                 "type": "null"
               }
             ],
-            "title": "Schedule"
+            "title": "Schedule",
+            "description": "Cron schedule expression (null if manual-only)",
+            "examples": [
+              "0 9 * * 1"
+            ]
           },
           "webhook_url": {
             "anyOf": [
@@ -6837,15 +6863,27 @@
                 "type": "null"
               }
             ],
-            "title": "Webhook Url"
+            "title": "Webhook Url",
+            "description": "URL to notify when a run completes",
+            "examples": [
+              "https://example.com/webhook"
+            ]
           },
           "is_active": {
             "type": "boolean",
-            "title": "Is Active"
+            "title": "Is Active",
+            "description": "Whether the agent is enabled",
+            "examples": [
+              true
+            ]
           },
           "max_concurrent_runs": {
             "type": "integer",
-            "title": "Max Concurrent Runs"
+            "title": "Max Concurrent Runs",
+            "description": "Maximum simultaneous runs for this agent",
+            "examples": [
+              1
+            ]
           },
           "template_slug": {
             "anyOf": [
@@ -6856,17 +6894,29 @@
                 "type": "null"
               }
             ],
-            "title": "Template Slug"
+            "title": "Template Slug",
+            "description": "Catalog template this agent was created from",
+            "examples": [
+              "seo-content-writer"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "Creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "Last update timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           }
         },
         "type": "object",
@@ -6897,11 +6947,13 @@
               "$ref": "#/components/schemas/AgentRunResponse"
             },
             "type": "array",
-            "title": "Runs"
+            "title": "Runs",
+            "description": "List of run objects"
           },
           "total": {
             "type": "integer",
             "title": "Total",
+            "description": "Total number of runs matching the query",
             "examples": [
               25
             ]
@@ -6928,18 +6980,21 @@
           "agent_id": {
             "type": "string",
             "title": "Agent Id",
+            "description": "Parent agent ID",
             "examples": [
               "507f1f77bcf86cd799439012"
             ]
           },
           "status": {
             "$ref": "#/components/schemas/AgentRunStatus",
+            "description": "Current run status",
             "examples": [
               "completed"
             ]
           },
           "trigger": {
             "$ref": "#/components/schemas/AgentRunTrigger",
+            "description": "How the run was triggered",
             "examples": [
               "manual"
             ]
@@ -6954,6 +7009,7 @@
               }
             ],
             "title": "Input Message",
+            "description": "User-provided input for this run",
             "examples": [
               "Generate content for my website"
             ]
@@ -6968,6 +7024,7 @@
               }
             ],
             "title": "Result",
+            "description": "Final result summary on completion",
             "examples": [
               "Successfully generated 3 articles"
             ]
@@ -6982,6 +7039,7 @@
               }
             ],
             "title": "Error",
+            "description": "Error message if the run failed",
             "examples": [
               "Rate limit exceeded"
             ]
@@ -6989,6 +7047,7 @@
           "total_tokens": {
             "type": "integer",
             "title": "Total Tokens",
+            "description": "Total AI tokens consumed during the run",
             "default": 0,
             "examples": [
               5000
@@ -7004,6 +7063,7 @@
               }
             ],
             "title": "Worker Id",
+            "description": "Worker process that executed this run",
             "examples": [
               "worker-01"
             ]
@@ -7019,6 +7079,7 @@
               }
             ],
             "title": "Started At",
+            "description": "When execution began",
             "examples": [
               "2024-01-15T10:30:05Z"
             ]
@@ -7034,6 +7095,7 @@
               }
             ],
             "title": "Finished At",
+            "description": "When execution completed or failed",
             "examples": [
               "2024-01-15T10:35:00Z"
             ]
@@ -7042,6 +7104,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At",
+            "description": "When the run was created",
             "examples": [
               "2024-01-15T10:30:00Z"
             ]
@@ -7477,7 +7540,8 @@
               "$ref": "#/components/schemas/CatalogTemplateResponse"
             },
             "type": "array",
-            "title": "Templates"
+            "title": "Templates",
+            "description": "Available agent templates"
           }
         },
         "type": "object",
@@ -13849,12 +13913,14 @@
               }
             ],
             "title": "Template Slug",
+            "description": "Catalog template used to start the wizard",
             "examples": [
               "seo-content-writer"
             ]
           },
           "status": {
             "$ref": "#/components/schemas/WizardStatus",
+            "description": "Current wizard session status",
             "examples": [
               "in_progress"
             ]
@@ -13864,7 +13930,8 @@
               "$ref": "#/components/schemas/WizardMessage"
             },
             "type": "array",
-            "title": "Messages"
+            "title": "Messages",
+            "description": "Conversation history between user and wizard"
           },
           "generated_config": {
             "anyOf": [
@@ -13876,12 +13943,14 @@
                 "type": "null"
               }
             ],
-            "title": "Generated Config"
+            "title": "Generated Config",
+            "description": "Agent configuration generated from wizard answers"
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
             "title": "Expires At",
+            "description": "Session expiration timestamp",
             "examples": [
               "2024-01-16T10:30:00Z"
             ]

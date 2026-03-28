@@ -14,7 +14,7 @@ Interactive API documentation site for **1Platform** developers. Features an Ope
 - **TypeScript 5.6** — type-safe configuration and components
 - **[@scalar/docusaurus](https://github.com/scalar/scalar)** — interactive API reference from OpenAPI spec
 - **MDX** — enhanced Markdown with React components for documentation
-- **Prism** — syntax highlighting (Dracula theme, dark-first)
+- **Prism** — syntax highlighting (GitHub light default, Dracula dark)
 - **Package manager:** pnpm
 - **Node version:** 24 (see `.nvmrc`)
 - **Output:** `build/` folder with pure static HTML/CSS/JS
@@ -35,8 +35,16 @@ npm run clear            # Clear Docusaurus cache
 ```
 1platform-api-developer/
 ├── docs/                        # Source documentation (MDX/Markdown)
-│   └── flows/
-│       └── generate-invoice.mdx # Complete invoicing flow guide
+│   └── flows/                   # 9 integration flow guides (~5,800 lines MDX)
+│       ├── generate-invoice.mdx     # FEL invoicing flow
+│       ├── user-onboarding.mdx      # User registration & auth
+│       ├── activity-logs.mdx        # API logging
+│       ├── ai-agents.mdx            # Agent lifecycle & execution
+│       ├── ai-generations.mdx       # AI comments, images, profiles
+│       ├── external-integrations.mdx # GSC, link building
+│       ├── generate-ai-content.mdx  # Keywords, content, indexing
+│       ├── manage-websites.mdx      # Website CRUD, legal pages
+│       └── payments-and-subscriptions.mdx # Billing & subscriptions
 ├── scripts/
 │   └── fetch-openapi.mjs        # Downloads OpenAPI spec at build time
 ├── src/
@@ -72,16 +80,26 @@ npm run clear            # Clear Docusaurus cache
 ### OpenAPI Spec Pipeline
 
 1. `prebuild` script runs `node scripts/fetch-openapi.mjs`
-2. Fetches from `https://api-qa.1platform.pro/openapi.json` (override with `OPENAPI_URL` env var)
+2. Fetches from `https://api.1platform.pro/openapi.json` (override with `OPENAPI_URL` env var)
 3. Injects server info (Production + QA URLs)
 4. Saves to `static/openapi.json`
 
-### Sidebar Structure
+### Sidebar Structure (9 Integration Flows)
 
 ```ts
-// sidebars.ts — expand as new flows are added
+// sidebars.ts
 docs: [
-  { type: 'category', label: 'Flows', items: ['flows/generate-invoice'] }
+  { type: 'category', label: 'Flows', items: [
+    'flows/generate-invoice',        // FEL invoicing (TribuTax)
+    'flows/user-onboarding',         // User registration & auth
+    'flows/activity-logs',           // API logging and event tracking
+    'flows/ai-agents',               // Agent lifecycle, catalog, runs
+    'flows/ai-generations',          // AI comments, images, profiles
+    'flows/external-integrations',   // Google Search Console, link building
+    'flows/generate-ai-content',     // Keywords, content generation, indexing
+    'flows/manage-websites',         // Website CRUD, legal pages
+    'flows/payments-and-subscriptions' // Billing, transactions, subscriptions
+  ]}
 ]
 ```
 
@@ -132,6 +150,23 @@ Each flow document should follow this structure:
 ### Provider Names in Docs
 
 Unlike the marketing website, provider names (e.g., TribuTax) MAY appear in API developer documentation where technically necessary to explain integration behavior. However, prefer describing capabilities generically when possible.
+
+## CI/CD Pipeline (`.github/workflows/prod.yml`)
+
+Automated production deployment with 6 sequential jobs:
+
+1. **update_spec** — Fetches latest OpenAPI spec from production API, commits if changed
+2. **build** — Node 24, pnpm install, npm run build, uploads artifact
+3. **version_bump** — AI-powered semver determination (Claude Sonnet), updates package.json, commits
+4. **release** — Creates git tag + GitHub Release with build artifact
+5. **deploy** — Atomic rsync to Hetzner server, health check (10 attempts)
+6. **notify** — Slack notifications for failures/success
+
+**Triggers:** `workflow_dispatch`, `repository_dispatch` (from API repo deploy), `push` to `main`
+
+## Version
+
+Current version: **0.7.4** (auto-bumped by CI/CD pipeline)
 
 ## Restrictions (NEVER)
 

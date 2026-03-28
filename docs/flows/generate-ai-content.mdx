@@ -51,12 +51,20 @@ JOB_ID=""       # Obtained in Step 3
 
 ## Data required to generate content
 
-### Keyword extraction
+### Keyword extraction (by domain)
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `domain` | string | Yes | Domain URL to extract keywords from (min 3 chars) |
 | `country` | string | No | Country code for search analysis (default: `"es"`) |
+| `lang` | string | No | Language code for categorization (default: `"en"`) |
+
+### Keyword extraction (by topic)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `topic` | string | Yes | Topic or theme to research keywords for (min 2 chars) |
+| `country` | string | No | Country code (default: `"es"`) |
 | `lang` | string | No | Language code for categorization (default: `"en"`) |
 
 ### Content generation
@@ -238,6 +246,62 @@ Choose a keyword with high search volume from the results for content generation
 | 422 | Validation error — missing or malformed fields | Check required fields |
 | 429 | Rate limit exceeded (10 req/min) | Wait and retry |
 | 500 | Service configuration error or provider unavailable | Verify AI provider configuration |
+
+---
+
+### Step 2b — Extract Keywords by Topic (alternative)
+
+**Goal:** Discover SEO keywords for a topic or theme instead of analyzing an existing domain. Useful when you don't have a domain to analyze or want to explore a new niche.
+
+**Endpoint:** `POST /api/v1/posts/keywords/topic/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/posts/keywords/topic/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "sustainable gardening tips",
+    "country": "us",
+    "lang": "en"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "keywords": [
+      {
+        "keyword": "best seo tools 2024",
+        "volume": 1200,
+        "difficulty": 45
+      }
+    ],
+    "total": 1
+  },
+  "msg": "Keywords extracted successfully"
+}
+```
+
+:::tip
+Use Step 2 (by domain) when you already have a website and want to find keywords related to your existing content. Use Step 2b (by topic) when exploring new niches or generating content for topics not yet covered.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid topic or validation error | Verify the topic is at least 2 characters |
+| 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 422 | Validation error — missing or malformed fields | Check required fields |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 502 | Search provider unavailable | Retry after a short delay |
+| 504 | Keyword extraction timed out | Retry with a simpler topic |
 
 ---
 
@@ -523,6 +587,7 @@ The API does not support an `Idempotency-Key` header. Content generation jobs ar
 | 0 | `POST` | `/api/v1/auth/token` | Get app token |
 | 1 | `POST` | `/api/v1/users/token` | Get user token |
 | 2 | `POST` | `/api/v1/posts/keywords/` | Extract keywords from domain |
+| 2b | `POST` | `/api/v1/posts/keywords/topic/` | Extract keywords by topic (alternative) |
 | 3 | `POST` | `/api/v1/posts/content/` | Submit content generation job |
 | 4 | `GET` | `/api/v1/posts/content/jobs/{job_id}` | Poll job status |
 | 5 | `POST` | `/api/v1/posts/indexing/` | Submit URL for indexing |
@@ -535,7 +600,7 @@ The API does not support an `Idempotency-Key` header. Content generation jobs ar
 - [ ] I have the User API Key (`sk-...`)
 - [ ] I obtained the App Token (`POST /auth/token`)
 - [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I extracted keywords from my domain (`POST /posts/keywords/`)
+- [ ] I extracted keywords from my domain (`POST /posts/keywords/`) or by topic (`POST /posts/keywords/topic/`)
 - [ ] I selected a keyword with good search volume
 - [ ] I submitted a content generation job (`POST /posts/content/`)
 - [ ] I polled the job until completion (`GET /posts/content/jobs/{job_id}`)

@@ -237,6 +237,46 @@ curl -X GET "$BASE_URL/users/profile" \
 
 ---
 
+### Step 4 — Revoke All User Tokens
+
+**Goal:** Invalidate all existing JWT tokens for the user. After this call, the user must obtain a new token via `POST /users/token`.
+
+**Endpoint:** `POST /api/v1/users/revoke-tokens`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/revoke-tokens" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "All tokens revoked successfully",
+    "token_version": 2
+  },
+  "msg": "All tokens revoked successfully"
+}
+```
+
+:::warning
+After revoking tokens, the current `$USER_TOKEN` is no longer valid. You must call `POST /users/token` again to obtain a new token.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid or already revoked token | Obtain a new token via `POST /users/token` |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
 ## Full end-to-end example
 
 Complete flow with consistent fictitious values, from authentication to profile verification.
@@ -281,6 +321,21 @@ curl -s -X GET "$BASE_URL/users/profile" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
+
+# === STEP 4: Revoke All Tokens (optional — for security rotation) ===
+curl -s -X POST "$BASE_URL/users/revoke-tokens" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# After revoking, get a new user token
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}' \
+  | jq -r '.data.access_token')
+
+echo "NEW USER_TOKEN: $USER_TOKEN"
 ```
 
 ---
@@ -321,6 +376,7 @@ The API does not support an `Idempotency-Key` header. If a user creation request
 | 1 | `POST` | `/api/v1/users` | Create user |
 | 2 | `POST` | `/api/v1/users/token` | Get user token |
 | 3 | `GET` | `/api/v1/users/profile` | Get user profile |
+| 4 | `POST` | `/api/v1/users/revoke-tokens` | Revoke all user tokens |
 
 ---
 
@@ -332,3 +388,4 @@ The API does not support an `Idempotency-Key` header. If a user creation request
 - [ ] I obtained the User Token (`POST /users/token`)
 - [ ] I verified the user profile (`GET /users/profile`)
 - [ ] I stored the user's `api_key` securely for future token generation
+- [ ] I can revoke tokens when needed (`POST /users/revoke-tokens`)

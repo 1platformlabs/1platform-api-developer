@@ -13,6 +13,7 @@ const sidebars: SidebarsConfig = {
         'flows/ai-generations',
         'flows/external-integrations',
         'flows/generate-ai-content',
+        'flows/google-analytics',
         'flows/manage-websites',
         'flows/payments-and-subscriptions',
       ],

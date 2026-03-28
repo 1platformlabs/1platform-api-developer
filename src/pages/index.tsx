@@ -62,6 +62,13 @@ const quickLinks = [
     primary: false,
   },
   {
+    icon: '📊',
+    title: 'Google Analytics',
+    description: 'Step-by-step flow to connect Google Analytics 4, provision properties, install tracking, view metrics, and send server-side events via the 1Platform API.',
+    href: '/docs/flows/google-analytics',
+    primary: false,
+  },
+  {
     icon: '🌐',
     title: 'Manage Websites',
     description: 'Step-by-step flow to register, update, search, delete websites, and generate legal pages via the 1Platform API.',

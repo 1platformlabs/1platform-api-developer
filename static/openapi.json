@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Platform API",
-    "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"ak-your-app-api-key\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
+    "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"ak-your-app-api-key\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
     "version": "PRODv1.7.2"
   },
   "servers": [
@@ -525,7 +525,7 @@
           "Keywords, Content & Indexing"
         ],
         "summary": "Get content generation job status",
-        "description": "Poll the status of an async content generation job.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- Returns job status: `pending`, `processing`, `completed`, or `failed`\n- On completion, includes the full content generation result in `data.result`\n- On failure, includes error details in `data.error`\n\n**Recommended polling interval:** 5 seconds\n\n**cURL example:**\n```bash\ncurl https://api.1platform.pro/api/v1/posts/content/jobs/JOB_ID \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
+        "description": "Poll the status of an async content generation job.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns job status: `pending`, `processing`, `completed`, or `failed`\n- On completion, includes the full content generation result in `data.result`\n- On failure, includes error details in `data.error`\n\n**Recommended polling interval:** 5 seconds\n\n**cURL example:**\n```bash\ncurl https://api.1platform.pro/api/v1/posts/content/jobs/JOB_ID \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
         "operationId": "getContentJob",
         "security": [
           {
@@ -1345,7 +1345,7 @@
             }
           },
           "400": {
-            "description": "Website already exists for this user",
+            "description": "Validation error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1366,6 +1366,16 @@
           },
           "404": {
             "description": "Category not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Website already exists for this user",
             "content": {
               "application/json": {
                 "schema": {
@@ -4944,7 +4954,7 @@
           "Agents - Wizard"
         ],
         "summary": "Start a wizard session",
-        "description": "Start a new guided wizard session for agent creation.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires Anthropic API key configured",
+        "description": "Start a new guided wizard session for agent creation.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires AI API key configured",
         "operationId": "startWizard",
         "requestBody": {
           "content": {
@@ -5031,7 +5041,7 @@
           "Agents - Wizard"
         ],
         "summary": "Respond to wizard session",
-        "description": "Continue an active wizard session with a user reply.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires Anthropic API key configured",
+        "description": "Continue an active wizard session with a user reply.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires AI API key configured",
         "operationId": "respondToWizard",
         "security": [
           {
@@ -5795,7 +5805,7 @@
           "Agents - Execution"
         ],
         "summary": "Trigger an agent run",
-        "description": "Trigger a new agent run. Returns immediately with the run in PENDING status.\nThe run executes asynchronously in the background.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Requires Anthropic API key configured\n- Agent must be active\n- Subject to per-agent and global concurrency limits",
+        "description": "Trigger a new agent run. Returns immediately with the run in PENDING status.\nThe run executes asynchronously in the background.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Requires AI API key configured\n- Agent must be active\n- Subject to per-agent and global concurrency limits",
         "operationId": "triggerAgentRun",
         "security": [
           {
@@ -6617,7 +6627,9 @@
             "description": "Analytics provisioning started",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
@@ -6720,7 +6732,9 @@
             "description": "Analytics disconnected",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_NoneType_"
+                },
                 "example": {
                   "success": true,
                   "msg": "Analytics disconnected"
@@ -6818,7 +6832,9 @@
             "description": "Analytics deprovisioned",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_NoneType_"
+                },
                 "example": {
                   "success": true,
                   "msg": "Analytics deprovisioned"
@@ -6906,7 +6922,9 @@
             "description": "Analytics status retrieved",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
@@ -6999,7 +7017,9 @@
             "description": "Analytics accounts listed",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": [
@@ -7093,7 +7113,9 @@
             "description": "Property details retrieved",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
@@ -7187,7 +7209,9 @@
             "description": "Data streams listed",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": [
@@ -7282,7 +7306,9 @@
             "description": "Site tag retrieved",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
@@ -7373,7 +7399,9 @@
             "description": "Custom dimensions listed",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": [
@@ -7468,7 +7496,9 @@
             "description": "Key events listed",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": [
@@ -7581,7 +7611,9 @@
             "description": "Site overview retrieved",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
@@ -7675,7 +7707,9 @@
             "description": "Realtime metrics retrieved",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
@@ -7790,7 +7824,9 @@
             "description": "Page metrics retrieved",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
@@ -7885,7 +7921,9 @@
             "description": "Event sent successfully",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_NoneType_"
+                },
                 "example": {
                   "success": true,
                   "msg": "Event sent"
@@ -7973,11 +8011,13 @@
             "description": "OAuth consent URL generated",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
-                    "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=..."
+                    "authorize_url": "https://accounts.example.com/oauth/authorize?client_id=..."
                   },
                   "msg": "Open this URL to authorize analytics"
                 }
@@ -8064,7 +8104,9 @@
             "description": "OAuth tokens revoked",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "msg": "OAuth revoked"
@@ -8162,7 +8204,9 @@
             "description": "OAuth connection status",
             "content": {
               "application/json": {
-                "schema": {},
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
                 "example": {
                   "success": true,
                   "data": {
@@ -9919,8 +9963,12 @@
         "example": {
           "entries": [
             {
-              "level": "error",
-              "message": "Failed to load analytics widget",
+              "endpoint": "/api/v1/posts/content/",
+              "error_type": "generation_error",
+              "method": "POST",
+              "response_message": "Failed to generate content",
+              "response_status": 500,
+              "success": false,
               "timestamp": "2024-01-15T10:30:00Z"
             }
           ]
@@ -10284,14 +10332,14 @@
           "image_provider": {
             "type": "string",
             "enum": [
-              "pixabay",
-              "pexels"
+              "default",
+              "alternative"
             ],
             "title": "Image Provider",
-            "description": "Image library to use for article illustrations",
-            "default": "pixabay",
+            "description": "Image provider selection",
+            "default": "default",
             "examples": [
-              "pixabay"
+              "default"
             ]
           },
           "categories": {
@@ -10314,7 +10362,7 @@
             "Home & Garden"
           ],
           "country": "us",
-          "image_provider": "pixabay",
+          "image_provider": "default",
           "keyword": "sustainable gardening tips",
           "lang": "en"
         }
@@ -10643,8 +10691,10 @@
             }
           ],
           "receptorInfo": {
-            "nit": "12345678",
-            "nombre": "Empresa Ejemplo S.A."
+            "documentNumber": "12345678-9",
+            "documentType": "NIT",
+            "email": "empresa@example.com",
+            "name": "Empresa Ejemplo S.A."
           }
         }
       },
@@ -14778,7 +14828,7 @@
           "input_schema"
         ],
         "title": "ToolDefinition",
-        "description": "Anthropic-compatible tool definition schema."
+        "description": "AI-compatible tool definition schema."
       },
       "ToolExecutionConfig-Input": {
         "properties": {

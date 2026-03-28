@@ -2,6 +2,22 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [0.8.0] - 2026-03-28
+
+### Added
+
+- **Google Analytics flow** (`docs/flows/google-analytics.mdx`) — 18-step guide covering the full GA4 integration lifecycle: OAuth authorization, property provisioning, tracking tag installation, custom dimensions, key events, site overview/realtime/per-page metrics, Measurement Protocol events, disconnect, and deprovision.
+- **Revoke tokens step** in User Onboarding flow — Step 4 (`POST /users/revoke-tokens`) for invalidating all user JWT tokens.
+- **Keywords by topic step** in Generate AI Content flow — Step 2b (`POST /posts/keywords/topic/`) for discovering SEO keywords by topic instead of domain.
+- Homepage card for Google Analytics flow in `quickLinks` array.
+
+### Changed
+
+- Updated `sidebars.ts` to include `google-analytics` entry.
+- Updated `generate-ai-content.mdx` quick endpoint reference and checklist with keywords/topic.
+- Updated `user-onboarding.mdx` quick endpoint reference, checklist, and end-to-end example with token revocation.
+- Refreshed OpenAPI spec from Production API (PRODv1.7.2 — includes 18 new Analytics endpoints).
+
 ## [0.6.0] - 2026-03-21
 
 ### Added

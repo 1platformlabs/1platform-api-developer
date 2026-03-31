@@ -36,7 +36,7 @@
                   "success": true,
                   "data": {
                     "service": "ok",
-                    "database": "connected"
+                    "database": "ok"
                   },
                   "msg": "Health check completed"
                 }
@@ -148,7 +148,7 @@
     "/api/v1/posts/keywords/": {
       "post": {
         "tags": [
-          "Keywords, Content & Indexing"
+          "Keywords Content & Indexing"
         ],
         "summary": "Extract keywords from a domain",
         "description": "Analyze a domain and extract SEO keywords using AI-powered search analysis.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n- Requires an active App with AI provider configured\n\n**Process:**\n1. Analyzes domain content and structure\n2. Extracts relevant keywords via search providers\n3. Uses 1Platform AI to detect keyword cannibalization\n4. Categorizes keywords by search intent and volume\n5. Returns structured keyword data with metrics\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/keywords/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"domain\": \"example.com\", \"country\": \"es\", \"lang\": \"en\"}'\n```",
@@ -206,7 +206,7 @@
                     ],
                     "country": "es",
                     "lang": "en",
-                    "domain": "example.com",
+                    "lookup_key": "example-com",
                     "keywords": [
                       {
                         "keyword": "example keyword",
@@ -243,6 +243,26 @@
               }
             }
           },
+          "402": {
+            "description": "Insufficient balance for keyword extraction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing record not found for user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -254,7 +274,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "Rate limit exceeded or plan limit reached",
             "content": {
               "application/json": {
                 "schema": {
@@ -279,10 +299,10 @@
     "/api/v1/posts/keywords/topic/": {
       "post": {
         "tags": [
-          "Keywords, Content & Indexing"
+          "Keywords Content & Indexing"
         ],
         "summary": "Extract keywords by topic",
-        "description": "Discover SEO keywords for a topic/theme using Google search analysis.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n\n**Process:**\n1. Searches topic in Google to discover top niche domains\n2. Analyzes each domain for topic-relevant pages\n3. Extracts main keyword from each page title via AI\n4. Removes semantic duplicates (cannibalization)\n5. Returns structured keyword data with estimated volume",
+        "description": "Discover SEO keywords for a topic/theme using search analysis.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n\n**Process:**\n1. Searches topic in search engines to discover top niche domains\n2. Analyzes each domain for topic-relevant pages\n3. Extracts main keyword from each page title via AI\n4. Removes semantic duplicates (cannibalization)\n5. Returns structured keyword data with estimated volume",
         "operationId": "extractKeywordsByTopic",
         "security": [
           {
@@ -330,14 +350,23 @@
                 "example": {
                   "success": true,
                   "data": {
+                    "total": 1,
+                    "categories": [
+                      "SEO"
+                    ],
+                    "country": "es",
+                    "lang": "en",
+                    "lookup_key": "best-seo-tools-2024",
                     "keywords": [
                       {
                         "keyword": "best seo tools 2024",
+                        "title": "Best SEO Tools 2024: Complete Guide",
+                        "original_title": "Best SEO Tools 2024: Complete Guide",
+                        "original_keyword": "best seo tools 2024",
                         "volume": 1200,
-                        "difficulty": 45
+                        "url": "https://example.com/best-seo-tools"
                       }
-                    ],
-                    "total": 1
+                    ]
                   },
                   "msg": "Keywords extracted successfully"
                 }
@@ -364,6 +393,26 @@
               }
             }
           },
+          "402": {
+            "description": "Insufficient balance for keyword extraction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing record not found for user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -375,7 +424,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "Rate limit exceeded or plan limit reached",
             "content": {
               "application/json": {
                 "schema": {
@@ -410,7 +459,7 @@
     "/api/v1/posts/content/": {
       "post": {
         "tags": [
-          "Keywords, Content & Indexing"
+          "Keywords Content & Indexing"
         ],
         "summary": "Submit content generation job",
         "description": "Submit an async content generation job for a target keyword.\n\nReturns immediately with a job ID. Use `GET /content/jobs/{job_id}` to poll status.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min (AI-intensive)\n- Requires AI and image provider keys in the App configuration\n\n**Process (runs in background):**\n1. Generates title variations via 1Platform AI\n2. Searches related content using search providers\n3. Produces structured article with headings and paragraphs\n4. Fetches relevant images from the configured image library\n5. Creates a URL-friendly slug\n6. Classifies content into provided categories\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/content/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"keyword\": \"best running shoes\", \"lang\": \"en\", \"image_provider\": \"default\", \"categories\": [\"sports\"]}'\n```",
@@ -486,6 +535,26 @@
               }
             }
           },
+          "402": {
+            "description": "Insufficient balance for content generation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing record not found for user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -497,7 +566,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "Rate limit exceeded or plan limit reached",
             "content": {
               "application/json": {
                 "schema": {
@@ -522,7 +591,7 @@
     "/api/v1/posts/content/jobs/{job_id}": {
       "get": {
         "tags": [
-          "Keywords, Content & Indexing"
+          "Keywords Content & Indexing"
         ],
         "summary": "Get content generation job status",
         "description": "Poll the status of an async content generation job.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns job status: `pending`, `processing`, `completed`, or `failed`\n- On completion, includes the full content generation result in `data.result`\n- On failure, includes error details in `data.error`\n\n**Recommended polling interval:** 5 seconds\n\n**cURL example:**\n```bash\ncurl https://api.1platform.pro/api/v1/posts/content/jobs/JOB_ID \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
@@ -542,7 +611,8 @@
               "description": "Content generation job ID",
               "title": "Job Id"
             },
-            "description": "Content generation job ID"
+            "description": "Content generation job ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -655,7 +725,7 @@
     "/api/v1/posts/indexing/": {
       "post": {
         "tags": [
-          "Keywords, Content & Indexing"
+          "Keywords Content & Indexing"
         ],
         "summary": "Submit URL for Google indexing",
         "description": "Submit a URL to the Google Indexing API for faster crawling.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The URL must belong to a website verified in Google Search Console\n- A service account with Search Console access is required\n- The URL must be publicly accessible\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/indexing/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"url\": \"https://example.com/new-page\"}'\n```",
@@ -734,6 +804,26 @@
               }
             }
           },
+          "402": {
+            "description": "Insufficient balance for indexing operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing record not found for user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -745,7 +835,7 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "Rate limit exceeded or plan limit reached",
             "content": {
               "application/json": {
                 "schema": {
@@ -755,7 +845,7 @@
             }
           },
           "500": {
-            "description": "Google Indexing API error or service unavailable",
+            "description": "Indexing API error or service unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1181,7 +1271,8 @@
               "default": "active",
               "title": "Status Filter"
             },
-            "description": "Filter by status: active, inactive, or all"
+            "description": "Filter by status: active, inactive, or all",
+            "example": "active"
           },
           {
             "name": "x-user-token",
@@ -1428,7 +1519,8 @@
               "description": "Website URL to search",
               "title": "Url"
             },
-            "description": "Website URL to search"
+            "description": "Website URL to search",
+            "example": "https://myblog.com"
           },
           {
             "name": "x-user-token",
@@ -1554,7 +1646,8 @@
               "description": "Website ID",
               "title": "Website Id"
             },
-            "description": "Website ID"
+            "description": "Website ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -1688,7 +1781,8 @@
               "description": "Website ID",
               "title": "Website Id"
             },
-            "description": "Website ID"
+            "description": "Website ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -1812,7 +1906,8 @@
               "description": "Website ID",
               "title": "Website Id"
             },
-            "description": "Website ID"
+            "description": "Website ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -1914,7 +2009,8 @@
               "description": "Website ID",
               "title": "Website Id"
             },
-            "description": "Website ID"
+            "description": "Website ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -2050,7 +2146,8 @@
               "description": "Website ID",
               "title": "Website Id"
             },
-            "description": "Website ID"
+            "description": "Website ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -2112,6 +2209,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient balance for this operation",
             "content": {
               "application/json": {
                 "schema": {
@@ -2186,7 +2293,8 @@
               "description": "Website ID",
               "title": "Website Id"
             },
-            "description": "Website ID"
+            "description": "Website ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -2253,6 +2361,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient balance for this operation",
             "content": {
               "application/json": {
                 "schema": {
@@ -2393,6 +2511,16 @@
               }
             }
           },
+          "402": {
+            "description": "Insufficient balance for this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation error in request data",
             "content": {
@@ -2486,6 +2614,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient balance for this operation",
             "content": {
               "application/json": {
                 "schema": {
@@ -2603,6 +2741,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient balance for this operation",
             "content": {
               "application/json": {
                 "schema": {
@@ -2992,7 +3140,8 @@
               "description": "Subscription ID",
               "title": "Subscription Id"
             },
-            "description": "Subscription ID"
+            "description": "Subscription ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -3056,6 +3205,305 @@
           },
           "429": {
             "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/consumption": {
+      "get": {
+        "tags": [
+          "Billing & Consumption"
+        ],
+        "summary": "Get consumption history",
+        "description": "Retrieve paginated consumption history for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Filter by operation type, date range\n- Results sorted by most recent first",
+        "operationId": "getConsumptionHistory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum items to return (1-100)",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum items to return (1-100)"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Pagination offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "operation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by operation type",
+              "title": "Operation"
+            },
+            "description": "Filter by operation type"
+          },
+          {
+            "name": "from_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date filter (YYYY-MM-DD)",
+              "title": "From Date"
+            },
+            "description": "Start date filter (YYYY-MM-DD)",
+            "example": "2026-01-01"
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date filter (YYYY-MM-DD)",
+              "title": "To Date"
+            },
+            "description": "End date filter (YYYY-MM-DD)",
+            "example": "2026-03-31"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumption history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ConsumptionHistoryResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/consumption/summary": {
+      "get": {
+        "tags": [
+          "Billing & Consumption"
+        ],
+        "summary": "Get consumption summary",
+        "description": "Retrieve consumption summary grouped by operation type.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns total spent, operation count, and per-operation breakdown",
+        "operationId": "getConsumptionSummary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date (YYYY-MM-DD)",
+              "title": "From Date"
+            },
+            "description": "Start date (YYYY-MM-DD)",
+            "example": "2026-01-01"
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date (YYYY-MM-DD)",
+              "title": "To Date"
+            },
+            "description": "End date (YYYY-MM-DD)",
+            "example": "2026-03-31"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumption summary retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ConsumptionSummaryResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3386,7 +3834,8 @@
               "description": "Business ID",
               "title": "Businessid"
             },
-            "description": "Business ID"
+            "description": "Business ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -3484,7 +3933,8 @@
               "description": "Business ID",
               "title": "Businessid"
             },
-            "description": "Business ID"
+            "description": "Business ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -3602,7 +4052,8 @@
               "description": "Business ID",
               "title": "Businessid"
             },
-            "description": "Business ID"
+            "description": "Business ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "branchId",
@@ -3613,7 +4064,8 @@
               "description": "Branch ID",
               "title": "Branchid"
             },
-            "description": "Branch ID"
+            "description": "Branch ID",
+            "example": "507f1f77bcf86cd799439012"
           },
           {
             "name": "x-user-token",
@@ -3721,7 +4173,8 @@
               "description": "Business ID",
               "title": "Businessid"
             },
-            "description": "Business ID"
+            "description": "Business ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -3837,7 +4290,8 @@
               "description": "Business ID",
               "title": "Businessid"
             },
-            "description": "Business ID"
+            "description": "Business ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "page",
@@ -3850,7 +4304,8 @@
               "default": 1,
               "title": "Page"
             },
-            "description": "Page number (1-based)"
+            "description": "Page number (1-based)",
+            "example": 1
           },
           {
             "name": "limit",
@@ -3864,7 +4319,8 @@
               "default": 20,
               "title": "Limit"
             },
-            "description": "Maximum invoices per page (1-100)"
+            "description": "Maximum invoices per page (1-100)",
+            "example": 20
           },
           {
             "name": "status",
@@ -3879,10 +4335,11 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by invoice status",
+              "description": "Filter by invoice status (e.g. issued, cancelled)",
               "title": "Status"
             },
-            "description": "Filter by invoice status"
+            "description": "Filter by invoice status (e.g. issued, cancelled)",
+            "example": "issued"
           },
           {
             "name": "date_from",
@@ -3900,7 +4357,8 @@
               "description": "Filter invoices created on or after this date (ISO 8601)",
               "title": "Date From"
             },
-            "description": "Filter invoices created on or after this date (ISO 8601)"
+            "description": "Filter invoices created on or after this date (ISO 8601)",
+            "example": "2024-01-01"
           },
           {
             "name": "date_to",
@@ -3918,7 +4376,8 @@
               "description": "Filter invoices created on or before this date (ISO 8601)",
               "title": "Date To"
             },
-            "description": "Filter invoices created on or before this date (ISO 8601)"
+            "description": "Filter invoices created on or before this date (ISO 8601)",
+            "example": "2024-12-31"
           },
           {
             "name": "sort_by",
@@ -3930,7 +4389,8 @@
               "default": "created_at",
               "title": "Sort By"
             },
-            "description": "Field to sort by"
+            "description": "Field to sort by",
+            "example": "created_at"
           },
           {
             "name": "sort_order",
@@ -3942,7 +4402,8 @@
               "default": "desc",
               "title": "Sort Order"
             },
-            "description": "Sort direction: asc or desc"
+            "description": "Sort direction: asc or desc",
+            "example": "desc"
           },
           {
             "name": "x-user-token",
@@ -4040,7 +4501,8 @@
               "description": "Business ID",
               "title": "Businessid"
             },
-            "description": "Business ID"
+            "description": "Business ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "invoiceId",
@@ -4051,7 +4513,8 @@
               "description": "Invoice ID",
               "title": "Invoiceid"
             },
-            "description": "Invoice ID"
+            "description": "Invoice ID",
+            "example": "507f1f77bcf86cd799439012"
           },
           {
             "name": "x-user-token",
@@ -4147,7 +4610,8 @@
               "description": "Business ID",
               "title": "Businessid"
             },
-            "description": "Business ID"
+            "description": "Business ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "invoiceId",
@@ -4158,7 +4622,8 @@
               "description": "Invoice ID",
               "title": "Invoiceid"
             },
-            "description": "Invoice ID"
+            "description": "Invoice ID",
+            "example": "507f1f77bcf86cd799439012"
           },
           {
             "name": "x-user-token",
@@ -4659,7 +5124,8 @@
               "description": "Unique identifier of the log entry",
               "title": "Log Id"
             },
-            "description": "Unique identifier of the log entry"
+            "description": "Unique identifier of the log entry",
+            "example": "507f1f77bcf86cd799439011"
           }
         ],
         "responses": {
@@ -4824,7 +5290,7 @@
     "/api/v1/agents/catalog": {
       "get": {
         "tags": [
-          "Agents - Catalog"
+          "Agents Catalog"
         ],
         "summary": "List agent catalog templates",
         "description": "Return the full agent template catalog.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -4871,7 +5337,7 @@
     "/api/v1/agents/catalog/{slug}": {
       "get": {
         "tags": [
-          "Agents - Catalog"
+          "Agents Catalog"
         ],
         "summary": "Get a catalog template by slug",
         "description": "Return a single agent template from the catalog.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -4891,7 +5357,8 @@
               "description": "Template slug",
               "title": "Slug"
             },
-            "description": "Template slug"
+            "description": "Template slug",
+            "example": "seo-content-writer"
           }
         ],
         "responses": {
@@ -4951,20 +5418,43 @@
     "/api/v1/agents/wizard/start": {
       "post": {
         "tags": [
-          "Agents - Wizard"
+          "Agents Wizard"
         ],
         "summary": "Start a wizard session",
         "description": "Start a new guided wizard session for agent creation.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires AI API key configured",
         "operationId": "startWizard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WizardStartRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -4989,6 +5479,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient balance for this operation",
             "content": {
               "application/json": {
                 "schema": {
@@ -5027,18 +5527,13 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/agents/wizard/{session_id}/respond": {
       "post": {
         "tags": [
-          "Agents - Wizard"
+          "Agents Wizard"
         ],
         "summary": "Respond to wizard session",
         "description": "Continue an active wizard session with a user reply.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Requires AI API key configured",
@@ -5058,7 +5553,24 @@
               "description": "Wizard session ID",
               "title": "Session Id"
             },
-            "description": "Wizard session ID"
+            "description": "Wizard session ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
           }
         ],
         "requestBody": {
@@ -5084,6 +5596,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient balance for this operation",
             "content": {
               "application/json": {
                 "schema": {
@@ -5138,7 +5660,7 @@
     "/api/v1/agents/wizard/{session_id}/confirm": {
       "post": {
         "tags": [
-          "Agents - Wizard"
+          "Agents Wizard"
         ],
         "summary": "Confirm wizard and create agent",
         "description": "Confirm a wizard session and create the agent from the generated configuration.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min",
@@ -5158,7 +5680,24 @@
               "description": "Wizard session ID",
               "title": "Session Id"
             },
-            "description": "Wizard session ID"
+            "description": "Wizard session ID",
+            "example": "507f1f77bcf86cd799439011"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
           }
         ],
         "responses": {
@@ -5174,6 +5713,16 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient balance for this operation",
             "content": {
               "application/json": {
                 "schema": {
@@ -5228,7 +5777,7 @@
     "/api/v1/agents/wizard/{session_id}": {
       "get": {
         "tags": [
-          "Agents - Wizard"
+          "Agents Wizard"
         ],
         "summary": "Get wizard session",
         "description": "Retrieve an existing wizard session by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -5248,7 +5797,8 @@
               "description": "Wizard session ID",
               "title": "Session Id"
             },
-            "description": "Wizard session ID"
+            "description": "Wizard session ID",
+            "example": "507f1f77bcf86cd799439011"
           }
         ],
         "responses": {
@@ -5308,7 +5858,7 @@
     "/api/v1/agents": {
       "post": {
         "tags": [
-          "Agents - CRUD"
+          "Agents CRUD"
         ],
         "summary": "Create an agent",
         "description": "Create a new agent definition.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Maximum 50 agents per app\n- Cron schedules must have at least 15-minute intervals",
@@ -5393,7 +5943,7 @@
       },
       "get": {
         "tags": [
-          "Agents - CRUD"
+          "Agents CRUD"
         ],
         "summary": "List agents",
         "description": "List agents for the authenticated app with pagination.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -5479,7 +6029,7 @@
     "/api/v1/agents/metrics": {
       "get": {
         "tags": [
-          "Agents - Metrics"
+          "Agents Metrics"
         ],
         "summary": "Get agent metrics",
         "description": "Return aggregated operational metrics for the agent domain.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Admin-level visibility into platform capacity and usage",
@@ -5536,7 +6086,7 @@
     "/api/v1/agents/{agent_id}": {
       "get": {
         "tags": [
-          "Agents - CRUD"
+          "Agents CRUD"
         ],
         "summary": "Get an agent",
         "description": "Retrieve an agent definition by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -5556,7 +6106,8 @@
               "description": "Agent ID",
               "title": "Agent Id"
             },
-            "description": "Agent ID"
+            "description": "Agent ID",
+            "example": "507f1f77bcf86cd799439011"
           }
         ],
         "responses": {
@@ -5614,7 +6165,7 @@
       },
       "put": {
         "tags": [
-          "Agents - CRUD"
+          "Agents CRUD"
         ],
         "summary": "Update an agent",
         "description": "Update an existing agent definition. All fields are optional.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -5634,7 +6185,8 @@
               "description": "Agent ID",
               "title": "Agent Id"
             },
-            "description": "Agent ID"
+            "description": "Agent ID",
+            "example": "507f1f77bcf86cd799439011"
           }
         ],
         "requestBody": {
@@ -5722,7 +6274,7 @@
       },
       "delete": {
         "tags": [
-          "Agents - CRUD"
+          "Agents CRUD"
         ],
         "summary": "Delete an agent",
         "description": "Delete an agent definition.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -5742,7 +6294,8 @@
               "description": "Agent ID",
               "title": "Agent Id"
             },
-            "description": "Agent ID"
+            "description": "Agent ID",
+            "example": "507f1f77bcf86cd799439011"
           }
         ],
         "responses": {
@@ -5802,7 +6355,7 @@
     "/api/v1/agents/{agent_id}/run": {
       "post": {
         "tags": [
-          "Agents - Execution"
+          "Agents Execution"
         ],
         "summary": "Trigger an agent run",
         "description": "Trigger a new agent run. Returns immediately with the run in PENDING status.\nThe run executes asynchronously in the background.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Requires AI API key configured\n- Agent must be active\n- Subject to per-agent and global concurrency limits",
@@ -5822,7 +6375,8 @@
               "description": "Agent ID",
               "title": "Agent Id"
             },
-            "description": "Agent ID"
+            "description": "Agent ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -5927,7 +6481,7 @@
     "/api/v1/agents/{agent_id}/runs": {
       "get": {
         "tags": [
-          "Agents - Execution"
+          "Agents Execution"
         ],
         "summary": "List agent runs",
         "description": "List execution runs for a specific agent with optional filters.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Filter by status: pending, running, completed, failed\n- Filter by trigger: manual, scheduled",
@@ -5947,7 +6501,8 @@
               "description": "Agent ID",
               "title": "Agent Id"
             },
-            "description": "Agent ID"
+            "description": "Agent ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "status",
@@ -6070,7 +6625,7 @@
     "/api/v1/agents/{agent_id}/runs/{run_id}": {
       "get": {
         "tags": [
-          "Agents - Execution"
+          "Agents Execution"
         ],
         "summary": "Get a specific run",
         "description": "Retrieve details of a specific agent run.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -6090,7 +6645,8 @@
               "description": "Agent ID",
               "title": "Agent Id"
             },
-            "description": "Agent ID"
+            "description": "Agent ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "run_id",
@@ -6101,7 +6657,8 @@
               "description": "Run ID",
               "title": "Run Id"
             },
-            "description": "Run ID"
+            "description": "Run ID",
+            "example": "507f1f77bcf86cd799439012"
           }
         ],
         "responses": {
@@ -6161,7 +6718,7 @@
     "/api/v1/agents/{agent_id}/runs/{run_id}/stop": {
       "post": {
         "tags": [
-          "Agents - Execution"
+          "Agents Execution"
         ],
         "summary": "Stop a running agent run",
         "description": "Stop a running or pending agent run.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Only runs in PENDING or RUNNING status can be stopped",
@@ -6181,7 +6738,8 @@
               "description": "Agent ID",
               "title": "Agent Id"
             },
-            "description": "Agent ID"
+            "description": "Agent ID",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "run_id",
@@ -6192,7 +6750,8 @@
               "description": "Run ID",
               "title": "Run Id"
             },
-            "description": "Run ID"
+            "description": "Run ID",
+            "example": "507f1f77bcf86cd799439012"
           }
         ],
         "responses": {
@@ -6262,7 +6821,7 @@
     "/api/v1/agent-actions": {
       "get": {
         "tags": [
-          "Agents - Actions"
+          "Agents Actions"
         ],
         "summary": "List agent actions",
         "description": "List human-in-the-loop actions for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Filter by type, status, or agent_id",
@@ -6402,7 +6961,7 @@
     "/api/v1/agent-actions/{action_id}": {
       "get": {
         "tags": [
-          "Agents - Actions"
+          "Agents Actions"
         ],
         "summary": "Get an action",
         "description": "Retrieve a specific agent action by ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min",
@@ -6422,7 +6981,8 @@
               "description": "Action ID",
               "title": "Action Id"
             },
-            "description": "Action ID"
+            "description": "Action ID",
+            "example": "507f1f77bcf86cd799439013"
           }
         ],
         "responses": {
@@ -6482,7 +7042,7 @@
     "/api/v1/agent-actions/{action_id}/consume": {
       "patch": {
         "tags": [
-          "Agents - Actions"
+          "Agents Actions"
         ],
         "summary": "Consume an action",
         "description": "Consume a pending human-in-the-loop action.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- Action must be in PENDING status",
@@ -6502,7 +7062,8 @@
               "description": "Action ID",
               "title": "Action Id"
             },
-            "description": "Action ID"
+            "description": "Action ID",
+            "example": "507f1f77bcf86cd799439013"
           }
         ],
         "requestBody": {
@@ -6705,8 +7266,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to disconnect analytics from",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to disconnect analytics from",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -6795,8 +7359,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to deprovision analytics for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to deprovision analytics for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "confirm",
@@ -6804,9 +7371,12 @@
             "required": false,
             "schema": {
               "type": "boolean",
+              "description": "Must be true to confirm permanent deprovisioning",
               "default": false,
               "title": "Confirm"
-            }
+            },
+            "description": "Must be true to confirm permanent deprovisioning",
+            "example": true
           },
           {
             "name": "x-user-token",
@@ -6895,8 +7465,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to check analytics status for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to check analytics status for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -6990,8 +7563,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to list analytics accounts for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to list analytics accounts for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -7086,8 +7662,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to retrieve analytics property for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to retrieve analytics property for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -7182,8 +7761,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to list data streams for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to list data streams for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -7279,8 +7861,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to retrieve site tag for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to retrieve site tag for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -7372,8 +7957,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to list custom dimensions for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to list custom dimensions for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -7469,8 +8057,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to list key events for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to list key events for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -7565,8 +8156,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to retrieve overview metrics for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to retrieve overview metrics for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "period",
@@ -7574,8 +8168,11 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/ReportPeriod",
+              "description": "Report time period",
               "default": "30d"
-            }
+            },
+            "description": "Report time period",
+            "example": "30d"
           },
           {
             "name": "compare",
@@ -7583,9 +8180,12 @@
             "required": false,
             "schema": {
               "type": "boolean",
+              "description": "Include comparison with previous period",
               "default": true,
               "title": "Compare"
-            }
+            },
+            "description": "Include comparison with previous period",
+            "example": true
           },
           {
             "name": "x-user-token",
@@ -7680,8 +8280,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to retrieve realtime metrics for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to retrieve realtime metrics for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -7779,8 +8382,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to retrieve page metrics for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to retrieve page metrics for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "page_path",
@@ -7788,8 +8394,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "URL path of the page to analyze",
               "title": "Page Path"
-            }
+            },
+            "description": "URL path of the page to analyze",
+            "example": "/blog/seo-tips"
           },
           {
             "name": "period",
@@ -7797,8 +8406,11 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/ReportPeriod",
+              "description": "Report time period",
               "default": "30d"
-            }
+            },
+            "description": "Report time period",
+            "example": "30d"
           },
           {
             "name": "x-user-token",
@@ -7984,8 +8596,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to authorize analytics for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to authorize analytics for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -8077,8 +8692,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to revoke OAuth tokens for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to revoke OAuth tokens for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -8177,8 +8795,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Website ID to check OAuth status for",
               "title": "Website Id"
-            }
+            },
+            "description": "Website ID to check OAuth status for",
+            "example": "507f1f77bcf86cd799439011"
           },
           {
             "name": "x-user-token",
@@ -8268,8 +8889,10 @@
             "required": false,
             "schema": {
               "type": "string",
+              "description": "Authorization code returned by the OAuth provider",
               "title": "Code"
-            }
+            },
+            "description": "Authorization code returned by the OAuth provider"
           },
           {
             "name": "state",
@@ -8277,8 +8900,10 @@
             "required": false,
             "schema": {
               "type": "string",
+              "description": "Encrypted state parameter for CSRF protection",
               "title": "State"
-            }
+            },
+            "description": "Encrypted state parameter for CSRF protection"
           },
           {
             "name": "error",
@@ -8286,8 +8911,10 @@
             "required": false,
             "schema": {
               "type": "string",
+              "description": "Error code if the user denied authorization",
               "title": "Error"
-            }
+            },
+            "description": "Error code if the user denied authorization"
           }
         ],
         "responses": {
@@ -8307,6 +8934,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9915,7 +10552,9 @@
                 "type": "null"
               }
             ],
-            "title": "Website Id"
+            "title": "Website Id",
+            "description": "Filter deletion to a specific website",
+            "example": "site-abc123"
           },
           "provider": {
             "anyOf": [
@@ -9926,7 +10565,9 @@
                 "type": "null"
               }
             ],
-            "title": "Provider"
+            "title": "Provider",
+            "description": "Filter deletion to a specific provider",
+            "example": "content"
           },
           "older_than": {
             "anyOf": [
@@ -9938,7 +10579,9 @@
                 "type": "null"
               }
             ],
-            "title": "Older Than"
+            "title": "Older Than",
+            "description": "Delete only logs older than this timestamp",
+            "example": "2024-01-01T00:00:00Z"
           }
         },
         "type": "object",
@@ -9978,11 +10621,15 @@
         "properties": {
           "accepted": {
             "type": "integer",
-            "title": "Accepted"
+            "title": "Accepted",
+            "description": "Number of log entries successfully accepted",
+            "example": 8
           },
           "rejected": {
             "type": "integer",
-            "title": "Rejected"
+            "title": "Rejected",
+            "description": "Number of log entries rejected due to validation errors",
+            "example": 2
           },
           "errors": {
             "items": {
@@ -9990,7 +10637,8 @@
               "type": "object"
             },
             "type": "array",
-            "title": "Errors"
+            "title": "Errors",
+            "description": "Details of rejected entries"
           }
         },
         "type": "object",
@@ -10289,6 +10937,337 @@
             "notes": "Looks good, publish it"
           }
         }
+      },
+      "ConsumptionHistoryResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total consumption logs for user",
+            "examples": [
+              42
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConsumptionItemResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "List of consumption log entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total"
+        ],
+        "title": "ConsumptionHistoryResponse",
+        "description": "Paginated consumption history."
+      },
+      "ConsumptionItemResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Consumption log ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "description": "Operation key",
+            "examples": [
+              "content_generation"
+            ]
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint",
+            "description": "Endpoint path",
+            "examples": [
+              "POST /api/v1/posts/content/"
+            ]
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd",
+            "description": "Cost in USD",
+            "examples": [
+              0.05
+            ]
+          },
+          "balance_after": {
+            "type": "number",
+            "title": "Balance After",
+            "description": "Balance after operation",
+            "examples": [
+              49.95
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConsumptionStatus",
+            "description": "Consumption status",
+            "examples": [
+              "charged"
+            ]
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ConsumptionMetadata"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Timestamp",
+            "examples": [
+              "2026-01-15T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "operation",
+          "endpoint",
+          "cost_usd",
+          "balance_after",
+          "status",
+          "created_at"
+        ],
+        "title": "ConsumptionItemResponse",
+        "description": "Single consumption log entry for API responses."
+      },
+      "ConsumptionMetadata": {
+        "properties": {
+          "keyword": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keyword"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "image_provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Provider"
+          },
+          "page_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Type"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "tokens_used": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Used"
+          },
+          "extra": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra",
+            "description": "Max 5 key-value pairs, max 200 chars per value"
+          }
+        },
+        "type": "object",
+        "title": "ConsumptionMetadata",
+        "description": "Typed metadata for consumption logs. Max 10 fields, values bounded."
+      },
+      "ConsumptionStatus": {
+        "type": "string",
+        "enum": [
+          "charged",
+          "free_tier",
+          "charge_failed",
+          "refunded"
+        ],
+        "title": "ConsumptionStatus",
+        "description": "Status of a consumption log entry."
+      },
+      "ConsumptionSummaryItem": {
+        "properties": {
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "description": "Operation key",
+            "examples": [
+              "content_generation"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Number of operations",
+            "examples": [
+              15
+            ]
+          },
+          "total_cost": {
+            "type": "number",
+            "title": "Total Cost",
+            "description": "Total cost in USD",
+            "examples": [
+              0.75
+            ]
+          },
+          "avg_cost": {
+            "type": "number",
+            "title": "Avg Cost",
+            "description": "Average cost per operation",
+            "examples": [
+              0.05
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "operation",
+          "count",
+          "total_cost",
+          "avg_cost"
+        ],
+        "title": "ConsumptionSummaryItem",
+        "description": "Aggregated consumption per operation type."
+      },
+      "ConsumptionSummaryResponse": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "description": "Period identifier, e.g. 2026-03",
+            "examples": [
+              "2026-03"
+            ]
+          },
+          "total_spent": {
+            "type": "number",
+            "title": "Total Spent",
+            "description": "Total spent in USD",
+            "examples": [
+              3.5
+            ]
+          },
+          "total_operations": {
+            "type": "integer",
+            "title": "Total Operations",
+            "description": "Total number of operations",
+            "examples": [
+              42
+            ]
+          },
+          "by_operation": {
+            "items": {
+              "$ref": "#/components/schemas/ConsumptionSummaryItem"
+            },
+            "type": "array",
+            "title": "By Operation",
+            "description": "Breakdown by operation type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "total_spent",
+          "total_operations"
+        ],
+        "title": "ConsumptionSummaryResponse",
+        "description": "Consumption summary for a period."
       },
       "ContentGenerationRequest": {
         "properties": {
@@ -14060,6 +15039,70 @@
         ],
         "title": "SuccessResponse[CommentGenerationResponse]"
       },
+      "SuccessResponse_ConsumptionHistoryResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConsumptionHistoryResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[ConsumptionHistoryResponse]"
+      },
+      "SuccessResponse_ConsumptionSummaryResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConsumptionSummaryResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[ConsumptionSummaryResponse]"
+      },
       "SuccessResponse_GenerateUserImagesResponse_": {
         "properties": {
           "success": {
@@ -14949,7 +15992,13 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
-            "description": "Additional metadata"
+            "description": "Additional metadata",
+            "examples": [
+              {
+                "campaign_id": "abc123",
+                "source": "web"
+              }
+            ]
           }
         },
         "type": "object",
@@ -14997,14 +16046,16 @@
           "total": 25,
           "transactions": [
             {
-              "amount": 100,
+              "amount": 78,
               "created_at": "2024-01-01T12:00:00Z",
-              "currency": "GTQ",
+              "currency": "USD",
+              "currency_provider": "GTQ",
               "description": "Account top-up",
               "id": "65a1b2c3d4e5f6789abcdef0",
-              "reference": "MIGOGT123456",
+              "reference": "GT123456",
               "status": "approved",
               "updated_at": "2024-01-01T12:05:00Z",
+              "usd_amount": 10,
               "user_id": "65a1b2c3d4e5f6789abcdef1"
             }
           ]
@@ -15192,6 +16243,7 @@
               }
             ],
             "title": "Name",
+            "description": "Human-readable agent name",
             "examples": [
               "SEO Content Agent"
             ]
@@ -15207,6 +16259,7 @@
               }
             ],
             "title": "Description",
+            "description": "What the agent does",
             "examples": [
               "Generates SEO-optimized content for websites"
             ]
@@ -15222,6 +16275,7 @@
               }
             ],
             "title": "System Prompt",
+            "description": "System prompt for the LLM",
             "examples": [
               "You are an SEO content specialist..."
             ]
@@ -15238,7 +16292,8 @@
                 "type": "null"
               }
             ],
-            "title": "Tools"
+            "title": "Tools",
+            "description": "Tools available to the agent"
           },
           "model": {
             "anyOf": [
@@ -15249,6 +16304,7 @@
                 "type": "null"
               }
             ],
+            "description": "LLM model to use",
             "examples": [
               "claude-sonnet-4-6"
             ]
@@ -15265,6 +16321,7 @@
               }
             ],
             "title": "Max Iterations",
+            "description": "Maximum agentic loop iterations",
             "examples": [
               10
             ]
@@ -15279,6 +16336,7 @@
               }
             ],
             "title": "Schedule",
+            "description": "Cron expression — null to disable scheduling",
             "examples": [
               "0 9 * * 1"
             ]
@@ -15293,6 +16351,7 @@
               }
             ],
             "title": "Webhook Url",
+            "description": "Webhook URL for run result notifications",
             "examples": [
               "https://example.com/webhooks/agent-result"
             ]
@@ -15307,6 +16366,7 @@
               }
             ],
             "title": "Is Active",
+            "description": "Whether the agent is active",
             "examples": [
               true
             ]
@@ -15323,6 +16383,7 @@
               }
             ],
             "title": "Max Concurrent Runs",
+            "description": "Maximum simultaneous runs",
             "examples": [
               1
             ]
@@ -15337,6 +16398,7 @@
               }
             ],
             "title": "Template Slug",
+            "description": "Catalog template slug",
             "examples": [
               "seo-content-writer"
             ]
@@ -16312,7 +17374,7 @@
       "description": "Obtain a JWT app token using your App API key. The returned token must be sent as `Authorization: Bearer <token>` on all protected endpoints."
     },
     {
-      "name": "Keywords, Content & Indexing",
+      "name": "Keywords Content & Indexing",
       "description": "Extract SEO keywords from a domain, generate AI-powered articles, and submit URLs to Google for indexing."
     },
     {
@@ -16352,6 +17414,10 @@
       "description": "View subscription plan details and current plan status."
     },
     {
+      "name": "Billing & Consumption",
+      "description": "Track credit consumption history and view usage summaries grouped by operation type."
+    },
+    {
       "name": "Payment Notifications",
       "description": "Receive automatic payment status updates from the payment service. No authentication required — designed for server-to-server callbacks. All responses return HTTP 200 to prevent retries."
     },
@@ -16372,27 +17438,27 @@
       "description": "Analytics integration — connect, provision properties, track content performance, and query real-time metrics."
     },
     {
-      "name": "Agents - Catalog",
+      "name": "Agents Catalog",
       "description": "Browse the agent template catalog to discover pre-built automation recipes."
     },
     {
-      "name": "Agents - Wizard",
+      "name": "Agents Wizard",
       "description": "Create agents interactively using a guided wizard powered by AI. Start a session, answer questions, and confirm to deploy."
     },
     {
-      "name": "Agents - CRUD",
+      "name": "Agents CRUD",
       "description": "Create, list, read, update, and delete agent definitions."
     },
     {
-      "name": "Agents - Execution",
+      "name": "Agents Execution",
       "description": "Trigger agent runs, list execution history, inspect run details, and stop running or pending executions."
     },
     {
-      "name": "Agents - Metrics",
+      "name": "Agents Metrics",
       "description": "View aggregated operational metrics for the agent platform (admin-level)."
     },
     {
-      "name": "Agents - Actions",
+      "name": "Agents Actions",
       "description": "List, inspect, and consume human-in-the-loop actions generated by agent runs. Actions require manual approval before the agent proceeds."
     }
   ]

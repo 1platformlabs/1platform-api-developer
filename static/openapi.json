@@ -8874,6 +8874,1315 @@
         }
       }
     },
+    "/api/v1/adsense/connect": {
+      "post": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Connect AdSense",
+        "description": "Connect AdSense to a website after OAuth authorization.",
+        "operationId": "connectAdSense",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AdSense connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AdSenseStatusResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OAuth not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already active or invalid transition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/disconnect": {
+      "delete": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Disconnect AdSense",
+        "description": "Disconnect AdSense from a website. Preserves publisher ID.",
+        "operationId": "disconnectAdSense",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AdSense disconnected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AdSenseStatusResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/status": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Get AdSense Status",
+        "description": "Get AdSense connection status for a website.",
+        "operationId": "getAdSenseStatus",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AdSenseStatusResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/accounts": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "List AdSense Accounts",
+        "description": "List AdSense accounts accessible by the user's OAuth tokens.",
+        "operationId": "listAdSenseAccounts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/sites": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "List AdSense Sites",
+        "description": "List sites with their approval states.",
+        "operationId": "listAdSenseSites",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/sites/sync": {
+      "post": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Sync Site State",
+        "description": "Force sync site state from AdSense API.",
+        "operationId": "syncAdSenseSiteState",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/alerts": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "List AdSense Alerts",
+        "description": "List account alerts (Pro only).",
+        "operationId": "listAdSenseAlerts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/policy-issues": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "List Policy Issues",
+        "description": "List policy issues affecting the account (Pro only).",
+        "operationId": "listAdSensePolicyIssues",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/earnings/overview": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Earnings Overview",
+        "description": "Quick earnings overview (Free=7d only).",
+        "operationId": "getAdSenseEarningsOverview",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "description": "Report period",
+              "default": "7d"
+            },
+            "description": "Report period"
+          },
+          {
+            "name": "compare",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Compare vs previous period",
+              "default": true,
+              "title": "Compare"
+            },
+            "description": "Compare vs previous period"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_EarningsOverviewResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/earnings/by-page": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Earnings by Page",
+        "description": "Earnings broken down by page URL (Pro only).",
+        "operationId": "getAdSenseEarningsByPage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "description": "Report period",
+              "default": "30d"
+            },
+            "description": "Report period"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_PageEarningsResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/earnings/report": {
+      "post": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Custom Earnings Report",
+        "description": "Custom earnings report with selectable dimensions and metrics (Pro only).",
+        "operationId": "generateAdSenseEarningsReport",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EarningsReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_EarningsReportResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/repair": {
+      "post": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Repair Stuck Connection",
+        "description": "Admin-only: reset stuck 'connecting' state.",
+        "operationId": "repairAdSenseConnection",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connection repaired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AdSenseStatusResponse_"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/admin/health": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "AdSense Health Check",
+        "description": "Admin-only: system health metrics.",
+        "operationId": "getAdSenseHealth",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Health status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/oauth/authorize": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Start AdSense OAuth Authorization",
+        "description": "Generate an OAuth consent URL with PKCE for connecting AdSense. The returned URL must be opened in a browser popup. Requires both app and user tokens.",
+        "operationId": "startAdSenseOAuthAuthorize",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID to authorize AdSense for",
+              "title": "Website Id"
+            },
+            "description": "Website ID to authorize AdSense for"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth consent URL generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/oauth/revoke": {
+      "post": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Revoke AdSense OAuth",
+        "description": "Revoke the OAuth tokens for AdSense. Clears local tokens.",
+        "operationId": "revokeAdSenseOAuth",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth tokens revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "OAuth not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adsense/oauth/status": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Get AdSense OAuth Status",
+        "description": "Check whether OAuth is connected for AdSense.",
+        "operationId": "getAdSenseOAuthStatus",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/oauth/callback": {
       "get": {
         "tags": [
@@ -8950,6 +10259,73 @@
           }
         }
       }
+    },
+    "/api/v1/adsense/oauth/callback": {
+      "get": {
+        "tags": [
+          "AdSense"
+        ],
+        "summary": "Handle AdSense OAuth Callback",
+        "description": "Handles the OAuth redirect after user authorization. Exchanges the authorization code for tokens and stores them.",
+        "operationId": "handleAdSenseOAuthCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Authorization code",
+              "title": "Code"
+            },
+            "description": "Authorization code"
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Encrypted state parameter",
+              "title": "State"
+            },
+            "description": "Encrypted state parameter"
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Error code if user denied",
+              "title": "Error"
+            },
+            "description": "Error code if user denied"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8973,6 +10349,374 @@
         ],
         "title": "ActionType",
         "description": "Category of human action requested by an agent."
+      },
+      "AdSenseActions": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^accounts/pub-\\d{10,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "account_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Name"
+          },
+          "publisher_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30,
+                "pattern": "^pub-\\d{10,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "disconnected",
+              "connecting",
+              "active",
+              "suspended",
+              "error"
+            ],
+            "title": "Status",
+            "default": "disconnected"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "site_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site State"
+          },
+          "site_auto_ads_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Auto Ads Enabled"
+          },
+          "oauth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdSenseOAuth"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "connected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connected At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "worker_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Id"
+          }
+        },
+        "type": "object",
+        "title": "AdSenseActions",
+        "description": "AdSense integration state, embedded in Website.actions.adsense."
+      },
+      "AdSenseOAuth": {
+        "properties": {
+          "refresh_token_encrypted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token Encrypted"
+          },
+          "access_token_encrypted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Token Encrypted"
+          },
+          "token_expiry": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Expiry"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scopes"
+          },
+          "authorized_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorized Email"
+          },
+          "authorized_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorized At"
+          },
+          "revoked": {
+            "type": "boolean",
+            "title": "Revoked",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "AdSenseOAuth",
+        "description": "OAuth2 tokens for per-user AdSense authorization.\nTokens encrypted with Fernet via shared encrypt_value()/decrypt_value()\nfrom app/utils/encryption.py. Key derived via HKDF from ENCRYPTION_KEY.\nSupports key rotation: current + FERNET_PREVIOUS_KEY fallback."
+      },
+      "AdSenseStatusResponse": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id",
+            "description": "AdSense account ID"
+          },
+          "account_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Name",
+            "description": "AdSense account display name"
+          },
+          "publisher_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher Id",
+            "description": "Publisher ID (pub-NNNN)"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Connection status",
+            "default": "disconnected"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone",
+            "description": "Account timezone"
+          },
+          "site_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site State",
+            "description": "Site approval state"
+          },
+          "site_auto_ads_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Auto Ads Enabled",
+            "description": "Whether auto ads are enabled"
+          },
+          "connected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connected At",
+            "description": "When AdSense was connected"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "Error message if in error state"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At",
+            "description": "Last site state sync"
+          },
+          "oauth_connected": {
+            "type": "boolean",
+            "title": "Oauth Connected",
+            "description": "Whether OAuth is active",
+            "default": false
+          },
+          "oauth_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Email",
+            "description": "OAuth authorized email"
+          }
+        },
+        "type": "object",
+        "title": "AdSenseStatusResponse",
+        "description": "Safe response. Excludes OAuth tokens and worker_id."
       },
       "AgentActionListResponse": {
         "properties": {
@@ -11709,6 +13453,240 @@
           "email": "user@example.com"
         }
       },
+      "EarningsOverviewResponse": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "description": "Report period (7d, 30d, 90d)"
+          },
+          "estimated_earnings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricComparison"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Estimated Earnings",
+            "description": "Estimated earnings"
+          },
+          "clicks": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricComparison"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Clicks",
+            "description": "Total clicks"
+          },
+          "impressions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricComparison"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Impressions",
+            "description": "Total impressions"
+          },
+          "page_views": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricComparison"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Page Views",
+            "description": "Total page views"
+          },
+          "page_views_rpm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricComparison"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Page Views Rpm",
+            "description": "Page views RPM"
+          },
+          "clicks_ctr": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricComparison"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Clicks Ctr",
+            "description": "Click-through rate"
+          },
+          "cost_per_click": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricComparison"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Cost Per Click",
+            "description": "Cost per click"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "estimated_earnings",
+          "clicks",
+          "impressions",
+          "page_views",
+          "page_views_rpm",
+          "clicks_ctr",
+          "cost_per_click"
+        ],
+        "title": "EarningsOverviewResponse"
+      },
+      "EarningsReportRequest": {
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Start Date",
+            "description": "Start date (YYYY-MM-DD)"
+          },
+          "end_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "End Date",
+            "description": "End date (YYYY-MM-DD)"
+          },
+          "dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dimensions",
+            "description": "Report dimensions (max 2)",
+            "default": [
+              "DATE"
+            ]
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metrics",
+            "description": "Report metrics",
+            "default": [
+              "ESTIMATED_EARNINGS",
+              "CLICKS",
+              "IMPRESSIONS"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_date",
+          "end_date"
+        ],
+        "title": "EarningsReportRequest",
+        "description": "Custom report request — Pro only.",
+        "example": {
+          "dimensions": [
+            "DATE"
+          ],
+          "end_date": "2026-03-31",
+          "metrics": [
+            "ESTIMATED_EARNINGS",
+            "CLICKS",
+            "IMPRESSIONS"
+          ],
+          "start_date": "2026-03-01"
+        }
+      },
+      "EarningsReportResponse": {
+        "properties": {
+          "headers": {
+            "items": {
+              "$ref": "#/components/schemas/ReportHeader"
+            },
+            "type": "array",
+            "title": "Headers",
+            "description": "Report column headers"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ReportRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Report data rows"
+          },
+          "totals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportRow"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Totals row"
+          },
+          "averages": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportRow"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Averages row"
+          },
+          "start_date": {
+            "type": "string",
+            "title": "Start Date",
+            "description": "Report start date"
+          },
+          "end_date": {
+            "type": "string",
+            "title": "End Date",
+            "description": "Report end date"
+          },
+          "total_matched_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Matched Rows",
+            "description": "Total matched rows in report"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_date",
+          "end_date"
+        ],
+        "title": "EarningsReportResponse"
+      },
       "ErrorResponse": {
         "properties": {
           "success": {
@@ -13909,6 +15887,115 @@
           "website_id": "507f1f77bcf86cd799439011"
         }
       },
+      "MetricComparison": {
+        "properties": {
+          "current": {
+            "type": "number",
+            "title": "Current",
+            "description": "Metric value for the selected period"
+          },
+          "previous": {
+            "type": "number",
+            "title": "Previous",
+            "description": "Metric value for the comparison period"
+          },
+          "change_percent": {
+            "type": "number",
+            "title": "Change Percent",
+            "description": "Percentage change between periods"
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "flat"
+            ],
+            "title": "Trend",
+            "description": "Trend direction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "previous",
+          "change_percent",
+          "trend"
+        ],
+        "title": "MetricComparison"
+      },
+      "PageEarningItem": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Page URL"
+          },
+          "earnings": {
+            "type": "number",
+            "title": "Earnings",
+            "description": "Page earnings"
+          },
+          "page_views": {
+            "type": "integer",
+            "title": "Page Views",
+            "description": "Page views"
+          },
+          "rpm": {
+            "type": "number",
+            "title": "Rpm",
+            "description": "Revenue per mille"
+          },
+          "clicks": {
+            "type": "integer",
+            "title": "Clicks",
+            "description": "Page clicks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "earnings",
+          "page_views",
+          "rpm",
+          "clicks"
+        ],
+        "title": "PageEarningItem"
+      },
+      "PageEarningsResponse": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "description": "Report period"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageEarningItem"
+            },
+            "type": "array",
+            "title": "Pages",
+            "description": "Earnings per page"
+          },
+          "total_earnings": {
+            "type": "number",
+            "title": "Total Earnings",
+            "description": "Total earnings across all pages"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages",
+            "description": "Total number of pages with data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "total_earnings",
+          "total_pages"
+        ],
+        "title": "PageEarningsResponse"
+      },
       "PaginationResponse": {
         "properties": {
           "page": {
@@ -14314,6 +16401,38 @@
         ],
         "title": "ReceptorInfo"
       },
+      "ReportHeader": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Header name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Header type"
+          },
+          "currency_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Code",
+            "description": "Currency code if monetary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "ReportHeader"
+      },
       "ReportPeriod": {
         "type": "string",
         "enum": [
@@ -14323,6 +16442,21 @@
           "12m"
         ],
         "title": "ReportPeriod"
+      },
+      "ReportRow": {
+        "properties": {
+          "cells": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Cells",
+            "description": "Row cell values"
+          }
+        },
+        "type": "object",
+        "title": "ReportRow"
       },
       "RevokeTokensResponse": {
         "properties": {
@@ -14622,6 +16756,38 @@
         ],
         "title": "SubscriptionStatus",
         "description": "Subscription status enum"
+      },
+      "SuccessResponse_AdSenseStatusResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AdSenseStatusResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AdSenseStatusResponse]"
       },
       "SuccessResponse_AgentActionListResponse_": {
         "properties": {
@@ -15103,6 +17269,70 @@
         ],
         "title": "SuccessResponse[ConsumptionSummaryResponse]"
       },
+      "SuccessResponse_EarningsOverviewResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/EarningsOverviewResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[EarningsOverviewResponse]"
+      },
+      "SuccessResponse_EarningsReportResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/EarningsReportResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[EarningsReportResponse]"
+      },
       "SuccessResponse_GenerateUserImagesResponse_": {
         "properties": {
           "success": {
@@ -15391,6 +17621,38 @@
           "msg"
         ],
         "title": "SuccessResponse[NoneType]"
+      },
+      "SuccessResponse_PageEarningsResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageEarningsResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[PageEarningsResponse]"
       },
       "SuccessResponse_ProfileGenerationResponse_": {
         "properties": {
@@ -16791,6 +19053,17 @@
               }
             ],
             "description": "Google Analytics GA4 integration state"
+          },
+          "adsense": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdSenseActions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Google AdSense integration state"
           }
         },
         "type": "object",
@@ -17341,6 +19614,15 @@
         ],
         "title": "WizardStatus",
         "description": "Status of an agent creation wizard session."
+      },
+      "app__models__adsense__ReportPeriod": {
+        "type": "string",
+        "enum": [
+          "7d",
+          "30d",
+          "90d"
+        ],
+        "title": "ReportPeriod"
       }
     },
     "securitySchemes": {
@@ -17436,6 +19718,10 @@
     {
       "name": "Analytics",
       "description": "Analytics integration — connect, provision properties, track content performance, and query real-time metrics."
+    },
+    {
+      "name": "AdSense",
+      "description": "AdSense integration — connect your account via OAuth, monitor site approval states, view earnings reports, and track policy compliance."
     },
     {
       "name": "Agents Catalog",

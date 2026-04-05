@@ -22,7 +22,7 @@ This flow documents how to manage payments and subscriptions through the 1Platfo
 |---|---|
 | App API Key | Application key (`ak-...`) provided when registering your app |
 | User API Key | User key (`sk-...`) obtained when creating the user |
-| Payment provider configured | The App must have payment provider (Migo) configured |
+| Payment provider configured | The App must have a payment gateway configured in MongoDB |
 
 ### Required headers for all requests
 
@@ -242,7 +242,7 @@ curl -X POST "$BASE_URL/users/transactions" \
     "currency": "USD",
     "currency_provider": "GTQ",
     "status": "created",
-    "payment_url": "https://sb-mw.migopayments.com/checkout/abc123",
+    "payment_url": "https://checkout.payment-service.com/pay/abc123",
     "reference": null,
     "description": "Account top-up - March 2026",
     "created_at": "2026-03-18T10:30:00Z",
@@ -259,7 +259,7 @@ Redirect the user to `data.payment_url` to complete the payment. Save `data.id` 
 - `usd_amount` — original amount in the merchant's currency (USD)
 - `amount` — converted amount sent to the payment provider (GTQ)
 - `payment_url` — checkout URL where the user completes the payment
-- `status` — starts as `"created"`, updated to `"approved"` or `"rejected"` via webhook
+- `status` — starts as `"created"`, updated to `"approved"` or `"denied"` via webhook
 :::
 
 **Common errors:**
@@ -465,7 +465,7 @@ The API does not support an `Idempotency-Key` header for transactions. If a tran
 ### Important validations
 - The `amount` must be a positive number.
 - The `description` field has a maximum length of 500 characters.
-- Transaction status updates (`approved`, `rejected`) arrive via webhook to `POST /webhooks/transactions` — your application should listen for these updates.
+- Transaction status updates (`approved`, `denied`, `cancelled`, `expired`) arrive via webhook to `POST /webhooks/transactions` — your application should listen for these updates.
 - The `payment_url` is only valid for a limited time — redirect the user promptly.
 
 ---

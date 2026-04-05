@@ -2877,6 +2877,313 @@
         }
       }
     },
+    "/api/v1/users/consumption": {
+      "get": {
+        "tags": [
+          "Billing & Consumption"
+        ],
+        "summary": "Get consumption history",
+        "description": "Retrieve paginated consumption history for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Filter by operation type, date range\n- Results sorted by most recent first",
+        "operationId": "getConsumptionHistory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum items to return (1-100)",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum items to return (1-100)"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Pagination offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "operation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by operation type",
+              "title": "Operation"
+            },
+            "description": "Filter by operation type"
+          },
+          {
+            "name": "from_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date filter (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "From Date"
+            },
+            "description": "Start date filter (YYYY-MM-DD)"
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date filter (YYYY-MM-DD)",
+              "examples": [
+                "2026-03-31"
+              ],
+              "title": "To Date"
+            },
+            "description": "End date filter (YYYY-MM-DD)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumption history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ConsumptionHistoryResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/consumption/summary": {
+      "get": {
+        "tags": [
+          "Billing & Consumption"
+        ],
+        "summary": "Get consumption summary",
+        "description": "Retrieve consumption summary grouped by operation type.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns total spent, operation count, and per-operation breakdown",
+        "operationId": "getConsumptionSummary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "From Date"
+            },
+            "description": "Start date (YYYY-MM-DD)"
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date (YYYY-MM-DD)",
+              "examples": [
+                "2026-03-31"
+              ],
+              "title": "To Date"
+            },
+            "description": "End date (YYYY-MM-DD)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumption summary retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ConsumptionSummaryResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/transactions": {
       "post": {
         "tags": [
@@ -3138,10 +3445,12 @@
             "schema": {
               "type": "string",
               "description": "Subscription ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
               "title": "Subscription Id"
             },
-            "description": "Subscription ID",
-            "example": "507f1f77bcf86cd799439011"
+            "description": "Subscription ID"
           },
           {
             "name": "x-user-token",
@@ -3205,305 +3514,6 @@
           },
           "429": {
             "description": "Rate limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/consumption": {
-      "get": {
-        "tags": [
-          "Billing & Consumption"
-        ],
-        "summary": "Get consumption history",
-        "description": "Retrieve paginated consumption history for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Filter by operation type, date range\n- Results sorted by most recent first",
-        "operationId": "getConsumptionHistory",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "description": "Maximum items to return (1-100)",
-              "default": 50,
-              "title": "Limit"
-            },
-            "description": "Maximum items to return (1-100)"
-          },
-          {
-            "name": "skip",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Pagination offset",
-              "default": 0,
-              "title": "Skip"
-            },
-            "description": "Pagination offset"
-          },
-          {
-            "name": "operation",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by operation type",
-              "title": "Operation"
-            },
-            "description": "Filter by operation type"
-          },
-          {
-            "name": "from_date",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Start date filter (YYYY-MM-DD)",
-              "title": "From Date"
-            },
-            "description": "Start date filter (YYYY-MM-DD)",
-            "example": "2026-01-01"
-          },
-          {
-            "name": "to_date",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "End date filter (YYYY-MM-DD)",
-              "title": "To Date"
-            },
-            "description": "End date filter (YYYY-MM-DD)",
-            "example": "2026-03-31"
-          },
-          {
-            "name": "x-user-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User JWT token",
-              "title": "X-User-Token"
-            },
-            "description": "User JWT token"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Consumption history retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_ConsumptionHistoryResponse_"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/consumption/summary": {
-      "get": {
-        "tags": [
-          "Billing & Consumption"
-        ],
-        "summary": "Get consumption summary",
-        "description": "Retrieve consumption summary grouped by operation type.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns total spent, operation count, and per-operation breakdown",
-        "operationId": "getConsumptionSummary",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "from_date",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Start date (YYYY-MM-DD)",
-              "title": "From Date"
-            },
-            "description": "Start date (YYYY-MM-DD)",
-            "example": "2026-01-01"
-          },
-          {
-            "name": "to_date",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "End date (YYYY-MM-DD)",
-              "title": "To Date"
-            },
-            "description": "End date (YYYY-MM-DD)",
-            "example": "2026-03-31"
-          },
-          {
-            "name": "x-user-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User JWT token",
-              "title": "X-User-Token"
-            },
-            "description": "User JWT token"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Consumption summary retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_ConsumptionSummaryResponse_"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3687,6 +3697,97 @@
                 "example": {
                   "status": "success",
                   "message": "Processed"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/billing/credit": {
+      "post": {
+        "tags": [
+          "Internal Webhooks"
+        ],
+        "summary": "Credit user balance (internal)",
+        "description": "Internal endpoint called by PaymentWebhookDispatcher after a transaction is approved. Credits the user's billing balance.\n\n- **Auth:** `Authorization: Bearer <internal_webhook_token>` (token from PlatformSettings.security.internal_webhook_token)\n- **Idempotent:** If already credited, returns 200 without effect\n- **Rate limit:** 20 req/min",
+        "operationId": "creditBillingFromWebhook",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingCreditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Balance credited (or already credited — idempotent)",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Transaction not approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid internal token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transaction or billing not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -11788,6 +11889,21 @@
         ],
         "title": "AssignedUserResponse"
       },
+      "BillingCreditRequest": {
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "title": "Transaction Id",
+            "description": "Transaction ID to credit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transaction_id"
+        ],
+        "title": "BillingCreditRequest",
+        "description": "Request body for the internal billing credit endpoint.\n\nOnly transaction_id is required — all other fields (amount, currency,\nbilling_id) are resolved from the Transaction record in MongoDB to\nprevent spoofing. The body is intentionally minimal."
+      },
       "BillingResponse": {
         "properties": {
           "id": {
@@ -19702,6 +19818,10 @@
     {
       "name": "Payment Notifications",
       "description": "Receive automatic payment status updates from the payment service. No authentication required — designed for server-to-server callbacks. All responses return HTTP 200 to prevent retries."
+    },
+    {
+      "name": "Internal Webhooks",
+      "description": "Internal webhook endpoints for automated billing operations. Called by the payment webhook dispatcher after transaction status changes. Authenticated via internal bearer token — not for external use."
     },
     {
       "name": "Businesses & Branches",

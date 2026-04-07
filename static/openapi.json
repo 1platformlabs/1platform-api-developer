@@ -8481,7 +8481,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ReportPeriod",
+              "$ref": "#/components/schemas/app__models__analytics__ReportPeriod",
               "description": "Report time period",
               "examples": [
                 "30d"
@@ -8729,7 +8729,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ReportPeriod",
+              "$ref": "#/components/schemas/app__models__analytics__ReportPeriod",
               "description": "Report time period",
               "examples": [
                 "30d"
@@ -9918,7 +9918,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "$ref": "#/components/schemas/ReportPeriod",
               "description": "Report period",
               "default": "7d"
             },
@@ -10009,7 +10009,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "$ref": "#/components/schemas/ReportPeriod",
               "description": "Report period",
               "default": "30d"
             },
@@ -18951,13 +18951,71 @@
             "type": "string",
             "enum": [
               "add",
-              "verify"
+              "verify",
+              "orders",
+              "view_order",
+              "sync",
+              "accept_order",
+              "reject_order",
+              "reopen_order",
+              "send_url"
             ],
             "title": "Action",
-            "description": "Action to perform: add or verify",
+            "description": "Action to perform",
             "examples": [
               "add"
             ]
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id",
+            "description": "Order ID for order-specific actions"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Published URL for send_url action"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Page",
+            "description": "Page number for orders listing",
+            "default": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Page Size",
+            "description": "Items per page for orders listing",
+            "default": 20
+          },
+          "status_filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Filter",
+            "description": "Filter orders by status"
           }
         },
         "type": "object",
@@ -18966,7 +19024,7 @@
         ],
         "title": "PublisuitesActionRequest",
         "example": {
-          "action": "add"
+          "action": "orders"
         }
       },
       "PublisuitesActions": {
@@ -19162,8 +19220,7 @@
         "enum": [
           "7d",
           "30d",
-          "90d",
-          "12m"
+          "90d"
         ],
         "title": "ReportPeriod"
       },
@@ -22371,12 +22428,13 @@
         "title": "WizardStatus",
         "description": "Status of an agent creation wizard session."
       },
-      "app__models__adsense__ReportPeriod": {
+      "app__models__analytics__ReportPeriod": {
         "type": "string",
         "enum": [
           "7d",
           "30d",
-          "90d"
+          "90d",
+          "12m"
         ],
         "title": "ReportPeriod"
       }

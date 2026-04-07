@@ -2,6 +2,15 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [0.12.0] - 2026-04-06
+
+### Added
+- **Generate Invoice flow**: Added Step 2d — person lookup by CUI/DPI (`POST /api/v1/identify`) for pre-filling invoice receptor data
+- **AI Agents flow**: Added Step 8b — get agent by ID (`GET /agents/{agent_id}`) and Step 11b — get action by ID (`GET /agent-actions/{action_id}`)
+
+### Changed
+- **Sidebar**: Cleaned up duplicate flow entries after upstream merge
+
 ## [0.10.0] - 2026-04-06
 
 ### Added

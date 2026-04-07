@@ -596,6 +596,57 @@ Save `data.id` as `$AGENT_ID`.
 
 ---
 
+### Step 8b — Get Agent by ID
+
+**Goal:** Retrieve the full configuration of a single agent. Useful for verifying a just-created agent, displaying its settings in your UI, or checking its current `is_active` state before triggering a run.
+
+**Endpoint:** `GET /api/v1/agents/{agent_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agents/$AGENT_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60c2d3e4f5a6b7890cdef103",
+    "app_id": "507f1f77bcf86cd799439011",
+    "name": "Invoice Anomaly Detector",
+    "description": "Reviews invoices daily and flags amounts above Q50,000 for human approval",
+    "system_prompt": "You are a financial review agent. Examine each invoice and flag any with amounts exceeding Q50,000 or unusual patterns for human review.",
+    "tools": [],
+    "model": "claude-haiku-4-5-20251001",
+    "max_iterations": 10,
+    "schedule": "0 8 * * *",
+    "webhook_url": null,
+    "is_active": true,
+    "max_concurrent_runs": 1,
+    "template_slug": null,
+    "created_at": "2026-03-21T15:10:00Z",
+    "updated_at": "2026-03-21T15:10:00Z"
+  },
+  "msg": "Agent retrieved"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Agent not found | Verify the `agent_id` — use `GET /agents` to list all agents |
+| 422 | Invalid `agent_id` format | Verify the ID is a valid identifier |
+| 429 | Rate limit exceeded (30 req/min) | Wait and retry |
+
+---
+
 ### Step 9 — Trigger an Agent Run
 
 **Goal:** Manually trigger an agent run with an optional input message.
@@ -781,6 +832,57 @@ Save the `id` of any action you want to act on as `$ACTION_ID`.
 |---|---|---|
 | 401 | Authentication required | Regenerate tokens |
 | 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 11b — Get Action by ID
+
+**Goal:** Retrieve the full details of a specific agent action. Useful when you have an `action_id` from a webhook notification or a previous listing and want to inspect the full payload before consuming it.
+
+**Endpoint:** `GET /api/v1/agent-actions/{action_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/agent-actions/$ACTION_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60e4f5a6b7c8d9012ef34567",
+    "agent_id": "60c2d3e4f5a6b7890cdef103",
+    "run_id": "60d3e4f5a6b7c8901def2045",
+    "type": "review_invoice",
+    "status": "pending",
+    "payload": {
+      "invoice_id": "709f1f77bcf86cd799439033",
+      "amount": 75000.00,
+      "reason": "Amount exceeds Q50,000 threshold",
+      "receptor": "ABC Corporation S.A."
+    },
+    "consume_result": null,
+    "consumed_by": null,
+    "consumed_at": null,
+    "created_at": "2026-03-21T15:16:00Z"
+  },
+  "msg": "Action retrieved"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 404 | Action not found | Verify the `action_id` — use `GET /agent-actions` to list all actions |
+| 422 | Invalid `action_id` format | Verify the ID is a valid identifier |
+| 429 | Rate limit exceeded (30 req/min) | Wait and retry |
 
 ---
 
@@ -1313,9 +1415,11 @@ curl -s -X GET "$BASE_URL/agents/metrics" \
 | 6 | `POST` | `/api/v1/agents/wizard/{session_id}/confirm` | Confirm wizard and create agent |
 | 7 | `GET` | `/api/v1/agents/wizard/{session_id}` | Get wizard session |
 | 8 | `POST` | `/api/v1/agents` | Create agent directly |
+| 8b | `GET` | `/api/v1/agents/{agent_id}` | Get agent by ID |
 | 9 | `POST` | `/api/v1/agents/{agent_id}/run` | Trigger an agent run |
 | 10 | `GET` | `/api/v1/agents/{agent_id}/runs/{run_id}` | Get run status |
 | 11 | `GET` | `/api/v1/agent-actions` | List pending actions |
+| 11b | `GET` | `/api/v1/agent-actions/{action_id}` | Get action by ID |
 | 12 | `PATCH` | `/api/v1/agent-actions/{action_id}/consume` | Consume an action |
 | 13 | `GET` | `/api/v1/agents/{agent_id}/runs` | List agent runs |
 | 14 | `POST` | `/api/v1/agents/{agent_id}/runs/{run_id}/stop` | Stop a running run |
@@ -1334,8 +1438,10 @@ curl -s -X GET "$BASE_URL/agents/metrics" \
 - [ ] I obtained the User Token (`POST /users/token`)
 - [ ] I browsed the catalog or defined my agent configuration
 - [ ] I created an agent (wizard or direct API)
+- [ ] I verified the agent configuration with `GET /agents/{agent_id}`
 - [ ] I triggered a run and received a `202` response
 - [ ] I polled run status until `completed` or `failed`
 - [ ] I checked for pending actions (`GET /agent-actions?status=pending`)
+- [ ] I inspected action details with `GET /agent-actions/{action_id}` before consuming
 - [ ] I consumed any required actions
 - [ ] I verified agent metrics for capacity monitoring

@@ -62,24 +62,10 @@ const quickLinks = [
     primary: false,
   },
   {
-    icon: '🌍',
-    title: 'Domain Management',
-    description: 'Step-by-step flow to check availability, register domains, manage DNS records, nameservers, transfers, and renewals via the 1Platform API.',
-    href: '/docs/flows/domain-management',
-    primary: false,
-  },
-  {
     icon: '📊',
     title: 'Google Analytics',
     description: 'Step-by-step flow to connect Google Analytics 4, provision properties, install tracking, view metrics, and send server-side events via the 1Platform API.',
     href: '/docs/flows/google-analytics',
-    primary: false,
-  },
-  {
-    icon: '📺',
-    title: 'Google AdSense',
-    description: 'Step-by-step flow to connect Google AdSense, view earnings, manage sites, monitor alerts and policy issues via the 1Platform API.',
-    href: '/docs/flows/google-adsense',
     primary: false,
   },
   {

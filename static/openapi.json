@@ -8481,7 +8481,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ReportPeriod",
+              "$ref": "#/components/schemas/app__models__analytics__ReportPeriod",
               "description": "Report time period",
               "examples": [
                 "30d"
@@ -8729,7 +8729,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ReportPeriod",
+              "$ref": "#/components/schemas/app__models__analytics__ReportPeriod",
               "description": "Report time period",
               "examples": [
                 "30d"
@@ -9918,7 +9918,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "$ref": "#/components/schemas/ReportPeriod",
               "description": "Report period",
               "default": "7d"
             },
@@ -10009,7 +10009,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "$ref": "#/components/schemas/ReportPeriod",
               "description": "Report period",
               "default": "30d"
             },
@@ -12278,6 +12278,196 @@
           },
           "502": {
             "description": "Domain provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/": {
+      "post": {
+        "tags": [
+          "Onboarding",
+          "Onboarding"
+        ],
+        "summary": "Register a new account via payment",
+        "description": "Create a new user registration session. Returns a payment URL where the user completes checkout. Once payment is confirmed, the account is created and an API key is available via the status endpoint.\n\n- **Auth:** `Authorization: Bearer <app_token>` (no user token required)\n- **Rate limit:** 20 req/min\n- Minimum amount: $5.00 USD (configurable)\n- Sessions expire after 24 hours",
+        "operationId": "createRegistration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Registration session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_RegistrationCreatedResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Amount below minimum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid email format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Registration temporarily disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/onboarding/status/{session_id}": {
+      "get": {
+        "tags": [
+          "Onboarding",
+          "Onboarding"
+        ],
+        "summary": "Check registration status",
+        "description": "Poll the status of a registration session. Returns the API key when payment is confirmed. The API key is only returned once (single-read guard).\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 50 req/min\n- Poll every 5 seconds until status is `completed` or `failed`",
+        "operationId": "getRegistrationStatus",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "description": "Registration session ID (UUID)",
+              "title": "Session Id"
+            },
+            "description": "Registration session ID (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_RegistrationStatusResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "API key already retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -15552,6 +15742,40 @@
           }
         }
       },
+      "CreateRegistrationRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "title": "Email"
+          },
+          "amount": {
+            "type": "number",
+            "maximum": 10000,
+            "exclusiveMinimum": 0,
+            "title": "Amount",
+            "description": "Amount in merchant currency"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "default": "USD"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "amount"
+        ],
+        "title": "CreateRegistrationRequest",
+        "example": {
+          "amount": 10,
+          "currency": "USD",
+          "email": "user@example.com"
+        }
+      },
       "CreateUserRequest": {
         "properties": {
           "email": {
@@ -18402,6 +18626,16 @@
         "title": "NameserverUpdateRequest",
         "description": "Payload for updating a domain's nameservers."
       },
+      "OnboardingStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "completed",
+          "failed",
+          "expired"
+        ],
+        "title": "OnboardingStatus"
+      },
       "PageEarningItem": {
         "properties": {
           "url": {
@@ -19183,6 +19417,52 @@
         ],
         "title": "ReceptorInfo"
       },
+      "RegistrationCreatedResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "payment_url": {
+            "type": "string",
+            "title": "Payment Url"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In",
+            "default": 86400
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "payment_url"
+        ],
+        "title": "RegistrationCreatedResponse"
+      },
+      "RegistrationStatusResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OnboardingStatus"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "RegistrationStatusResponse"
+      },
       "ReportHeader": {
         "properties": {
           "name": {
@@ -19220,8 +19500,7 @@
         "enum": [
           "7d",
           "30d",
-          "90d",
-          "12m"
+          "90d"
         ],
         "title": "ReportPeriod"
       },
@@ -20499,6 +20778,70 @@
           "msg"
         ],
         "title": "SuccessResponse[ProfileGenerationResponse]"
+      },
+      "SuccessResponse_RegistrationCreatedResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/RegistrationCreatedResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[RegistrationCreatedResponse]"
+      },
+      "SuccessResponse_RegistrationStatusResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/RegistrationStatusResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[RegistrationStatusResponse]"
       },
       "SuccessResponse_RevokeTokensResponse_": {
         "properties": {
@@ -22429,12 +22772,13 @@
         "title": "WizardStatus",
         "description": "Status of an agent creation wizard session."
       },
-      "app__models__adsense__ReportPeriod": {
+      "app__models__analytics__ReportPeriod": {
         "type": "string",
         "enum": [
           "7d",
           "30d",
-          "90d"
+          "90d",
+          "12m"
         ],
         "title": "ReportPeriod"
       }

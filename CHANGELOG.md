@@ -2,6 +2,21 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [0.10.0] - 2026-04-06
+
+### Added
+
+- **Google AdSense flow** (`docs/flows/google-adsense.mdx`) — 17-step guide covering the full AdSense integration: OAuth authorization, account connection, site management, earnings overview/by-page/custom reports, alerts, policy issues, disconnect, and repair.
+- **Domain Management flow** (`docs/flows/domain-management.mdx`) — 17-step guide covering domain registration, DNS record management, nameserver configuration, WHOIS privacy, domain transfers, renewals, registrar locks, and operations history.
+- **Consumption tracking** in Payments & Subscriptions flow — Step 6 (`GET /users/consumption`) for paginated consumption history and Step 7 (`GET /users/consumption/summary`) for aggregated cost breakdowns by operation type.
+- Homepage cards for Google AdSense and Domain Management flows.
+
+### Changed
+
+- Updated `sidebars.ts` to include `google-adsense` and `domain-management` entries.
+- Updated `payments-and-subscriptions.mdx` description, overview, end-to-end example, quick reference, and checklist with consumption endpoints.
+- Refreshed OpenAPI spec from Production API.
+
 ## [0.8.0] - 2026-03-28
 
 ### Added

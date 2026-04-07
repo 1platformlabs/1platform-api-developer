@@ -144,6 +144,7 @@ Save `data.api_key` as `$USER_API_KEY`. This is the user's permanent API key use
 | Code | Cause | Solution |
 |---|---|---|
 | 400 | Invalid email format or validation error | Verify the email address format |
+| 401 | Authentication required (app token) | Verify the app token is valid |
 | 409 | Email already registered | Use the existing user; obtain their token with `POST /users/token` |
 | 422 | Missing `email` field | Send `{"email": "..."}` in the body |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
@@ -233,6 +234,7 @@ curl -X GET "$BASE_URL/users/profile" \
 | Code | Cause | Solution |
 |---|---|---|
 | 401 | Authentication required — invalid or missing token | Regenerate tokens (Steps 0 and 2) |
+| 422 | Validation error | Check request format |
 | 429 | Rate limit exceeded (50 req/min) | Wait and retry |
 
 ---
@@ -273,6 +275,7 @@ After revoking tokens, the current `$USER_TOKEN` is no longer valid. You must ca
 | Code | Cause | Solution |
 |---|---|---|
 | 401 | Invalid or already revoked token | Obtain a new token via `POST /users/token` |
+| 422 | Validation error | Check request format |
 | 429 | Rate limit exceeded (10 req/min) | Wait and retry |
 
 ---

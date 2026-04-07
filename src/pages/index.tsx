@@ -83,6 +83,20 @@ const quickLinks = [
     primary: false,
   },
   {
+    icon: '💰',
+    title: 'Google AdSense',
+    description: 'Step-by-step flow to connect Google AdSense, view earnings, manage sites, handle alerts and policy issues via the 1Platform API.',
+    href: '/docs/flows/google-adsense',
+    primary: false,
+  },
+  {
+    icon: '🌍',
+    title: 'Domain Management',
+    description: 'Step-by-step flow to check domain availability, register domains, manage DNS records, nameservers, transfers, and renewals via the 1Platform API.',
+    href: '/docs/flows/domain-management',
+    primary: false,
+  },
+  {
     icon: '📄',
     title: 'OpenAPI Spec',
     description: 'Download the raw OpenAPI 3.1 specification for code generation or custom tooling.',

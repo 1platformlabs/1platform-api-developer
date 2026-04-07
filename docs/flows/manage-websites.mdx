@@ -217,6 +217,7 @@ Save the desired `id` as `$CATEGORY_ID` to use when creating or updating a websi
 | Code | Cause | Solution |
 |---|---|---|
 | 401 | Authentication required | Regenerate tokens |
+| 422 | Validation error | Check query parameter format |
 | 429 | Rate limit exceeded (50 req/min) | Wait and retry |
 
 ---
@@ -281,9 +282,9 @@ Save `data.id` as `$WEBSITE_ID`.
 
 | Code | Cause | Solution |
 |---|---|---|
-| 400 | Website already exists for this user | Use a different URL or search for the existing website |
 | 401 | Authentication required | Regenerate tokens |
 | 404 | Category not found | Verify the `category_id` exists |
+| 409 | Website already exists for this user | Use a different URL or search for the existing website |
 | 422 | Validation error — missing required fields | Verify `url` and `site_name` are present |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
 
@@ -331,6 +332,7 @@ curl -X GET "$BASE_URL/users/websites?url=https://mijardin.com" \
 |---|---|---|
 | 401 | Authentication required | Regenerate tokens |
 | 404 | Website not found | Verify the URL matches exactly |
+| 422 | Validation error | Check query parameter format |
 | 429 | Rate limit exceeded (50 req/min) | Wait and retry |
 
 ---
@@ -359,6 +361,7 @@ The response has the same structure as the create response (Step 3).
 |---|---|---|
 | 401 | Authentication required | Regenerate tokens |
 | 404 | Website not found | Verify the `website_id` |
+| 422 | Validation error | Check path parameter format |
 | 429 | Rate limit exceeded (50 req/min) | Wait and retry |
 
 ---
@@ -498,6 +501,7 @@ If you omit `legal_owner` or `legal_address`, the API will use AI to generate su
 | Code | Cause | Solution |
 |---|---|---|
 | 401 | Authentication required | Regenerate tokens |
+| 402 | Insufficient balance — not enough credits | Top up your account balance |
 | 404 | Website not found | Verify the `website_id` |
 | 422 | Validation error — `legal_email` missing or too short | Provide a valid email (min 5 chars) |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
@@ -539,6 +543,7 @@ This action is irreversible. The website and all its associated data will be per
 |---|---|---|
 | 401 | Authentication required | Regenerate tokens |
 | 404 | Website not found | Verify the `website_id` |
+| 422 | Validation error | Check path parameter format |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
 
 ---
@@ -627,7 +632,7 @@ curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/legal" \
 ### Idempotency
 
 :::warning[No idempotency mechanism]
-The API does not support an `Idempotency-Key` header. If a website creation request fails due to timeout, search for the website by URL (`GET /users/websites?url=...`) before retrying. Duplicate URLs for the same user return a **400** error.
+The API does not support an `Idempotency-Key` header. If a website creation request fails due to timeout, search for the website by URL (`GET /users/websites?url=...`) before retrying. Duplicate URLs for the same user return a **409** error.
 :::
 
 ### Retries

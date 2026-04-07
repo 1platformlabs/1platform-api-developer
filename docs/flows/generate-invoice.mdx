@@ -346,6 +346,77 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/branches/$BRANCH_ID" \
 
 ---
 
+### Step 2d — Look Up Person by Document (Optional)
+
+**Goal:** Retrieve personal data for a person using their CUI/DPI number. Useful for pre-filling the invoice receptor fields (`name`, `documentNumber`) without asking the customer to type them manually.
+
+**Endpoint:** `POST /api/v1/identify`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/identify" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_number": "2943817650101"
+  }'
+```
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `document_number` | string | Yes | CUI/DPI number — exactly 13 digits |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "document_number": "2943817650101",
+    "first_name": "María",
+    "second_name": "Fernanda",
+    "third_name": null,
+    "first_surname": "López",
+    "second_surname": "García",
+    "married_surname": null,
+    "date_of_birth": "15/08/1985",
+    "date_of_death": null,
+    "gender": "F",
+    "marital_status": "SO",
+    "nationality": "guatemalteca",
+    "birth_country": "Guatemala",
+    "birth_department": "Guatemala",
+    "birth_municipality": "Guatemala",
+    "residence": "12 Avenida 3-40, Zona 1, Guatemala",
+    "occupation": "Comerciante",
+    "expiration_date": "15/08/2030"
+  },
+  "msg": "Person found"
+}
+```
+
+:::note
+Combine `first_name`, `second_name`, `first_surname`, and `second_surname` to build the receptor `name` field. The `document_number` from the response is the CUI, which can be passed as `documentNumber` in the invoice receptor with `documentType: "CUI"`.
+
+For invoices issued to companies, use the NIT lookup path instead (the receptor's `documentType` should be `"NIT"`).
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid or expired token | Regenerate tokens (Steps 0 and 1) |
+| 404 | No records found for the document number | Verify the CUI/DPI is correct (13 digits) |
+| 422 | Integration not configured or lookup error | Ensure the App has the person lookup integration enabled |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
 ### Step 3 — Create Invoice
 
 **Goal:** Issue an electronic invoice (FEL) associated with a business. The business NIT is used as the emitter on TribuTax.
@@ -899,7 +970,8 @@ Invoice emission involves an external call to TribuTax with a configurable timeo
 | 2 | `POST` | `/api/v1/businesses` | Create business |
 | 2b | `POST` | `/api/v1/businesses/{businessId}/branches` | Create branch (optional) |
 | 2c | `GET` | `/api/v1/businesses/{businessId}/branches/{branchId}` | Get branch details |
-| 2d | `GET` | `/api/v1/businesses/{businessId}` | Get business |
+| 2d | `POST` | `/api/v1/identify` | Look up person by CUI/DPI (optional) |
+| 2e | `GET` | `/api/v1/businesses/{businessId}` | Get business |
 | 3 | `POST` | `/api/v1/businesses/{businessId}/invoices` | Create invoice |
 | 4 | `GET` | `/api/v1/businesses/{businessId}/invoices/{invoiceId}` | Get invoice details |
 | 5 | `GET` | `/api/v1/businesses/{businessId}/invoices` | List invoices |
@@ -915,7 +987,8 @@ Invoice emission involves an external call to TribuTax with a configurable timeo
 - [ ] I obtained the User Token (`POST /users/token`)
 - [ ] I created the Business or have its ID (`POST /businesses`)
 - [ ] I created a Branch if needed (`POST /businesses/{id}/branches`) (optional)
-- [ ] I have the receptor data (name, NIT, email)
+- [ ] I looked up the receptor's personal data via CUI/DPI if needed (`POST /identify`) (optional)
+- [ ] I have the receptor data (name, document number, email)
 - [ ] I have at least 1 item with description, unit price, and quantity
 - [ ] I issued the invoice (`POST /businesses/{id}/invoices`)
 - [ ] I verified the invoice status (`status: "issued"`) and FEL sync (`fel_synced: true`)

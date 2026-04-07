@@ -4871,6 +4871,113 @@
         }
       }
     },
+    "/api/v1/identify": {
+      "post": {
+        "tags": [
+          "Electronic Invoicing (FEL)"
+        ],
+        "summary": "Look up a person by identification document",
+        "description": "Search for a person's information using their identification document number (CUI/DPI).\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n- Returns personal data including name, date of birth, nationality, and more\n- Useful for pre-filling invoice receptor information",
+        "operationId": "identifyPerson",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonLookupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Person found successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_PersonData_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No records found for the document number",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Integration not configured or lookup error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/logs/": {
       "get": {
         "tags": [
@@ -18411,6 +18518,252 @@
         ],
         "title": "PaginationResponse"
       },
+      "PersonData": {
+        "properties": {
+          "document_number": {
+            "type": "string",
+            "maxLength": 13,
+            "title": "Document Number",
+            "description": "CUI/DPI number"
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "First Name",
+            "description": "First name"
+          },
+          "second_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Name",
+            "description": "Second name"
+          },
+          "third_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Third Name",
+            "description": "Third name"
+          },
+          "first_surname": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "First Surname",
+            "description": "First surname"
+          },
+          "second_surname": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Surname",
+            "description": "Second surname"
+          },
+          "married_surname": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Married Surname",
+            "description": "Married surname"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth",
+            "description": "Date of birth (DD/MM/YYYY)"
+          },
+          "date_of_death": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Death",
+            "description": "Date of death if deceased"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender",
+            "description": "Gender (M/F)"
+          },
+          "marital_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marital Status",
+            "description": "Marital status code"
+          },
+          "nationality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nationality",
+            "description": "Nationality"
+          },
+          "birth_country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Country",
+            "description": "Country of birth"
+          },
+          "birth_department": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Department",
+            "description": "Department of birth"
+          },
+          "birth_municipality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Municipality",
+            "description": "Municipality of birth"
+          },
+          "residence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residence",
+            "description": "Registered residence"
+          },
+          "occupation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occupation",
+            "description": "Occupation"
+          },
+          "expiration_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiration Date",
+            "description": "DPI expiration date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_number",
+          "first_name",
+          "first_surname"
+        ],
+        "title": "PersonData",
+        "description": "Person information returned from lookup.\n\nFlat response model (same pattern as BusinessResponse).\nUsed directly as SuccessResponse[PersonData]."
+      },
+      "PersonLookupRequest": {
+        "properties": {
+          "document_number": {
+            "type": "string",
+            "maxLength": 13,
+            "minLength": 13,
+            "pattern": "^\\d{13}$",
+            "title": "Document Number",
+            "description": "CUI/DPI number (13 digits)",
+            "examples": [
+              "1234567890101"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_number"
+        ],
+        "title": "PersonLookupRequest",
+        "description": "Request to look up a person by identification document."
+      },
       "PlanResponse": {
         "properties": {
           "id": {
@@ -20023,6 +20376,38 @@
           "msg"
         ],
         "title": "SuccessResponse[PageEarningsResponse]"
+      },
+      "SuccessResponse_PersonData_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/PersonData",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[PersonData]"
       },
       "SuccessResponse_ProfileGenerationResponse_": {
         "properties": {

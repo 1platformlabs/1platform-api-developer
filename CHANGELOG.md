@@ -2,6 +2,23 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [0.14.0] - 2026-04-07
+
+### Added
+- **402 error codes**: Added `402 Insufficient balance` error responses to AI generations (comments, images, profiles), content generation, keyword research, indexing, Search Console, legal pages, and link-building endpoints
+- **422 error codes**: Added missing `422 Validation error` responses to user onboarding, website management, and Search Console endpoints
+- **Homepage quick links**: Added Google AdSense and Domain Management flow cards to the developer docs homepage
+- **Link-building tip**: Added admonition documenting all marketplace actions (`orders`, `sync`, `accept_order`, etc.)
+
+### Changed
+- **Image provider values**: Changed `"pixabay"`/`"pexels"` to `"default"`/`"alternative"` in all content generation examples and validations
+- **Keyword response field**: Renamed `domain` to `lookup_key` in keyword-by-domain response to match API
+- **Topic keyword response**: Updated response example with fuller structure (`total`, `categories`, `country`, `title`, `url` fields)
+- **Analytics response**: Added `"data": null` to MP event, disconnect, and deprovision responses
+- **Website duplicate error**: Changed from `400` to `409` for duplicate website creation
+- **User onboarding**: Added `401` error for invalid app token on user creation
+- **OpenAPI spec**: Updated `ReportPeriod` schema references — Analytics uses `ReportPeriod` (with `12m`), AdSense uses `app__models__adsense__ReportPeriod` (without `12m`)
+
 ## [0.12.0] - 2026-04-06
 
 ### Added

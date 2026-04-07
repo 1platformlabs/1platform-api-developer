@@ -176,7 +176,9 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
 |---|---|---|
 | 400 | Invalid action or website not registered in Search Console | Verify action is `add`, `verify`, `delete`, or `sitemaps` |
 | 401 | Authentication required | Regenerate tokens |
+| 402 | Insufficient balance — not enough credits | Top up your account balance |
 | 404 | Website not found | Verify the `website_id` |
+| 422 | Validation error — missing or malformed fields | Check required fields |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
 | 502 | Google Search Console API error | Service temporarily unavailable — retry later |
 
@@ -218,7 +220,9 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
 |---|---|---|
 | 400 | Website not registered in Search Console or verification failed | Add the website first (Step 2) |
 | 401 | Authentication required | Regenerate tokens |
+| 402 | Insufficient balance — not enough credits | Top up your account balance |
 | 404 | Website not found | Verify the `website_id` |
+| 422 | Validation error — missing or malformed fields | Check required fields |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
 | 502 | Google Search Console API error | Service temporarily unavailable — retry later |
 
@@ -268,7 +272,9 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
 |---|---|---|
 | 400 | Invalid action or missing sitemaps payload | Include `payload.sitemaps` array for sitemaps action |
 | 401 | Authentication required | Regenerate tokens |
+| 402 | Insufficient balance — not enough credits | Top up your account balance |
 | 404 | Website not found | Verify the `website_id` |
+| 422 | Validation error — missing or malformed fields | Check required fields |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
 | 502 | Google Search Console API error | Service temporarily unavailable — retry later |
 
@@ -308,11 +314,16 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
 
 | Code | Cause | Solution |
 |---|---|---|
-| 400 | Invalid action, missing credentials, or website already added | Verify action is `add` or `verify` and marketplace credentials are configured |
+| 400 | Invalid action, missing credentials, or website already added | Verify the action value and marketplace credentials are configured |
 | 401 | Authentication required | Regenerate tokens |
 | 404 | Website not found in marketplace | Verify the `website_id` |
+| 422 | Validation error — missing or malformed fields | Check required fields |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
 | 502 | Link-building service unavailable | Service temporarily unavailable — retry later |
+
+:::tip
+The link-building marketplace endpoint supports additional actions beyond `add` and `verify`: `orders`, `view_order`, `sync`, `accept_order`, `reject_order`, `reopen_order`, and `send_url`. These actions support optional fields like `order_id`, `url`, `page`, `page_size`, and `status_filter` for order management workflows.
+:::
 
 ---
 
@@ -353,6 +364,7 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
 | 400 | Verification failed or website not added yet | Add the website first (Step 5) |
 | 401 | Authentication required | Regenerate tokens |
 | 404 | Website not found in marketplace | Verify the website was added |
+| 422 | Validation error — missing or malformed fields | Check required fields |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
 | 502 | Link-building service unavailable | Service temporarily unavailable — retry later |
 

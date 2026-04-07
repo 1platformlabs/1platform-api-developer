@@ -74,7 +74,7 @@ JOB_ID=""       # Obtained in Step 3
 | `keyword` | string | Yes | Keyword to generate content for (min 3 chars) |
 | `lang` | string | No | Language code (default: `"en"`) |
 | `country` | string | No | Country code for search context |
-| `image_provider` | string | No | Image provider: `"pixabay"` or `"pexels"` (default: `"pixabay"`) |
+| `image_provider` | string | No | Image provider: `"default"` or `"alternative"` (default: `"default"`) |
 | `categories` | array | No | List of category names for content classification |
 
 ### Indexing
@@ -209,7 +209,7 @@ curl -X POST "$BASE_URL/posts/keywords/" \
     ],
     "country": "es",
     "lang": "en",
-    "domain": "ecologiaverde.com",
+    "lookup_key": "ecologiaverde.com",
     "keywords": [
       {
         "keyword": "black panther",
@@ -243,6 +243,8 @@ Choose a keyword with high search volume from the results for content generation
 |---|---|---|
 | 400 | Invalid domain or validation error | Verify the domain format |
 | 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 402 | Insufficient balance — not enough credits | Top up your account balance |
+| 404 | Resource not found | Verify the request parameters |
 | 422 | Validation error — missing or malformed fields | Check required fields |
 | 429 | Rate limit exceeded (10 req/min) | Wait and retry |
 | 500 | Service configuration error or provider unavailable | Verify AI provider configuration |
@@ -275,14 +277,24 @@ curl -X POST "$BASE_URL/posts/keywords/topic/" \
 {
   "success": true,
   "data": {
+    "total": 25,
+    "categories": [
+      "Gardening",
+      "Sustainability"
+    ],
+    "country": "us",
+    "lang": "en",
+    "lookup_key": "sustainable gardening tips",
     "keywords": [
       {
-        "keyword": "best seo tools 2024",
+        "keyword": "sustainable gardening tips",
+        "title": "Sustainable Gardening Tips for Beginners",
+        "original_title": "Sustainable Gardening Tips for Beginners",
+        "original_keyword": "sustainable gardening tips",
         "volume": 1200,
-        "difficulty": 45
+        "url": ""
       }
-    ],
-    "total": 1
+    ]
   },
   "msg": "Keywords extracted successfully"
 }
@@ -298,6 +310,8 @@ Use Step 2 (by domain) when you already have a website and want to find keywords
 |---|---|---|
 | 400 | Invalid topic or validation error | Verify the topic is at least 2 characters |
 | 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 402 | Insufficient balance — not enough credits | Top up your account balance |
+| 404 | Resource not found | Verify the request parameters |
 | 422 | Validation error — missing or malformed fields | Check required fields |
 | 429 | Rate limit exceeded (10 req/min) | Wait and retry |
 | 502 | Search provider unavailable | Retry after a short delay |
@@ -322,7 +336,7 @@ curl -X POST "$BASE_URL/posts/content/" \
     "keyword": "sustainable gardening tips",
     "lang": "en",
     "country": "us",
-    "image_provider": "pixabay",
+    "image_provider": "default",
     "categories": ["Home & Garden"]
   }'
 ```
@@ -339,7 +353,7 @@ curl -X POST "$BASE_URL/posts/content/" \
     "input": {
       "keyword": "sustainable gardening tips",
       "lang": "en",
-      "image_provider": "pixabay"
+      "image_provider": "default"
     },
     "created_at": "2026-03-18T10:30:00"
   },
@@ -356,6 +370,8 @@ Save `data.job_id` as `$JOB_ID`. The job runs asynchronously — poll its status
 | Code | Cause | Solution |
 |---|---|---|
 | 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 402 | Insufficient balance — not enough credits | Top up your account balance |
+| 404 | Resource not found | Verify the request parameters |
 | 422 | Validation error — keyword too short or invalid fields | Keyword must be at least 3 characters |
 | 429 | Rate limit exceeded (5 req/min) | Wait and retry — this is an AI-intensive endpoint |
 | 500 | Service configuration error or AI provider unavailable | Verify AI and image provider configuration |
@@ -388,7 +404,7 @@ curl -X GET "$BASE_URL/posts/content/jobs/$JOB_ID" \
     "input": {
       "keyword": "sustainable gardening tips",
       "lang": "en",
-      "image_provider": "pixabay"
+      "image_provider": "default"
     },
     "result": {
       "title": "Sustainable Gardening Tips for 2026",
@@ -462,6 +478,8 @@ curl -X POST "$BASE_URL/posts/indexing/" \
 |---|---|---|
 | 400 | Invalid URL format or inaccessible URL | Verify the URL is publicly accessible |
 | 401 | Authentication failed — invalid or missing token | Regenerate tokens |
+| 402 | Insufficient balance — not enough credits | Top up your account balance |
+| 404 | Resource not found | Verify the request parameters |
 | 422 | Validation error — missing URL field | Send `{"url": "..."}` in the body |
 | 429 | Rate limit exceeded (20 req/min) | Wait and retry |
 | 500 | Google Indexing API error or service unavailable | Verify Search Console configuration |
@@ -515,7 +533,7 @@ JOB_ID=$(curl -s -X POST "$BASE_URL/posts/content/" \
     "keyword": "sustainable gardening tips",
     "lang": "en",
     "country": "us",
-    "image_provider": "pixabay",
+    "image_provider": "default",
     "categories": ["Home & Garden"]
   }' \
   | jq -r '.data.job_id')
@@ -574,7 +592,7 @@ The API does not support an `Idempotency-Key` header. Content generation jobs ar
 ### Important validations
 - The `keyword` must be at least 3 characters long.
 - The `domain` must be a valid domain name (min 3 chars).
-- The `image_provider` must be either `"pixabay"` or `"pexels"`.
+- The `image_provider` must be either `"default"` or `"alternative"`.
 - The `lang` field must be a 2-character language code.
 - The indexing URL must be publicly accessible and belong to a Google Search Console verified property.
 

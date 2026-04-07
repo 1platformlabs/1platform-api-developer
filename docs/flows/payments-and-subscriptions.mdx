@@ -1,6 +1,6 @@
 ---
 title: "Payments & Subscriptions"
-description: "Step-by-step flow to check billing, create payment transactions, view transaction history, and check subscription details via the 1Platform API."
+description: "Step-by-step flow to check billing, create payment transactions, view transaction history, check subscription details, and track consumption via the 1Platform API."
 sidebar_position: 7
 ---
 
@@ -8,11 +8,11 @@ sidebar_position: 7
 
 ## Overview
 
-This flow documents how to manage payments and subscriptions through the 1Platform API. It covers checking billing balance, creating payment transactions, viewing transaction history, and retrieving subscription details.
+This flow documents how to manage payments and subscriptions through the 1Platform API. It covers checking billing balance, creating payment transactions, viewing transaction history, retrieving subscription details, and tracking API consumption.
 
 **Use case:** Allow users to top up their account balance via the integrated payment service, track transaction history, and manage their subscription plan.
 
-**End result:** A completed payment transaction with balance credited to the user's account, and full visibility into billing and subscription status.
+**End result:** A completed payment transaction with balance credited to the user's account, full visibility into billing, subscription status, and detailed consumption tracking.
 
 ---
 
@@ -377,6 +377,167 @@ This endpoint is a placeholder — full subscription management will be availabl
 
 ---
 
+### Step 6 — Get Consumption History
+
+**Goal:** Retrieve a paginated list of the user's API consumption events, optionally filtered by operation type and date range.
+
+**Endpoint:** `GET /api/v1/users/consumption`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/consumption?limit=10&skip=0" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+
+# With filters
+curl -X GET "$BASE_URL/users/consumption?operation=content_generation&from_date=2026-03-01&to_date=2026-03-31&limit=20&skip=0" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `limit` | integer | `50` | Maximum items to return (1-100) |
+| `skip` | integer | `0` | Pagination offset |
+| `operation` | string | — | Filter by operation type (e.g., `content_generation`, `keyword_extraction`) |
+| `from_date` | string | — | Start date filter (`YYYY-MM-DD`) |
+| `to_date` | string | — | End date filter (`YYYY-MM-DD`) |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 42,
+    "items": [
+      {
+        "id": "507f1f77bcf86cd799439011",
+        "operation": "content_generation",
+        "endpoint": "POST /api/v1/posts/content/",
+        "cost_usd": 0.15,
+        "balance_after": 25.35,
+        "status": "charged",
+        "metadata": {
+          "keyword": "marketing digital guatemala",
+          "lang": "es",
+          "domain": "example-demo.com"
+        },
+        "created_at": "2026-03-18T14:30:00Z"
+      },
+      {
+        "id": "507f1f77bcf86cd799439012",
+        "operation": "keyword_extraction",
+        "endpoint": "POST /api/v1/posts/keywords/",
+        "cost_usd": 0.05,
+        "balance_after": 25.50,
+        "status": "charged",
+        "metadata": {
+          "domain": "example-demo.com",
+          "lang": "es",
+          "country": "GT"
+        },
+        "created_at": "2026-03-18T10:15:00Z"
+      }
+    ]
+  },
+  "msg": "Consumption history retrieved successfully"
+}
+```
+
+:::note
+Each consumption event records a single API operation with its cost. Key fields: `cost_usd` is the charge in USD, `balance_after` shows the remaining balance, and `status` can be `charged`, `free_tier`, `charge_failed`, or `refunded`. Use the `operation` filter to isolate specific operation types.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Invalid query parameters | Check date format (`YYYY-MM-DD`) and numeric ranges |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+### Step 7 — Get Consumption Summary
+
+**Goal:** Retrieve an aggregated summary of consumption grouped by operation type, useful for billing dashboards and cost analysis.
+
+**Endpoint:** `GET /api/v1/users/consumption/summary`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/consumption/summary" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+
+# With date range
+curl -X GET "$BASE_URL/users/consumption/summary?from_date=2026-03-01&to_date=2026-03-31" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `from_date` | string | — | Start date (`YYYY-MM-DD`) |
+| `to_date` | string | — | End date (`YYYY-MM-DD`) |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "period": "2026-03",
+    "total_spent": 3.50,
+    "total_operations": 42,
+    "by_operation": [
+      {
+        "operation": "content_generation",
+        "count": 15,
+        "total_cost": 2.25,
+        "avg_cost": 0.15
+      },
+      {
+        "operation": "keyword_extraction",
+        "count": 20,
+        "total_cost": 1.00,
+        "avg_cost": 0.05
+      },
+      {
+        "operation": "image_generation",
+        "count": 7,
+        "total_cost": 0.25,
+        "avg_cost": 0.04
+      }
+    ]
+  },
+  "msg": "Consumption summary retrieved successfully"
+}
+```
+
+:::tip
+Use this endpoint to build billing dashboards showing per-operation cost breakdowns. Combine with date filters for monthly or weekly reports.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Invalid query parameters | Check date format (`YYYY-MM-DD`) |
+| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
 ## Full end-to-end example
 
 Complete flow with consistent fictitious values.
@@ -436,6 +597,18 @@ curl -s -X GET "$BASE_URL/users/subscriptions/$SUBSCRIPTION_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
+
+# === STEP 6: Get Consumption History ===
+curl -s -X GET "$BASE_URL/users/consumption?limit=5" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 7: Get Consumption Summary ===
+curl -s -X GET "$BASE_URL/users/consumption/summary" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
 ```
 
 ---
@@ -480,6 +653,8 @@ The API does not support an `Idempotency-Key` header for transactions. If a tran
 | 3 | `POST` | `/api/v1/users/transactions` | Create payment transaction |
 | 4 | `GET` | `/api/v1/users/transactions` | Get transaction history |
 | 5 | `GET` | `/api/v1/users/subscriptions/{subscription_id}` | Get subscription details |
+| 6 | `GET` | `/api/v1/users/consumption` | Get consumption history |
+| 7 | `GET` | `/api/v1/users/consumption/summary` | Get consumption summary |
 
 ---
 
@@ -494,3 +669,5 @@ The API does not support an `Idempotency-Key` header for transactions. If a tran
 - [ ] I redirected the user to the `payment_url`
 - [ ] I set up a webhook listener for transaction status updates
 - [ ] I verified the updated balance after payment approval
+- [ ] I reviewed consumption history (`GET /users/consumption`)
+- [ ] I checked consumption summary for cost analysis (`GET /users/consumption/summary`)

@@ -1,0 +1,1163 @@
+---
+title: "Google AdSense"
+description: "Step-by-step flow to connect Google AdSense, view earnings, manage sites, handle alerts and policy issues via the 1Platform API."
+sidebar_position: 11
+---
+
+# Flow: Google AdSense
+
+## Overview
+
+This flow documents how to integrate Google AdSense with your websites through the 1Platform API. It covers OAuth authorization, connecting AdSense accounts, viewing earnings (overview, by page, custom reports), managing sites, monitoring alerts and policy issues, and disconnecting or repairing connections.
+
+**Use case:** Connect your users' websites to Google AdSense, monitor ad earnings and performance, track policy issues and alerts, and manage the full AdSense lifecycle — all through a unified API.
+
+**End result:** A fully connected Google AdSense account with access to earnings data, site management, alerts monitoring, and policy issue tracking.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| Website registered | A website must be registered via the Manage Websites flow |
+| Google AdSense account | An active Google AdSense account is required |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""      # Obtained in Step 0
+USER_TOKEN=""     # Obtained in Step 1
+WEBSITE_ID=""     # Website ID to connect AdSense to
+```
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Start OAuth Authorization
+
+**Goal:** Initiate the Google OAuth flow for AdSense. The API returns an authorization URL that the user must visit in their browser to grant access.
+
+**Endpoint:** `GET /api/v1/adsense/oauth/authorize`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/oauth/authorize?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID to authorize AdSense for |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=...&scope=https://www.googleapis.com/auth/adsense.readonly&state=507f1f77bcf86cd799439011",
+    "state": "507f1f77bcf86cd799439011"
+  },
+  "msg": "Authorization URL generated successfully"
+}
+```
+
+:::warning
+The user must open the `authorization_url` in their browser, sign in with their Google account, and grant AdSense permissions. The OAuth callback is handled automatically by 1Platform. After authorization, use Step 3 to verify the OAuth status before connecting.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Missing or invalid authentication token | Regenerate tokens (Steps 0 and 1) |
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 3 — Check OAuth Status
+
+**Goal:** Verify whether the user has completed the Google OAuth authorization for AdSense.
+
+**Endpoint:** `GET /api/v1/adsense/oauth/status`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/oauth/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID to check OAuth status for |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "oauth_connected": true,
+    "oauth_email": "publisher@example.com",
+    "authorized_at": "2026-04-06T14:30:00Z"
+  },
+  "msg": "OAuth status retrieved successfully"
+}
+```
+
+:::tip
+Poll this endpoint after the user visits the authorization URL (Step 2). Once `oauth_connected` is `true`, proceed to Step 4 to connect AdSense.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 4 — Connect AdSense
+
+**Goal:** Activate the AdSense connection for the website after OAuth has been authorized.
+
+**Endpoint:** `POST /api/v1/adsense/connect`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/adsense/connect?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID to connect AdSense for |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "account_id": "pub-1234567890123456",
+    "account_name": "Ejemplo AdSense Demo",
+    "publisher_id": "pub-1234567890123456",
+    "status": "active",
+    "timezone": "America/Guatemala",
+    "site_state": "READY",
+    "site_auto_ads_enabled": true,
+    "connected_at": "2026-04-06T14:35:00Z",
+    "error_message": null,
+    "last_sync_at": "2026-04-06T14:35:00Z",
+    "oauth_connected": true,
+    "oauth_email": "publisher@example.com"
+  },
+  "msg": "AdSense connected successfully"
+}
+```
+
+:::note
+The response is an `AdSenseStatusResponse` object. Key fields:
+- `status` — Connection status (`"active"`, `"disconnected"`, `"error"`)
+- `publisher_id` — Your AdSense publisher ID (format: `pub-NNNN`)
+- `site_state` — Google's approval state for this site (e.g., `"READY"`, `"REQUIRES_REVIEW"`)
+- `site_auto_ads_enabled` — Whether auto ads are enabled for this site
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | OAuth not authorized | Complete the OAuth flow first (Steps 2 and 3) |
+| 409 | Already active or invalid state transition | Check current status with `GET /adsense/status`. The connection may already be active |
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 5 — Get AdSense Status
+
+**Goal:** Retrieve the current AdSense connection status for a website.
+
+**Endpoint:** `GET /api/v1/adsense/status`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID to check status for |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "account_id": "pub-1234567890123456",
+    "account_name": "Ejemplo AdSense Demo",
+    "publisher_id": "pub-1234567890123456",
+    "status": "active",
+    "timezone": "America/Guatemala",
+    "site_state": "READY",
+    "site_auto_ads_enabled": true,
+    "connected_at": "2026-04-06T14:35:00Z",
+    "error_message": null,
+    "last_sync_at": "2026-04-06T15:00:00Z",
+    "oauth_connected": true,
+    "oauth_email": "publisher@example.com"
+  },
+  "msg": "AdSense status retrieved successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 6 — List AdSense Accounts
+
+**Goal:** Retrieve the list of AdSense accounts available for the authorized Google account.
+
+**Endpoint:** `GET /api/v1/adsense/accounts`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/accounts?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID with an active AdSense connection |
+| `page` | integer | No | Page number (default: 1) |
+| `page_size` | integer | No | Items per page (1-100, default: 50) |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "accounts": [
+      {
+        "name": "accounts/pub-1234567890123456",
+        "display_name": "Ejemplo AdSense Demo",
+        "timezone": "America/Guatemala",
+        "premium": false,
+        "state": "READY"
+      }
+    ]
+  },
+  "msg": "Accounts retrieved successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 7 — List AdSense Sites
+
+**Goal:** Retrieve the list of sites registered in the AdSense account.
+
+**Endpoint:** `GET /api/v1/adsense/sites`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/sites?website_id=$WEBSITE_ID&page=1&page_size=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID with an active AdSense connection |
+| `page` | integer | No | Page number for pagination |
+| `page_size` | integer | No | Number of results per page |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "sites": [
+      {
+        "name": "accounts/pub-1234567890123456/sites/example.com",
+        "domain": "example.com",
+        "state": "READY",
+        "auto_ads_enabled": true
+      },
+      {
+        "name": "accounts/pub-1234567890123456/sites/blog.example.com",
+        "domain": "blog.example.com",
+        "state": "REQUIRES_REVIEW",
+        "auto_ads_enabled": false
+      }
+    ],
+    "page": 1,
+    "page_size": 20,
+    "total": 2
+  },
+  "msg": "Sites retrieved successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 8 — Sync Site State
+
+**Goal:** Force a sync of the site state from Google AdSense to update the local status (approval state, auto ads, etc.).
+
+**Endpoint:** `POST /api/v1/adsense/sites/sync`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/adsense/sites/sync?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID to sync site state for |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "site_state": "READY",
+    "auto_ads_enabled": true,
+    "synced_at": "2026-04-06T15:30:00Z"
+  },
+  "msg": "Site state synced successfully"
+}
+```
+
+:::tip
+Use this endpoint after making changes in the Google AdSense dashboard (e.g., enabling auto ads or submitting a site for review) to ensure the local state reflects the latest configuration.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 9 — Earnings Overview
+
+**Goal:** Retrieve an overview of AdSense earnings for the website, with optional comparison to a previous period.
+
+**Endpoint:** `GET /api/v1/adsense/earnings/overview`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=30d&compare=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID with an active AdSense connection |
+| `period` | string | No | Report period (e.g., `"7d"`, `"30d"`, `"90d"`) |
+| `compare` | boolean | No | Compare with the previous period of the same length |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "period": "30d",
+    "estimated_earnings": {
+      "current": 150.00,
+      "previous": 120.50
+    },
+    "page_views": {
+      "current": 45000,
+      "previous": 38000
+    },
+    "clicks": {
+      "current": 1200,
+      "previous": 980
+    },
+    "ctr": {
+      "current": 2.67,
+      "previous": 2.58
+    },
+    "rpm": {
+      "current": 3.33,
+      "previous": 3.17
+    }
+  },
+  "msg": "Earnings overview retrieved successfully"
+}
+```
+
+:::note
+When `compare` is `true`, each metric includes both `current` and `previous` values. When `false` or omitted, only `current` values are returned.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` and optional `period` value |
+
+---
+
+### Step 10 — Earnings by Page
+
+**Goal:** Retrieve earnings broken down by individual page URL.
+
+**Endpoint:** `GET /api/v1/adsense/earnings/by-page`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/earnings/by-page?website_id=$WEBSITE_ID&period=30d" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID with an active AdSense connection |
+| `period` | string | No | Report period (e.g., `"7d"`, `"30d"`, `"90d"`) |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "period": "30d",
+    "pages": [
+      {
+        "url": "/blog/best-practices-seo-2026",
+        "earnings": 45.50,
+        "page_views": 12000
+      },
+      {
+        "url": "/guides/getting-started",
+        "earnings": 32.00,
+        "page_views": 8500
+      },
+      {
+        "url": "/blog/content-marketing-tips",
+        "earnings": 18.75,
+        "page_views": 5200
+      }
+    ]
+  },
+  "msg": "Earnings by page retrieved successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` and optional `period` value |
+
+---
+
+### Step 11 — Custom Earnings Report
+
+**Goal:** Generate a custom earnings report with specific date ranges and dimensions.
+
+**Endpoint:** `POST /api/v1/adsense/earnings/report`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/adsense/earnings/report?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date": "2026-03-01",
+    "end_date": "2026-03-31",
+    "dimensions": ["DATE", "COUNTRY"]
+  }'
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID with an active AdSense connection |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `start_date` | string | Yes | Start date in `YYYY-MM-DD` format |
+| `end_date` | string | Yes | End date in `YYYY-MM-DD` format |
+| `dimensions` | array | No | Array of dimension strings (e.g., `"DATE"`, `"COUNTRY"`, `"AD_UNIT"`). Default: `["DATE"]` |
+| `metrics` | array | No | Array of metric strings (e.g., `"ESTIMATED_EARNINGS"`, `"CLICKS"`, `"IMPRESSIONS"`). Default: `["ESTIMATED_EARNINGS", "CLICKS", "IMPRESSIONS"]` |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "headers": [
+      { "name": "DATE", "type": "DIMENSION" },
+      { "name": "COUNTRY", "type": "DIMENSION" },
+      { "name": "ESTIMATED_EARNINGS", "type": "METRIC_CURRENCY", "currency_code": "USD" },
+      { "name": "PAGE_VIEWS", "type": "METRIC_TALLY" },
+      { "name": "CLICKS", "type": "METRIC_TALLY" }
+    ],
+    "rows": [
+      ["2026-03-01", "US", "12.50", "3200", "85"],
+      ["2026-03-01", "MX", "3.25", "1100", "28"],
+      ["2026-03-02", "US", "14.00", "3500", "92"],
+      ["2026-03-02", "GT", "2.10", "800", "15"]
+    ]
+  },
+  "msg": "Custom report generated successfully"
+}
+```
+
+:::note
+The `headers` array describes each column in the `rows`. Each row is an array of string values corresponding to the headers in order. Currency values are returned as string representations of decimal numbers.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing fields or invalid date range | Ensure `start_date`, `end_date`, and `dimensions` are present and valid |
+
+---
+
+### Step 12 — List Alerts
+
+**Goal:** Retrieve AdSense alerts for the connected account (e.g., payment issues, policy warnings).
+
+**Endpoint:** `GET /api/v1/adsense/alerts`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/alerts?website_id=$WEBSITE_ID&page=1&page_size=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID with an active AdSense connection |
+| `page` | integer | No | Page number for pagination |
+| `page_size` | integer | No | Number of results per page |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "alerts": [
+      {
+        "name": "accounts/pub-1234567890123456/alerts/ALERT001",
+        "severity": "WARNING",
+        "type": "ADS_TXT_ISSUES",
+        "message": "You need to fix some ads.txt file issues to avoid a severe impact to your revenue."
+      },
+      {
+        "name": "accounts/pub-1234567890123456/alerts/ALERT002",
+        "severity": "INFO",
+        "type": "PAYMENT_HOLD",
+        "message": "Your payment is currently on hold. Verify your payment information."
+      }
+    ],
+    "page": 1,
+    "page_size": 20,
+    "total": 2
+  },
+  "msg": "Alerts retrieved successfully"
+}
+```
+
+:::warning
+Alerts with `severity: "SEVERE"` require immediate attention and may indicate revenue-impacting issues. Monitor alerts regularly to avoid disruptions.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 13 — List Policy Issues
+
+**Goal:** Retrieve policy issues reported by Google AdSense for the connected site.
+
+**Endpoint:** `GET /api/v1/adsense/policy-issues`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/adsense/policy-issues?website_id=$WEBSITE_ID&page=1&page_size=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID with an active AdSense connection |
+| `page` | integer | No | Page number for pagination |
+| `page_size` | integer | No | Number of results per page |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "policy_issues": [
+      {
+        "name": "accounts/pub-1234567890123456/policyIssues/PI001",
+        "topic": "ADULT_CONTENT",
+        "entity_type": "PAGE",
+        "entity": "https://example.com/flagged-page",
+        "action": "AD_SERVING_RESTRICTED",
+        "warning_date": "2026-03-15"
+      }
+    ],
+    "page": 1,
+    "page_size": 20,
+    "total": 1
+  },
+  "msg": "Policy issues retrieved successfully"
+}
+```
+
+:::warning
+Policy issues can lead to ad serving restrictions or account suspension. Address reported issues promptly by reviewing and fixing the flagged content, then use Step 8 (Sync Site State) to refresh the status.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 14 — Disconnect AdSense
+
+**Goal:** Disconnect the AdSense integration for a website. The OAuth credentials are preserved so you can reconnect later without re-authorizing.
+
+**Endpoint:** `DELETE /api/v1/adsense/disconnect`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/adsense/disconnect?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID to disconnect AdSense from |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "account_id": "pub-1234567890123456",
+    "account_name": "Ejemplo AdSense Demo",
+    "publisher_id": "pub-1234567890123456",
+    "status": "disconnected",
+    "timezone": "America/Guatemala",
+    "site_state": null,
+    "site_auto_ads_enabled": null,
+    "connected_at": null,
+    "error_message": null,
+    "last_sync_at": "2026-04-06T15:00:00Z",
+    "oauth_connected": true,
+    "oauth_email": "publisher@example.com"
+  },
+  "msg": "AdSense disconnected successfully"
+}
+```
+
+:::tip
+After disconnecting, `oauth_connected` remains `true`. You can reconnect using Step 4 (Connect AdSense) without repeating the OAuth flow. To fully remove OAuth credentials, use Step 15 (Revoke OAuth).
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | AdSense is not active for this website | Check current status with `GET /adsense/status` |
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 15 — Revoke OAuth
+
+**Goal:** Revoke the Google OAuth credentials for AdSense. This fully removes the authorization and requires the user to re-authorize via the OAuth flow to reconnect.
+
+**Endpoint:** `POST /api/v1/adsense/oauth/revoke`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/adsense/oauth/revoke?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID to revoke OAuth for |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "oauth_connected": false,
+    "oauth_email": null,
+    "revoked_at": "2026-04-06T16:00:00Z"
+  },
+  "msg": "OAuth credentials revoked successfully"
+}
+```
+
+:::warning
+This action is irreversible. After revoking, the user must repeat the full OAuth flow (Step 2) to reconnect AdSense. Disconnect AdSense first (Step 14) if the connection is still active.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 404 | OAuth not configured for this website | No OAuth credentials exist for this website |
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+
+---
+
+### Step 16 — Repair Stuck Connection (admin)
+
+**Goal:** Repair a stuck or errored AdSense connection. This is an admin-only endpoint for resolving connection issues that cannot be fixed through normal disconnect/reconnect.
+
+**Endpoint:** `POST /api/v1/adsense/repair`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/adsense/repair?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `website_id` | string | Yes | Website ID with a stuck AdSense connection |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "account_id": "pub-1234567890123456",
+    "account_name": "Ejemplo AdSense Demo",
+    "publisher_id": "pub-1234567890123456",
+    "status": "active",
+    "timezone": "America/Guatemala",
+    "site_state": "READY",
+    "site_auto_ads_enabled": true,
+    "connected_at": "2026-04-06T16:15:00Z",
+    "error_message": null,
+    "last_sync_at": "2026-04-06T16:15:00Z",
+    "oauth_connected": true,
+    "oauth_email": "publisher@example.com"
+  },
+  "msg": "AdSense connection repaired successfully"
+}
+```
+
+:::warning
+This endpoint requires **admin-level access**. It is intended for support engineers to resolve edge cases where the connection is stuck in an error state and cannot be fixed via normal disconnect/reconnect operations.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 403 | Admin access required | This endpoint is restricted to admin users |
+| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values, from authentication to earnings retrieval.
+
+```bash
+#!/bin/bash
+# === Google AdSense — End-to-End Flow ===
+
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+WEBSITE_ID="507f1f77bcf86cd799439011"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-publisher-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: Start OAuth Authorization ===
+AUTH_URL=$(curl -s -X GET "$BASE_URL/adsense/oauth/authorize?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq -r '.data.authorization_url')
+
+echo "Open this URL in your browser: $AUTH_URL"
+echo "Press Enter after authorizing..."
+read -r
+
+# === STEP 3: Check OAuth Status ===
+OAUTH_STATUS=$(curl -s -X GET "$BASE_URL/adsense/oauth/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq -r '.data.oauth_connected')
+
+echo "OAuth connected: $OAUTH_STATUS"
+
+# === STEP 4: Connect AdSense ===
+curl -s -X POST "$BASE_URL/adsense/connect?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 5: Verify Status ===
+curl -s -X GET "$BASE_URL/adsense/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 6: List Accounts ===
+curl -s -X GET "$BASE_URL/adsense/accounts?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 7: List Sites ===
+curl -s -X GET "$BASE_URL/adsense/sites?website_id=$WEBSITE_ID&page=1&page_size=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 8: Sync Site State ===
+curl -s -X POST "$BASE_URL/adsense/sites/sync?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 9: Earnings Overview (last 30 days with comparison) ===
+curl -s -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=30d&compare=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 10: Earnings by Page ===
+curl -s -X GET "$BASE_URL/adsense/earnings/by-page?website_id=$WEBSITE_ID&period=30d" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 11: Custom Earnings Report ===
+curl -s -X POST "$BASE_URL/adsense/earnings/report?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date": "2026-03-01",
+    "end_date": "2026-03-31",
+    "dimensions": ["DATE", "COUNTRY"]
+  }' \
+  | jq .
+
+# === STEP 12: List Alerts ===
+curl -s -X GET "$BASE_URL/adsense/alerts?website_id=$WEBSITE_ID&page=1&page_size=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 13: List Policy Issues ===
+curl -s -X GET "$BASE_URL/adsense/policy-issues?website_id=$WEBSITE_ID&page=1&page_size=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+echo "AdSense flow completed successfully!"
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+
+:::note
+All `GET` endpoints in this flow are naturally idempotent — they can be called repeatedly without side effects. The `POST /adsense/connect` endpoint is guarded by state transitions: calling it when already active returns a `409` conflict, preventing duplicate connections.
+:::
+
+### Retries
+
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout**, check the current status with `GET /adsense/status` before retrying a connection or disconnect operation.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+
+:::warning
+OAuth authorization and connection operations involve external calls to Google APIs. Configure your HTTP client with at least **30 seconds** timeout for `POST /adsense/connect` and `POST /adsense/sites/sync`. Earnings report endpoints may take longer for large date ranges — use **60 seconds** timeout for `POST /adsense/earnings/report`.
+:::
+
+### Tokens
+
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Both tokens are required on all AdSense endpoints.
+
+### Important validations
+
+- The website must be registered via the Manage Websites flow before connecting AdSense.
+- OAuth must be completed (Steps 2-3) before connecting (Step 4).
+- The `website_id` query parameter is required on every AdSense endpoint.
+- Disconnect (Step 14) before revoking OAuth (Step 15) if the connection is active.
+- The repair endpoint (Step 16) is admin-only and should not be called from regular user flows.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/adsense/oauth/authorize` | Start OAuth authorization |
+| 3 | `GET` | `/api/v1/adsense/oauth/status` | Check OAuth status |
+| 4 | `POST` | `/api/v1/adsense/connect` | Connect AdSense |
+| 5 | `GET` | `/api/v1/adsense/status` | Get AdSense status |
+| 6 | `GET` | `/api/v1/adsense/accounts` | List AdSense accounts |
+| 7 | `GET` | `/api/v1/adsense/sites` | List AdSense sites |
+| 8 | `POST` | `/api/v1/adsense/sites/sync` | Sync site state |
+| 9 | `GET` | `/api/v1/adsense/earnings/overview` | Earnings overview |
+| 10 | `GET` | `/api/v1/adsense/earnings/by-page` | Earnings by page |
+| 11 | `POST` | `/api/v1/adsense/earnings/report` | Custom earnings report |
+| 12 | `GET` | `/api/v1/adsense/alerts` | List alerts |
+| 13 | `GET` | `/api/v1/adsense/policy-issues` | List policy issues |
+| 14 | `DELETE` | `/api/v1/adsense/disconnect` | Disconnect AdSense |
+| 15 | `POST` | `/api/v1/adsense/oauth/revoke` | Revoke OAuth |
+| 16 | `POST` | `/api/v1/adsense/repair` | Repair stuck connection (admin) |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I have a registered website with its ID
+- [ ] I completed the OAuth authorization flow (Steps 2-3)
+- [ ] I connected AdSense to the website (`POST /adsense/connect`)
+- [ ] I verified the connection status is `"active"` (`GET /adsense/status`)
+- [ ] I can retrieve earnings data (`GET /adsense/earnings/overview`)
+- [ ] I am monitoring alerts and policy issues regularly

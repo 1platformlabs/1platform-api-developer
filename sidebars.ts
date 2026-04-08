@@ -17,6 +17,7 @@ const sidebars: SidebarsConfig = {
         'flows/google-adsense',
         'flows/google-analytics',
         'flows/manage-websites',
+        'flows/paid-onboarding',
         'flows/payments-and-subscriptions',
       ],
     },

@@ -97,6 +97,13 @@ const quickLinks = [
     primary: false,
   },
   {
+    icon: '🚀',
+    title: 'Paid Onboarding',
+    description: 'Step-by-step flow to register new user accounts via payment — create a checkout session, poll for completion, and retrieve the API key via the 1Platform API.',
+    href: '/docs/flows/paid-onboarding',
+    primary: false,
+  },
+  {
     icon: '📄',
     title: 'OpenAPI Spec',
     description: 'Download the raw OpenAPI 3.1 specification for code generation or custom tooling.',

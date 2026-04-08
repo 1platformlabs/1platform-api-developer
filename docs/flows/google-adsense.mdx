@@ -529,23 +529,45 @@ curl -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=3
     "period": "30d",
     "estimated_earnings": {
       "current": 150.00,
-      "previous": 120.50
+      "previous": 120.50,
+      "change_percent": 24.48,
+      "trend": "up"
     },
     "page_views": {
       "current": 45000,
-      "previous": 38000
+      "previous": 38000,
+      "change_percent": 18.42,
+      "trend": "up"
     },
     "clicks": {
       "current": 1200,
-      "previous": 980
+      "previous": 980,
+      "change_percent": 22.45,
+      "trend": "up"
     },
-    "ctr": {
-      "current": 2.67,
-      "previous": 2.58
+    "impressions": {
+      "current": 52000,
+      "previous": 44000,
+      "change_percent": 18.18,
+      "trend": "up"
     },
-    "rpm": {
+    "clicks_ctr": {
+      "current": 2.31,
+      "previous": 2.23,
+      "change_percent": 3.59,
+      "trend": "up"
+    },
+    "page_views_rpm": {
       "current": 3.33,
-      "previous": 3.17
+      "previous": 3.17,
+      "change_percent": 5.05,
+      "trend": "up"
+    },
+    "cost_per_click": {
+      "current": 0.125,
+      "previous": 0.123,
+      "change_percent": 1.63,
+      "trend": "up"
     }
   },
   "msg": "Earnings overview retrieved successfully"
@@ -553,7 +575,7 @@ curl -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=3
 ```
 
 :::note
-When `compare` is `true`, each metric includes both `current` and `previous` values. When `false` or omitted, only `current` values are returned.
+When `compare` is `true`, each metric is a `MetricComparison` object with `current`, `previous`, `change_percent`, and `trend`. When `false` or omitted, metrics return as simple numbers.
 :::
 
 **Common errors:**
@@ -592,21 +614,29 @@ curl -X GET "$BASE_URL/adsense/earnings/by-page?website_id=$WEBSITE_ID&period=30
   "success": true,
   "data": {
     "period": "30d",
+    "total_earnings": 96.25,
+    "total_pages": 3,
     "pages": [
       {
         "url": "/blog/best-practices-seo-2026",
         "earnings": 45.50,
-        "page_views": 12000
+        "page_views": 12000,
+        "rpm": 3.79,
+        "clicks": 320
       },
       {
         "url": "/guides/getting-started",
         "earnings": 32.00,
-        "page_views": 8500
+        "page_views": 8500,
+        "rpm": 3.76,
+        "clicks": 225
       },
       {
         "url": "/blog/content-marketing-tips",
         "earnings": 18.75,
-        "page_views": 5200
+        "page_views": 5200,
+        "rpm": 3.61,
+        "clicks": 140
       }
     ]
   },
@@ -1050,6 +1080,8 @@ curl -s -X POST "$BASE_URL/adsense/sites/sync?website_id=$WEBSITE_ID" \
   | jq .
 
 # === STEP 9: Earnings Overview (last 30 days with comparison) ===
+# Returns MetricComparison objects with current, previous, change_percent, and trend for each metric.
+# Fields: estimated_earnings, page_views, clicks, impressions, clicks_ctr, page_views_rpm, cost_per_click
 curl -s -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=30d&compare=true" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \

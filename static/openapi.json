@@ -3549,7 +3549,7 @@
           "Payment Notifications"
         ],
         "summary": "Process payment webhook",
-        "description": "Receive transaction status updates from the payment service.\n\n- **Auth:** None — this endpoint is called by the external payment provider\n- **Idempotent:** Duplicate webhooks are safely ignored (prevents double-charging)\n- **Always returns HTTP 200** to prevent aggressive retries from the provider\n\n- Webhook authenticity is verified via HMAC signature validation\n**Flow:**\n1. Extract `customKeys.externalId` to find the local transaction\n2. Check idempotency (if status unchanged, return success)\n3. Validate status transition\n4. Update transaction status\n5. If approved, credit the user's balance\n\n**Response format** (simple JSON, not ResponseWrapper):\n```json\n{\"status\": \"success\", \"message\": \"Processed\"}\n```",
+        "description": "Receive transaction status updates from the payment service.\n\n- **Auth:** None — this endpoint is called by the external payment provider\n- **Idempotent:** Duplicate webhooks are safely ignored (prevents double-charging)\n- **Always returns HTTP 200** to prevent aggressive retries from the provider\n\n- Webhook authenticity is verified via HMAC signature validation\n**Flow:**\n1. Extract `externalId` from the root payload to find the local transaction\n2. Check idempotency (if status unchanged, return success)\n3. Validate status transition\n4. Update transaction status\n5. If approved, credit the user's balance\n\n**Response format** (simple JSON, not ResponseWrapper):\n```json\n{\"status\": \"success\", \"message\": \"Processed\"}\n```",
         "operationId": "processPaymentWebhook",
         "requestBody": {
           "content": {
@@ -3651,32 +3651,12 @@
                     ]
                   },
                   "externalId": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
+                    "type": "string",
                     "title": "Externalid",
-                    "description": "External identifier",
+                    "description": "Local transaction ID (sent during transaction creation)",
                     "examples": [
-                      "507f1f77bcf86cd799439011"
+                      "65a1b2c3d4e5f6789abcdef0"
                     ]
-                  },
-                  "customKeys": {
-                    "anyOf": [
-                      {
-                        "additionalProperties": true,
-                        "type": "object"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "title": "Customkeys",
-                    "description": "Custom keys sent during transaction creation"
                   }
                 },
                 "type": "object",
@@ -3684,16 +3664,15 @@
                   "transaction_id",
                   "status",
                   "amount",
-                  "currency"
+                  "currency",
+                  "externalId"
                 ],
                 "title": "WebhookPayload",
                 "description": "Webhook payload from payment service.\n\nUsed by POST /api/v1/webhooks/transactions endpoint.\nField names match payment service's webhook format.",
                 "example": {
                   "amount": 78,
                   "currency": "GTQ",
-                  "customKeys": {
-                    "externalId": "65a1b2c3d4e5f6789abcdef0"
-                  },
+                  "externalId": "65a1b2c3d4e5f6789abcdef0",
                   "reference": "GT123456",
                   "status": "approved",
                   "timestamp": "2024-01-01T12:00:00Z",

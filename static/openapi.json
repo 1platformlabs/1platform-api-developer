@@ -3802,6 +3802,294 @@
         }
       }
     },
+    "/api/v1/webhooks/config/": {
+      "get": {
+        "tags": [
+          "webhook-config"
+        ],
+        "summary": "Get webhook configuration",
+        "description": "Returns the current webhook configuration for the authenticated App.",
+        "operationId": "get_webhook_config_api_v1_webhooks_config__get",
+        "responses": {
+          "200": {
+            "description": "Webhook config retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_WebhookConfigResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/config/domains": {
+      "post": {
+        "tags": [
+          "webhook-config"
+        ],
+        "summary": "Register allowed domain",
+        "description": "Register a new domain to the webhook allowlist. Returns the webhook_secret (shown only once).",
+        "operationId": "register_domain_api_v1_webhooks_config_domains_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDomainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Domain registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_RegisterDomainResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Domain limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/config/domains/{domain}": {
+      "delete": {
+        "tags": [
+          "webhook-config"
+        ],
+        "summary": "Remove allowed domain",
+        "description": "Remove a domain from the webhook allowlist.",
+        "operationId": "remove_domain_api_v1_webhooks_config_domains__domain__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Domain to remove from the webhook allowlist",
+              "title": "Domain"
+            },
+            "description": "Domain to remove from the webhook allowlist"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Domain removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_NoneType_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/config/events": {
+      "put": {
+        "tags": [
+          "webhook-config"
+        ],
+        "summary": "Update webhook events",
+        "description": "Update the webhook event configurations (on_approved, on_denied, etc.).",
+        "operationId": "update_webhook_events_api_v1_webhooks_config_events_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebhookEventsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Events updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_NoneType_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "URL domain not in allowlist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/config/rotate-secret": {
+      "post": {
+        "tags": [
+          "webhook-config"
+        ],
+        "summary": "Rotate webhook secret",
+        "description": "Generate a new webhook_secret, invalidating the previous one immediately.",
+        "operationId": "rotate_webhook_secret_api_v1_webhooks_config_rotate_secret_post",
+        "responses": {
+          "200": {
+            "description": "Secret rotated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No secret configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/businesses": {
       "post": {
         "tags": [
@@ -19441,6 +19729,50 @@
         ],
         "title": "ReceptorInfo"
       },
+      "RegisterDomainRequest": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "maxLength": 253,
+            "title": "Domain",
+            "description": "Domain to register",
+            "examples": [
+              "api.bazar.com"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain"
+        ],
+        "title": "RegisterDomainRequest",
+        "description": "Request to register a new allowed domain."
+      },
+      "RegisterDomainResponse": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "webhook_secret": {
+            "type": "string",
+            "title": "Webhook Secret",
+            "description": "HMAC secret for signature verification (shown only once)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "verified",
+          "webhook_secret"
+        ],
+        "title": "RegisterDomainResponse",
+        "description": "Response after registering a domain (secret shown only once)."
+      },
       "RegistrationCreatedResponse": {
         "properties": {
           "session_id": {
@@ -20804,6 +21136,38 @@
         ],
         "title": "SuccessResponse[ProfileGenerationResponse]"
       },
+      "SuccessResponse_RegisterDomainResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/RegisterDomainResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[RegisterDomainResponse]"
+      },
       "SuccessResponse_RegistrationCreatedResponse_": {
         "properties": {
           "success": {
@@ -21091,6 +21455,38 @@
           "msg"
         ],
         "title": "SuccessResponse[UserResponse]"
+      },
+      "SuccessResponse_WebhookConfigResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/WebhookConfigResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[WebhookConfigResponse]"
       },
       "SuccessResponse_WebsiteResponse_": {
         "properties": {
@@ -21857,6 +22253,63 @@
           "name": "SEO Content Agent v2"
         }
       },
+      "UpdateWebhookEventsRequest": {
+        "properties": {
+          "on_approved": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookEventConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "on_denied": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookEventConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "on_cancelled": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookEventConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "on_expired": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookEventConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "on_dismiss": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookEventConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "UpdateWebhookEventsRequest",
+        "description": "Request to update webhook event configurations."
+      },
       "UserBillingResponse": {
         "properties": {
           "billing": {
@@ -22189,6 +22642,100 @@
         },
         "type": "object",
         "title": "VerificationAction"
+      },
+      "WebhookAllowedDomain": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "maxLength": 253,
+            "title": "Domain",
+            "description": "Allowed domain (e.g., api.bazar.com)"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified",
+            "description": "Whether the domain was verified via challenge",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain"
+        ],
+        "title": "WebhookAllowedDomain",
+        "description": "A domain allowed to receive webhooks for this App.\n\nDomain validation is performed by WebhookConfigService at write time,\nnot here, so legacy data can be read without ValidationError."
+      },
+      "WebhookConfigResponse": {
+        "properties": {
+          "allowed_domains": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookAllowedDomain"
+            },
+            "type": "array",
+            "title": "Allowed Domains"
+          },
+          "payment_webhooks": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Webhooks"
+          },
+          "has_secret": {
+            "type": "boolean",
+            "title": "Has Secret",
+            "description": "Whether a webhook_secret is configured",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "WebhookConfigResponse",
+        "description": "Response with current webhook configuration."
+      },
+      "WebhookEventConfig": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Url",
+            "description": "Webhook destination URL"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH"
+            ],
+            "title": "Method",
+            "description": "HTTP method",
+            "default": "POST"
+          },
+          "headers": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Headers",
+            "description": "Additional headers"
+          },
+          "body_template": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Body Template",
+            "description": "Body template with {{var}} placeholders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "WebhookEventConfig",
+        "description": "Configuration for a single webhook event."
       },
       "WebhookProcessedResponse": {
         "properties": {

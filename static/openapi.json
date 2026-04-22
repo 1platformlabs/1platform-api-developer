@@ -150,8 +150,8 @@
         "tags": [
           "Keywords Content & Indexing"
         ],
-        "summary": "Extract keywords from a domain",
-        "description": "Analyze a domain and extract SEO keywords using AI-powered search analysis.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n- Requires an active App with AI provider configured\n\n**Process:**\n1. Analyzes domain content and structure\n2. Extracts relevant keywords via search providers\n3. Uses 1Platform AI to detect keyword cannibalization\n4. Categorizes keywords by search intent and volume\n5. Returns structured keyword data with metrics\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/keywords/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"domain\": \"example.com\", \"country\": \"es\", \"lang\": \"en\"}'\n```",
+        "summary": "Extract Keywords From Domain",
+        "description": "Analyze a domain and extract SEO keywords using AI-powered search analysis. Requires an active App with an AI provider configured.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n\n**Process:**\n1. Analyzes domain content and structure\n2. Extracts relevant keywords via search providers\n3. Uses 1Platform AI to detect keyword cannibalization\n4. Categorizes keywords by search intent and volume\n5. Returns structured keyword data with metrics\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/keywords/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"domain\": \"example.com\", \"country\": \"es\", \"lang\": \"en\"}'\n```",
         "operationId": "extractKeywords",
         "security": [
           {
@@ -264,11 +264,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Request body validation failed",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -301,8 +301,8 @@
         "tags": [
           "Keywords Content & Indexing"
         ],
-        "summary": "Extract keywords by topic",
-        "description": "Discover SEO keywords for a topic/theme using search analysis.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n\n**Process:**\n1. Searches topic in search engines to discover top niche domains\n2. Analyzes each domain for topic-relevant pages\n3. Extracts main keyword from each page title via AI\n4. Removes semantic duplicates (cannibalization)\n5. Returns structured keyword data with estimated volume",
+        "summary": "Extract Keywords By Topic",
+        "description": "Discover SEO keywords for a topic or theme using search analysis. Returns deduplicated keywords with estimated volume.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n\n**Process:**\n1. Searches topic in search engines to discover top niche domains\n2. Analyzes each domain for topic-relevant pages\n3. Extracts main keyword from each page title via AI\n4. Removes semantic duplicates (cannibalization)\n5. Returns structured keyword data with estimated volume",
         "operationId": "extractKeywordsByTopic",
         "security": [
           {
@@ -414,11 +414,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Request body validation failed",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -461,9 +461,9 @@
         "tags": [
           "Keywords Content & Indexing"
         ],
-        "summary": "Submit content generation job",
-        "description": "Submit an async content generation job for a target keyword.\n\nReturns immediately with a job ID. Use `GET /content/jobs/{job_id}` to poll status.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min (AI-intensive)\n- Requires AI and image provider keys in the App configuration\n\n**Process (runs in background):**\n1. Generates title variations via 1Platform AI\n2. Searches related content using search providers\n3. Produces structured article with headings and paragraphs\n4. Fetches relevant images from the configured image library\n5. Creates a URL-friendly slug\n6. Classifies content into provided categories\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/content/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"keyword\": \"best running shoes\", \"lang\": \"en\", \"image_provider\": \"default\", \"categories\": [\"sports\"]}'\n```",
-        "operationId": "submitContentJob",
+        "summary": "Submit Content Generation Job",
+        "description": "Submit an async content generation job for a target keyword. Returns immediately with a job ID. Use `GET /content/jobs/{job_id}` to poll status. Requires AI and image provider keys configured in the App.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min (AI-intensive)\n\n**Process (runs in background):**\n1. Generates title variations via 1Platform AI\n2. Searches related content using search providers\n3. Produces structured article with headings and paragraphs\n4. Fetches relevant images from the configured image library\n5. Creates a URL-friendly slug\n6. Classifies content into provided categories\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/content/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"keyword\": \"best running shoes\", \"lang\": \"en\", \"image_provider\": \"default\", \"categories\": [\"sports\"]}'\n```",
+        "operationId": "generateContent",
         "security": [
           {
             "HTTPBearer": []
@@ -556,11 +556,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Request body validation failed",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -593,8 +593,8 @@
         "tags": [
           "Keywords Content & Indexing"
         ],
-        "summary": "Get content generation job status",
-        "description": "Poll the status of an async content generation job.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns job status: `pending`, `processing`, `completed`, or `failed`\n- On completion, includes the full content generation result in `data.result`\n- On failure, includes error details in `data.error`\n\n**Recommended polling interval:** 5 seconds\n\n**cURL example:**\n```bash\ncurl https://api.1platform.pro/api/v1/posts/content/jobs/JOB_ID \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
+        "summary": "Get Content Generation Job",
+        "description": "Poll the status of an async content generation job. Returns one of `pending`, `processing`, `completed`, or `failed` along with the full result on success.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n\n**Recommended polling interval:** 5 seconds\n\n**cURL example:**\n```bash\ncurl https://api.1platform.pro/api/v1/posts/content/jobs/JOB_ID \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
         "operationId": "getContentJob",
         "security": [
           {
@@ -729,9 +729,9 @@
         "tags": [
           "Keywords Content & Indexing"
         ],
-        "summary": "Submit URL for Google indexing",
-        "description": "Submit a URL to the Google Indexing API for faster crawling.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The URL must belong to a website verified in Google Search Console\n- A service account with Search Console access is required\n- The URL must be publicly accessible\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/indexing/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"url\": \"https://example.com/new-page\"}'\n```",
-        "operationId": "submitUrlForIndexing",
+        "summary": "Submit URL For Indexing",
+        "description": "Submit a URL to the Google Indexing API for faster crawling. The URL must belong to a website verified in Google Search Console, must be publicly accessible, and a service account with Search Console access is required.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/posts/indexing/ \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"url\": \"https://example.com/new-page\"}'\n```",
+        "operationId": "submitIndexing",
         "security": [
           {
             "HTTPBearer": []
@@ -827,11 +827,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Request body validation failed",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -866,7 +866,7 @@
         ],
         "summary": "Generate user token",
         "description": "Authenticate with a user API key and receive a JWT user token.\n\n- **Auth:** `Authorization: Bearer <app_token>` only (no user token needed)\n- **Rate limit:** 10 req/min\n- The returned token must be sent as the `x-user-token` header on all user-scoped requests\n- Token expires after the time indicated in `expires_in` (seconds)\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n```",
-        "operationId": "generateUserToken",
+        "operationId": "getUserToken",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1773,7 +1773,7 @@
         ],
         "summary": "Get website by ID",
         "description": "Retrieve details of a specific website by its ID.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Only returns websites owned by the authenticated user",
-        "operationId": "getWebsiteById",
+        "operationId": "getWebsite",
         "security": [
           {
             "HTTPBearer": []
@@ -2005,7 +2005,7 @@
         ],
         "summary": "Manage link-building integration",
         "description": "Add or verify a website in the link-building marketplace.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- **Actions:** `add` (register website) or `verify` (confirm ownership)\n- The user must have marketplace credentials configured\n- After adding, verify ownership to activate the listing",
-        "operationId": "manageLinkBuilding",
+        "operationId": "manageLinkBuildingActions",
         "security": [
           {
             "HTTPBearer": []
@@ -2144,7 +2144,7 @@
         ],
         "summary": "Manage Search Console integration",
         "description": "Add, verify, delete a website or manage sitemaps in Google Search Console.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- **Actions:** `add`, `verify`, `delete`, `sitemaps`\n- The website must be registered in the platform before adding to Search Console\n- For `sitemaps` action, include a `payload.sitemaps` array with sitemap URLs\n- Requires a Google service account with Search Console access",
-        "operationId": "manageSearchConsole",
+        "operationId": "manageSearchConsoleActions",
         "security": [
           {
             "HTTPBearer": []
@@ -2900,9 +2900,9 @@
         "tags": [
           "Payments"
         ],
-        "summary": "Create a payment transaction",
+        "summary": "Create Payment Transaction",
         "description": "Create a new payment transaction and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Payment is processed via the integrated payment service\n- Returns a `payment_url` where the user completes checkout\n- Transaction starts with status `CREATED`; status updates arrive via webhook\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 25.00, \"currency\": \"USD\", \"description\": \"Credit purchase\"}'\n```",
-        "operationId": "createTransaction",
+        "operationId": "createPaymentTransaction",
         "security": [
           {
             "HTTPBearer": []
@@ -3026,9 +3026,9 @@
         "tags": [
           "Payments"
         ],
-        "summary": "Get transaction history",
+        "summary": "List Payment Transactions",
         "description": "Retrieve paginated transaction history for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- `limit`: max transactions to return (default: 50, max: 100)\n- `skip`: offset for pagination (default: 0)",
-        "operationId": "getTransactionHistory",
+        "operationId": "listPaymentTransactions",
         "security": [
           {
             "HTTPBearer": []
@@ -3140,9 +3140,9 @@
         "tags": [
           "Subscriptions"
         ],
-        "summary": "Get subscription details",
+        "summary": "Get Subscription Details",
         "description": "Retrieve details of a specific subscription for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Note:** This endpoint currently returns a preview response — full subscription management will be available in a future release",
-        "operationId": "getSubscription",
+        "operationId": "getPaymentSubscription",
         "security": [
           {
             "HTTPBearer": []
@@ -3241,7 +3241,7 @@
         "tags": [
           "Billing & Consumption"
         ],
-        "summary": "Get consumption history",
+        "summary": "Get Consumption History",
         "description": "Retrieve paginated consumption history for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Filter by operation type, date range\n- Results sorted by most recent first",
         "operationId": "getConsumptionHistory",
         "security": [
@@ -3417,7 +3417,7 @@
         "tags": [
           "Billing & Consumption"
         ],
-        "summary": "Get consumption summary",
+        "summary": "Get Consumption Summary",
         "description": "Retrieve consumption summary grouped by operation type.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Returns total spent, operation count, and per-operation breakdown",
         "operationId": "getConsumptionSummary",
         "security": [
@@ -3548,9 +3548,9 @@
         "tags": [
           "Payment Notifications"
         ],
-        "summary": "Process payment webhook",
-        "description": "Receive transaction status updates from the payment service.\n\n- **Auth:** None — this endpoint is called by the external payment provider\n- **Idempotent:** Duplicate webhooks are safely ignored (prevents double-charging)\n- **Always returns HTTP 200** to prevent aggressive retries from the provider\n\n- Webhook authenticity is verified via HMAC signature validation\n**Flow:**\n1. Extract `externalId` from the root payload to find the local transaction\n2. Check idempotency (if status unchanged, return success)\n3. Validate status transition\n4. Update transaction status\n5. If approved, credit the user's balance\n\n**Response format** (simple JSON, not ResponseWrapper):\n```json\n{\"status\": \"success\", \"message\": \"Processed\"}\n```",
-        "operationId": "processPaymentWebhook",
+        "summary": "Receive Payment Notification",
+        "description": "Receive transaction status updates from the payment service. This endpoint requires no authentication and is invoked by the external payment provider; authenticity is verified via HMAC signature. Processing is idempotent — duplicate webhooks are safely ignored to prevent double-charging — and the endpoint always returns HTTP 200 to suppress aggressive provider retries. Rate limit: 20 req/min.\n\n**Flow:**\n1. Extract `externalId` from the root payload to find the local transaction\n2. Check idempotency (if status unchanged, return success)\n3. Validate status transition\n4. Update transaction status\n5. If approved, credit the user's balance\n\n**Response format** (simple JSON, not ResponseWrapper):\n```json\n{\"status\": \"success\", \"message\": \"Processed\"}\n```",
+        "operationId": "receivePaymentNotification",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3716,8 +3716,8 @@
         "tags": [
           "Internal Webhooks"
         ],
-        "summary": "Credit user balance (internal)",
-        "description": "Internal endpoint called by PaymentWebhookDispatcher after a transaction is approved. Credits the user's billing balance.\n\n- **Auth:** `Authorization: Bearer <internal_webhook_token>` (token from PlatformSettings.security.internal_webhook_token)\n- **Idempotent:** If already credited, returns 200 without effect\n- **Rate limit:** 20 req/min",
+        "summary": "Credit Billing From Webhook",
+        "description": "Internal endpoint called by the payment webhook dispatcher after a transaction is approved, crediting the user's billing balance. Authentication uses an `Authorization: Bearer <internal_webhook_token>` header where the token is resolved from PlatformSettings (`security.internal_webhook_token`). Processing is idempotent — if the transaction is already credited, the endpoint returns 200 with no balance change. Rate limit: 20 req/min.",
         "operationId": "creditBillingFromWebhook",
         "parameters": [
           {
@@ -3805,11 +3805,12 @@
     "/api/v1/webhooks/config/": {
       "get": {
         "tags": [
-          "webhook-config"
+          "Webhook Configuration",
+          "Webhook Configuration"
         ],
-        "summary": "Get webhook configuration",
-        "description": "Returns the current webhook configuration for the authenticated App.",
-        "operationId": "get_webhook_config_api_v1_webhooks_config__get",
+        "summary": "Get Webhook Configuration",
+        "description": "Retrieve the current webhook configuration for the authenticated App, including allowed domains, registered event handlers, and whether a webhook secret is configured. Authentication requires an app token via `Authorization: Bearer <app_token>`. Rate limit: 50 req/min.",
+        "operationId": "getWebhookConfig",
         "responses": {
           "200": {
             "description": "Webhook config retrieved",
@@ -3830,6 +3831,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3842,11 +3853,12 @@
     "/api/v1/webhooks/config/domains": {
       "post": {
         "tags": [
-          "webhook-config"
+          "Webhook Configuration",
+          "Webhook Configuration"
         ],
-        "summary": "Register allowed domain",
-        "description": "Register a new domain to the webhook allowlist. Returns the webhook_secret (shown only once).",
-        "operationId": "register_domain_api_v1_webhooks_config_domains_post",
+        "summary": "Register Webhook Domain",
+        "description": "Register a new domain in the webhook allowlist for the authenticated App. The response includes the `webhook_secret` used for HMAC signature verification — it is shown only once and must be stored securely. Authentication requires an app token via `Authorization: Bearer <app_token>`. Rate limit: 20 req/min.",
+        "operationId": "registerWebhookDomain",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3907,6 +3919,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3919,11 +3941,12 @@
     "/api/v1/webhooks/config/domains/{domain}": {
       "delete": {
         "tags": [
-          "webhook-config"
+          "Webhook Configuration",
+          "Webhook Configuration"
         ],
-        "summary": "Remove allowed domain",
-        "description": "Remove a domain from the webhook allowlist.",
-        "operationId": "remove_domain_api_v1_webhooks_config_domains__domain__delete",
+        "summary": "Remove Webhook Domain",
+        "description": "Remove a domain from the webhook allowlist for the authenticated App. After removal, webhook event URLs pointing at that domain will be rejected. Authentication requires an app token via `Authorization: Bearer <app_token>`. Rate limit: 20 req/min.",
+        "operationId": "removeWebhookDomain",
         "security": [
           {
             "HTTPBearer": []
@@ -3982,6 +4005,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -3989,11 +4022,12 @@
     "/api/v1/webhooks/config/events": {
       "put": {
         "tags": [
-          "webhook-config"
+          "Webhook Configuration",
+          "Webhook Configuration"
         ],
-        "summary": "Update webhook events",
-        "description": "Update the webhook event configurations (on_approved, on_denied, etc.).",
-        "operationId": "update_webhook_events_api_v1_webhooks_config_events_put",
+        "summary": "Update Webhook Events",
+        "description": "Update the webhook event configurations for the authenticated App (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`). Each event URL must use HTTPS and resolve to a domain present in the allowlist. Authentication requires an app token via `Authorization: Bearer <app_token>`. Rate limit: 20 req/min.",
+        "operationId": "updateWebhookEvents",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4011,6 +4045,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_NoneType_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid webhook URL or domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4034,6 +4078,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4046,11 +4100,12 @@
     "/api/v1/webhooks/config/rotate-secret": {
       "post": {
         "tags": [
-          "webhook-config"
+          "Webhook Configuration",
+          "Webhook Configuration"
         ],
-        "summary": "Rotate webhook secret",
-        "description": "Generate a new webhook_secret, invalidating the previous one immediately.",
-        "operationId": "rotate_webhook_secret_api_v1_webhooks_config_rotate_secret_post",
+        "summary": "Rotate Webhook Secret",
+        "description": "Generate a new HMAC `webhook_secret` for the authenticated App, invalidating the previous one immediately. The new secret is returned only once — store it securely as it cannot be retrieved later. Authentication requires an app token via `Authorization: Bearer <app_token>`. Rate limit: 20 req/min.",
+        "operationId": "rotateWebhookSecret",
         "responses": {
           "200": {
             "description": "Secret rotated",
@@ -4081,6 +4136,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4095,7 +4160,7 @@
         "tags": [
           "Businesses & Branches"
         ],
-        "summary": "Create a business",
+        "summary": "Create Business",
         "description": "Register a new business entity for invoicing.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The business is used as the issuing party on invoices\n- Business identifiers (tax ID) must be unique\n- Optionally set `commerceId` for electronic invoicing (FEL) integration",
         "operationId": "createBusiness",
         "security": [
@@ -4202,7 +4267,7 @@
         "tags": [
           "Businesses & Branches"
         ],
-        "summary": "Get a business",
+        "summary": "Get Business",
         "description": "Retrieve details of a specific business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
         "operationId": "getBusiness",
         "security": [
@@ -4303,7 +4368,7 @@
         "tags": [
           "Businesses & Branches"
         ],
-        "summary": "Create a branch",
+        "summary": "Create Branch",
         "description": "Create a new branch for a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The authenticated user is automatically assigned to the new branch\n- Each branch can issue invoices independently",
         "operationId": "createBranch",
         "security": [
@@ -4424,7 +4489,7 @@
         "tags": [
           "Businesses & Branches"
         ],
-        "summary": "Get a branch",
+        "summary": "Get Branch",
         "description": "Retrieve details of a specific branch within a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
         "operationId": "getBranch",
         "security": [
@@ -4549,8 +4614,8 @@
         "tags": [
           "Electronic Invoicing (FEL)"
         ],
-        "summary": "Create an invoice",
-        "description": "Issue a new invoice for a business via electronic invoicing (FEL).\n\n- **Rate limit:** 20 req/min\n**Flow:**\n1. Authenticate and resolve businessId from the path\n2. Validate business exists\n3. Validate invoice items and receptorInfo\n4. Persist invoice associated to business_id\n5. If `emitOnCreate=true`, emit via FEL using the business NIT\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- The invoice is associated directly to the business (via business_id)\n- The business NIT is used as the emitter for FEL invoicing",
+        "summary": "Create Invoice",
+        "description": "Issue a new invoice for a business via electronic invoicing (FEL).\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The invoice is associated directly to the business (via business_id)\n- The business NIT is used as the emitter for FEL invoicing\n\n**Flow:**\n1. Authenticate and resolve businessId from the path\n2. Validate business exists\n3. Validate invoice items and receptorInfo\n4. Persist invoice associated to business_id\n5. If `emitOnCreate=true`, emit via FEL using the business NIT",
         "operationId": "createInvoice",
         "security": [
           {
@@ -4668,7 +4733,7 @@
         "tags": [
           "Electronic Invoicing (FEL)"
         ],
-        "summary": "List invoices",
+        "summary": "List Invoices",
         "description": "Retrieve a paginated list of invoices for a business.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Supports filtering by status and date range\n- Supports sorting by any field (default: `created_at` desc)\n- Invoices are scoped to the business's commerceId",
         "operationId": "listInvoices",
         "security": [
@@ -4895,7 +4960,7 @@
         "tags": [
           "Electronic Invoicing (FEL)"
         ],
-        "summary": "Get invoice detail",
+        "summary": "Get Invoice",
         "description": "Retrieve full details of a specific invoice.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- The invoice must belong to the specified business\n- FEL report metadata is automatically fetched and cached on first access",
         "operationId": "getInvoice",
         "security": [
@@ -5008,7 +5073,7 @@
         "tags": [
           "Electronic Invoicing (FEL)"
         ],
-        "summary": "Cancel an invoice",
+        "summary": "Cancel Invoice",
         "description": "Cancel an existing invoice.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The invoice must belong to the specified business\n- A cancellation reason is required in the request body\n- Already-cancelled invoices cannot be cancelled again\n- If the invoice was emitted, it will be voided via electronic invoicing (FEL)",
         "operationId": "cancelInvoice",
         "security": [
@@ -5143,7 +5208,7 @@
         "tags": [
           "Electronic Invoicing (FEL)"
         ],
-        "summary": "Look up a person by identification document",
+        "summary": "Identify Person",
         "description": "Search for a person's information using their identification document number (CUI/DPI).\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min\n- Returns personal data including name, date of birth, nationality, and more\n- Useful for pre-filling invoice receptor information",
         "operationId": "identifyPerson",
         "security": [
@@ -5250,9 +5315,9 @@
         "tags": [
           "Activity Logs"
         ],
-        "summary": "List API logs",
-        "description": "Retrieve paginated API logs for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Optional:** `x-user-token` — when present, returns only logs for that user\n- **Rate limit:** 50 req/min\n- Supports filtering by website, provider, status, error type, etc.",
-        "operationId": "listLogs",
+        "summary": "List API Logs",
+        "description": "Retrieve paginated API logs for the authenticated app with optional filters.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Optional:** `x-user-token` — when present, returns only logs for that user\n- **Rate limit:** 50 req/min\n- Supports filtering by website, provider, status, error type, date range, and source type.",
+        "operationId": "listApiLogs",
         "security": [
           {
             "HTTPBearer": []
@@ -5542,9 +5607,9 @@
         "tags": [
           "Activity Logs"
         ],
-        "summary": "Clear logs",
-        "description": "Delete API logs matching the given filters.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- An audit log entry is created before deletion",
-        "operationId": "clearLogs",
+        "summary": "Clear API Logs",
+        "description": "Delete API logs matching the given filters; requires `confirm=true` to proceed.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 20 req/min\n- An audit log entry is created before deletion. Returns the count of deleted records.",
+        "operationId": "clearApiLogs",
         "security": [
           {
             "HTTPBearer": []
@@ -5581,6 +5646,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Confirmation flag missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5633,9 +5708,9 @@
         "tags": [
           "Activity Logs"
         ],
-        "summary": "Get log detail",
-        "description": "Retrieve full details of a specific API log entry.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 50 req/min",
-        "operationId": "getLogDetail",
+        "summary": "Get API Log Detail",
+        "description": "Retrieve full details of a specific API log entry by its ID.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 50 req/min\n- Returns 404 if the log does not exist or does not belong to the authenticated app.",
+        "operationId": "getApiLog",
         "security": [
           {
             "HTTPBearer": []
@@ -5726,9 +5801,9 @@
         "tags": [
           "Activity Logs"
         ],
-        "summary": "Register client-side logs",
-        "description": "Ingest a batch of client-side log entries.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 10 req/min\n- Maximum 50 entries per batch\n- Timestamps must be within 7 days in the past and 5 minutes in the future",
-        "operationId": "registerClientLogs",
+        "summary": "Submit Client-Side Logs",
+        "description": "Ingest a batch of client-side log entries for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Optional:** `x-user-token` for user attribution\n- **Rate limit:** 10 req/min\n- Maximum 50 entries per batch. Timestamps must be within 7 days in the past and 5 minutes in the future. Entries with invalid timestamps are rejected without failing the whole batch.",
+        "operationId": "submitClientLogs",
         "security": [
           {
             "HTTPBearer": []
@@ -5763,7 +5838,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Client logs processed",
             "content": {
               "application/json": {
@@ -9174,9 +9249,9 @@
         "tags": [
           "Analytics"
         ],
-        "summary": "Start OAuth Authorization",
+        "summary": "Start Analytics OAuth Authorization",
         "description": "Generate an OAuth consent URL with PKCE for connecting analytics. The returned URL must be opened in a browser popup. Requires both app and user tokens. Rate limit: 10/minute.",
-        "operationId": "startOAuthAuthorize",
+        "operationId": "startAnalyticsOAuthAuthorize",
         "security": [
           {
             "HTTPBearer": []
@@ -9272,9 +9347,9 @@
         "tags": [
           "Analytics"
         ],
-        "summary": "Revoke OAuth Authorization",
+        "summary": "Revoke Analytics OAuth",
         "description": "Revoke the OAuth tokens for a website's analytics connection. The website will need to re-authorize to reconnect analytics. Requires both app and user tokens. Rate limit: 10/minute.",
-        "operationId": "revokeOAuth",
+        "operationId": "revokeAnalyticsOAuth",
         "security": [
           {
             "HTTPBearer": []
@@ -9377,9 +9452,9 @@
         "tags": [
           "Analytics"
         ],
-        "summary": "Get OAuth Connection Status",
+        "summary": "Get Analytics OAuth Status",
         "description": "Check whether OAuth is connected for a website's analytics integration. Returns connection state, authorized email, and authorization timestamp. Requires both app and user tokens. Rate limit: 30/minute.",
-        "operationId": "getOAuthStatus",
+        "operationId": "getAnalyticsOAuthStatus",
         "security": [
           {
             "HTTPBearer": []
@@ -9479,7 +9554,7 @@
           "AdSense"
         ],
         "summary": "Connect AdSense",
-        "description": "Connect AdSense to a website after OAuth authorization.",
+        "description": "Connect AdSense to a website after OAuth authorization completes. Activates the integration and stores the linked publisher account. Requires both app and user tokens. Rate limit: 2/minute.",
         "operationId": "connectAdSense",
         "security": [
           {
@@ -9538,6 +9613,16 @@
               }
             }
           },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Already active or invalid transition",
             "content": {
@@ -9557,6 +9642,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded or connect cooldown active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -9567,7 +9662,7 @@
           "AdSense"
         ],
         "summary": "Disconnect AdSense",
-        "description": "Disconnect AdSense from a website. Preserves publisher ID.",
+        "description": "Disconnect AdSense from a website while preserving the publisher ID. The integration can be reconnected later without re-authorization. Requires both app and user tokens. Rate limit: 10/minute.",
         "operationId": "disconnectAdSense",
         "security": [
           {
@@ -9626,12 +9721,32 @@
               }
             }
           },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9645,7 +9760,7 @@
           "AdSense"
         ],
         "summary": "Get AdSense Status",
-        "description": "Get AdSense connection status for a website.",
+        "description": "Retrieve the AdSense connection status for a website. Returns publisher ID, account state, and OAuth connection info. Requires both app and user tokens. Rate limit: 30/minute.",
         "operationId": "getAdSenseStatus",
         "security": [
           {
@@ -9685,11 +9800,21 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Status retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdSenseStatusResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9703,6 +9828,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -9713,7 +9848,7 @@
           "AdSense"
         ],
         "summary": "List AdSense Accounts",
-        "description": "List AdSense accounts accessible by the user's OAuth tokens.",
+        "description": "List AdSense accounts accessible by the user's OAuth tokens. Used to identify which publisher account to connect. Requires both app and user tokens. Rate limit: 30/minute.",
         "operationId": "listAdSenseAccounts",
         "security": [
           {
@@ -9780,11 +9915,21 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Accounts listed",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9798,6 +9943,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -9808,7 +9963,7 @@
           "AdSense"
         ],
         "summary": "List AdSense Sites",
-        "description": "List sites with their approval states.",
+        "description": "List sites registered with AdSense and their approval states. Useful to verify whether the website is approved for ads. Requires both app and user tokens. Rate limit: 30/minute.",
         "operationId": "listAdSenseSites",
         "security": [
           {
@@ -9875,11 +10030,21 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Sites listed",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9893,6 +10058,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -9903,7 +10078,7 @@
           "AdSense"
         ],
         "summary": "Sync Site State",
-        "description": "Force sync site state from AdSense API.",
+        "description": "Force a sync of the site approval state from AdSense. Refreshes cached site status and auto ads configuration. Requires both app and user tokens. Rate limit: 10/minute.",
         "operationId": "syncAdSenseSiteState",
         "security": [
           {
@@ -9943,11 +10118,21 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Site state synced",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9961,6 +10146,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -9971,7 +10166,7 @@
           "AdSense"
         ],
         "summary": "List AdSense Alerts",
-        "description": "List account alerts (Pro only).",
+        "description": "List account alerts surfaced by AdSense (Pro plan only). Returns severity, message, and alert type for each entry. Requires both app and user tokens. Rate limit: 30/minute.",
         "operationId": "listAdSenseAlerts",
         "security": [
           {
@@ -10038,11 +10233,31 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Alerts listed",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pro plan required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10056,6 +10271,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10066,7 +10291,7 @@
           "AdSense"
         ],
         "summary": "List Policy Issues",
-        "description": "List policy issues affecting the account (Pro only).",
+        "description": "List policy issues affecting the account (Pro plan only). Includes required actions, affected entities, and policy topics. Requires both app and user tokens. Rate limit: 30/minute.",
         "operationId": "listAdSensePolicyIssues",
         "security": [
           {
@@ -10133,11 +10358,31 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Policy issues listed",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pro plan required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10151,6 +10396,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10161,7 +10416,7 @@
           "AdSense"
         ],
         "summary": "Earnings Overview",
-        "description": "Quick earnings overview (Free=7d only).",
+        "description": "Retrieve a quick earnings overview with optional period comparison. Free plan is limited to the last 7 days; Pro unlocks 30/90 day periods. Requires both app and user tokens. Rate limit: 20/minute.",
         "operationId": "getAdSenseEarningsOverview",
         "security": [
           {
@@ -10224,11 +10479,31 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Earnings overview retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_EarningsOverviewResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Period not allowed for current plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10242,6 +10517,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10252,7 +10537,7 @@
           "AdSense"
         ],
         "summary": "Earnings by Page",
-        "description": "Earnings broken down by page URL (Pro only).",
+        "description": "Retrieve earnings broken down by page URL (Pro plan only). Returns per-page revenue, page views, RPM, and clicks. Requires both app and user tokens. Rate limit: 20/minute.",
         "operationId": "getAdSenseEarningsByPage",
         "security": [
           {
@@ -10303,11 +10588,31 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Page earnings retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_PageEarningsResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pro plan required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10321,6 +10626,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10331,7 +10646,7 @@
           "AdSense"
         ],
         "summary": "Custom Earnings Report",
-        "description": "Custom earnings report with selectable dimensions and metrics (Pro only).",
+        "description": "Generate a custom earnings report with selectable dimensions and metrics (Pro plan only). Supports date ranges and arbitrary metric/dimension combinations. Requires both app and user tokens. Rate limit: 20/minute.",
         "operationId": "generateAdSenseEarningsReport",
         "security": [
           {
@@ -10381,11 +10696,41 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Report generated",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_EarningsReportResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid report parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pro plan required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10399,6 +10744,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10409,7 +10764,7 @@
           "AdSense"
         ],
         "summary": "Repair Stuck Connection",
-        "description": "Admin-only: reset stuck 'connecting' state.",
+        "description": "Admin-only utility to reset a connection stuck in the 'connecting' state. Use only when an automated recovery cycle has failed to restore the integration. Requires both app and user tokens. Rate limit: 5/minute.",
         "operationId": "repairAdSenseConnection",
         "security": [
           {
@@ -10458,6 +10813,16 @@
               }
             }
           },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Admin access required",
             "content": {
@@ -10477,6 +10842,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10487,7 +10862,7 @@
           "AdSense"
         ],
         "summary": "AdSense Health Check",
-        "description": "Admin-only: system health metrics.",
+        "description": "Admin-only system health metrics for the AdSense integration. Reports queue depth, recent error rates, and worker activity. Requires both app and user tokens. Rate limit: 5/minute.",
         "operationId": "getAdSenseHealth",
         "security": [
           {
@@ -10525,6 +10900,16 @@
               }
             }
           },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Admin access required",
             "content": {
@@ -10544,6 +10929,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10554,7 +10949,7 @@
           "AdSense"
         ],
         "summary": "Start AdSense OAuth Authorization",
-        "description": "Generate an OAuth consent URL with PKCE for connecting AdSense. The returned URL must be opened in a browser popup. Requires both app and user tokens.",
+        "description": "Generate an OAuth consent URL with PKCE for connecting AdSense. The returned URL must be opened in a browser popup. Requires both app and user tokens. Rate limit: 10/minute.",
         "operationId": "startAdSenseOAuthAuthorize",
         "security": [
           {
@@ -10632,6 +11027,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "Ads integration not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10642,7 +11047,7 @@
           "AdSense"
         ],
         "summary": "Revoke AdSense OAuth",
-        "description": "Revoke the OAuth tokens for AdSense. Clears local tokens.",
+        "description": "Revoke the OAuth tokens for AdSense and clear local credentials. The website must re-authorize before reconnecting AdSense. Requires both app and user tokens. Rate limit: 10/minute.",
         "operationId": "revokeAdSenseOAuth",
         "security": [
           {
@@ -10691,6 +11096,16 @@
               }
             }
           },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "OAuth not configured",
             "content": {
@@ -10710,6 +11125,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10720,7 +11145,7 @@
           "AdSense"
         ],
         "summary": "Get AdSense OAuth Status",
-        "description": "Check whether OAuth is connected for AdSense.",
+        "description": "Check whether OAuth is connected for AdSense on this website. Returns connection state, authorized email, and authorization timestamp. Requires both app and user tokens. Rate limit: 30/minute.",
         "operationId": "getAdSenseOAuthStatus",
         "security": [
           {
@@ -10760,11 +11185,21 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "OAuth status retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10775,6 +11210,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -11282,7 +11727,7 @@
           "Domains"
         ],
         "summary": "Get domain contact profile",
-        "description": "Get the user's WHOIS contact profile.\n\n- **Rate limit:** 10 req/min",
+        "description": "Retrieve the user's WHOIS contact profile used for domain registration.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min",
         "operationId": "getDomainContact",
         "security": [
           {
@@ -11365,7 +11810,7 @@
           "Domains"
         ],
         "summary": "Create or update domain contact",
-        "description": "Create or update the WHOIS contact profile.\n\n- **Rate limit:** 10 req/min",
+        "description": "Create or update the WHOIS contact profile used for domain registration.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min",
         "operationId": "setDomainContact",
         "security": [
           {
@@ -11463,7 +11908,7 @@
           "Domains"
         ],
         "summary": "List domain operations history",
-        "description": "Get the history of domain operations.\n\n- **Rate limit:** 30 req/min",
+        "description": "Retrieve the audit history of domain operations (register, renew, transfer, DNS, lock).\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 30 req/min",
         "operationId": "listDomainOperations",
         "security": [
           {
@@ -11597,7 +12042,7 @@
           "Domains"
         ],
         "summary": "Initiate domain transfer",
-        "description": "Transfer a domain to 1Platform using an EPP/auth code.\n\n- **Rate limit:** 5 req/min",
+        "description": "Initiate the transfer of an existing domain to 1Platform using an EPP/auth code.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min",
         "operationId": "transferDomain",
         "security": [
           {
@@ -11828,7 +12273,7 @@
           "Domains"
         ],
         "summary": "Get DNS records",
-        "description": "Get all DNS host records for a domain.\n\n- **Rate limit:** 10 req/min",
+        "description": "Retrieve all DNS host records configured for a domain.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min",
         "operationId": "getDomainDnsRecords",
         "security": [
           {
@@ -11932,7 +12377,7 @@
           "Domains"
         ],
         "summary": "Set DNS records",
-        "description": "Set all DNS host records for a domain. **Replaces ALL existing records.**\n\n- **Rate limit:** 10 req/min",
+        "description": "Replace all DNS host records for a domain. **Replaces ALL existing records.**\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min",
         "operationId": "setDomainDnsRecords",
         "security": [
           {
@@ -12058,7 +12503,7 @@
           "Domains"
         ],
         "summary": "Set domain nameservers",
-        "description": "Configure custom nameservers or restore provider defaults.\n\n- **Rate limit:** 10 req/min",
+        "description": "Configure custom nameservers for a domain or restore the registrar's defaults.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min",
         "operationId": "setDomainNameservers",
         "security": [
           {
@@ -12184,7 +12629,7 @@
           "Domains"
         ],
         "summary": "Renew a domain",
-        "description": "Renew an existing domain for 1-10 years using your 1Platform balance.\n\n- **Rate limit:** 5 req/min",
+        "description": "Renew an existing domain for 1-10 years using your 1Platform balance.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 5 req/min",
         "operationId": "renewDomain",
         "security": [
           {
@@ -12320,7 +12765,7 @@
           "Domains"
         ],
         "summary": "Get domain transfer status",
-        "description": "Check the current status of a domain transfer.\n\n- **Rate limit:** 50 req/min",
+        "description": "Check the current status of an in-progress domain transfer.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
         "operationId": "getDomainTransferStatus",
         "security": [
           {
@@ -12436,7 +12881,7 @@
           "Domains"
         ],
         "summary": "Set registrar lock",
-        "description": "Enable or disable the registrar lock (transfer protection).\n\n- **Rate limit:** 10 req/min",
+        "description": "Enable or disable the registrar lock (transfer protection) on a domain.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 10 req/min",
         "operationId": "setDomainLock",
         "security": [
           {
@@ -12562,9 +13007,9 @@
           "Onboarding",
           "Onboarding"
         ],
-        "summary": "Register a new account via payment",
-        "description": "Create a new user registration session. Returns a payment URL where the user completes checkout. Once payment is confirmed, the account is created and an API key is available via the status endpoint.\n\n- **Auth:** `Authorization: Bearer <app_token>` (no user token required)\n- **Rate limit:** 20 req/min\n- Minimum amount: $5.00 USD (configurable)\n- Sessions expire after 24 hours",
-        "operationId": "createRegistration",
+        "summary": "Register Account",
+        "description": "Create a new user registration session and return a payment URL where the user completes checkout. Once payment is confirmed, the account is created and an API key becomes available via the status endpoint.\n\n- **Auth:** `Authorization: Bearer <app_token>` (no user token required)\n- **Rate limit:** 20 req/min\n- Minimum amount: $5.00 USD (configurable)\n- Sessions expire after 24 hours.",
+        "operationId": "registerAccount",
         "requestBody": {
           "content": {
             "application/json": {
@@ -12660,8 +13105,8 @@
           "Onboarding",
           "Onboarding"
         ],
-        "summary": "Check registration status",
-        "description": "Poll the status of a registration session. Returns the API key when payment is confirmed. The API key is only returned once (single-read guard).\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 50 req/min\n- Poll every 5 seconds until status is `completed` or `failed`",
+        "summary": "Get Registration Status",
+        "description": "Poll the status of a registration session and retrieve the API key once payment is confirmed. The API key is only returned once (single-read guard).\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 50 req/min\n- Poll every 5 seconds until status is `completed` or `failed`.",
         "operationId": "getRegistrationStatus",
         "security": [
           {
@@ -12751,9 +13196,9 @@
         "tags": [
           "Analytics"
         ],
-        "summary": "Handle OAuth Callback",
-        "description": "Handles the OAuth redirect after user authorization. Exchanges the authorization code for tokens and stores them. Returns an HTML page that sends a postMessage to the opener window.",
-        "operationId": "handleOAuthCallback",
+        "summary": "Handle Analytics OAuth Callback",
+        "description": "Handles the OAuth redirect after user authorization. Exchanges the authorization code for tokens and stores them. Returns an HTML page that sends a postMessage to the opener window. Rate limit: 10/minute.",
+        "operationId": "handleAnalyticsOAuthCallback",
         "parameters": [
           {
             "name": "code",
@@ -12829,7 +13274,7 @@
           "AdSense"
         ],
         "summary": "Handle AdSense OAuth Callback",
-        "description": "Handles the OAuth redirect after user authorization. Exchanges the authorization code for tokens and stores them.",
+        "description": "Handles the OAuth redirect after user authorization. Exchanges the authorization code for tokens and stores them. Returns an HTML page that posts the result to the opener window. Rate limit: 10/minute.",
         "operationId": "handleAdSenseOAuthCallback",
         "parameters": [
           {
@@ -12883,6 +13328,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -14356,7 +14811,10 @@
           "transaction_id": {
             "type": "string",
             "title": "Transaction Id",
-            "description": "Transaction ID to credit"
+            "description": "Transaction ID to credit",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           }
         },
         "type": "object",
@@ -14985,7 +15443,11 @@
           "timestamp": {
             "type": "string",
             "format": "date-time",
-            "title": "Timestamp"
+            "title": "Timestamp",
+            "description": "When the log entry was recorded on the client",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
           },
           "method": {
             "anyOf": [
@@ -14997,12 +15459,20 @@
                 "type": "null"
               }
             ],
-            "title": "Method"
+            "title": "Method",
+            "description": "HTTP method of the logged request",
+            "examples": [
+              "POST"
+            ]
           },
           "endpoint": {
             "type": "string",
             "maxLength": 500,
-            "title": "Endpoint"
+            "title": "Endpoint",
+            "description": "API endpoint path the client called",
+            "examples": [
+              "/api/v1/posts/content/"
+            ]
           },
           "action": {
             "anyOf": [
@@ -15014,7 +15484,11 @@
                 "type": "null"
               }
             ],
-            "title": "Action"
+            "title": "Action",
+            "description": "High-level action label",
+            "examples": [
+              "generate_content"
+            ]
           },
           "source_module": {
             "anyOf": [
@@ -15026,7 +15500,11 @@
                 "type": "null"
               }
             ],
-            "title": "Source Module"
+            "title": "Source Module",
+            "description": "Client module that produced the log entry",
+            "examples": [
+              "content_module"
+            ]
           },
           "website_id": {
             "anyOf": [
@@ -15038,7 +15516,11 @@
                 "type": "null"
               }
             ],
-            "title": "Website Id"
+            "title": "Website Id",
+            "description": "Associated website identifier",
+            "examples": [
+              "site-abc123"
+            ]
           },
           "provider": {
             "anyOf": [
@@ -15050,29 +15532,49 @@
                 "type": "null"
               }
             ],
-            "title": "Provider"
+            "title": "Provider",
+            "description": "Internal service provider that handled the request",
+            "examples": [
+              "content"
+            ]
           },
           "response_status": {
             "type": "integer",
             "maximum": 599,
             "minimum": 0,
             "title": "Response Status",
-            "default": 0
+            "description": "HTTP status code of the response",
+            "default": 0,
+            "examples": [
+              500
+            ]
           },
           "response_message": {
             "type": "string",
             "maxLength": 2000,
-            "title": "Response Message"
+            "title": "Response Message",
+            "description": "Response message or error summary",
+            "examples": [
+              "Failed to generate content"
+            ]
           },
           "success": {
             "type": "boolean",
             "title": "Success",
-            "default": false
+            "description": "Whether the operation succeeded",
+            "default": false,
+            "examples": [
+              false
+            ]
           },
           "error_type": {
             "type": "string",
             "maxLength": 50,
-            "title": "Error Type"
+            "title": "Error Type",
+            "description": "Error classification when the operation failed",
+            "examples": [
+              "generation_error"
+            ]
           },
           "trace_id": {
             "anyOf": [
@@ -15084,7 +15586,11 @@
                 "type": "null"
               }
             ],
-            "title": "Trace Id"
+            "title": "Trace Id",
+            "description": "Correlation ID for distributed tracing",
+            "examples": [
+              "tr-abc123"
+            ]
           },
           "request_context": {
             "anyOf": [
@@ -15096,7 +15602,8 @@
                 "type": "null"
               }
             ],
-            "title": "Request Context"
+            "title": "Request Context",
+            "description": "Sanitized environment context (allowed keys only)"
           }
         },
         "type": "object",
@@ -15383,7 +15890,11 @@
                 "type": "null"
               }
             ],
-            "title": "Keyword"
+            "title": "Keyword",
+            "description": "Keyword associated with the operation, when applicable",
+            "examples": [
+              "best running shoes"
+            ]
           },
           "lang": {
             "anyOf": [
@@ -15395,7 +15906,11 @@
                 "type": "null"
               }
             ],
-            "title": "Lang"
+            "title": "Lang",
+            "description": "ISO language code for the operation context",
+            "examples": [
+              "es"
+            ]
           },
           "country": {
             "anyOf": [
@@ -15407,7 +15922,11 @@
                 "type": "null"
               }
             ],
-            "title": "Country"
+            "title": "Country",
+            "description": "ISO country code for the operation context",
+            "examples": [
+              "GT"
+            ]
           },
           "domain": {
             "anyOf": [
@@ -15419,7 +15938,11 @@
                 "type": "null"
               }
             ],
-            "title": "Domain"
+            "title": "Domain",
+            "description": "Website domain associated with the operation",
+            "examples": [
+              "example.com"
+            ]
           },
           "image_provider": {
             "anyOf": [
@@ -15431,7 +15954,11 @@
                 "type": "null"
               }
             ],
-            "title": "Image Provider"
+            "title": "Image Provider",
+            "description": "Image source identifier when the operation involves images",
+            "examples": [
+              "library_a"
+            ]
           },
           "page_type": {
             "anyOf": [
@@ -15443,7 +15970,11 @@
                 "type": "null"
               }
             ],
-            "title": "Page Type"
+            "title": "Page Type",
+            "description": "Type of page produced or processed",
+            "examples": [
+              "article"
+            ]
           },
           "job_id": {
             "anyOf": [
@@ -15455,7 +15986,11 @@
                 "type": "null"
               }
             ],
-            "title": "Job Id"
+            "title": "Job Id",
+            "description": "Background job identifier when applicable",
+            "examples": [
+              "job_abc123"
+            ]
           },
           "agent_id": {
             "anyOf": [
@@ -15467,7 +16002,11 @@
                 "type": "null"
               }
             ],
-            "title": "Agent Id"
+            "title": "Agent Id",
+            "description": "Agent identifier when the operation was triggered by an agent",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
           },
           "tokens_used": {
             "anyOf": [
@@ -15479,7 +16018,11 @@
                 "type": "null"
               }
             ],
-            "title": "Tokens Used"
+            "title": "Tokens Used",
+            "description": "Total tokens consumed by the operation",
+            "examples": [
+              1500
+            ]
           },
           "extra": {
             "anyOf": [
@@ -15649,7 +16192,7 @@
               "pexels"
             ],
             "title": "Image Provider",
-            "description": "Image provider selection. Use `default` or `alternative`. The legacy aliases `pixabay` and `pexels` are accepted for backward compatibility with plugin versions < 2.31.3 and will be removed in a future release.",
+            "description": "Image library selection. Use `default` or `alternative`. Legacy aliases are accepted for backward compatibility with plugin versions < 2.31.3 and will be removed in a future release.",
             "default": "default",
             "examples": [
               "default"
@@ -16025,20 +16568,31 @@
             "type": "string",
             "maxLength": 254,
             "format": "email",
-            "title": "Email"
+            "title": "Email",
+            "description": "Email address for the new account",
+            "examples": [
+              "user@example.com"
+            ]
           },
           "amount": {
             "type": "number",
             "maximum": 10000,
             "exclusiveMinimum": 0,
             "title": "Amount",
-            "description": "Amount in merchant currency"
+            "description": "Amount in merchant currency",
+            "examples": [
+              10
+            ]
           },
           "currency": {
             "type": "string",
             "pattern": "^[A-Z]{3}$",
             "title": "Currency",
-            "default": "USD"
+            "description": "ISO 4217 currency code",
+            "default": "USD",
+            "examples": [
+              "USD"
+            ]
           }
         },
         "type": "object",
@@ -19779,16 +20333,28 @@
         "properties": {
           "session_id": {
             "type": "string",
-            "title": "Session Id"
+            "title": "Session Id",
+            "description": "Registration session ID used to poll the status endpoint",
+            "examples": [
+              "a1b2c3d4-e5f6-4789-89ab-cdef01234567"
+            ]
           },
           "payment_url": {
             "type": "string",
-            "title": "Payment Url"
+            "title": "Payment Url",
+            "description": "Checkout URL where the user completes payment",
+            "examples": [
+              "https://checkout.example.com/pay/abc123"
+            ]
           },
           "expires_in": {
             "type": "integer",
             "title": "Expires In",
-            "default": 86400
+            "description": "Seconds until the session expires",
+            "default": 86400,
+            "examples": [
+              86400
+            ]
           }
         },
         "type": "object",
@@ -19801,7 +20367,11 @@
       "RegistrationStatusResponse": {
         "properties": {
           "status": {
-            "$ref": "#/components/schemas/OnboardingStatus"
+            "$ref": "#/components/schemas/OnboardingStatus",
+            "description": "Current registration session status",
+            "examples": [
+              "completed"
+            ]
           },
           "api_key": {
             "anyOf": [
@@ -19812,7 +20382,11 @@
                 "type": "null"
               }
             ],
-            "title": "Api Key"
+            "title": "Api Key",
+            "description": "Newly issued API key, returned only once when status is COMPLETED",
+            "examples": [
+              "sk-abc123def456"
+            ]
           }
         },
         "type": "object",
@@ -23439,6 +24013,10 @@
       "description": "Internal webhook endpoints for automated billing operations. Called by the payment webhook dispatcher after transaction status changes. Authenticated via internal bearer token — not for external use."
     },
     {
+      "name": "Webhook Configuration",
+      "description": "Manage webhook configuration for your application: register, update, list, and delete the URLs that receive payment status callbacks."
+    },
+    {
       "name": "Businesses & Branches",
       "description": "Register business entities and their branches for electronic invoicing. Each branch can issue invoices independently."
     },
@@ -23485,6 +24063,10 @@
     {
       "name": "Domains",
       "description": "Search, register, renew, and manage domains. Configure DNS records, nameservers, and WHOIS contacts. Domain costs are deducted from your 1Platform balance."
+    },
+    {
+      "name": "Onboarding",
+      "description": "Guided onboarding flow for new users — start a session, complete the required steps, and convert it into an active account with billing initialized."
     }
   ]
 }

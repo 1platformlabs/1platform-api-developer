@@ -2895,6 +2895,93 @@
         }
       }
     },
+    "/api/v1/plans": {
+      "get": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "summary": "List active billing plans",
+        "description": "Return every active subscription plan available to users.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
+        "operationId": "listActivePlans",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active plans list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_PlanResponse__"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/transactions": {
       "post": {
         "tags": [
@@ -3516,6 +3603,117 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/transactions/{transaction_id}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Get Transaction by ID",
+        "description": "Retrieve a single transaction owned by the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Intended for status polling after creating a payment — clients can hit this endpoint until the transaction reaches a terminal state (`approved`, `denied`, `cancelled`, `expired`, `dismiss`).\n- Returns 404 if the transaction does not exist or belongs to another user.",
+        "operationId": "getPaymentTransactionById",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Transaction ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Transaction Id"
+            },
+            "description": "Transaction ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TransactionResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -4260,6 +4458,91 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Businesses & Branches"
+        ],
+        "summary": "List Businesses for current user",
+        "description": "Return every business the authenticated user has access to via branch assignments.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min",
+        "operationId": "listBusinessesForUser",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Businesses list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_BusinessResponse__"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/businesses/{businessId}": {
@@ -4912,6 +5195,16 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid query filters (e.g., malformed ISO date)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -4944,6 +5237,16 @@
           },
           "429": {
             "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
@@ -5283,6 +5586,180 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/invoices": {
+      "get": {
+        "tags": [
+          "Electronic Invoicing (FEL)"
+        ],
+        "summary": "List invoices across all businesses for current user",
+        "description": "Flat list of recent invoices issued by any business the authenticated user has access to.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Sorted by `created_at` descending. Capped at 100 items.",
+        "operationId": "listInvoicesForUser",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoices list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_UserInvoiceListItem__"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fel/report": {
+      "get": {
+        "tags": [
+          "Electronic Invoicing (FEL)"
+        ],
+        "summary": "Monthly FEL invoice report for current user",
+        "description": "Aggregated monthly counts and totals across all businesses the authenticated user has access to.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Sorted by month descending.",
+        "operationId": "getFelMonthlyReport",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly aggregated rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_FelReportRow__"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -13191,6 +13668,2241 @@
         }
       }
     },
+    "/api/v1/dashboard/bootstrap": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Fetch the whitelabel dashboard configuration",
+        "description": "Returns the full DashboardConfig for the authenticated app: branding, theme, modules, layout, supported languages, feature flags, and analytics/recaptcha wiring. Designed to be consumed by the SPA bootstrap flow.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 120 req/min\n- **Caching:** returns a strong `ETag`. Clients should send `If-None-Match` to get a `304 Not Modified` on repeat calls.",
+        "operationId": "getDashboardBootstrap",
+        "responses": {
+          "200": {
+            "description": "Configuration retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DashboardConfigResponse_"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Config unchanged (ETag matched)"
+          },
+          "401": {
+            "description": "Invalid or missing app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Dashboard disabled or config missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dashboard/i18n": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "List supported languages for the app",
+        "description": "Returns the app's supported languages and the default language. Source of truth is `DashboardConfig.supported_langs` — this list may include languages whose bundles are still empty while an admin is preparing the localization.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 120 req/min",
+        "operationId": "listDashboardLanguages",
+        "responses": {
+          "200": {
+            "description": "Languages listed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_I18nLanguagesResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Config missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dashboard/i18n/{lang}": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Fetch the i18n bundle for a language",
+        "description": "Returns the key/value dictionary for the requested language. An empty strings dict is returned when the app has the language declared in `supported_langs` but no bundle has been seeded yet (so the SPA can still render and fall back to the key).\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 120 req/min\n- **Caching:** returns a strong `ETag`.",
+        "operationId": "getDashboardI18nBundle",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 10,
+              "description": "Language code, e.g. 'es'",
+              "title": "Lang"
+            },
+            "description": "Language code, e.g. 'es'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bundle retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_I18nBundleResponse_"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Bundle unchanged (ETag matched)"
+          },
+          "400": {
+            "description": "Unsupported language",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing app token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Config missing or bundle not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/user/magic-link/request": {
+      "post": {
+        "tags": [
+          "User Authentication"
+        ],
+        "summary": "Request a magic-link sign-in email",
+        "description": "Kicks off the passwordless sign-in flow. The API creates or resolves the user, mints a short-lived (10 min) one-time token, and ships it over email.\n\n- **Auth:** App token (`Authorization: Bearer <app_token>`)\n- **Rate limit:** 3/min per email, 10/min per IP\n- Always responds 200 with an empty envelope to avoid email enumeration.",
+        "operationId": "requestMagicLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkRequestPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Magic link dispatched (or silently skipped)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_NoneType_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/user/magic-link/verify": {
+      "post": {
+        "tags": [
+          "User Authentication"
+        ],
+        "summary": "Exchange a magic-link token for access/refresh tokens",
+        "description": "Consumes the one-time magic-link token from the email and returns an access + refresh token pair scoped to the calling app.\n\n- **Auth:** App token (`Authorization: Bearer <app_token>`)\n- **Rate limit:** 10/min",
+        "operationId": "verifyMagicLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkVerifyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_MagicLinkTokenPair_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Token expired or consumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/user/refresh": {
+      "post": {
+        "tags": [
+          "User Authentication"
+        ],
+        "summary": "Rotate refresh token for a new access+refresh pair",
+        "description": "Single-flight rotation: revokes the presented refresh token and issues a fresh access + refresh pair. Replays of the old token after rotation return 409.\n\n- **Auth:** App token (`Authorization: Bearer <app_token>`)\n- **Rate limit:** 10/min",
+        "operationId": "refreshUserTokens",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens rotated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_MagicLinkTokenPair_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Refresh already used (single-flight guard)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/user/logout": {
+      "post": {
+        "tags": [
+          "User Authentication"
+        ],
+        "summary": "Revoke the presented token (access or refresh)",
+        "description": "Marks the presented token's `jti` as revoked so it can no longer be used. Idempotent: repeat calls with the same token are no-ops.\n\n- **Auth:** App token + user token\n- **Rate limit:** 10/min",
+        "operationId": "logoutUser",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid user token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/apps": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Provision a new App (superadmin)",
+        "operationId": "provisionApp",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisionAppRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "App provisioned with DashboardConfig + roles + admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AppFullResponse_"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Slug already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "List all apps (superadmin)",
+        "operationId": "listApps",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Apps listed (keys redacted)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_AppResponse__"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/apps/{app_id}": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Get full App including provider keys (superadmin)",
+        "operationId": "getAppFull",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "App document id (24-char MongoDB ObjectId)",
+              "title": "App Id"
+            },
+            "description": "App document id (24-char MongoDB ObjectId)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "App with keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AppFullResponse_"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/metrics": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Platform-wide aggregate metrics (superadmin)",
+        "operationId": "getPlatformMetrics",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metrics snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_PlatformMetricsResponse_"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List notifications for the authenticated user",
+        "operationId": "listNotifications",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "unread_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Filter to unread only",
+              "default": false,
+              "title": "Unread Only"
+            },
+            "description": "Filter to unread only"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Pagination offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Max results per page",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Max results per page"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications listed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_NotificationResponse__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Create a notification (admin)",
+        "operationId": "createNotification",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Notification created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_NotificationResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/{notification_id}/read": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark a notification as read",
+        "operationId": "markNotificationRead",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Notification document id",
+              "title": "Notification Id"
+            },
+            "description": "Notification document id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_NotificationResponse_"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notification not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Count unread notifications for the authenticated user",
+        "operationId": "getUnreadNotificationsCount",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unread count returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "Dashboard Settings"
+        ],
+        "summary": "List dashboard settings for the current app",
+        "operationId": "listDashboardSettings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_DashboardSettingResponse__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Dashboard Settings"
+        ],
+        "summary": "Upsert a dashboard setting (admin)",
+        "operationId": "upsertDashboardSetting",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardSettingUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DashboardSettingResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/{key}": {
+      "get": {
+        "tags": [
+          "Dashboard Settings"
+        ],
+        "summary": "Get a dashboard setting by key",
+        "operationId": "getDashboardSetting",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Setting key (e.g. GLOBAL_SETTINGS)",
+              "title": "Key"
+            },
+            "description": "Setting key (e.g. GLOBAL_SETTINGS)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DashboardSettingResponse_"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Dashboard Settings"
+        ],
+        "summary": "Delete a dashboard setting (admin)",
+        "operationId": "deleteDashboardSetting",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Setting key to delete",
+              "title": "Key"
+            },
+            "description": "Setting key to delete"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/summary": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Home KPIs aggregate — balance + unread + counts",
+        "operationId": "getDashboardSummary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DashboardSummaryResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support/tickets": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "List support tickets for the current user",
+        "operationId": "listTickets",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_TicketResponse__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Open a new support ticket",
+        "operationId": "createTicket",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TicketResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support/tickets/{ticket_id}/reply": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Append a message to a ticket",
+        "operationId": "replyToTicket",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Ticket document id",
+              "title": "Ticket Id"
+            },
+            "description": "Ticket document id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketReplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TicketResponse_"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ticket not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support/faqs": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "List published FAQs for the current app",
+        "operationId": "listFaqs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_FAQResponse__"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "summary": "Create a new FAQ entry (admin)",
+        "operationId": "createFaq",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FAQCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_FAQResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "List tasks for the current user",
+        "operationId": "listTasks",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_TaskResponse__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Create a new task",
+        "operationId": "createTask",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TaskResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}": {
+      "patch": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Update a task",
+        "operationId": "updateTask",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task document id",
+              "title": "Task Id"
+            },
+            "description": "Task document id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TaskResponse_"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Delete a task",
+        "operationId": "deleteTask",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task document id",
+              "title": "Task Id"
+            },
+            "description": "Task document id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/referrals/{code}": {
+      "get": {
+        "tags": [
+          "Referrals"
+        ],
+        "summary": "Resolve a referral code to its destination payload",
+        "operationId": "resolveReferral",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 60,
+              "description": "Referral code to resolve",
+              "title": "Code"
+            },
+            "description": "Referral code to resolve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ReferralResolutionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/oauth/callback": {
       "get": {
         "tags": [
@@ -14611,6 +17323,59 @@
         "title": "AnalyticsActions",
         "description": "Analytics integration state, embedded in Website.actions.analytics."
       },
+      "AnalyticsConfig": {
+        "properties": {
+          "ga_measurement_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ga Measurement Id"
+          },
+          "sentry_dsn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentry Dsn"
+          }
+        },
+        "type": "object",
+        "title": "AnalyticsConfig"
+      },
+      "AnalyticsKeys": {
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "title": "Client Id",
+            "description": "Google OAuth Client ID",
+            "default": ""
+          },
+          "client_secret_encrypted": {
+            "type": "string",
+            "title": "Client Secret Encrypted",
+            "description": "Encrypted OAuth Client Secret (Fernet)",
+            "default": ""
+          },
+          "redirect_uri": {
+            "type": "string",
+            "title": "Redirect Uri",
+            "description": "OAuth callback URI",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "AnalyticsKeys",
+        "description": "Google Analytics OAuth credentials per App.\n\nclient_secret_encrypted stores the Fernet-encrypted secret.\nUse get_client_secret() / set_client_secret() for access.\nLegacy plain-text client_secret is auto-migrated on first read."
+      },
       "AnalyticsOAuth": {
         "properties": {
           "refresh_token_encrypted": {
@@ -14760,6 +17525,190 @@
           "timezone": "America/Guatemala",
           "website_id": "507f1f77bcf86cd799439011"
         }
+      },
+      "AppFullResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/AppKeys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "status",
+          "is_admin",
+          "created_at",
+          "api_key",
+          "keys"
+        ],
+        "title": "AppFullResponse",
+        "description": "Superadmin-only projection — includes api_key and provider keys.\n\nReserved for ``GET /platform/apps/{id}`` (guarded by\n``get_current_superadmin``). Do NOT reference from other routes."
+      },
+      "AppKeys": {
+        "properties": {
+          "x_openai_key": {
+            "type": "string",
+            "title": "X Openai Key",
+            "description": "AI provider API key",
+            "default": "",
+            "examples": [
+              "sk-abc123..."
+            ]
+          },
+          "x_pixabay_key": {
+            "type": "string",
+            "title": "X Pixabay Key",
+            "description": "Image provider (primary) API key",
+            "default": "",
+            "examples": [
+              "img-key-abc123"
+            ]
+          },
+          "x_pexels_key": {
+            "type": "string",
+            "title": "X Pexels Key",
+            "description": "Image provider (secondary) API key",
+            "default": "",
+            "examples": [
+              "img-key-def456"
+            ]
+          },
+          "x_valueserp_key": {
+            "type": "string",
+            "title": "X Valueserp Key",
+            "description": "Search provider API key",
+            "default": "",
+            "examples": [
+              "search-key-abc123"
+            ]
+          },
+          "x_claude_key": {
+            "type": "string",
+            "title": "X Claude Key",
+            "description": "AI provider API key",
+            "default": "",
+            "examples": [
+              "claude-key-abc123"
+            ]
+          },
+          "tributax": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TribuTaxKeys"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FEL integration config"
+          },
+          "analytics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsKeys"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Google Analytics OAuth config"
+          },
+          "domain_registrar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DomainRegistrarKeys"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Domain registrar credentials"
+          }
+        },
+        "type": "object",
+        "title": "AppKeys",
+        "description": "API keys associated with an App."
+      },
+      "AppResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "status",
+          "is_admin",
+          "created_at"
+        ],
+        "title": "AppResponse",
+        "description": "Safe App projection — NEVER carries keys / api_key.\n\nUsed for all non-superadmin consumers. Any route that would expose\nprovider credentials (OpenAI, Claude, Pixabay, etc.) MUST serialize\nthrough this schema."
       },
       "AssignedUserResponse": {
         "properties": {
@@ -16639,6 +19588,438 @@
           "email": "user@example.com"
         }
       },
+      "DashboardBranding": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Full brand name",
+            "examples": [
+              "1Platform"
+            ]
+          },
+          "short_name": {
+            "type": "string",
+            "title": "Short Name",
+            "description": "Compact brand name for tight UI slots",
+            "examples": [
+              "1P"
+            ]
+          },
+          "logo_url": {
+            "type": "string",
+            "title": "Logo Url",
+            "description": "Wordmark logo URL (light backgrounds)"
+          },
+          "logo_white_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo White Url",
+            "description": "Wordmark logo URL for dark backgrounds"
+          },
+          "favicon_url": {
+            "type": "string",
+            "title": "Favicon Url",
+            "description": "Favicon URL (svg or png)"
+          },
+          "og_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Og Image Url",
+            "description": "Open Graph share image URL"
+          },
+          "support_email": {
+            "type": "string",
+            "format": "email",
+            "title": "Support Email",
+            "description": "Customer support contact"
+          },
+          "web_url": {
+            "type": "string",
+            "title": "Web Url",
+            "description": "Marketing site URL"
+          },
+          "tos_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tos Url",
+            "description": "Terms of Service URL"
+          },
+          "privacy_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Url",
+            "description": "Privacy Policy URL"
+          },
+          "cookies_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cookies Url",
+            "description": "Cookies Policy URL"
+          },
+          "basename": {
+            "type": "string",
+            "title": "Basename",
+            "description": "SPA router basename",
+            "default": "/app"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "short_name",
+          "logo_url",
+          "favicon_url",
+          "support_email",
+          "web_url"
+        ],
+        "title": "DashboardBranding",
+        "description": "Brand identity — logos, URLs, emails, SPA basename."
+      },
+      "DashboardConfigResponse": {
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "title": "App Id"
+          },
+          "config_version": {
+            "type": "integer",
+            "title": "Config Version"
+          },
+          "branding": {
+            "$ref": "#/components/schemas/DashboardBranding"
+          },
+          "theme": {
+            "$ref": "#/components/schemas/DashboardTheme"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/LayoutConfig"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/ModuleConfig"
+            },
+            "type": "array",
+            "title": "Modules"
+          },
+          "supported_langs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Langs"
+          },
+          "default_lang": {
+            "type": "string",
+            "title": "Default Lang"
+          },
+          "feature_flags": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Feature Flags"
+          },
+          "recaptcha": {
+            "$ref": "#/components/schemas/RecaptchaConfig"
+          },
+          "analytics": {
+            "$ref": "#/components/schemas/AnalyticsConfig"
+          },
+          "cookie_banner_enabled": {
+            "type": "boolean",
+            "title": "Cookie Banner Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_id",
+          "config_version",
+          "branding",
+          "theme",
+          "layout",
+          "modules",
+          "supported_langs",
+          "default_lang",
+          "feature_flags",
+          "recaptcha",
+          "analytics",
+          "cookie_banner_enabled"
+        ],
+        "title": "DashboardConfigResponse",
+        "description": "Public response shape served by ``GET /dashboard/bootstrap``.\n\n``app_id`` is stringified for JSON fidelity. Audit fields are excluded —\nthey are observable only via the audit collection."
+      },
+      "DashboardPalette": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "auto"
+            ],
+            "title": "Mode",
+            "default": "auto"
+          },
+          "primary": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Primary"
+          },
+          "secondary": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Secondary"
+          },
+          "featured": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Featured"
+          },
+          "info": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Info"
+          },
+          "success": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Success"
+          },
+          "warning": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Warning"
+          },
+          "error": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Error"
+          },
+          "background": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Background"
+          },
+          "text": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Text"
+          },
+          "gradient": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Gradient"
+          }
+        },
+        "type": "object",
+        "title": "DashboardPalette",
+        "description": "MUI-compatible palette slots. Each slot is a dict to tolerate custom keys."
+      },
+      "DashboardSettingResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Value"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "value",
+          "updated_at"
+        ],
+        "title": "DashboardSettingResponse"
+      },
+      "DashboardSettingUpsertRequest": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "DashboardSettingUpsertRequest"
+      },
+      "DashboardSummaryResponse": {
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "title": "App Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "balance": {
+            "type": "number",
+            "title": "Balance",
+            "default": 0
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "unread_notifications": {
+            "type": "integer",
+            "title": "Unread Notifications",
+            "default": 0
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_id",
+          "user_id",
+          "generated_at"
+        ],
+        "title": "DashboardSummaryResponse"
+      },
+      "DashboardTheme": {
+        "properties": {
+          "palette": {
+            "$ref": "#/components/schemas/DashboardPalette"
+          },
+          "typography": {
+            "$ref": "#/components/schemas/DashboardTypography"
+          },
+          "breakpoints": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Breakpoints"
+          },
+          "shadows": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shadows"
+          },
+          "component_overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Component Overrides"
+          }
+        },
+        "type": "object",
+        "title": "DashboardTheme",
+        "description": "Theme bundle consumed by MUI ``createTheme`` on the SPA."
+      },
+      "DashboardTypography": {
+        "properties": {
+          "font_family": {
+            "type": "string",
+            "title": "Font Family",
+            "default": "Inter, sans-serif"
+          },
+          "font_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Font Urls",
+            "description": "Google Fonts or self-hosted URLs"
+          },
+          "h1": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H1"
+          },
+          "body1": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body1"
+          }
+        },
+        "type": "object",
+        "title": "DashboardTypography"
+      },
       "DnsRecordRequest": {
         "properties": {
           "type": {
@@ -16884,6 +20265,37 @@
         ],
         "title": "DomainRegisterRequest",
         "description": "Payload for registering a new domain."
+      },
+      "DomainRegistrarKeys": {
+        "properties": {
+          "api_url": {
+            "type": "string",
+            "title": "Api Url",
+            "description": "Domain registrar API base URL",
+            "default": ""
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "description": "Domain registrar API key",
+            "default": ""
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Domain registrar username",
+            "default": ""
+          },
+          "client_ip": {
+            "type": "string",
+            "title": "Client Ip",
+            "description": "Whitelisted client IP for domain registrar API",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "DomainRegistrarKeys",
+        "description": "Domain registrar credentials per App."
       },
       "DomainRenewRequest": {
         "properties": {
@@ -17221,6 +20633,94 @@
           "msg": "Operation failed",
           "success": false
         }
+      },
+      "FAQCreateRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "answer": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Answer"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "order_index": {
+            "type": "integer",
+            "title": "Order Index",
+            "default": 0
+          },
+          "published": {
+            "type": "boolean",
+            "title": "Published",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "answer"
+        ],
+        "title": "FAQCreateRequest"
+      },
+      "FAQResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "order_index": {
+            "type": "integer",
+            "title": "Order Index"
+          },
+          "published": {
+            "type": "boolean",
+            "title": "Published"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "question",
+          "answer",
+          "category",
+          "order_index",
+          "published"
+        ],
+        "title": "FAQResponse"
       },
       "FelAddendum": {
         "properties": {
@@ -17874,6 +21374,38 @@
         "type": "object",
         "title": "FelReceiver"
       },
+      "FelReportRow": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month",
+            "description": "Year-month, ISO format",
+            "examples": [
+              "2026-04"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Count",
+            "description": "Number of invoices in the month"
+          },
+          "total": {
+            "type": "number",
+            "minimum": 0,
+            "title": "Total",
+            "description": "Total invoiced amount in the month"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "count",
+          "total"
+        ],
+        "title": "FelReportRow",
+        "description": "Monthly aggregation row used by ``GET /invoicing/fel/report``."
+      },
       "FelTax": {
         "properties": {
           "tax_short_name": {
@@ -18061,6 +21593,62 @@
           "database": "ok",
           "service": "ok"
         }
+      },
+      "I18nBundleResponse": {
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "title": "App Id"
+          },
+          "lang": {
+            "type": "string",
+            "title": "Lang"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "strings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Strings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_id",
+          "lang",
+          "version",
+          "strings"
+        ],
+        "title": "I18nBundleResponse",
+        "description": "Public response shape for ``GET /dashboard/i18n/{lang}``."
+      },
+      "I18nLanguagesResponse": {
+        "properties": {
+          "langs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Langs",
+            "description": "Languages with a bundle available for this app"
+          },
+          "default": {
+            "type": "string",
+            "title": "Default",
+            "description": "Default language from DashboardConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "langs",
+          "default"
+        ],
+        "title": "I18nLanguagesResponse",
+        "description": "Public response shape for ``GET /dashboard/i18n`` (language index)."
       },
       "IndexingRequest": {
         "properties": {
@@ -19173,6 +22761,32 @@
           "topic": "plantas de interior"
         }
       },
+      "LayoutConfig": {
+        "properties": {
+          "sidebar_collapsed_default": {
+            "type": "boolean",
+            "title": "Sidebar Collapsed Default",
+            "default": false
+          },
+          "show_language_switcher": {
+            "type": "boolean",
+            "title": "Show Language Switcher",
+            "default": true
+          },
+          "show_theme_toggle": {
+            "type": "boolean",
+            "title": "Show Theme Toggle",
+            "default": true
+          },
+          "show_notifications": {
+            "type": "boolean",
+            "title": "Show Notifications",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "LayoutConfig"
+      },
       "LegalPageData": {
         "properties": {
           "lang": {
@@ -19380,6 +22994,67 @@
           "website_id": "507f1f77bcf86cd799439011"
         }
       },
+      "MagicLinkRequestPayload": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "Email to send the magic link to"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "MagicLinkRequestPayload",
+        "description": "Request body for ``POST /auth/user/magic-link/request``."
+      },
+      "MagicLinkTokenPair": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in"
+        ],
+        "title": "MagicLinkTokenPair",
+        "description": "Returned after verifying a magic link — access + refresh."
+      },
+      "MagicLinkVerifyPayload": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Token",
+            "description": "The JWT embedded in the email link"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "MagicLinkVerifyPayload",
+        "description": "Request body for ``POST /auth/user/magic-link/verify``."
+      },
       "MetricComparison": {
         "properties": {
           "current": {
@@ -19416,6 +23091,77 @@
           "trend"
         ],
         "title": "MetricComparison"
+      },
+      "ModuleConfig": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Canonical module slug (matches INCLUDED_MODULES.md)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "label_key": {
+            "type": "string",
+            "title": "Label Key",
+            "description": "i18n key for the sidebar label"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "description": "MUI icon name"
+          },
+          "route": {
+            "type": "string",
+            "title": "Route",
+            "description": "SPA route path (e.g. /main/dashboard)"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 0
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "description": "CASL subjects required"
+          },
+          "admin": {
+            "type": "boolean",
+            "title": "Admin",
+            "description": "Render inside the /admin shell",
+            "default": false
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ModuleConfig"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "label_key",
+          "icon",
+          "route"
+        ],
+        "title": "ModuleConfig",
+        "description": "A single module entry exposed to the SPA.\n\nSupports nested ``children`` for sub-menus without changing the schema.\n``permissions`` holds CASL subjects — the SPA filters routes against the\nuser's constructed Ability."
       },
       "NameserverType": {
         "type": "string",
@@ -19456,6 +23202,129 @@
         ],
         "title": "NameserverUpdateRequest",
         "description": "Payload for updating a domain's nameservers."
+      },
+      "NotificationCreateRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ],
+            "title": "Severity",
+            "default": "info"
+          },
+          "link_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Url"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Target user, or None for broadcast"
+          },
+          "is_global": {
+            "type": "boolean",
+            "title": "Is Global",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "NotificationCreateRequest"
+      },
+      "NotificationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ],
+            "title": "Severity"
+          },
+          "link_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Url"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "body",
+          "severity",
+          "link_url",
+          "read_at",
+          "created_at"
+        ],
+        "title": "NotificationResponse"
       },
       "OnboardingStatus": {
         "type": "string",
@@ -19582,6 +23451,27 @@
           "total_pages"
         ],
         "title": "PaginationResponse"
+      },
+      "PermissionSummary": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "description": "Module/resource subject, e.g. 'DASHBOARD'"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "CASL verb, e.g. 'read', 'manage'"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "action"
+        ],
+        "title": "PermissionSummary",
+        "description": "CASL-style permission entry consumed by the dashboard's Ability builder."
       },
       "PersonData": {
         "properties": {
@@ -19910,6 +23800,40 @@
           "type": "basic"
         }
       },
+      "PlatformMetricsResponse": {
+        "properties": {
+          "apps": {
+            "type": "integer",
+            "title": "Apps"
+          },
+          "users": {
+            "type": "integer",
+            "title": "Users"
+          },
+          "dashboard_configs": {
+            "type": "integer",
+            "title": "Dashboard Configs"
+          },
+          "superadmins": {
+            "type": "integer",
+            "title": "Superadmins"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "apps",
+          "users",
+          "dashboard_configs",
+          "superadmins",
+          "generated_at"
+        ],
+        "title": "PlatformMetricsResponse"
+      },
       "ProfileGenerationInput": {
         "properties": {
           "owner": {
@@ -20009,6 +23933,35 @@
         ],
         "title": "ProfileGenerationResponse",
         "description": "Response payload for profile generation."
+      },
+      "ProvisionAppRequest": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 2,
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "admin_email": {
+            "type": "string",
+            "format": "email",
+            "title": "Admin Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "admin_email"
+        ],
+        "title": "ProvisionAppRequest"
       },
       "PublisuitesActionRequest": {
         "properties": {
@@ -20225,6 +24178,35 @@
         "type": "object",
         "title": "PublisuitesVerificationAction"
       },
+      "PydanticObjectId": {
+        "type": "string",
+        "maxLength": 24,
+        "minLength": 24,
+        "pattern": "^[0-9a-f]{24}$",
+        "example": "5eb7cf5a86d9755df3a6c593"
+      },
+      "RecaptchaConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "site_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Key"
+          }
+        },
+        "type": "object",
+        "title": "RecaptchaConfig"
+      },
       "ReceptorInfo": {
         "properties": {
           "name": {
@@ -20284,6 +24266,65 @@
           "email"
         ],
         "title": "ReceptorInfo"
+      },
+      "ReferralResolutionResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "The referral code looked up"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid",
+            "description": "Whether the code is currently active"
+          },
+          "referrer_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer Username"
+          },
+          "signup_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signup Url",
+            "description": "Deep link SPA should open for the invitee"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "valid"
+        ],
+        "title": "ReferralResolutionResponse"
+      },
+      "RefreshPayload": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Token",
+            "description": "The JWT embedded in the email link"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "RefreshPayload",
+        "description": "Shared shape for refresh-token body."
       },
       "RegisterDomainRequest": {
         "properties": {
@@ -20478,6 +24519,40 @@
         ],
         "title": "RevokeTokensResponse",
         "description": "Response after revoking all user tokens."
+      },
+      "RoleSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Role document ID"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Role slug/name, e.g. 'user', 'admin', 'verify'"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable role name"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionSummary"
+            },
+            "type": "array",
+            "title": "Permissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ],
+        "title": "RoleSummary",
+        "description": "Minimal role payload with resolved permissions (no cross-collection joins client-side)."
       },
       "RunAgentRequest": {
         "properties": {
@@ -21007,6 +25082,38 @@
         ],
         "title": "SuccessResponse[AgentRunResponse]"
       },
+      "SuccessResponse_AppFullResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AppFullResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AppFullResponse]"
+      },
       "SuccessResponse_BranchResponse_": {
         "properties": {
           "success": {
@@ -21263,6 +25370,102 @@
         ],
         "title": "SuccessResponse[ConsumptionSummaryResponse]"
       },
+      "SuccessResponse_DashboardConfigResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardConfigResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[DashboardConfigResponse]"
+      },
+      "SuccessResponse_DashboardSettingResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardSettingResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[DashboardSettingResponse]"
+      },
+      "SuccessResponse_DashboardSummaryResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardSummaryResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[DashboardSummaryResponse]"
+      },
       "SuccessResponse_EarningsOverviewResponse_": {
         "properties": {
           "success": {
@@ -21327,6 +25530,38 @@
         ],
         "title": "SuccessResponse[EarningsReportResponse]"
       },
+      "SuccessResponse_FAQResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/FAQResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[FAQResponse]"
+      },
       "SuccessResponse_GenerateUserImagesResponse_": {
         "properties": {
           "success": {
@@ -21390,6 +25625,70 @@
           "msg"
         ],
         "title": "SuccessResponse[HealthStatus]"
+      },
+      "SuccessResponse_I18nBundleResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/I18nBundleResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[I18nBundleResponse]"
+      },
+      "SuccessResponse_I18nLanguagesResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/I18nLanguagesResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[I18nLanguagesResponse]"
       },
       "SuccessResponse_InvoiceCancelResponse_": {
         "properties": {
@@ -21583,6 +25882,38 @@
         ],
         "title": "SuccessResponse[LegalPageData]"
       },
+      "SuccessResponse_MagicLinkTokenPair_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/MagicLinkTokenPair",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[MagicLinkTokenPair]"
+      },
       "SuccessResponse_NoneType_": {
         "properties": {
           "success": {
@@ -21615,6 +25946,38 @@
           "msg"
         ],
         "title": "SuccessResponse[NoneType]"
+      },
+      "SuccessResponse_NotificationResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[NotificationResponse]"
       },
       "SuccessResponse_PageEarningsResponse_": {
         "properties": {
@@ -21680,6 +26043,38 @@
         ],
         "title": "SuccessResponse[PersonData]"
       },
+      "SuccessResponse_PlatformMetricsResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlatformMetricsResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[PlatformMetricsResponse]"
+      },
       "SuccessResponse_ProfileGenerationResponse_": {
         "properties": {
           "success": {
@@ -21711,6 +26106,38 @@
           "msg"
         ],
         "title": "SuccessResponse[ProfileGenerationResponse]"
+      },
+      "SuccessResponse_ReferralResolutionResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReferralResolutionResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[ReferralResolutionResponse]"
       },
       "SuccessResponse_RegisterDomainResponse_": {
         "properties": {
@@ -21839,6 +26266,70 @@
           "msg"
         ],
         "title": "SuccessResponse[RevokeTokensResponse]"
+      },
+      "SuccessResponse_TaskResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[TaskResponse]"
+      },
+      "SuccessResponse_TicketResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/TicketResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[TicketResponse]"
       },
       "SuccessResponse_TokenResponse_": {
         "properties": {
@@ -22162,6 +26653,78 @@
         ],
         "title": "SuccessResponse[dict]"
       },
+      "SuccessResponse_list_AppResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AppResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[AppResponse]]"
+      },
+      "SuccessResponse_list_BusinessResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BusinessResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[BusinessResponse]]"
+      },
       "SuccessResponse_list_CategoryResponse__": {
         "properties": {
           "success": {
@@ -22197,6 +26760,609 @@
           "msg"
         ],
         "title": "SuccessResponse[list[CategoryResponse]]"
+      },
+      "SuccessResponse_list_DashboardSettingResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardSettingResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[DashboardSettingResponse]]"
+      },
+      "SuccessResponse_list_FAQResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/FAQResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[FAQResponse]]"
+      },
+      "SuccessResponse_list_FelReportRow__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/FelReportRow"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[FelReportRow]]"
+      },
+      "SuccessResponse_list_NotificationResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[NotificationResponse]]"
+      },
+      "SuccessResponse_list_PlanResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PlanResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[PlanResponse]]"
+      },
+      "SuccessResponse_list_TaskResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TaskResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[TaskResponse]]"
+      },
+      "SuccessResponse_list_TicketResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TicketResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[TicketResponse]]"
+      },
+      "SuccessResponse_list_UserInvoiceListItem__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/UserInvoiceListItem"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[UserInvoiceListItem]]"
+      },
+      "TaskCreateRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Description",
+            "default": ""
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "TaskCreateRequest"
+      },
+      "TaskResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "todo",
+              "in_progress",
+              "done",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "due_at",
+          "completed_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TaskResponse"
+      },
+      "TaskUpdateRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "todo",
+                  "in_progress",
+                  "done",
+                  "cancelled"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          }
+        },
+        "type": "object",
+        "title": "TaskUpdateRequest"
+      },
+      "TicketCreateRequest": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "initial_body": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Initial Body"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ],
+            "title": "Priority",
+            "default": "normal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "initial_body"
+        ],
+        "title": "TicketCreateRequest"
+      },
+      "TicketMessage": {
+        "properties": {
+          "author_id": {
+            "$ref": "#/components/schemas/PydanticObjectId"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Body"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "author_id",
+          "body"
+        ],
+        "title": "TicketMessage",
+        "description": "Embedded message in a ticket thread."
+      },
+      "TicketReplyRequest": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Body"
+          }
+        },
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "TicketReplyRequest"
+      },
+      "TicketResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "resolved",
+              "closed"
+            ],
+            "title": "Status"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ],
+            "title": "Priority"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/TicketMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject",
+          "status",
+          "priority",
+          "user_id",
+          "assignee_id",
+          "messages",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TicketResponse"
       },
       "TokenRequest": {
         "properties": {
@@ -22646,6 +27812,59 @@
         "title": "TransactionStatus",
         "description": "Transaction status enum matching payment service statuses.\n\nState machine:\n- CREATED (initial) can transition to any terminal state\n- Terminal states (APPROVED, DENIED, etc.) cannot transition\n- Idempotent: same status → same status is allowed"
       },
+      "TribuTaxKeys": {
+        "properties": {
+          "api_url": {
+            "type": "string",
+            "title": "Api Url",
+            "description": "FEL API base URL",
+            "default": "",
+            "examples": [
+              "https://api.fel.example.com"
+            ]
+          },
+          "renap_api_url": {
+            "type": "string",
+            "title": "Renap Api Url",
+            "description": "Person lookup API base URL",
+            "default": "https://api.tributax.app",
+            "examples": [
+              "https://api.tributax.app"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "FEL integration token",
+            "default": "",
+            "examples": [
+              "fel-token-abc123"
+            ]
+          },
+          "login": {
+            "type": "string",
+            "title": "Login",
+            "description": "FEL integration login",
+            "default": "",
+            "examples": [
+              "fel-user@example.com"
+            ]
+          },
+          "timeout": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "title": "Timeout",
+            "description": "Request timeout in seconds",
+            "default": 30,
+            "examples": [
+              30
+            ]
+          }
+        },
+        "type": "object",
+        "title": "TribuTaxKeys",
+        "description": "FEL integration credentials per App."
+      },
       "UpdateAgentRequest": {
         "properties": {
           "name": {
@@ -22932,6 +28151,82 @@
           }
         }
       },
+      "UserInvoiceListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Invoice ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "business_id": {
+            "type": "string",
+            "title": "Business Id",
+            "description": "Owning business ID"
+          },
+          "branch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id",
+            "description": "Optional branch ID"
+          },
+          "receiver_name": {
+            "type": "string",
+            "title": "Receiver Name",
+            "description": "Receiver display name",
+            "default": ""
+          },
+          "total": {
+            "type": "number",
+            "title": "Total",
+            "description": "Invoice total amount",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Invoice status",
+            "examples": [
+              "issued"
+            ]
+          },
+          "fel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fel Id",
+            "description": "External FEL ID, if emitted"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Creation timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "business_id",
+          "status",
+          "created_at"
+        ],
+        "title": "UserInvoiceListItem",
+        "description": "Flat invoice item across the businesses a user has access to.\n\nReturned by ``GET /invoicing/invoices`` for the dashboard's invoice list.\nAggregates invoices from every business linked to the current user via\nbranch assignments."
+      },
       "UserProfileResponse": {
         "properties": {
           "id": {
@@ -22980,6 +28275,50 @@
             "examples": [
               "2024-01-15T10:30:00Z"
             ]
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id",
+            "description": "Tenant app scope"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At",
+            "description": "First magic-link verification timestamp (ISO)"
+          },
+          "is_superadmin": {
+            "type": "boolean",
+            "title": "Is Superadmin",
+            "description": "Cross-tenant admin flag",
+            "default": false
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleSummary"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Roles with resolved permissions"
+          },
+          "theme": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Theme",
+            "description": "User theme preferences"
           }
         },
         "type": "object",
@@ -22990,7 +28329,7 @@
           "is_active"
         ],
         "title": "UserProfileResponse",
-        "description": "User profile information (subset of full user data, no sensitive fields)."
+        "description": "User profile information (no sensitive fields).\n\nConsumed by both the WordPress plugin (legacy, uses id/username/email/is_active/created_at)\nand the whitelabel dashboard (uses app_id/verified_at/is_superadmin/roles/theme). All\ndashboard-specific fields are optional so the legacy contract remains backwards-compatible."
       },
       "UserResponse": {
         "properties": {
@@ -23942,12 +29281,6 @@
         "in": "header",
         "name": "x-user-token",
         "description": "User token obtained from POST /users/token. Format: `sk-...`"
-      },
-      "HTTPBearer": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "App token obtained from POST /auth/token. Format: `ak-...`"
       }
     }
   },
@@ -24067,6 +29400,38 @@
     {
       "name": "Onboarding",
       "description": "Guided onboarding flow for new users — start a session, complete the required steps, and convert it into an active account with billing initialized."
+    },
+    {
+      "name": "Dashboard",
+      "description": "Whitelabel dashboard bootstrap — per-app branding, theme, modules, layout, feature flags, and i18n bundles. Drives the SPA boot flow. Read endpoints return strong ETags for CDN / client caching."
+    },
+    {
+      "name": "Dashboard Settings",
+      "description": "Per-app dashboard settings store — read, upsert, and delete free-form configuration entries scoped to your app (used by the SPA for feature flags, layout overrides, and tenant-specific preferences)."
+    },
+    {
+      "name": "Notifications",
+      "description": "In-app notifications for the authenticated user — list, create, mark as read, and check the unread badge count."
+    },
+    {
+      "name": "Tasks",
+      "description": "Personal task list for the authenticated user — create, list, update status, and delete tasks shown on the dashboard."
+    },
+    {
+      "name": "Support",
+      "description": "Customer support workspace — open and reply to tickets, browse frequently asked questions, and let admins curate the FAQ catalog."
+    },
+    {
+      "name": "Referrals",
+      "description": "Referral program lookups — resolve a referral code to its public metadata (program name, signup URL, app branding)."
+    },
+    {
+      "name": "User Authentication",
+      "description": "Passwordless dashboard login — request a magic link, exchange it for an access + refresh token pair, rotate refresh tokens, and revoke sessions on logout."
+    },
+    {
+      "name": "Platform Admin",
+      "description": "Cross-tenant administration for the 1Platform team — provision new apps, list every registered app, inspect a single app, and view platform-wide metrics. Requires the superadmin role."
     }
   ]
 }

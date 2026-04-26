@@ -168,6 +168,29 @@ Automated production deployment with 6 sequential jobs:
 
 Current version: **0.7.4** (auto-bumped by CI/CD pipeline)
 
+## Navbar & Footer Harmony Rule (MUST)
+
+The developer docs **navbar AND footer** **MUST mirror the marketing website** so users experience a seamless transition between subdomains (`1platform.pro` ↔ `developer.1platform.pro`). Both chromes must feel identical across domains.
+
+**Source of truth on each side:**
+- Website — `1platform-website/src/components/Header.astro` (navbar) and `1platform-website/src/components/Footer.astro` (footer)
+- Developer docs — `1platform-api-developer/docusaurus.config.ts` (navbar) and `1platform-api-developer/src/theme/Footer/index.tsx` + `styles.module.css` (footer swizzle)
+
+**Navbar contract:**
+- **Item order and labels:** Solutions, Features, Pricing, Docs, Blog — centered between logo and CTA.
+- **Cross-subdomain links:** Solutions/Features/Pricing/Blog point to `https://1platform.pro/<page>/` with `target: '_self'`; external-link icons are hidden.
+- **Docs entry:** Single link (no dropdown). On the developer site it points to `/`; on the website it points to `https://developer.1platform.pro/`.
+- **CTA:** "Get Started Free" → `https://app.1platform.pro`, right-aligned, accent-blue button (`.navbar__cta` on docs mirrors `.btn--primary.btn--sm` on the website).
+- **Logo:** "1Platform" word-mark with the visually distinct "1" — identical on both sites.
+
+**Footer contract:**
+- **CTA banner:** "Stop Managing 19+ Different Tools" headline + lead + [Get Started Free, View Documentation] buttons.
+- **Link grid:** brand column (`1Platform` logo + "One platform. Every solution." tagline) + four columns in this order — **Solutions** (14 items), **Resources** (Documentation, API Reference, Code Examples, Blog, Changelog), **Company** (About, Why 1Platform, Pricing), **Legal** (Terms of Service, Privacy Policy, Cookie Policy).
+- **Bottom row:** `© {year} 1Platform Labs. All rights reserved.`
+- **Grid template:** `1.5fr repeat(4, 1fr)` on desktop, collapses to 2-col with brand spanning full row at ≤768px.
+
+**If you add, remove, rename, or reorder a navbar item or footer column/link on either site, you MUST update the other in the same commit.**
+
 ## Restrictions (NEVER)
 
 - Never hardcode API tokens or real credentials in examples — always use placeholders

@@ -52,13 +52,30 @@ const config: Config = {
       {
         label: 'API Reference',
         route: ROUTE_API_REFERENCE,
-        showNavLink: true,
+        showNavLink: false,
         configuration: {
           // Served from static/openapi.json (downloaded at build time by prebuild script).
           // Using the local copy avoids CORS issues in production.
           url: OPENAPI_LOCAL_PATH,
           // Proxy requests through Scalar to avoid CORS issues when using "Send" in the browser.
           proxy: 'https://proxy.scalar.com',
+          // Default to light mode (matches the 1Platform Design System).
+          // Users can still toggle dark via the sun/moon button.
+          darkMode: false,
+          customCss: `
+            .light-mode {
+              --scalar-color-accent: #2563eb;
+              --scalar-color-1: #0f172a;
+              --scalar-color-2: #475569;
+              --scalar-color-3: #64748b;
+              --scalar-background-1: #ffffff;
+              --scalar-background-2: #f8fafc;
+              --scalar-background-3: #f1f5f9;
+              --scalar-border-color: #e2e8f0;
+              --scalar-font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              --scalar-font-code: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            }
+          `,
         },
       },
     ],
@@ -72,70 +89,57 @@ const config: Config = {
     image: 'img/docusaurus-social-card.jpg',
     colorMode: {
       defaultMode: 'light',
-      respectPrefersColorScheme: true,
+      respectPrefersColorScheme: false,
     },
     navbar: {
+      // Mirrors the marketing website navbar (1platform.pro) so users experience
+      // a seamless subdomain transition. Keep item order and labels in sync with
+      // 1platform-website/src/components/Header.astro.
       items: [
-        // "API Reference" link is auto-injected by @scalar/docusaurus (showNavLink: true).
         {
-          type: 'docSidebar',
-          sidebarId: 'docs',
-          label: 'Flows',
+          href: 'https://1platform.pro/solutions/',
+          label: 'Solutions',
           position: 'left',
+          target: '_self',
         },
-        // Cross-project navigation — back to marketing site
         {
-          href: 'https://1platform.pro',
-          label: '1platform.pro',
+          href: 'https://1platform.pro/features/',
+          label: 'Features',
+          position: 'left',
+          target: '_self',
+        },
+        {
+          href: 'https://1platform.pro/pricing/',
+          label: 'Pricing',
+          position: 'left',
+          target: '_self',
+        },
+        {
+          to: '/',
+          label: 'Docs',
+          position: 'left',
+          activeBaseRegex: '^/(docs|api-docs)?/?$|^/(docs|api-docs)/.*',
+        },
+        {
+          href: 'https://1platform.pro/blog/',
+          label: 'Blog',
+          position: 'left',
+          target: '_self',
+        },
+        {
+          href: 'https://app.1platform.pro',
+          label: 'Get Started Free',
           position: 'right',
-          className: 'navbar__link--back',
+          className: 'navbar__cta',
         },
       ],
     },
+    // Footer content is rendered by the custom swizzle at
+    // src/theme/Footer/index.tsx, which mirrors the marketing-site footer.
+    // This config stub is kept only so Docusaurus mounts the Footer slot.
     footer: {
       style: 'light',
-      links: [
-        {
-          title: 'API',
-          items: [
-            {
-              label: 'API Reference',
-              to: ROUTE_API_REFERENCE,
-            },
-            {
-              label: 'OpenAPI Spec (JSON)',
-              href: 'pathname:///openapi.json',
-            },
-          ],
-        },
-        {
-          title: 'Guides',
-          items: [
-            {
-              label: 'Generate Invoice (FEL)',
-              to: '/docs/flows/generate-invoice',
-            },
-          ],
-        },
-        {
-          title: '1Platform',
-          items: [
-            {
-              label: 'Website',
-              href: 'https://1platform.pro',
-            },
-            {
-              label: 'Solutions',
-              href: 'https://1platform.pro/solutions/',
-            },
-            {
-              label: 'Pricing',
-              href: 'https://1platform.pro/pricing/',
-            },
-          ],
-        },
-      ],
-      copyright: `Copyright © ${new Date().getFullYear()} 1Platform Labs.`,
+      copyright: `© ${new Date().getFullYear()} 1Platform Labs. All rights reserved.`,
     },
     prism: {
       theme: prismThemes.github,

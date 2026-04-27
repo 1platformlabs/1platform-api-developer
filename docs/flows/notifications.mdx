@@ -1,0 +1,462 @@
+---
+title: "Notifications"
+description: "Step-by-step flow to list, create, mark as read, and count unread notifications via the 1Platform API."
+sidebar_position: 17
+---
+
+# Flow: Notifications
+
+## Overview
+
+This flow documents how a dashboard or admin tool integrates with the notifications subsystem — listing the user's notification feed, broadcasting messages from an admin context, marking individual entries as read, and reading the unread count for a navbar bell icon.
+
+**Use case:** Show an in-app notifications inbox with unread badges, and let admins push announcements to all users or a specific user.
+
+**End result:** The dashboard renders an up-to-date notifications feed with read/unread state, and the unread badge stays in sync with `/notifications/unread-count`.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| Admin role | Creating notifications requires admin privileges on the app |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""           # Obtained in Step 0
+USER_TOKEN=""          # Obtained in Step 1
+NOTIFICATION_ID=""     # Obtained in Step 2 or Step 3
+```
+
+---
+
+## Data model
+
+### Notification object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | Yes | MongoDB ObjectId of the notification |
+| `title` | string | Yes | Short headline shown in the feed |
+| `body` | string | Yes | Full notification body (Markdown is allowed) |
+| `severity` | string | Yes | One of `info`, `success`, `warning` |
+| `link_url` | string \| null | Yes | Optional URL the notification links to |
+| `read_at` | string \| null | Yes | ISO-8601 timestamp when marked as read, `null` if unread |
+| `created_at` | string | Yes | ISO-8601 timestamp when created |
+
+### Create payload
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `title` | string | Yes | Short headline (max ~120 chars recommended) |
+| `body` | string | No | Full body text |
+| `severity` | string | No | `info` (default), `success`, or `warning` |
+| `link_url` | string \| null | No | Optional URL for click-through |
+| `user_id` | string \| null | No | Target a specific user. Mutually exclusive with `is_global` |
+| `is_global` | boolean | No | If `true`, broadcast to every user in the app |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — List notifications
+
+**Goal:** Page through the authenticated user's notification feed.
+
+**Endpoint:** `GET /api/v1/notifications`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+**Query parameters:**
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| `unread_only` | boolean | No | When `true`, return only unread notifications |
+| `skip` | integer | No | Offset for pagination (default `0`) |
+| `limit` | integer | No | Page size (default `20`) |
+
+```bash
+curl -X GET "$BASE_URL/notifications?unread_only=false&skip=0&limit=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "title": "Generación de contenido completada",
+      "body": "Tu artículo \"Guía de SEO 2026\" está listo.",
+      "severity": "success",
+      "link_url": "https://app.example.com/posts/507f1f77bcf86cd799439020",
+      "read_at": null,
+      "created_at": "2026-04-27T15:00:00Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439012",
+      "title": "Mantenimiento programado",
+      "body": "El servicio estará en mantenimiento el 30/04 a las 02:00.",
+      "severity": "warning",
+      "link_url": null,
+      "read_at": "2026-04-26T18:30:00Z",
+      "created_at": "2026-04-26T18:00:00Z"
+    }
+  ],
+  "msg": "Notifications fetched successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Invalid query parameter type | Pass `unread_only` as boolean and `skip`/`limit` as integers |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 3 — Create a notification (admin)
+
+**Goal:** Push a notification to a specific user or broadcast to all users in the app.
+
+**Endpoint:** `POST /api/v1/notifications`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/notifications" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Nueva integración disponible",
+    "body": "Conecta tu cuenta de Google Search Console para ver insights.",
+    "severity": "info",
+    "link_url": "https://app.example.com/integrations/search-console",
+    "is_global": true
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439013",
+    "title": "Nueva integración disponible",
+    "body": "Conecta tu cuenta de Google Search Console para ver insights.",
+    "severity": "info",
+    "link_url": "https://app.example.com/integrations/search-console",
+    "read_at": null,
+    "created_at": "2026-04-27T15:30:00Z"
+  },
+  "msg": "Notification created successfully"
+}
+```
+
+:::warning
+`user_id` and `is_global: true` are mutually exclusive — set one or the other. Sending both returns **422**.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Missing `title`, invalid `severity`, or conflicting `user_id` + `is_global` | Set exactly one targeting field and a valid `severity` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 4 — Mark a notification as read
+
+**Goal:** Update the `read_at` timestamp on a single notification.
+
+**Endpoint:** `PATCH /api/v1/notifications/{notification_id}/read`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PATCH "$BASE_URL/notifications/$NOTIFICATION_ID/read" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "title": "Generación de contenido completada",
+    "body": "Tu artículo \"Guía de SEO 2026\" está listo.",
+    "severity": "success",
+    "link_url": "https://app.example.com/posts/507f1f77bcf86cd799439020",
+    "read_at": "2026-04-27T15:35:00Z",
+    "created_at": "2026-04-27T15:00:00Z"
+  },
+  "msg": "Notification marked as read"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 404 | Notification does not exist or belongs to another user | Verify the `notification_id` |
+| 422 | Malformed `notification_id` path parameter | Use a valid ObjectId |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 5 — Read the unread count
+
+**Goal:** Show the unread badge on the bell icon — fast, lightweight check.
+
+**Endpoint:** `GET /api/v1/notifications/unread-count`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/notifications/unread-count" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "unread": 2
+  },
+  "msg": "Unread count fetched successfully"
+}
+```
+
+:::tip
+Poll this endpoint every 30–60 seconds, or hook it into a webhook. It is far cheaper than calling `/notifications?unread_only=true` because the server returns only the count, not the documents.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Missing or malformed user token header | Send `x-user-token: $USER_TOKEN` |
+| 429 | Rate limit exceeded | Reduce poll frequency or back off |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+# === STEP 2: List notifications ===
+curl -s -X GET "$BASE_URL/notifications?unread_only=true&limit=10" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+
+# === STEP 3: Create a global notification ===
+NOTIFICATION_ID=$(curl -s -X POST "$BASE_URL/notifications" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Demo notification",
+    "body": "Sent from the Integration Flows guide",
+    "severity": "info",
+    "is_global": true
+  }' | jq -r '.data.id')
+
+echo "Created notification: $NOTIFICATION_ID"
+
+# === STEP 4: Mark as read ===
+curl -s -X PATCH "$BASE_URL/notifications/$NOTIFICATION_ID/read" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+
+# === STEP 5: Read unread count ===
+curl -s -X GET "$BASE_URL/notifications/unread-count" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+- `PATCH /notifications/{id}/read` is idempotent — marking an already-read notification returns the same final state.
+- `POST /notifications` is **not** idempotent — every call creates a new notification. Send a deduplication identifier in your application layer if you need exactly-once semantics.
+- `GET` endpoints are read-only and naturally idempotent.
+
+### Retries
+- If you receive **429** (rate limit), back off and retry. The unread-count endpoint is safe to call every 30–60 seconds.
+- For **5xx** errors, retry with exponential backoff.
+- For **401**, regenerate tokens and retry.
+
+### Timeouts
+- All endpoints are simple CRUD operations — set a 5-second client timeout.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+
+### Important validations
+- `severity` must be one of `info`, `success`, `warning` — the API rejects any other value.
+- `user_id` and `is_global: true` are mutually exclusive.
+- `link_url` should be HTTPS — http URLs may be flagged as unsafe by browsers.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/notifications` | List notifications (paginated) |
+| 3 | `POST` | `/api/v1/notifications` | Create a notification (admin) |
+| 4 | `PATCH` | `/api/v1/notifications/{notification_id}/read` | Mark as read |
+| 5 | `GET` | `/api/v1/notifications/unread-count` | Read unread count |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I listed notifications and rendered them in the UI
+- [ ] I created a notification via `POST /notifications`
+- [ ] I marked at least one notification as read
+- [ ] I wired the unread-count endpoint to the navbar badge

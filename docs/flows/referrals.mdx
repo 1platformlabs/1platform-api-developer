@@ -1,0 +1,237 @@
+---
+title: "Referrals"
+description: "Step-by-step flow to resolve a referral code to its destination payload (referrer, signup URL) via the 1Platform API."
+sidebar_position: 18
+---
+
+# Flow: Referrals
+
+## Overview
+
+This flow documents how a public-facing landing page or signup widget resolves a referral code to its destination — typically the referrer's username and a pre-filled signup URL — so the page can show "Invited by María García" and reward both parties when the new user signs up.
+
+**Use case:** Render a personalized signup page when a visitor arrives via a referral link like `https://example.com/r/MARIA2026`.
+
+**End result:** Your client knows whether the referral code is valid and, if so, who referred the visitor and where to send them next.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| Referral code | The code captured from the URL or shared link |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+Content-Type: application/json
+```
+
+:::note
+This is a public lookup — no user token is required. The endpoint is safe to call from a public landing page (server-side) using the app token.
+:::
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+APP_TOKEN=""             # Obtained in Step 0
+REFERRAL_CODE="MARIA2026"  # Captured from the URL path or query string
+```
+
+---
+
+## Data model
+
+### Referral resolution object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `code` | string | Yes | The original referral code |
+| `valid` | boolean | Yes | `true` if the code resolves, `false` otherwise |
+| `referrer_username` | string \| null | No | Public username of the referrer (when `valid` is `true`) |
+| `signup_url` | string \| null | No | Optional pre-filled signup URL (e.g., with `?ref=...`) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Resolve the referral code
+
+**Goal:** Look up the referrer info and signup destination for a given code.
+
+**Endpoint:** `GET /api/v1/referrals/{code}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/referrals/$REFERRAL_CODE" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Response (200) — valid code:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "code": "MARIA2026",
+    "valid": true,
+    "referrer_username": "maria_demo",
+    "signup_url": "https://app.example.com/signup?ref=MARIA2026"
+  },
+  "msg": "Referral code resolved successfully"
+}
+```
+
+**Response (200) — invalid code:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "code": "BADCODE",
+    "valid": false,
+    "referrer_username": null,
+    "signup_url": null
+  },
+  "msg": "Referral code resolved successfully"
+}
+```
+
+:::note
+The endpoint always returns **200** with `valid: false` for unknown codes — this avoids leaking whether a code exists via HTTP status codes. Inspect `data.valid` in your client to decide how to render the page.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Malformed `code` path parameter (empty or invalid characters) | Use a non-empty alphanumeric code |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+REFERRAL_CODE="MARIA2026"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Resolve referral code ===
+RESPONSE=$(curl -s -X GET "$BASE_URL/referrals/$REFERRAL_CODE" \
+  -H "Authorization: Bearer $APP_TOKEN")
+
+VALID=$(echo "$RESPONSE" | jq -r '.data.valid')
+REFERRER=$(echo "$RESPONSE" | jq -r '.data.referrer_username')
+SIGNUP_URL=$(echo "$RESPONSE" | jq -r '.data.signup_url')
+
+if [ "$VALID" = "true" ]; then
+  echo "Invited by: $REFERRER"
+  echo "Signup URL: $SIGNUP_URL"
+else
+  echo "Referral code is invalid — fall back to default signup."
+fi
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+The endpoint is read-only and idempotent — repeated calls return the same data.
+
+### Retries
+- If you receive **429** (rate limit), wait and retry.
+- For **5xx** errors, retry with exponential backoff.
+- For **401**, regenerate the app token and retry.
+
+### Timeouts
+Set a 5-second client timeout.
+
+### Caching
+Resolved codes can be cached for **5 minutes** server-side without losing freshness — referrer usernames rarely change. If you cache client-side, store only `(code, referrer_username, signup_url)` pairs and refresh on cache miss.
+
+### Tokens
+The app token expires in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+
+### Important validations
+- Validate the `code` parameter on the client before calling the API — strip whitespace, reject obvious garbage to avoid wasting requests.
+- Always check `data.valid` before showing personalized content. Unknown codes return **200** with `valid: false`, not 404.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `GET` | `/api/v1/referrals/{code}` | Resolve referral code |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I extracted the referral code from the URL
+- [ ] I called `/referrals/{code}` and inspected `data.valid`
+- [ ] I rendered the personalized signup page when valid, fallback otherwise

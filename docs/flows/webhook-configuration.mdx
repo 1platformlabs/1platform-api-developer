@@ -1,0 +1,524 @@
+---
+title: "Webhook Configuration"
+description: "Step-by-step flow to configure webhook signing, register allowed domains, declare event handlers, and rotate the signing secret via the 1Platform API."
+sidebar_position: 21
+---
+
+# Flow: Webhook Configuration
+
+## Overview
+
+This flow documents how an integrator sets up outbound webhooks from the 1Platform API to their own backend — registering the domains that can receive webhooks, declaring per-event handler URLs (approved, denied, cancelled, expired, dismissed), and rotating the shared signing secret used to verify payloads.
+
+**Use case:** Receive real-time payment lifecycle events at your backend so you can fulfill orders, send receipts, or update CRM records without polling.
+
+**End result:** Your backend receives signed webhook payloads at the configured URLs whenever a payment transitions state, and you can verify each payload with the shared secret.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user (admin role required to mutate config) |
+| HTTPS endpoints | Your webhook URLs must be HTTPS — plain HTTP destinations are rejected |
+| Domain control | You must control the domain you register (the API may emit a verification probe) |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""           # Obtained in Step 0
+USER_TOKEN=""          # Obtained in Step 1
+WEBHOOK_DOMAIN="hooks.example.com"
+WEBHOOK_SECRET=""      # Obtained in Step 3 or rotated in Step 6
+```
+
+---
+
+## Data model
+
+### Webhook configuration object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `allowed_domains` | array | No | List of registered domain entries |
+| `payment_webhooks` | object \| null | No | Per-event webhook handler configuration |
+| `has_secret` | boolean | No | `true` once a signing secret has been generated |
+
+### Domain entry
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `domain` | string | Yes | Registered domain (no scheme, no path) |
+| `verified` | boolean | Yes | `true` once the domain has passed the verification probe |
+| `webhook_secret` | string | Yes | Initial signing secret returned at registration time |
+
+### Event handler payload
+
+The `PUT /webhooks/config/events` body accepts up to five optional handler entries — `on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`. Each entry has the shape:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `url` | string | Yes | Full HTTPS URL to call when the event fires |
+| `method` | string | No | One of `GET`, `POST`, `PUT` (default `POST`) |
+| `headers` | object | No | Static request headers to include |
+| `body_template` | object | No | JSON template merged with the event payload |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Read current webhook configuration
+
+**Goal:** Inspect the current webhook configuration before making changes.
+
+**Endpoint:** `GET /api/v1/webhooks/config/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/webhooks/config/" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "allowed_domains": [
+      {
+        "domain": "hooks.example.com",
+        "verified": true,
+        "webhook_secret": "whsec_demo_abc123"
+      }
+    ],
+    "payment_webhooks": {
+      "on_approved": {
+        "url": "https://hooks.example.com/payments/approved",
+        "method": "POST",
+        "headers": {"X-App": "demo"},
+        "body_template": {"order_ref": "{order_id}"}
+      }
+    },
+    "has_secret": true
+  },
+  "msg": "Webhook configuration fetched successfully"
+}
+```
+
+:::note
+The `webhook_secret` value returned here is the **initial** secret created when the domain was first registered. Use the secret returned in the rotate-secret response (Step 6) for ongoing signature verification.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Missing or invalid app token | Regenerate `$APP_TOKEN` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 3 — Register an allowed domain
+
+**Goal:** Authorize a domain to receive webhooks. The response includes the initial signing secret.
+
+**Endpoint:** `POST /api/v1/webhooks/config/domains`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/webhooks/config/domains" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "'$WEBHOOK_DOMAIN'"}'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "domain": "hooks.example.com",
+    "verified": false,
+    "webhook_secret": "whsec_demo_abc123"
+  },
+  "msg": "Webhook domain registered successfully"
+}
+```
+
+:::warning
+Save `data.webhook_secret` immediately — the API will not return it in cleartext again. Lose it and you must rotate via Step 6.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid domain format (scheme included, port present, etc.) | Send a bare domain like `"hooks.example.com"` |
+| 401 | Missing or invalid app token | Regenerate `$APP_TOKEN` |
+| 409 | Domain already registered for this app | Use `GET /webhooks/config/` to inspect or remove first |
+| 422 | Missing `domain` field | Send `{"domain": "..."}` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 4 — Declare event handlers
+
+**Goal:** Map payment lifecycle events to your webhook URLs.
+
+**Endpoint:** `PUT /api/v1/webhooks/config/events`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X PUT "$BASE_URL/webhooks/config/events" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "on_approved": {
+      "url": "https://hooks.example.com/payments/approved",
+      "method": "POST",
+      "headers": {"X-App": "demo"},
+      "body_template": {"order_ref": "{order_id}"}
+    },
+    "on_denied": {
+      "url": "https://hooks.example.com/payments/denied",
+      "method": "POST"
+    },
+    "on_cancelled": null,
+    "on_expired": null,
+    "on_dismiss": null
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": null,
+  "msg": "Webhook events updated successfully"
+}
+```
+
+:::note
+Sending `null` for an event entry **removes** the previously configured handler. Sending an object **replaces** it. The endpoint is idempotent — call it again with the same payload to converge on the desired state.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | URL host is not in `allowed_domains` | Register the host first via Step 3 |
+| 401 | Missing or invalid app token | Regenerate `$APP_TOKEN` |
+| 422 | Invalid `method`, malformed URL, or wrong field types | Use HTTPS URL and one of `GET`/`POST`/`PUT` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 5 — Remove a domain
+
+**Goal:** Unregister a domain. Any event handlers pointing at it become invalid until reconfigured.
+
+**Endpoint:** `DELETE /api/v1/webhooks/config/domains/{domain}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/webhooks/config/domains/$WEBHOOK_DOMAIN" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": null,
+  "msg": "Webhook domain removed successfully"
+}
+```
+
+:::warning
+After removing a domain, update event handlers in `PUT /webhooks/config/events` so no `url` references the removed host.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Missing or invalid app token | Regenerate `$APP_TOKEN` |
+| 404 | Domain not registered for this app | Verify the domain via `GET /webhooks/config/` |
+| 422 | Malformed `domain` path parameter | Use a bare domain (no scheme, no path) |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 6 — Rotate the webhook secret
+
+**Goal:** Generate a fresh signing secret. Use this when the previous secret may have leaked or per your compliance schedule.
+
+**Endpoint:** `POST /api/v1/webhooks/config/rotate-secret`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/webhooks/config/rotate-secret" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "webhook_secret": "whsec_demo_rotated_xyz789",
+    "rotated_at": "2026-04-27T15:30:00Z"
+  },
+  "msg": "Webhook secret rotated successfully"
+}
+```
+
+:::warning
+The previous secret is invalidated **immediately**. Deploy the new secret to your verification middleware before triggering any new events, otherwise legitimate payloads will fail signature verification.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Missing or invalid app token | Regenerate `$APP_TOKEN` |
+| 404 | No webhook configuration to rotate | Register a domain first via Step 3 |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+WEBHOOK_DOMAIN="hooks.example.com"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+# === STEP 1: Get User Token (admin) ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+# === STEP 2: Inspect current config ===
+curl -s -X GET "$BASE_URL/webhooks/config/" \
+  -H "Authorization: Bearer $APP_TOKEN" | jq
+
+# === STEP 3: Register a domain ===
+WEBHOOK_SECRET=$(curl -s -X POST "$BASE_URL/webhooks/config/domains" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "'$WEBHOOK_DOMAIN'"}' | jq -r '.data.webhook_secret')
+
+echo "WEBHOOK_SECRET (store securely): $WEBHOOK_SECRET"
+
+# === STEP 4: Declare event handlers ===
+curl -s -X PUT "$BASE_URL/webhooks/config/events" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "on_approved": {
+      "url": "https://hooks.example.com/payments/approved",
+      "method": "POST",
+      "headers": {"X-App": "demo"},
+      "body_template": {"order_ref": "{order_id}"}
+    },
+    "on_denied": {
+      "url": "https://hooks.example.com/payments/denied",
+      "method": "POST"
+    }
+  }' | jq
+
+# === STEP 5: Remove the domain (cleanup demo) ===
+# curl -s -X DELETE "$BASE_URL/webhooks/config/domains/$WEBHOOK_DOMAIN" \
+#   -H "Authorization: Bearer $APP_TOKEN" | jq
+
+# === STEP 6: Rotate the secret ===
+NEW_SECRET=$(curl -s -X POST "$BASE_URL/webhooks/config/rotate-secret" \
+  -H "Authorization: Bearer $APP_TOKEN" | jq -r '.data.webhook_secret')
+
+echo "Rotated secret: $NEW_SECRET"
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+- `GET /webhooks/config/` is naturally idempotent.
+- `POST /webhooks/config/domains` is **not** idempotent — duplicate registrations return 409.
+- `PUT /webhooks/config/events` is idempotent — sending the same payload twice converges on the same state.
+- `DELETE /webhooks/config/domains/{domain}` is idempotent — removing an already-removed domain returns 404; treat 404 as success.
+- `POST /webhooks/config/rotate-secret` is **not** idempotent — every call produces a new secret.
+
+### Retries
+- For **5xx** errors and **429**, retry with exponential backoff. `PUT` and `DELETE` are safe to retry.
+- For **POST /domains**, do NOT retry blindly — check the configuration first to see whether the domain was already registered.
+- For **rotate-secret**, never retry — duplicate rotations invalidate freshly issued secrets and may break receivers.
+
+### Timeouts
+- Set a 5-second client timeout on all configuration endpoints.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+
+### Verifying webhook payloads
+- Every outbound webhook is signed with HMAC-SHA256 over the raw body, using the shared `webhook_secret`. Verify the `X-Webhook-Signature` header before trusting the payload.
+- Reject any request older than 5 minutes (`X-Webhook-Timestamp` skew) to prevent replay attacks.
+- Always return **200** or **2xx** quickly — the API retries with exponential backoff on non-2xx responses, which can amplify load on your backend during outages.
+
+### Important validations
+- Domains must be bare (`hooks.example.com`, not `https://hooks.example.com:443/path`).
+- Event handler URLs must use HTTPS and point to a registered domain.
+- `headers` keys cannot start with `X-Webhook-` — those are reserved for the API's own metadata.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/webhooks/config/` | Read current configuration |
+| 3 | `POST` | `/api/v1/webhooks/config/domains` | Register an allowed domain |
+| 4 | `PUT` | `/api/v1/webhooks/config/events` | Declare event handlers |
+| 5 | `DELETE` | `/api/v1/webhooks/config/domains/{domain}` | Remove a domain |
+| 6 | `POST` | `/api/v1/webhooks/config/rotate-secret` | Rotate the signing secret |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I read the current webhook configuration
+- [ ] I registered at least one allowed domain and stored the secret securely
+- [ ] I declared event handlers for the events I care about
+- [ ] My backend verifies signatures on every incoming webhook
+- [ ] I have a runbook for rotating the secret when needed

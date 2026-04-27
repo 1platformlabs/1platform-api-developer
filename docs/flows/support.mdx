@@ -1,0 +1,573 @@
+---
+title: "Support"
+description: "Step-by-step flow to list and create support tickets, append replies, and read or publish FAQ entries via the 1Platform API."
+sidebar_position: 19
+---
+
+# Flow: Support
+
+## Overview
+
+This flow documents how a help center or support widget integrates with the 1Platform support subsystem — listing the user's open tickets, opening a new ticket, appending reply messages to an existing thread, and reading or publishing the public FAQ catalog.
+
+**Use case:** Build an in-app support center where users can read FAQs, open tickets, and have ongoing back-and-forth conversations with the support team.
+
+**End result:** Users can self-serve via FAQs, escalate to a ticket when needed, and continue threaded conversations until the issue is resolved.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| Admin role | Publishing FAQs requires admin privileges on the app |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""        # Obtained in Step 0
+USER_TOKEN=""       # Obtained in Step 1
+TICKET_ID=""        # Obtained in Step 3
+```
+
+---
+
+## Data model
+
+### Ticket object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | Yes | MongoDB ObjectId of the ticket |
+| `subject` | string | Yes | Short subject line of the ticket |
+| `status` | string | Yes | One of `open`, `in_progress`, `resolved` |
+| `priority` | string | Yes | One of `low`, `normal`, `high` |
+| `user_id` | string | Yes | Owner of the ticket |
+| `assignee_id` | string \| null | Yes | Support agent assigned to the ticket |
+| `messages` | array | Yes | Threaded list of messages (oldest first) |
+| `created_at` | string | Yes | ISO-8601 creation timestamp |
+| `updated_at` | string | Yes | ISO-8601 timestamp of the last update |
+
+### FAQ object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | Yes | MongoDB ObjectId of the FAQ |
+| `question` | string | Yes | Public-facing question text |
+| `answer` | string | Yes | Public-facing answer (Markdown allowed) |
+| `category` | string \| null | Yes | Optional grouping category |
+| `order_index` | integer | Yes | Sort order within a category |
+| `published` | boolean | Yes | Whether the FAQ is publicly visible |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Read the public FAQ catalog
+
+**Goal:** Show users the published FAQs before they open a ticket. This is the "deflection" step.
+
+**Endpoint:** `GET /api/v1/support/faqs`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/support/faqs" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "question": "¿Cómo cambio mi contraseña?",
+      "answer": "Ve a Ajustes y haz clic en \"Cambiar contraseña\".",
+      "category": "cuenta",
+      "order_index": 0,
+      "published": true
+    },
+    {
+      "id": "507f1f77bcf86cd799439012",
+      "question": "¿Cómo solicito una factura?",
+      "answer": "Genera una factura desde la pantalla de transacciones.",
+      "category": "facturacion",
+      "order_index": 0,
+      "published": true
+    }
+  ],
+  "msg": "FAQs fetched successfully"
+}
+```
+
+:::tip
+Group the response client-side by `category` and order each group by `order_index` to render a clean help center.
+:::
+
+---
+
+### Step 3 — Open a new support ticket
+
+**Goal:** Create a ticket with an opening message when the FAQ does not solve the user's problem.
+
+**Endpoint:** `POST /api/v1/support/tickets`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/support/tickets" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "No puedo conectar mi cuenta de Search Console",
+    "initial_body": "Sigo el flujo del dashboard pero el OAuth me devuelve error 400. Ya intenté en Chrome y Safari.",
+    "priority": "normal"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439020",
+    "subject": "No puedo conectar mi cuenta de Search Console",
+    "status": "open",
+    "priority": "normal",
+    "user_id": "507f1f77bcf86cd799439001",
+    "assignee_id": null,
+    "messages": [
+      {
+        "author_id": "507f1f77bcf86cd799439001",
+        "author_role": "user",
+        "body": "Sigo el flujo del dashboard pero el OAuth me devuelve error 400. Ya intenté en Chrome y Safari.",
+        "created_at": "2026-04-27T15:30:00Z"
+      }
+    ],
+    "created_at": "2026-04-27T15:30:00Z",
+    "updated_at": "2026-04-27T15:30:00Z"
+  },
+  "msg": "Ticket created successfully"
+}
+```
+
+:::note
+Save `data.id` as `$TICKET_ID`. Status starts at `open` and the assignee is `null` until a support agent picks it up.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Missing `subject` or `initial_body`, or invalid `priority` | Provide both required fields and use `low`/`normal`/`high` |
+
+---
+
+### Step 4 — List the user's tickets
+
+**Goal:** Show the user their ticket history, paginated.
+
+**Endpoint:** `GET /api/v1/support/tickets`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+**Query parameters:**
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| `skip` | integer | No | Offset for pagination (default `0`) |
+| `limit` | integer | No | Page size (default `20`) |
+
+```bash
+curl -X GET "$BASE_URL/support/tickets?skip=0&limit=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439020",
+      "subject": "No puedo conectar mi cuenta de Search Console",
+      "status": "in_progress",
+      "priority": "normal",
+      "user_id": "507f1f77bcf86cd799439001",
+      "assignee_id": "507f1f77bcf86cd799439099",
+      "messages": [
+        {
+          "author_id": "507f1f77bcf86cd799439001",
+          "author_role": "user",
+          "body": "Sigo el flujo...",
+          "created_at": "2026-04-27T15:30:00Z"
+        },
+        {
+          "author_id": "507f1f77bcf86cd799439099",
+          "author_role": "agent",
+          "body": "Hola María, ¿puedes confirmar si tu cuenta tiene acceso de propietario en Search Console?",
+          "created_at": "2026-04-27T16:00:00Z"
+        }
+      ],
+      "created_at": "2026-04-27T15:30:00Z",
+      "updated_at": "2026-04-27T16:00:00Z"
+    }
+  ],
+  "msg": "Tickets fetched successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Invalid pagination parameters | Pass `skip`/`limit` as integers |
+
+---
+
+### Step 5 — Append a reply to a ticket
+
+**Goal:** Add a message to an existing ticket thread.
+
+**Endpoint:** `POST /api/v1/support/tickets/{ticket_id}/reply`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/support/tickets/$TICKET_ID/reply" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "body": "Sí, soy propietaria verificada. Adjunto captura del error."
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439020",
+    "subject": "No puedo conectar mi cuenta de Search Console",
+    "status": "in_progress",
+    "priority": "normal",
+    "user_id": "507f1f77bcf86cd799439001",
+    "assignee_id": "507f1f77bcf86cd799439099",
+    "messages": [
+      {
+        "author_id": "507f1f77bcf86cd799439001",
+        "author_role": "user",
+        "body": "Sigo el flujo...",
+        "created_at": "2026-04-27T15:30:00Z"
+      },
+      {
+        "author_id": "507f1f77bcf86cd799439099",
+        "author_role": "agent",
+        "body": "Hola María, ¿puedes confirmar...?",
+        "created_at": "2026-04-27T16:00:00Z"
+      },
+      {
+        "author_id": "507f1f77bcf86cd799439001",
+        "author_role": "user",
+        "body": "Sí, soy propietaria verificada. Adjunto captura del error.",
+        "created_at": "2026-04-27T16:30:00Z"
+      }
+    ],
+    "created_at": "2026-04-27T15:30:00Z",
+    "updated_at": "2026-04-27T16:30:00Z"
+  },
+  "msg": "Reply appended successfully"
+}
+```
+
+:::note
+The full ticket (with the appended message) is returned — your client does not need to refetch the ticket separately.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 404 | Ticket does not exist or belongs to another user | Verify `$TICKET_ID` |
+| 422 | Missing `body` field | Send `{"body": "..."}` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 6 — Publish a new FAQ (admin)
+
+**Goal:** Add an entry to the public FAQ catalog. Useful when patterns of similar tickets emerge.
+
+**Endpoint:** `POST /api/v1/support/faqs`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/support/faqs" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "¿Por qué falla la conexión con Search Console?",
+    "answer": "La cuenta debe ser propietaria verificada del sitio. Sigue [esta guía](https://example.com/help/sc).",
+    "category": "integraciones",
+    "order_index": 1,
+    "published": true
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439030",
+    "question": "¿Por qué falla la conexión con Search Console?",
+    "answer": "La cuenta debe ser propietaria verificada del sitio. Sigue [esta guía](https://example.com/help/sc).",
+    "category": "integraciones",
+    "order_index": 1,
+    "published": true
+  },
+  "msg": "FAQ created successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Missing `question` or `answer` | Provide both required fields |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+# === STEP 2: Read FAQs ===
+curl -s -X GET "$BASE_URL/support/faqs" \
+  -H "Authorization: Bearer $APP_TOKEN" | jq
+
+# === STEP 3: Open a new ticket ===
+TICKET_ID=$(curl -s -X POST "$BASE_URL/support/tickets" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "Demo: necesito ayuda",
+    "initial_body": "Mensaje de prueba",
+    "priority": "normal"
+  }' | jq -r '.data.id')
+
+echo "TICKET_ID: $TICKET_ID"
+
+# === STEP 4: List my tickets ===
+curl -s -X GET "$BASE_URL/support/tickets?limit=5" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+
+# === STEP 5: Append a reply ===
+curl -s -X POST "$BASE_URL/support/tickets/$TICKET_ID/reply" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"body": "Aquí va información adicional."}' | jq
+
+# === STEP 6 (admin): Publish a new FAQ ===
+curl -s -X POST "$BASE_URL/support/faqs" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Demo question?",
+    "answer": "Demo answer.",
+    "category": "demo",
+    "order_index": 0,
+    "published": true
+  }' | jq
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+- `POST /support/tickets` is **not** idempotent — every call creates a new ticket. Send a deduplication identifier in your application layer if you need exactly-once semantics.
+- `POST /support/tickets/{id}/reply` is **not** idempotent — every call appends a new message.
+- `POST /support/faqs` is **not** idempotent — duplicate questions are allowed; deduplicate at the admin UI layer.
+- `GET /support/faqs` and `GET /support/tickets` are read-only and idempotent.
+
+### Retries
+- For **5xx** errors on `POST` endpoints, retry with care — the previous attempt may have succeeded. Use idempotency keys at the client level if exact duplicates are unacceptable.
+- For **429**, back off and retry.
+- For **401**, regenerate tokens.
+
+### Timeouts
+- All endpoints are simple CRUD — set a 5-second client timeout.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+
+### Important validations
+- `priority` must be one of `low`, `normal`, `high`.
+- `status` is server-controlled — you cannot set it from the client.
+- FAQ `published: false` entries are visible only to admins, not in the public `GET /support/faqs` response.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/support/faqs` | List published FAQs |
+| 3 | `POST` | `/api/v1/support/tickets` | Open a new ticket |
+| 4 | `GET` | `/api/v1/support/tickets` | List my tickets |
+| 5 | `POST` | `/api/v1/support/tickets/{ticket_id}/reply` | Append a reply |
+| 6 | `POST` | `/api/v1/support/faqs` | Publish a new FAQ (admin) |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I rendered the public FAQ catalog
+- [ ] I opened a ticket via `POST /support/tickets`
+- [ ] I listed the user's ticket history
+- [ ] I appended at least one reply to a ticket
+- [ ] (Admin) I published a new FAQ entry

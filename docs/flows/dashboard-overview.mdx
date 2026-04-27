@@ -1,0 +1,496 @@
+---
+title: "Dashboard Overview"
+description: "Step-by-step flow to bootstrap the whitelabel dashboard, fetch supported languages, load translation bundles, and read aggregate KPIs via the 1Platform API."
+sidebar_position: 14
+---
+
+# Flow: Dashboard Overview
+
+## Overview
+
+This flow documents how a custom dashboard (or whitelabel UI) bootstraps itself against the 1Platform API. It loads branding, theme, layout, modules, and feature flags from a single configuration endpoint, fetches the i18n catalog for the user's language, and finally reads the home KPIs (balance, unread notifications, counts).
+
+**Use case:** Build a whitelabel dashboard or admin panel that adapts its branding, theme, modules, and language at runtime from a single API source.
+
+**End result:** A dashboard configured with the app's branding/theme, translated into the user's language, with KPIs ready to render on the home view.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| Whitelabel config | The App must have whitelabel branding/theme/layout configured for `/dashboard/bootstrap` to return data |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtained in Step 0
+USER_TOKEN=""   # Obtained in Step 1
+LANG="es"       # Language code resolved from /dashboard/i18n
+```
+
+---
+
+## Data returned by the bootstrap
+
+### Branding object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Display name of the app |
+| `short_name` | string | Yes | Short brand name (used in tabs, mobile) |
+| `logo_url` | string | Yes | Primary logo URL |
+| `logo_white_url` | string | No | White/dark-mode logo variant |
+| `favicon_url` | string | Yes | Favicon URL |
+| `og_image_url` | string | No | Open Graph image for sharing |
+| `support_email` | string | Yes | Support contact email |
+| `web_url` | string | Yes | Marketing site URL |
+| `tos_url` | string | No | Terms of Service URL |
+| `privacy_url` | string | No | Privacy Policy URL |
+| `cookies_url` | string | No | Cookie Policy URL |
+| `basename` | string | No | Base path for the dashboard (e.g., `/app`) |
+
+### Layout object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `sidebar_collapsed_default` | boolean | No | Whether the sidebar starts collapsed |
+| `show_language_switcher` | boolean | No | Show the language toggle in the navbar |
+| `show_theme_toggle` | boolean | No | Show the dark/light theme toggle |
+| `show_notifications` | boolean | No | Show the notifications bell |
+
+### Summary object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `app_id` | string | Yes | App identifier |
+| `user_id` | string | Yes | User identifier |
+| `generated_at` | string | Yes | ISO-8601 timestamp when the snapshot was generated |
+| `balance` | number | No | Current user balance |
+| `currency` | string | No | Currency code (e.g., `GTQ`, `USD`) |
+| `unread_notifications` | integer | No | Number of unread notifications |
+| `counts` | object | No | Map of resource counters (websites, agents, etc.) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — Bootstrap the dashboard
+
+**Goal:** Fetch the whitelabel configuration (branding, theme, layout, modules, feature flags) for the current app.
+
+**Endpoint:** `GET /api/v1/dashboard/bootstrap`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/dashboard/bootstrap" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "app_id": "507f1f77bcf86cd799439011",
+    "config_version": 7,
+    "branding": {
+      "name": "Acme Demo",
+      "short_name": "Acme",
+      "logo_url": "https://cdn.example.com/acme/logo.svg",
+      "logo_white_url": "https://cdn.example.com/acme/logo-white.svg",
+      "favicon_url": "https://cdn.example.com/acme/favicon.ico",
+      "og_image_url": "https://cdn.example.com/acme/og.png",
+      "support_email": "support@example.com",
+      "web_url": "https://example.com",
+      "tos_url": "https://example.com/terms",
+      "privacy_url": "https://example.com/privacy",
+      "cookies_url": "https://example.com/cookies",
+      "basename": "/app"
+    },
+    "theme": {
+      "palette": {"primary": "#2563eb", "background": "#ffffff"},
+      "typography": {"font_family": "Inter, sans-serif"},
+      "breakpoints": {"sm": 640, "md": 768, "lg": 1024},
+      "shadows": {},
+      "component_overrides": {}
+    },
+    "layout": {
+      "sidebar_collapsed_default": false,
+      "show_language_switcher": true,
+      "show_theme_toggle": true,
+      "show_notifications": true
+    },
+    "modules": [
+      {"key": "websites", "enabled": true},
+      {"key": "agents", "enabled": true},
+      {"key": "billing", "enabled": true}
+    ],
+    "supported_langs": ["es", "en"],
+    "default_lang": "es",
+    "feature_flags": {"agents_v2": true, "fel_export": false},
+    "recaptcha": {"enabled": false, "site_key": null},
+    "analytics": {"ga_measurement_id": null, "sentry_dsn": null},
+    "cookie_banner_enabled": true
+  },
+  "msg": "Dashboard configuration fetched successfully"
+}
+```
+
+:::note
+`config_version` increments whenever the configuration changes. Cache it client-side and send it on subsequent loads — the API replies **304 Not Modified** when nothing has changed, saving payload size.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 304 | Configuration unchanged | Use the cached configuration |
+| 401 | Missing or invalid app token | Regenerate `$APP_TOKEN` via `POST /auth/token` |
+| 404 | App has no whitelabel configuration | Configure branding/theme/layout for the app |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 3 — List supported languages
+
+**Goal:** Discover which languages this app supports and which is the default.
+
+**Endpoint:** `GET /api/v1/dashboard/i18n`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/dashboard/i18n" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "langs": ["es", "en"],
+    "default": "es"
+  },
+  "msg": "Supported languages fetched successfully"
+}
+```
+
+:::tip
+The `supported_langs` field returned by `/dashboard/bootstrap` is the same list. You may skip this step if you already cached it.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Missing or invalid app token | Regenerate `$APP_TOKEN` |
+| 404 | App has no i18n configuration | Configure at least one language for the app |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 4 — Fetch the i18n bundle for a language
+
+**Goal:** Load the translation strings for the user's selected language.
+
+**Endpoint:** `GET /api/v1/dashboard/i18n/{lang}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/dashboard/i18n/$LANG" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "app_id": "507f1f77bcf86cd799439011",
+    "lang": "es",
+    "version": 12,
+    "strings": {
+      "navbar.dashboard": "Panel",
+      "navbar.websites": "Sitios web",
+      "navbar.agents": "Agentes",
+      "common.save": "Guardar",
+      "common.cancel": "Cancelar"
+    }
+  },
+  "msg": "i18n bundle fetched successfully"
+}
+```
+
+:::note
+`version` increments when strings change. Cache it and re-request only when it differs from the cached version. The API replies **304 Not Modified** if the bundle has not changed.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 304 | Bundle unchanged | Use the cached bundle |
+| 400 | Invalid language code | Pass a valid code from `/dashboard/i18n` (e.g., `es`, `en`) |
+| 401 | Missing or invalid app token | Regenerate `$APP_TOKEN` |
+| 404 | Language not configured for this app | Use a language listed in `data.langs` |
+| 422 | Malformed `lang` path parameter | Use a 2-letter ISO code |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 5 — Read the home KPIs
+
+**Goal:** Fetch the aggregate home metrics — balance, unread notifications, and resource counters.
+
+**Endpoint:** `GET /api/v1/dashboard/summary`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/dashboard/summary" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "app_id": "507f1f77bcf86cd799439011",
+    "user_id": "507f1f77bcf86cd799439012",
+    "generated_at": "2026-04-27T15:30:00Z",
+    "balance": 250.00,
+    "currency": "GTQ",
+    "unread_notifications": 3,
+    "counts": {
+      "websites": 4,
+      "agents": 2,
+      "open_tasks": 5,
+      "open_tickets": 1
+    }
+  },
+  "msg": "Dashboard summary fetched successfully"
+}
+```
+
+:::note
+`generated_at` reflects the snapshot time. Counters are cheap to compute server-side — request this every time the home view is opened.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Missing or malformed user token header | Send `x-user-token: $USER_TOKEN` |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === STEP 2: Bootstrap dashboard ===
+BOOT=$(curl -s -X GET "$BASE_URL/dashboard/bootstrap" \
+  -H "Authorization: Bearer $APP_TOKEN")
+DEFAULT_LANG=$(echo "$BOOT" | jq -r '.data.default_lang')
+
+echo "Default language: $DEFAULT_LANG"
+
+# === STEP 3: List supported languages ===
+curl -s -X GET "$BASE_URL/dashboard/i18n" \
+  -H "Authorization: Bearer $APP_TOKEN" | jq
+
+# === STEP 4: Fetch i18n bundle ===
+curl -s -X GET "$BASE_URL/dashboard/i18n/$DEFAULT_LANG" \
+  -H "Authorization: Bearer $APP_TOKEN" | jq '.data.strings'
+
+# === STEP 5: Read home KPIs ===
+curl -s -X GET "$BASE_URL/dashboard/summary" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+All endpoints in this flow are read-only (`GET`) and idempotent — repeated calls return the same data.
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout**, retry after a short backoff. No side effects since the calls are read-only.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- `/dashboard/bootstrap`, `/dashboard/i18n`, `/dashboard/i18n/{lang}` are static-cacheable — set a 5-second client timeout.
+- `/dashboard/summary` aggregates user data — set a 10-second timeout.
+
+### Caching
+- Persist `config_version` and the i18n bundle `version` in client storage. Re-fetch only when the cached version is stale.
+- The API returns **304 Not Modified** when nothing has changed — your client should treat that as a signal to keep using the cached payload.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- `/dashboard/bootstrap`, `/dashboard/i18n`, and `/dashboard/i18n/{lang}` only require the app token; `/dashboard/summary` requires the user token as well.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/dashboard/bootstrap` | Fetch whitelabel configuration |
+| 3 | `GET` | `/api/v1/dashboard/i18n` | List supported languages |
+| 4 | `GET` | `/api/v1/dashboard/i18n/{lang}` | Fetch i18n bundle |
+| 5 | `GET` | `/api/v1/dashboard/summary` | Read home KPIs |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I bootstrapped the dashboard and cached `config_version`
+- [ ] I selected a language from `data.supported_langs`
+- [ ] I fetched the i18n bundle and cached `version`
+- [ ] I read the home KPIs from `/dashboard/summary`

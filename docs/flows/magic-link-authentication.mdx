@@ -1,0 +1,441 @@
+---
+title: "Magic Link Authentication"
+description: "Step-by-step flow to authenticate end users via email magic-link, exchange the token for an access/refresh pair, rotate refresh tokens, and revoke sessions via the 1Platform API."
+sidebar_position: 16
+---
+
+# Flow: Magic Link Authentication
+
+## Overview
+
+This flow documents how to sign users in with a passwordless **magic link** sent to their email, exchange the link token for an access/refresh token pair, rotate tokens before they expire, and revoke them on logout.
+
+This is an alternative to the API-key flow used by server-to-server integrations. Magic-link auth targets end-user clients (web, mobile) that need short-lived access tokens scoped to a specific user, with refresh-token rotation for long-lived sessions.
+
+**Use case:** Sign users into a whitelabel dashboard or mobile app without managing passwords.
+
+**End result:** The user is authenticated, the client holds a fresh access token plus a refresh token for renewal, and a logout endpoint can revoke both at any time.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| Email delivery configured | The App must have email-sending credentials configured to deliver the magic link |
+| Existing user account | The email must belong to a user already registered for the app |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+Content-Type: application/json
+```
+
+:::note
+Magic-link endpoints only require the **app token** — the whole point of this flow is to obtain user tokens, so you don't have one yet. The optional `x-user-token` header on `/auth/user/logout` is sent when revoking the active session.
+:::
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+APP_TOKEN=""           # Obtained in Step 0
+USER_EMAIL="maria@example.com"
+MAGIC_LINK_TOKEN=""    # Captured from the email link in Step 2
+ACCESS_TOKEN=""        # Obtained in Step 3
+REFRESH_TOKEN=""       # Obtained in Step 3
+```
+
+---
+
+## Data required per step
+
+### Magic link request
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `email` | string | Yes | User email address — must already be registered |
+
+### Magic link verify
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `token` | string | Yes | Single-use token included in the email link query string |
+
+### Refresh / Logout
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `token` | string | Yes | The refresh token (or access token, for `/logout`) |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Request a magic link
+
+**Goal:** Trigger an email containing a single-use sign-in link to the user's inbox.
+
+**Endpoint:** `POST /api/v1/auth/user/magic-link/request`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/auth/user/magic-link/request" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "'$USER_EMAIL'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": null,
+  "msg": "If the email exists, a magic link has been sent"
+}
+```
+
+:::tip
+The response is intentionally generic — it does not reveal whether the email is registered. This prevents account enumeration. Always show a neutral "Check your inbox" message in the UI.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Missing or invalid email format | Send a valid `{"email": "..."}` body |
+| 429 | Too many magic-link requests for the same email | Wait and retry — informs the user politely |
+
+---
+
+### Step 2 — User clicks the email link
+
+The email contains a link of the form:
+
+```
+https://app.example.com/auth/callback?token=eyJhbGciOiJIUzI1NiIs...
+```
+
+Your client extracts the `token` query parameter and uses it in the next step. The token is **single-use** and **expires** quickly (typically 15 minutes).
+
+:::warning
+This step happens in the user's email client and browser — there is no API call from your backend. Do not try to consume the token from your server unless you also redirect the user; otherwise the link will be burned before they reach your dashboard.
+:::
+
+---
+
+### Step 3 — Exchange the magic-link token
+
+**Goal:** Exchange the single-use magic-link token for an access + refresh token pair.
+
+**Endpoint:** `POST /api/v1/auth/user/magic-link/verify`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/auth/user/magic-link/verify" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$MAGIC_LINK_TOKEN'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "Magic-link verified, tokens issued"
+}
+```
+
+:::note
+Save `data.access_token` as `$ACCESS_TOKEN` (use as `x-user-token` for protected endpoints) and `data.refresh_token` as `$REFRESH_TOKEN`. The access token expires in 30 minutes; the refresh token has a longer lifetime configured per app.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Token malformed | Verify the token was extracted correctly from the email URL |
+| 410 | Token already used or expired | Request a new magic link via Step 1 |
+| 422 | Missing `token` field | Send `{"token": "..."}` |
+| 429 | Rate limit exceeded | Wait and retry |
+| 500 | Server-side error during verification | Retry with exponential backoff |
+
+---
+
+### Step 4 — Use the access token for protected calls
+
+The access token returned in Step 3 IS the user token used by every other 1Platform endpoint. Pass it via the `x-user-token` header (along with the app token in `Authorization`):
+
+```bash
+curl -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $ACCESS_TOKEN"
+```
+
+:::tip
+The access token from this flow is interchangeable with the user token from `POST /users/token` — both are JWTs carrying the same `user_id` claim. Choose the magic-link flow for end-user UIs and the API-key flow for server-to-server integrations.
+:::
+
+---
+
+### Step 5 — Rotate the refresh token before expiry
+
+**Goal:** Exchange the refresh token for a new access + refresh pair, extending the user's session without forcing re-login.
+
+**Endpoint:** `POST /api/v1/auth/user/refresh`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/auth/user/refresh" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "Tokens rotated successfully"
+}
+```
+
+:::warning
+The previous refresh token is **invalidated** the moment a new one is issued. Replace `$REFRESH_TOKEN` immediately and never reuse the old one — replays return **409 Conflict**.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Token malformed | Verify the refresh token has not been truncated |
+| 409 | Refresh token already rotated (replay) | Force the user to re-authenticate via Step 1 |
+| 422 | Missing `token` field | Send `{"token": "..."}` |
+| 429 | Rate limit exceeded | Back off and retry |
+| 500 | Server-side error | Retry with exponential backoff |
+
+---
+
+### Step 6 — Logout (revoke a token)
+
+**Goal:** Revoke an active access or refresh token. The token can no longer be used after this call.
+
+**Endpoint:** `POST /api/v1/auth/user/logout`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $ACCESS_TOKEN` (optional)
+
+```bash
+curl -X POST "$BASE_URL/auth/user/logout" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "revoked": true
+  },
+  "msg": "Token revoked successfully"
+}
+```
+
+:::note
+You can revoke either the access token or the refresh token. Best practice: revoke the **refresh** token in the body and the **access** token via the `x-user-token` header in the same call to fully invalidate the session.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Token already invalid or unknown | Treat as a successful logout — the desired state is reached |
+| 422 | Missing `token` field | Send `{"token": "..."}` |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values. The magic-link token is captured manually because the user clicks the email link in their browser.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+USER_EMAIL="maria@example.com"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === STEP 1: Request magic link ===
+curl -s -X POST "$BASE_URL/auth/user/magic-link/request" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "'$USER_EMAIL'"}' | jq
+
+# === STEP 2: User clicks the email link ===
+# Capture the token from the URL query string and assign it manually:
+# MAGIC_LINK_TOKEN="eyJhbGciOi..." (paste from the link)
+MAGIC_LINK_TOKEN="paste-the-token-from-the-email-here"
+
+# === STEP 3: Verify magic link, get access + refresh tokens ===
+TOKENS=$(curl -s -X POST "$BASE_URL/auth/user/magic-link/verify" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$MAGIC_LINK_TOKEN'"}')
+
+ACCESS_TOKEN=$(echo "$TOKENS" | jq -r '.data.access_token')
+REFRESH_TOKEN=$(echo "$TOKENS" | jq -r '.data.refresh_token')
+
+echo "ACCESS_TOKEN: $ACCESS_TOKEN"
+echo "REFRESH_TOKEN: $REFRESH_TOKEN"
+
+# === STEP 4: Use the access token for protected endpoints ===
+curl -s -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $ACCESS_TOKEN" | jq
+
+# === STEP 5: Rotate the refresh token ===
+ROTATED=$(curl -s -X POST "$BASE_URL/auth/user/refresh" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}')
+
+ACCESS_TOKEN=$(echo "$ROTATED" | jq -r '.data.access_token')
+REFRESH_TOKEN=$(echo "$ROTATED" | jq -r '.data.refresh_token')
+
+# === STEP 6: Logout ===
+curl -s -X POST "$BASE_URL/auth/user/logout" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}' | jq
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+- `/auth/user/magic-link/request` is rate-limited but otherwise idempotent — repeated calls within a short window return the same response without sending duplicate emails.
+- `/auth/user/magic-link/verify` is **not** idempotent — the magic-link token is single-use. Treat the response as the authoritative outcome.
+- `/auth/user/refresh` is **not** idempotent — each call rotates and invalidates the previous refresh token.
+- `/auth/user/logout` is idempotent in spirit — revoking an already-revoked token returns the same final state (or 401 — handle both).
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry. Do NOT retry magic-link requests aggressively — that floods the user's inbox.
+- If you receive **500** or a **timeout** on `/refresh`, do NOT retry blindly — your refresh token may already be rotated. Re-authenticate via Step 1 if uncertain.
+- For **401** during normal API calls, attempt one refresh via Step 5 before forcing re-login.
+
+### Timeouts
+- Set 10-second client timeouts on magic-link request/verify (allow for email queueing).
+- Set 5-second timeouts on `/refresh` and `/logout`.
+
+### Tokens
+- **Magic-link tokens** expire quickly (~15 minutes) and are single-use.
+- **Access tokens** expire in 30 minutes (1800 seconds).
+- **Refresh tokens** have a longer lifetime configured per app — rotate them proactively before they expire.
+- Store refresh tokens in **httpOnly secure cookies** or platform-secure storage (Keychain, Keystore) — never in `localStorage`.
+
+### Important validations
+- The same email address is rate-limited at the magic-link endpoint to prevent abuse — back off when 429 is returned and surface a friendly UI message.
+- Always treat a 410 on `/verify` as "user must request a new link" rather than a hard error.
+- A 409 on `/refresh` is a strong signal of refresh-token replay (possible token theft) — invalidate all sessions for the user via `POST /api/v1/users/revoke-tokens` and force re-login.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/auth/user/magic-link/request` | Send magic link to email |
+| 3 | `POST` | `/api/v1/auth/user/magic-link/verify` | Exchange magic-link token for access + refresh |
+| 5 | `POST` | `/api/v1/auth/user/refresh` | Rotate refresh token |
+| 6 | `POST` | `/api/v1/auth/user/logout` | Revoke a token |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I requested a magic link for the user's email
+- [ ] The user clicked the email link and my client captured the `token` query parameter
+- [ ] I exchanged the magic-link token for access + refresh tokens
+- [ ] I successfully called a protected endpoint with the access token
+- [ ] I rotated the refresh token at least once before logout
+- [ ] I revoked the session via `/auth/user/logout` on sign-out

@@ -2,6 +2,24 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [0.17.0] - 2026-04-27
+
+### Added
+- **Dashboard Overview flow** — End-to-end flow for bootstrapping a whitelabel dashboard via `GET /dashboard/bootstrap` (branding, theme, layout, modules, feature flags), `GET /dashboard/i18n` and `GET /dashboard/i18n/{lang}` for localized strings (with 304 Not Modified caching), and `GET /dashboard/summary` for home KPIs (balance, unread notifications, resource counters)
+- **Dashboard Settings flow** — CRUD on app-level key/value settings: list (`GET /settings`), upsert (`PUT /settings`), read by key (`GET /settings/{key}`), and delete (`DELETE /settings/{key}`). `PUT` is idempotent for safe retries
+- **Magic Link Authentication flow** — Passwordless email auth: request a magic link, exchange the single-use token for an access + refresh token pair (`POST /auth/user/magic-link/verify`), rotate refresh tokens (`POST /auth/user/refresh`), and revoke sessions (`POST /auth/user/logout`)
+- **Notifications flow** — In-app notification feed with severity (`info`, `success`, `warning`), per-user or global broadcast targeting (`POST /notifications`), mark-as-read (`PATCH /notifications/{id}/read`), and a dedicated unread-count endpoint for navbar badges
+- **Referrals flow** — Resolve a referral code to its destination payload (`code`, `valid`, `referrer_username`, `signup_url`) via `GET /referrals/{code}` for public landing pages
+- **Support flow** — Embed a help center: list and create tickets with priority and status, append threaded user/agent replies (`POST /support/tickets/{id}/reply`), and serve a public FAQ catalog (with admin-only publishing)
+- **Tasks flow** — Personal task list with `todo` / `in_progress` / `done` lifecycle, optional due dates, and automatic `completed_at` tracking when status moves to `done`
+- **Webhook Configuration flow** — Configure outbound webhooks: register allowed domains (returns the initial signing secret), declare per-event handler URLs (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`), remove domains, and rotate the HMAC signing secret
+- **List Plans step in Payments & Subscriptions flow** — Documents the new `GET /api/v1/plans` endpoint for enumerating active billing plans (`free`, `payg`, `subscription`) before initiating an upgrade
+
+### Changed
+- **Sidebar**: Added 8 new flow entries (alphabetical from position 14 onward); kept `generate-invoice` at position 1 and `user-onboarding` at position 2 per the canonical ordering
+- **Homepage**: Added 8 new flow cards to the `quickLinks` array, reordered all flow cards by `sidebar_position` for visual alignment with the sidebar; total now 21 flows + API Reference + OpenAPI Spec
+- **Payments & Subscriptions flow**: Renumbered consumption steps (history → 7, summary → 8) to accommodate the new "List Available Plans" step at position 6
+
 ## [0.14.0] - 2026-04-07
 
 ### Added

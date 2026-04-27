@@ -1,0 +1,447 @@
+---
+title: "Dashboard Settings"
+description: "Step-by-step flow to list, read, upsert, and delete dashboard settings (key/value pairs) for a 1Platform app."
+sidebar_position: 15
+---
+
+# Flow: Dashboard Settings
+
+## Overview
+
+This flow documents how to manage app-level dashboard settings — arbitrary key/value pairs that the dashboard reads to drive UI behavior, feature toggles, banners, scheduled maintenance windows, and other runtime configuration. Settings are scoped per app and persist across user sessions.
+
+**Use case:** Drive whitelabel UI configuration (announcement banners, feature flags, links, default values) without redeploying the dashboard.
+
+**End result:** Your app has a fully managed key/value settings store accessible from the dashboard.
+
+---
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| App API Key | Application key (`ak-...`) provided when registering your app |
+| User API Key | User key (`sk-...`) obtained when creating the user |
+| Admin role | Upserting and deleting settings requires admin privileges on the app |
+
+### Required headers for all requests
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables used in examples
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtained in Step 0
+USER_TOKEN=""   # Obtained in Step 1
+SETTING_KEY="announcement_banner"  # Used in Steps 3-5
+```
+
+---
+
+## Data model
+
+### Setting object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | Yes | MongoDB ObjectId of the setting record |
+| `key` | string | Yes | Unique key identifier (slug-style) |
+| `value` | object | Yes | Arbitrary JSON value (object, array, primitive) |
+| `updated_at` | string | Yes | ISO-8601 timestamp of the last write |
+
+### Upsert payload
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `key` | string | Yes | Unique key identifier |
+| `value` | object | No | JSON value to store. Defaults to `{}` if omitted |
+
+---
+
+## Step-by-step flow
+
+### Step 0 — Get App Token
+
+**Goal:** Authenticate the application and obtain the app JWT token.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** None (this is the entry point)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
+| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+
+---
+
+### Step 1 — Get User Token
+
+**Goal:** Authenticate the user and obtain the user JWT token.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
+| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
+| 429 | Rate limit exceeded | Wait and retry |
+
+:::tip
+If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+:::
+
+---
+
+### Step 2 — List all settings
+
+**Goal:** Retrieve every setting configured for the current app.
+
+**Endpoint:** `GET /api/v1/settings`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/settings" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "key": "announcement_banner",
+      "value": {
+        "enabled": true,
+        "message": "Mantenimiento programado el 30/04 a las 02:00",
+        "severity": "warning"
+      },
+      "updated_at": "2026-04-27T10:00:00Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439012",
+      "key": "default_currency",
+      "value": "GTQ",
+      "updated_at": "2026-04-15T08:30:00Z"
+    }
+  ],
+  "msg": "Settings fetched successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Missing or malformed user token header | Send `x-user-token: $USER_TOKEN` |
+
+---
+
+### Step 3 — Upsert a setting
+
+**Goal:** Create a new setting or update the value of an existing key.
+
+**Endpoint:** `PUT /api/v1/settings`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PUT "$BASE_URL/settings" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "announcement_banner",
+    "value": {
+      "enabled": true,
+      "message": "Nuevo: Domains disponible",
+      "severity": "info"
+    }
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "key": "announcement_banner",
+    "value": {
+      "enabled": true,
+      "message": "Nuevo: Domains disponible",
+      "severity": "info"
+    },
+    "updated_at": "2026-04-27T15:30:00Z"
+  },
+  "msg": "Setting upserted successfully"
+}
+```
+
+:::note
+`PUT` is idempotent — sending the same payload twice produces the same final state. Use it to safely retry on network errors.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Missing `key` or invalid `value` shape | Provide `{"key": "...", "value": {...}}` |
+
+---
+
+### Step 4 — Read a single setting by key
+
+**Goal:** Look up a setting by its key.
+
+**Endpoint:** `GET /api/v1/settings/{key}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/settings/$SETTING_KEY" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "key": "announcement_banner",
+    "value": {
+      "enabled": true,
+      "message": "Nuevo: Domains disponible",
+      "severity": "info"
+    },
+    "updated_at": "2026-04-27T15:30:00Z"
+  },
+  "msg": "Setting fetched successfully"
+}
+```
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 404 | No setting with that key | Verify the key spelling — keys are case-sensitive |
+| 422 | Malformed `key` path parameter | Use a non-empty alphanumeric key |
+| 429 | Rate limit exceeded | Wait and retry |
+
+---
+
+### Step 5 — Delete a setting
+
+**Goal:** Remove a setting permanently.
+
+**Endpoint:** `DELETE /api/v1/settings/{key}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/settings/$SETTING_KEY" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true,
+    "key": "announcement_banner"
+  },
+  "msg": "Setting deleted successfully"
+}
+```
+
+:::warning
+This action is irreversible. The next call to `/settings/{key}` will return **404**.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 422 | Malformed `key` path parameter | Use a non-empty alphanumeric key |
+
+---
+
+## Full end-to-end example
+
+Complete flow with consistent fictitious values.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+SETTING_KEY="announcement_banner"
+
+# === STEP 0: Get App Token ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+# === STEP 1: Get User Token ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+# === STEP 2: List all settings ===
+curl -s -X GET "$BASE_URL/settings" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+
+# === STEP 3: Upsert a setting ===
+curl -s -X PUT "$BASE_URL/settings" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "'$SETTING_KEY'",
+    "value": {
+      "enabled": true,
+      "message": "Demo update",
+      "severity": "info"
+    }
+  }' | jq
+
+# === STEP 4: Read the setting ===
+curl -s -X GET "$BASE_URL/settings/$SETTING_KEY" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+
+# === STEP 5: Delete the setting ===
+curl -s -X DELETE "$BASE_URL/settings/$SETTING_KEY" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+- `PUT /settings` is idempotent by design — the same payload always produces the same final state.
+- `DELETE /settings/{key}` is idempotent — deleting an already-deleted key returns the same outcome (or 404 — handle both).
+- `GET` endpoints are read-only and naturally idempotent.
+
+### Retries
+- If you receive **429** (rate limit), wait the indicated time and retry.
+- If you receive **500** or a **timeout** on `PUT`, retry — the operation is idempotent.
+- For **401** (expired token), regenerate the token and retry the original request.
+
+### Timeouts
+- All endpoints in this flow are simple key/value reads and writes — set a 5-second client timeout.
+
+### Tokens
+- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+
+### Important validations
+- `key` must be unique per app and case-sensitive.
+- `value` may be any JSON-serializable object, array, string, number, or boolean.
+- Settings should NOT contain secrets — they are not encrypted at rest. Use the App's `keys` configuration for credentials.
+
+---
+
+## Quick endpoint reference
+
+| Step | Method | Endpoint | Description |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Get app token |
+| 1 | `POST` | `/api/v1/users/token` | Get user token |
+| 2 | `GET` | `/api/v1/settings` | List all settings |
+| 3 | `PUT` | `/api/v1/settings` | Upsert a setting |
+| 4 | `GET` | `/api/v1/settings/{key}` | Read a single setting |
+| 5 | `DELETE` | `/api/v1/settings/{key}` | Delete a setting |
+
+---
+
+## Quick checklist
+
+- [ ] I have the App API Key (`ak-...`)
+- [ ] I have the User API Key (`sk-...`)
+- [ ] I obtained the App Token (`POST /auth/token`)
+- [ ] I obtained the User Token (`POST /users/token`)
+- [ ] I listed existing settings to see what's already configured
+- [ ] I upserted at least one setting via `PUT /settings`
+- [ ] I read it back via `GET /settings/{key}`
+- [ ] I confirmed deletion works via `DELETE /settings/{key}`

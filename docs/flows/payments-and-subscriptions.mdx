@@ -377,7 +377,74 @@ This endpoint is a placeholder — full subscription management will be availabl
 
 ---
 
-### Step 6 — Get Consumption History
+### Step 6 — List Available Plans
+
+**Goal:** Retrieve the catalog of active billing plans your users can subscribe to.
+
+**Endpoint:** `GET /api/v1/plans`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/plans" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "65a1b2c3d4e5f6789abcdef0",
+      "plan_id": "plan_free",
+      "name": "Free",
+      "type": "free",
+      "price": 0.00,
+      "currency": "USD",
+      "billing_cycle_days": 30
+    },
+    {
+      "id": "65a1b2c3d4e5f6789abcdef1",
+      "plan_id": "plan_payg",
+      "name": "Pay As You Go",
+      "type": "payg",
+      "price": 0.00,
+      "currency": "USD",
+      "billing_cycle_days": 30
+    },
+    {
+      "id": "65a1b2c3d4e5f6789abcdef2",
+      "plan_id": "plan_pro",
+      "name": "Pro",
+      "type": "subscription",
+      "price": 29.00,
+      "currency": "USD",
+      "billing_cycle_days": 30
+    }
+  ],
+  "msg": "Plans retrieved successfully"
+}
+```
+
+:::tip
+Use `plan_id` as the stable identifier when displaying plan options or initiating an upgrade. The `type` field tells you whether the plan is `free`, `payg` (consumption-based), or `subscription` (recurring).
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Authentication required | Regenerate tokens |
+| 422 | Invalid query parameters | None expected — endpoint takes no parameters |
+| 429 | Rate limit exceeded | Wait and retry |
+| 500 | Internal server error | Contact support |
+
+---
+
+### Step 7 — Get Consumption History
 
 **Goal:** Retrieve a paginated list of the user's API consumption events, optionally filtered by operation type and date range.
 
@@ -463,7 +530,7 @@ Each consumption event records a single API operation with its cost. Key fields:
 
 ---
 
-### Step 7 — Get Consumption Summary
+### Step 8 — Get Consumption Summary
 
 **Goal:** Retrieve an aggregated summary of consumption grouped by operation type, useful for billing dashboards and cost analysis.
 
@@ -598,13 +665,19 @@ curl -s -X GET "$BASE_URL/users/subscriptions/$SUBSCRIPTION_ID" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 6: Get Consumption History ===
+# === STEP 6: List Available Plans ===
+curl -s -X GET "$BASE_URL/plans" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === STEP 7: Get Consumption History ===
 curl -s -X GET "$BASE_URL/users/consumption?limit=5" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 7: Get Consumption Summary ===
+# === STEP 8: Get Consumption Summary ===
 curl -s -X GET "$BASE_URL/users/consumption/summary" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -653,8 +726,9 @@ The API does not support an `Idempotency-Key` header for transactions. If a tran
 | 3 | `POST` | `/api/v1/users/transactions` | Create payment transaction |
 | 4 | `GET` | `/api/v1/users/transactions` | Get transaction history |
 | 5 | `GET` | `/api/v1/users/subscriptions/{subscription_id}` | Get subscription details |
-| 6 | `GET` | `/api/v1/users/consumption` | Get consumption history |
-| 7 | `GET` | `/api/v1/users/consumption/summary` | Get consumption summary |
+| 6 | `GET` | `/api/v1/plans` | List available billing plans |
+| 7 | `GET` | `/api/v1/users/consumption` | Get consumption history |
+| 8 | `GET` | `/api/v1/users/consumption/summary` | Get consumption summary |
 
 ---
 
@@ -669,5 +743,6 @@ The API does not support an `Idempotency-Key` header for transactions. If a tran
 - [ ] I redirected the user to the `payment_url`
 - [ ] I set up a webhook listener for transaction status updates
 - [ ] I verified the updated balance after payment approval
+- [ ] I listed available billing plans (`GET /plans`)
 - [ ] I reviewed consumption history (`GET /users/consumption`)
 - [ ] I checked consumption summary for cost analysis (`GET /users/consumption/summary`)

@@ -1,0 +1,83 @@
+---
+title: Response format
+description: The standard response wrapper, the webhook namespace exception, and how to read errors consistently.
+sidebar_position: 7
+---
+
+# Response format
+
+The 1Platform API uses **two** response shapes, depending on the namespace.
+
+## Wrapper 1 — client-facing endpoints (`{ success, data, msg }`)
+
+Every endpoint under `/auth/*`, `/users/*`, `/posts/*`, `/agents/*`, etc.
+wraps the response in:
+
+```json
+{
+  "success": true,
+  "data": { /* endpoint-specific payload, can be null */ },
+  "msg": "Human-readable summary"
+}
+```
+
+On error:
+
+```json
+{
+  "success": false,
+  "data": { "code": "PAYMENT_GATEWAY_NOT_CONFIGURED" },
+  "msg": "This account does not have a payment gateway configured. ..."
+}
+```
+
+When `data.code` is present, branch on it for client logic. When it's absent,
+treat the HTTP status code as the source of truth and surface `msg` to the
+operator.
+
+## Wrapper 2 — inbound webhook namespace (`{ status, message }`)
+
+`POST /webhooks/transactions` (the **inbound** receiver from the upstream
+provider) uses a flat shape because the provider expects it:
+
+```json
+{ "status": "ok", "message": "Webhook accepted" }
+```
+
+You don't normally interact with this endpoint directly — the upstream
+provider does.
+
+## Outbound webhooks — neither wrapper
+
+Outbound webhooks (1Platform → merchant) use a domain-specific payload, not
+either of the wrappers above. See
+[receiving notifications → canonical payload](../webhooks/receiving-notifications#canonical-payload).
+
+## Pydantic 422 errors
+
+FastAPI's automatic schema validation returns **its own** shape, not the
+wrapper:
+
+```json
+{
+  "detail": [
+    { "type": "missing", "loc": ["body", "amount"], "msg": "Field required" }
+  ],
+  "message": "Validation error"
+}
+```
+
+These are client bugs (missing field, wrong type) — fix the request, never
+retry blindly.
+
+## Choosing what to read
+
+| You want to know... | Read |
+|---|---|
+| Did the request succeed? | HTTP status code (`2xx` = yes) |
+| Is the response a wrapper? | `success` field — present means yes |
+| What kind of business failure? | `data.code` if present |
+| What to show the operator? | `msg` |
+| What field of my request is wrong? | `detail[].loc` (Pydantic 422 only) |
+
+See also: [error code reference](./error-codes).

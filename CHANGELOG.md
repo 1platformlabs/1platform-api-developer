@@ -2,6 +2,30 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [0.18.0] - 2026-04-29
+
+### Added
+- **Webhook Integration section (6 new pages)** — Dedicated category covering the outbound webhook contract from end to end:
+  - `webhooks/overview` — Mermaid sequence diagram of the buyer → merchant → 1Platform → upstream → merchant flow plus the canonical event list (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`)
+  - `webhooks/security` — HMAC-SHA256 signing scheme: `X-Webhook-Signature: sha256=<hex>` + `X-Webhook-Timestamp` (epoch seconds), 5-minute replay window, body canonicalization rules, and verification snippets in Python / TypeScript / PHP. Includes a `:::danger` callout that secret rotation is irreversible
+  - `webhooks/receiving-notifications` — Canonical outbound payload schema with the dual-currency contract (`amount` in provider currency vs `merchant_amount` for ledgering), echoed `metadata` and `merchant_reference`, and the FSM table for inbound statuses
+  - `webhooks/configuring-urls` — How to register allowed domains, declare per-event handler URLs, remove domains, and rotate the signing secret
+  - `webhooks/retry-and-delivery` — At-least-once delivery semantics, backoff schedule, dead-letter behaviour, and merchant idempotency requirements (`transaction_id + event`)
+  - `webhooks/code-samples` — Multi-language verification + dispatch examples in Python (`httpx` + `hmac`), TypeScript/Node (`fetch` + `node:crypto`), PHP (`cURL` + `hash_hmac`)
+- **Reference section (7 new pages)** — Canonical lookup tables that previously lived only in flow walkthroughs:
+  - `reference/environments` — Production vs QA base URLs, key scoping rules, and runtime environment discovery via `GET /health` `data.environment`
+  - `reference/glossary` — Authoritative names for every identifier in the API (`transaction_id`, `external_transaction_id`, `merchant_reference`, `metadata`, `payment_gateway_id`, `app_token`, `user_token`, `webhook_secret`) with deprecation note on `externalId`
+  - `reference/error-codes` — Unified catalogue of every machine-readable `data.code` value (`PAYMENT_GATEWAY_NOT_CONFIGURED`, `CURRENCY_NOT_SUPPORTED`, `PAYMENT_PROVIDER_TIMEOUT`, `REFUND_NOT_SUPPORTED`, `DOMAIN_ALREADY_REGISTERED`, `URL_HOST_NOT_ALLOWED`) with HTTP status, meaning, and recommended client behaviour
+  - `reference/rate-limits` — All `*_LIMIT` constants from `app/core/rate_limit.py` plus the SHA-256 key derivation rule
+  - `reference/troubleshooting` — Catalogue of non-obvious failure modes (502 with HTML, 401-on-every-call, webhook signature mismatches) with concrete fixes
+  - `reference/testing` — Sandbox tenant guidance, test card numbers, and webhook replay with `ngrok` / `smee`
+  - `reference/response-format` — The two response wrappers (client-facing `{success, data, msg}` vs inbound webhook `{status, message}`) and how outbound webhooks are domain-specific
+
+### Changed
+- **`flows/payments-and-subscriptions`**: Step 3 rewritten with a `:::warning` prerequisite callout citing 422 / `PAYMENT_GATEWAY_NOT_CONFIGURED`; new explanation of `usd_amount` (merchant currency) vs `amount` (provider currency) vs `currency_provider`; new Refund section documenting the 501 stub; added Token Caching tip in Step 0/1; added Idempotency note in Step 3 recommending `merchant_reference` for reconciliation; added FSM table summarising inbound transaction statuses
+- **Sidebar**: Added two new top-level categories — **Webhook Integration** (above Reference) and **Reference** (above Flows). Existing flows category and ordering unchanged
+- **Theme**: Forced light mode permanently (`darkMode: false`, `forceDarkModeState: 'light'`, `hideDarkModeToggle: true`, navbar `colorMode.disableSwitch: true`) to match the 1Platform Design System and remove a UI toggle that contradicted the documented "light by default" policy
+
 ## [0.17.0] - 2026-04-27
 
 ### Added

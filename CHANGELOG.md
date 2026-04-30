@@ -2,6 +2,11 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **`webhooks/configuring-urls`**: Update the example webhook receiver from `api.bowerbird.pro` to `api.bowerfans.com` to match the customer's settled product domain. Documentation example only — no contract change
+
 ## [0.18.0] - 2026-04-29
 
 ### Added

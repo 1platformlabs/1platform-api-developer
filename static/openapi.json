@@ -36,7 +36,8 @@
                   "success": true,
                   "data": {
                     "service": "ok",
-                    "database": "ok"
+                    "database": "ok",
+                    "environment": "production"
                   },
                   "msg": "Health check completed"
                 }
@@ -2982,347 +2983,6 @@
         }
       }
     },
-    "/api/v1/users/transactions": {
-      "post": {
-        "tags": [
-          "Payments"
-        ],
-        "summary": "Create Payment Transaction",
-        "description": "Create a new payment transaction and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Payment is processed via the integrated payment service\n- Returns a `payment_url` where the user completes checkout\n- Transaction starts with status `CREATED`; status updates arrive via webhook\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 25.00, \"currency\": \"USD\", \"description\": \"Credit purchase\"}'\n```",
-        "operationId": "createPaymentTransaction",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "x-user-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User JWT token",
-              "title": "X-User-Token"
-            },
-            "description": "User JWT token"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransactionCreateRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Transaction created — redirect user to payment URL",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_TransactionResponse_"
-                },
-                "example": {
-                  "success": true,
-                  "data": {
-                    "transaction_id": "507f1f77bcf86cd799439011",
-                    "payment_url": "https://checkout.example.com/pay/abc123",
-                    "status": "created",
-                    "amount": 25,
-                    "currency": "USD"
-                  },
-                  "msg": "Transaction created successfully. Please complete payment at the provided URL."
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Billing record not found for user",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation error — invalid request data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Payment provider temporarily unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "Payments"
-        ],
-        "summary": "List Payment Transactions",
-        "description": "Retrieve paginated transaction history for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- `limit`: max transactions to return (default: 50, max: 100)\n- `skip`: offset for pagination (default: 0)",
-        "operationId": "listPaymentTransactions",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "description": "Maximum transactions to return (1-100)",
-              "default": 50,
-              "title": "Limit"
-            },
-            "description": "Maximum transactions to return (1-100)"
-          },
-          {
-            "name": "skip",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of transactions to skip for pagination",
-              "default": 0,
-              "title": "Skip"
-            },
-            "description": "Number of transactions to skip for pagination"
-          },
-          {
-            "name": "x-user-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User JWT token",
-              "title": "X-User-Token"
-            },
-            "description": "User JWT token"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Transaction history retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_TransactionHistoryResponse_"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/subscriptions/{subscription_id}": {
-      "get": {
-        "tags": [
-          "Subscriptions"
-        ],
-        "summary": "Get Subscription Details",
-        "description": "Retrieve details of a specific subscription for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Note:** This endpoint currently returns a preview response — full subscription management will be available in a future release",
-        "operationId": "getPaymentSubscription",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "subscription_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Subscription ID",
-              "examples": [
-                "507f1f77bcf86cd799439011"
-              ],
-              "title": "Subscription Id"
-            },
-            "description": "Subscription ID"
-          },
-          {
-            "name": "x-user-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User JWT token",
-              "title": "X-User-Token"
-            },
-            "description": "User JWT token"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Subscription details retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_dict_"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Subscription not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/users/consumption": {
       "get": {
         "tags": [
@@ -3630,6 +3290,246 @@
         }
       }
     },
+    "/api/v1/users/transactions": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Create Payment Transaction",
+        "description": "Create a new payment transaction and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Payment is processed via the integrated payment service\n- Returns a `payment_url` where the user completes checkout\n- Transaction starts with status `CREATED`; status updates arrive via webhook\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 25.00, \"currency\": \"USD\", \"description\": \"Credit purchase\"}'\n```",
+        "operationId": "createPaymentTransaction",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transaction created — redirect user to payment URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TransactionResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "transaction_id": "507f1f77bcf86cd799439011",
+                    "payment_url": "https://checkout.example.com/pay/abc123",
+                    "status": "created",
+                    "amount": 25,
+                    "currency": "USD"
+                  },
+                  "msg": "Transaction created successfully. Please complete payment at the provided URL."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing record not found for user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or payment gateway not configured. Inspect `data.code`: `PAYMENT_GATEWAY_NOT_CONFIGURED` means the tenant must configure a payment gateway in the dashboard before creating transactions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Payment provider temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "List Payment Transactions",
+        "description": "Retrieve paginated transaction history for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- `limit`: max transactions to return (default: 50, max: 100)\n- `skip`: offset for pagination (default: 0)",
+        "operationId": "listPaymentTransactions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum transactions to return (1-100)",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum transactions to return (1-100)"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of transactions to skip for pagination",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of transactions to skip for pagination"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TransactionHistoryResponse_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/transactions/{transaction_id}": {
       "get": {
         "tags": [
@@ -3730,6 +3630,198 @@
           },
           "500": {
             "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/transactions/{transaction_id}/refund": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Refund a Payment Transaction (not yet implemented)",
+        "description": "Reserved endpoint for refunding a previously approved transaction.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Refund flow is not yet exposed via the API. Refunds must be issued out-of-band via the operator dashboard.\n- The endpoint always returns **501** with `data.code: REFUND_NOT_SUPPORTED` — clients should not retry.",
+        "operationId": "refundPaymentTransaction",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Transaction ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Transaction Id"
+            },
+            "description": "Transaction ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Refund API not yet exposed — use the operator dashboard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/subscriptions/{subscription_id}": {
+      "get": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "summary": "Get Subscription Details",
+        "description": "Retrieve details of a specific subscription for the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Note:** This endpoint currently returns a preview response — full subscription management will be available in a future release",
+        "operationId": "getPaymentSubscription",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subscription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Subscription ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Subscription Id"
+            },
+            "description": "Subscription ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription details retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -21581,16 +21673,27 @@
             "examples": [
               "ok"
             ]
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment",
+            "description": "Deployment environment label (e.g. `production`, `qa`)",
+            "examples": [
+              "production",
+              "qa"
+            ]
           }
         },
         "type": "object",
         "required": [
           "service",
-          "database"
+          "database",
+          "environment"
         ],
         "title": "HealthStatus",
         "example": {
           "database": "ok",
+          "environment": "production",
           "service": "ok"
         }
       },
@@ -27573,12 +27676,28 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
-            "description": "Additional metadata",
+            "description": "Additional metadata — echoed back in the outbound webhook payload",
             "examples": [
               {
                 "campaign_id": "abc123",
                 "source": "web"
               }
+            ]
+          },
+          "merchant_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Reference",
+            "description": "Free-form identifier the merchant attaches to the transaction. Echoed back unchanged in the outbound webhook payload — use it to correlate the webhook with your local order without parsing metadata.",
+            "examples": [
+              "bower_order_abc123"
             ]
           }
         },
@@ -27591,6 +27710,7 @@
         "example": {
           "amount": 10,
           "description": "Account top-up",
+          "merchant_reference": "bower_order_abc123",
           "metadata": {
             "campaign_id": "abc123",
             "source": "web"

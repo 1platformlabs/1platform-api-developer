@@ -1,0 +1,52 @@
+---
+title: Glossary of identifiers
+description: Canonical names for every ID in the 1Platform API — who owns each one and what aliases exist.
+sidebar_position: 2
+---
+
+# Glossary
+
+Several IDs flow through the payment lifecycle. They look similar but mean
+different things. This page is the canonical mapping.
+
+| Term | Owner | Definition | Aliases |
+|---|---|---|---|
+| `transaction_id` | 1Platform | Internal transaction ID. Returned as `data.id` on `POST /users/transactions` and as `transaction_id` in the outbound webhook. | `id` (in response body) |
+| `external_transaction_id` | upstream provider | The provider's own transaction ID (e.g. Migo). Returned in webhook payloads as `external_transaction_id`. Used by operator support to look up the charge in the provider's dashboard. | `externalId` (deprecated alias in legacy webhook payloads) |
+| `merchant_reference` | merchant | Free-form string the merchant attaches at create time. **Echoed back unchanged** in the outbound webhook. The deterministic correlation key on your side. | (none) |
+| `metadata` | merchant | Free-form JSON object echoed back unchanged in the outbound webhook. Use it for context that doesn't need to be a single string. | (none) |
+| `payment_gateway_id` | 1Platform | ObjectId of a `PaymentGateway` document. Configured by the operator, not by the API caller. | (none) |
+| `app_token` | 1Platform | Short-lived JWT (30 min). Issued by `POST /auth/token`. | `access_token` (in response body) |
+| `user_token` | 1Platform | Short-lived JWT (30 min). Issued by `POST /users/token`. | `access_token` (in response body) |
+| `webhook_secret` | 1Platform | HMAC signing key for outbound webhooks. Returned **once** at registration or rotation. There is no `GET` endpoint to retrieve it later. | (none) |
+
+## Which one to correlate on
+
+When a webhook arrives, you have three IDs to potentially match against:
+
+1. **`merchant_reference`** — your own, deterministic. Best correlation key
+   when you set it at create time.
+2. **`transaction_id`** — 1Platform-internal. Always present, always unique.
+   Best fallback when `merchant_reference` is null.
+3. **`external_transaction_id`** — useful for support tickets but **not**
+   guaranteed to be present in the inbound payload from the upstream provider.
+   Avoid relying on it for correlation.
+
+:::caution `externalId` is ambiguous
+The legacy webhook field `externalId` is described as "Local transaction ID
+(sent during transaction creation)" — but the create-transaction request body
+**does not accept** an `externalId` field. The webhook value is whatever the
+upstream provider stamps it with, not something you control. Match on
+`transaction_id` (or `merchant_reference`) instead.
+:::
+
+## ID format reference
+
+| Field | Format | Example |
+|---|---|---|
+| `transaction_id` / `id` | 24-char hex MongoDB ObjectId | `65a1b2c3d4e5f6789abcdef0` |
+| `external_transaction_id` | provider-specific | `MIGOGT123456` |
+| `app_token` / `user_token` | JWT | `eyJhbGciOiJIUzI1NiIs...` |
+| App API key | `ak-` + 64 hex chars | `ak-a1b2c3...` |
+| User API key | `sk-` + 64 hex chars | `sk-d4e5f6...` |
+| `webhook_secret` | `whsec_` + opaque string | `whsec_demo_abc123` |

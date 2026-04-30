@@ -59,9 +59,10 @@ const config: Config = {
           url: OPENAPI_LOCAL_PATH,
           // Proxy requests through Scalar to avoid CORS issues when using "Send" in the browser.
           proxy: 'https://proxy.scalar.com',
-          // Default to light mode (matches the 1Platform Design System).
-          // Users can still toggle dark via the sun/moon button.
+          // Force light mode permanently (matches the 1Platform Design System).
           darkMode: false,
+          forceDarkModeState: 'light',
+          hideDarkModeToggle: true,
           customCss: `
             .light-mode {
               --scalar-color-accent: #2563eb;
@@ -89,6 +90,7 @@ const config: Config = {
     image: 'img/docusaurus-social-card.jpg',
     colorMode: {
       defaultMode: 'light',
+      disableSwitch: true,
       respectPrefersColorScheme: false,
     },
     navbar: {

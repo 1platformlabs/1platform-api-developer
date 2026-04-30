@@ -1,0 +1,41 @@
+---
+title: Error code reference
+description: Unified catalogue of every machine-readable `data.code` returned by the 1Platform API, with recommended client behaviour.
+sidebar_position: 3
+---
+
+# Error code reference
+
+Most failure responses follow the standard wrapper `{ success: false, data: { code }, msg }`.
+This page lists every `data.code` value, what it means, and what the client
+should do.
+
+| Endpoint(s) | HTTP | `data.code` | Meaning | Recommended client behaviour |
+|---|---|---|---|---|
+| `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | Tenant has no active gateway configured. | Surface a setup CTA to the operator. **Do not retry.** |
+| `POST /users/transactions` | 422 | `CURRENCY_NOT_SUPPORTED` | Gateway does not support the requested currency. | Reject the request client-side; show the gateway's supported list. **Do not retry.** |
+| `POST /users/transactions` | 502 | `PAYMENT_PROVIDER_TIMEOUT` | Upstream payment provider timed out. | Retry with exponential backoff (max 3, base 30s). |
+| `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | Refund API not yet implemented; use the operator dashboard. | **Do not retry.** Issue refunds out-of-band. |
+| `POST /webhooks/config/domains` | 409 | (no code; `msg` only) | Domain already in `allowed_domains`. | Treat as success or call DELETE first. |
+| `PUT /webhooks/config/events` | 400 | (no code; `msg` only) | URL host is not in `allowed_domains`. | Register the domain via the [webhook configuration flow](../flows/webhook-configuration). |
+| (any) | 401 | (no code; `msg` only) | Token expired or invalid. | Mint a fresh token and retry **once**. |
+| (any) | 422 | (no code; Pydantic `detail`) | Schema validation error. | Fix client-side — never retry. |
+| (any) | 429 | (no code; `msg` only) | Rate limit exceeded. | Honour `Retry-After` header (or default to 60s). |
+| `POST /users/transactions` | 502 | (no code; generic `msg`) | Upstream payment provider unreachable / timed out. | Retry with exponential backoff (max 3 attempts, base 30s). |
+
+## Conventions
+
+- **Endpoints that return `data.code`** — anything where a client needs to
+  branch on the *kind* of failure. Always check `data.code` before reading
+  `msg`, since `msg` is human-facing copy that may change.
+- **Endpoints that return `msg` only** — generic 4xx/5xx where the HTTP
+  status code carries enough information.
+- **Pydantic 422** — schema-level validation failures use FastAPI's default
+  shape `{ detail: [...], message: "Validation error" }` rather than the
+  ResponseWrapper. See [response format](./response-format).
+
+## Adding new codes
+
+When the API adds a new `data.code`, this page is updated in the same change
+that ships the code. If you find a value here without a matching entry,
+that's a documentation bug — please report it.

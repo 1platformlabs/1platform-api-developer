@@ -4,6 +4,31 @@ const sidebars: SidebarsConfig = {
   docs: [
     {
       type: 'category',
+      label: 'Webhook Integration',
+      items: [
+        'webhooks/overview',
+        'webhooks/security',
+        'webhooks/receiving-notifications',
+        'webhooks/configuring-urls',
+        'webhooks/retry-and-delivery',
+        'webhooks/code-samples',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Reference',
+      items: [
+        'reference/environments',
+        'reference/glossary',
+        'reference/error-codes',
+        'reference/rate-limits',
+        'reference/troubleshooting',
+        'reference/testing',
+        'reference/response-format',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Flows',
       items: [
         'flows/generate-invoice',

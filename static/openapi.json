@@ -3221,8 +3221,8 @@
                         "id": "507f1f77bcf86cd799439011",
                         "operation": "content_generation",
                         "endpoint": "POST /api/v1/posts/content/",
-                        "cost_usd": 0.05,
-                        "balance_after": 49.95,
+                        "cost_usd": "0.05",
+                        "balance_after": "49.95",
                         "status": "charged",
                         "metadata": {},
                         "created_at": "2026-04-30T12:00:00Z"
@@ -3366,14 +3366,14 @@
                   "success": true,
                   "data": {
                     "period": "2026-04",
-                    "total_spent": 3.5,
+                    "total_spent": "3.50",
                     "total_operations": 42,
                     "by_operation": [
                       {
                         "operation": "content_generation",
                         "count": 15,
-                        "total_cost": 0.75,
-                        "avg_cost": 0.05
+                        "total_cost": "0.75",
+                        "avg_cost": "0.05"
                       }
                     ]
                   },
@@ -3414,6 +3414,268 @@
           },
           "500": {
             "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/holds": {
+      "get": {
+        "tags": [
+          "Billing & Consumption"
+        ],
+        "summary": "List user's balance holds",
+        "description": "Return up to `limit` `BalanceHold` records for the authenticated user, sorted by `created_at` DESC. Optional `status` filter narrows to a single lifecycle state (ACTIVE, CAPTURED, RELEASED, EXPIRED).\n\n**Use case:** observability for the Authorize+Capture path — clients can show reserved-vs-debited credits, audit recently released holds, and reconcile their local view of the user's balance.",
+        "operationId": "listBalanceHolds",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/BalanceHoldStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by hold status (active, captured, released, expired)",
+              "examples": [
+                "active"
+              ],
+              "title": "Status"
+            },
+            "description": "Filter by hold status (active, captured, released, expired)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Pagination offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Holds retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_BalanceHoldListResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 1,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439099",
+                        "idempotency_key": "post_content_abc123",
+                        "operation": "content_generation",
+                        "owner": "posts.content",
+                        "amount": "0.05",
+                        "currency": "USD",
+                        "status": "active",
+                        "created_at": "2026-05-19T10:30:00Z",
+                        "expires_at": "2026-05-19T10:45:00Z"
+                      }
+                    ]
+                  },
+                  "msg": "Balance holds retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/holds/{hold_id}": {
+      "get": {
+        "tags": [
+          "Billing & Consumption"
+        ],
+        "summary": "Retrieve a single balance hold",
+        "description": "Fetch a single `BalanceHold` by id. Only the owning user can read their own holds — cross-user lookups return 404.",
+        "operationId": "getBalanceHold",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hold_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "BalanceHold document id (ObjectId)",
+              "examples": [
+                "507f1f77bcf86cd799439099"
+              ],
+              "title": "Hold Id"
+            },
+            "description": "BalanceHold document id (ObjectId)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hold retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_BalanceHoldResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439099",
+                    "idempotency_key": "post_content_abc123",
+                    "operation": "content_generation",
+                    "owner": "posts.content",
+                    "amount": "0.05",
+                    "currency": "USD",
+                    "status": "captured",
+                    "created_at": "2026-05-19T10:30:00Z",
+                    "expires_at": "2026-05-19T10:45:00Z",
+                    "captured_at": "2026-05-19T10:33:00Z"
+                  },
+                  "msg": "Balance hold retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hold not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
             "content": {
               "application/json": {
                 "schema": {
@@ -10496,7 +10758,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ReportPeriod",
+              "$ref": "#/components/schemas/app__models__analytics__ReportPeriod",
               "description": "Report time period",
               "examples": [
                 "30d"
@@ -10744,7 +11006,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ReportPeriod",
+              "$ref": "#/components/schemas/app__models__analytics__ReportPeriod",
               "description": "Report time period",
               "examples": [
                 "30d"
@@ -12259,7 +12521,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "$ref": "#/components/schemas/ReportPeriod",
               "description": "Report period",
               "default": "7d"
             },
@@ -12429,7 +12691,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "$ref": "#/components/schemas/ReportPeriod",
               "description": "Report period",
               "default": "30d"
             },
@@ -20256,6 +20518,154 @@
         ],
         "title": "AssignedUserResponse"
       },
+      "BalanceHoldListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "examples": [
+              3
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BalanceHoldResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total"
+        ],
+        "title": "BalanceHoldListResponse",
+        "description": "Paginated list of balance holds."
+      },
+      "BalanceHoldResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Hold ID",
+            "examples": [
+              "507f1f77bcf86cd799439099"
+            ]
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key",
+            "examples": [
+              "job_abc123"
+            ]
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "examples": [
+              "content_generation"
+            ]
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner",
+            "examples": [
+              "posts.content"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Reserved amount (decimal string)",
+            "examples": [
+              "0.05"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "examples": [
+              "USD"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/BalanceHoldStatus",
+            "examples": [
+              "active"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "release_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "idempotency_key",
+          "operation",
+          "owner",
+          "amount",
+          "currency",
+          "status",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "BalanceHoldResponse",
+        "description": "Public representation of a balance hold (transparency endpoint)."
+      },
+      "BalanceHoldStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "captured",
+          "released",
+          "expired"
+        ],
+        "title": "BalanceHoldStatus",
+        "description": "Lifecycle of a `BalanceHold` document.\n\nState machine (idempotent terminal transitions):\n    ACTIVE → CAPTURED   (success: balance debited, reserved_balance freed)\n    ACTIVE → RELEASED   (failure: reserved_balance freed, balance untouched)\n    ACTIVE → EXPIRED    (TTL worker reaped a stale hold)"
+      },
       "BillingCreditRequest": {
         "properties": {
           "transaction_id": {
@@ -21283,19 +21693,19 @@
             ]
           },
           "cost_usd": {
-            "type": "number",
+            "type": "string",
             "title": "Cost Usd",
-            "description": "Cost in USD",
+            "description": "Cost in USD (decimal string)",
             "examples": [
-              0.05
+              "0.05"
             ]
           },
           "balance_after": {
-            "type": "number",
+            "type": "string",
             "title": "Balance After",
-            "description": "Balance after operation",
+            "description": "Balance after operation (decimal string)",
             "examples": [
-              49.95
+              "49.95"
             ]
           },
           "status": {
@@ -21307,6 +21717,21 @@
           },
           "metadata": {
             "$ref": "#/components/schemas/ConsumptionMetadata"
+          },
+          "hold_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Id",
+            "description": "Linked BalanceHold._id when present",
+            "examples": [
+              "507f1f77bcf86cd799439099"
+            ]
           },
           "created_at": {
             "type": "string",
@@ -21329,7 +21754,7 @@
           "created_at"
         ],
         "title": "ConsumptionItemResponse",
-        "description": "Single consumption log entry for API responses."
+        "description": "Single consumption log entry for API responses.\n\nCost/balance fields render as decimal strings to preserve precision over the\nwire. Clients that previously parsed them as numbers will continue to work\n(JSON numbers and strings are interchangeable for display)."
       },
       "ConsumptionMetadata": {
         "properties": {
@@ -21527,19 +21952,19 @@
             ]
           },
           "total_cost": {
-            "type": "number",
+            "type": "string",
             "title": "Total Cost",
-            "description": "Total cost in USD",
+            "description": "Total cost in USD (decimal string)",
             "examples": [
-              0.75
+              "0.75"
             ]
           },
           "avg_cost": {
-            "type": "number",
+            "type": "string",
             "title": "Avg Cost",
-            "description": "Average cost per operation",
+            "description": "Average cost per operation (decimal string)",
             "examples": [
-              0.05
+              "0.05"
             ]
           }
         },
@@ -21564,11 +21989,11 @@
             ]
           },
           "total_spent": {
-            "type": "number",
+            "type": "string",
             "title": "Total Spent",
-            "description": "Total spent in USD",
+            "description": "Total spent in USD (decimal string)",
             "examples": [
-              3.5
+              "3.50"
             ]
           },
           "total_operations": {
@@ -27018,8 +27443,7 @@
         "enum": [
           "7d",
           "30d",
-          "90d",
-          "12m"
+          "90d"
         ],
         "title": "ReportPeriod"
       },
@@ -27658,6 +28082,70 @@
           "msg"
         ],
         "title": "SuccessResponse[AppFullResponse]"
+      },
+      "SuccessResponse_BalanceHoldListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/BalanceHoldListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[BalanceHoldListResponse]"
+      },
+      "SuccessResponse_BalanceHoldResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/BalanceHoldResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[BalanceHoldResponse]"
       },
       "SuccessResponse_BranchResponse_": {
         "properties": {
@@ -31858,12 +32346,13 @@
         "title": "WizardStatus",
         "description": "Status of an agent creation wizard session."
       },
-      "app__models__adsense__ReportPeriod": {
+      "app__models__analytics__ReportPeriod": {
         "type": "string",
         "enum": [
           "7d",
           "30d",
-          "90d"
+          "90d",
+          "12m"
         ],
         "title": "ReportPeriod"
       }

@@ -485,6 +485,24 @@
         ],
         "parameters": [
           {
+            "name": "X-Site-URL",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Origin site URL reported by the plugin",
+              "title": "X-Site-Url"
+            },
+            "description": "Origin site URL reported by the plugin"
+          },
+          {
             "name": "x-user-token",
             "in": "header",
             "required": false,
@@ -16939,6 +16957,145 @@
         }
       }
     },
+    "/api/v1/platform/plugin-heartbeats": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "List plugin heartbeat status (superadmin)",
+        "description": "Returns a paginated view of every ``Website`` the API tracks for the external plugin cron heartbeat. Use this to debug stuck queues (``heartbeat_active=False``, high ``consecutive_heartbeat_failures``, or stale ``last_pending_seen_at``).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)\n\n**Rate limit:** 60 req/min",
+        "operationId": "listPluginHeartbeats",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "description": "1-indexed page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "1-indexed page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "If true, only sites with heartbeat_active=True",
+              "default": false,
+              "title": "Active Only"
+            },
+            "description": "If true, only sites with heartbeat_active=True"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Heartbeat status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_PluginHeartbeatListResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 50,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011",
+                        "user_id": "507f1f77bcf86cd799439012",
+                        "url": "https://example.com",
+                        "domain": "example.com",
+                        "heartbeat_active": true,
+                        "last_pending_seen_at": "2026-05-19T10:30:00Z",
+                        "last_heartbeat_at": "2026-05-19T10:30:42Z",
+                        "last_heartbeat_status": 200,
+                        "consecutive_heartbeat_failures": 0
+                      }
+                    ]
+                  },
+                  "msg": "Plugin heartbeats retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "tags": [
@@ -26796,6 +26953,149 @@
         ],
         "title": "PlatformMetricsResponse"
       },
+      "PluginHeartbeatItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Website document id",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "Owning user id",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Site URL",
+            "examples": [
+              "https://example.com"
+            ]
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain",
+            "description": "Domain",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "heartbeat_active": {
+            "type": "boolean",
+            "title": "Heartbeat Active",
+            "description": "Whether the heartbeat sweep includes this site"
+          },
+          "last_pending_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Pending Seen At",
+            "description": "Last time the plugin reported a PENDING job"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At",
+            "description": "Last ping timestamp"
+          },
+          "last_heartbeat_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat Status",
+            "description": "HTTP code of last ping"
+          },
+          "consecutive_heartbeat_failures": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Consecutive Heartbeat Failures",
+            "description": "Consecutive failure counter",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "url",
+          "heartbeat_active"
+        ],
+        "title": "PluginHeartbeatItem"
+      },
+      "PluginHeartbeatListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Total",
+            "examples": [
+              5
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Page",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Page Size",
+            "examples": [
+              50
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHeartbeatItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "PluginHeartbeatListResponse"
+      },
       "ProfileGenerationInput": {
         "properties": {
           "owner": {
@@ -29074,6 +29374,38 @@
           "msg"
         ],
         "title": "SuccessResponse[PlatformMetricsResponse]"
+      },
+      "SuccessResponse_PluginHeartbeatListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/PluginHeartbeatListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[PluginHeartbeatListResponse]"
       },
       "SuccessResponse_ProfileGenerationResponse_": {
         "properties": {

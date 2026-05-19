@@ -1,0 +1,255 @@
+---
+title: "Billing Holds & Captures"
+description: "Authorize+Capture billing primitive for async operations — reserve user balance, do work, capture or refund automatically. Covers BalanceHold lifecycle, headers, idempotency, and the X-Plugin-Version gate."
+sidebar_position: 8
+---
+
+# Flow: Billing Holds & Captures (Authorize + Capture)
+
+## Overview
+
+Operations that take real time to complete (content generation, batch jobs, AI agents) need a billing pattern that is **safe under failure**: if the work fails after the balance is debited, the user must be reimbursed automatically — without manual intervention.
+
+1Platform implements the **Authorize + Capture** pattern, the same approach Stripe, AWS, and PayPal use for time-bounded operations:
+
+```
+┌────────────────┐    ┌────────────────┐    ┌────────────────┐
+│   AUTHORIZE    │───▶│    EXECUTE     │───▶│    CAPTURE     │
+│ reserve funds  │    │ run async work │    │  debit funds   │
+└────────────────┘    └────────────────┘    └────────────────┘
+                              │
+                              │ on failure
+                              ▼
+                      ┌────────────────┐
+                      │    RELEASE     │
+                      │ refund balance │
+                      └────────────────┘
+```
+
+**Effect on the user balance:**
+
+- `balance` — the absolute ledger. Only debited at **CAPTURE**.
+- `reserved_balance` — funds currently held by ACTIVE `BalanceHold` records. Increased by **AUTHORIZE**, decreased by **CAPTURE** and **RELEASE**.
+- `available_balance = balance - reserved_balance` — the amount spendable for new operations.
+
+---
+
+## When is the hold path used?
+
+The hold path activates when **all three** conditions are met:
+
+1. The endpoint supports the hold pattern (currently: `POST /api/v1/posts/content/`).
+2. The global flag `BILLING_USE_HOLD_CAPTURE_FOR_POSTS` is `true` (default ON).
+3. The client sends `X-Plugin-Version: 2.36.0` or newer.
+
+If any condition is missing, the endpoint falls back to the legacy charge-first behavior. This keeps deployed clients running unchanged while newer plugins get the safer behavior automatically.
+
+| Plugin Version | Billing path | Refund on background failure |
+|---|---|---|
+| `< 2.36.0` (legacy) | charge-first | ❌ no automatic refund (background failures rare, manual remediation only) |
+| `>= 2.36.0` | authorize + capture | ✅ automatic — `BalanceHold` releases reserved funds |
+
+---
+
+## BalanceHold lifecycle
+
+A hold is a small document tracking a reservation. It transitions through four states:
+
+| Status | Set by | Side-effect |
+|---|---|---|
+| `ACTIVE` | `authorize()` | `reserved_balance += amount` |
+| `CAPTURED` | `capture()` (success) | `balance -= amount`, `reserved_balance -= amount`, writes `ConsumptionLog` |
+| `RELEASED` | `release()` (failure / cancel) | `reserved_balance -= amount` (balance untouched) |
+| `EXPIRED` | TTL worker (60s tick) | Same effects as `RELEASED`, indicates the process crashed or never completed |
+
+**Terminal states** (CAPTURED, RELEASED, EXPIRED) are immutable. Subsequent calls to `capture` or `release` on a terminal hold are no-ops (idempotent).
+
+**TTL:** every hold is created with `expires_at = now + 15 minutes` by default. If the work hasn't completed by then, the TTL worker releases the reservation automatically. This prevents stale holds from locking funds indefinitely if the API process crashes mid-job.
+
+---
+
+## Request flow — Content Generation example
+
+### 1. Submit the job
+
+```http
+POST /api/v1/posts/content/
+Authorization: Bearer ak-...
+x-user-token: sk-...
+X-Plugin-Version: 2.36.0
+X-Idempotency-Key: client-supplied-uuid-v4   # optional but recommended
+Content-Type: application/json
+
+{
+  "keyword": "best running shoes 2026",
+  "lang": "en",
+  "country": "us",
+  "image_provider": "default"
+}
+```
+
+### 2. Response (202 Accepted)
+
+The server creates the hold, persists it on the job, dispatches the background pipeline, and returns immediately:
+
+```http
+HTTP/1.1 202 Accepted
+X-Hold-Id: 507f1f77bcf86cd799439099
+X-Operation-Cost: 0.05
+X-Available-Balance: 99.95
+Content-Type: application/json
+
+{
+  "success": true,
+  "data": {
+    "job_id": "65a1b2c3d4e5f6789abcdef4",
+    "type": "content",
+    "status": "pending",
+    "input": { "keyword": "best running shoes 2026", "hold_id": "507f1f77bcf86cd799439099", ... },
+    "created_at": "2026-05-19T10:30:00Z"
+  },
+  "msg": "Content generation job created for keyword: best running shoes 2026"
+}
+```
+
+**Notice:**
+- The user's `balance` is still **100.00** (not yet debited).
+- `reserved_balance` is **0.05**.
+- `available_balance = 100.00 - 0.05 = 99.95` (returned in `X-Available-Balance`).
+
+### 3. Background work runs
+
+The content pipeline runs in the background. The API process executes the 10-layer generation flow. Two terminal outcomes:
+
+#### Success — CAPTURE
+
+```
+balance:           100.00 → 99.95   ✅ debited
+reserved_balance:    0.05 →  0.00   ✅ reservation released
+hold.status:       CAPTURED
+ConsumptionLog:    written with status=CHARGED, linked to hold_id
+```
+
+#### Failure (provider error, invariant violation, etc.) — RELEASE
+
+```
+balance:           100.00 → 100.00  ✅ untouched
+reserved_balance:    0.05 →   0.00  ✅ fully released
+hold.status:       RELEASED
+hold.release_reason: "ProviderError" | "no_keywords" | etc.
+```
+
+### 4. Poll the job
+
+```http
+GET /api/v1/posts/content/{job_id}
+Authorization: Bearer ak-...
+x-user-token: sk-...
+```
+
+The response includes the current job status. Clients can inspect the linked hold via the `holds` endpoint.
+
+---
+
+## Idempotency
+
+The `idempotency_key` ties an authorize request to a logical operation so that retries don't double-charge. If a second `POST /api/v1/posts/content/` arrives with the same `X-Idempotency-Key` while the first is still in flight (or completed), the server returns the **same hold** — never creating two reservations.
+
+**Recommended:** clients generate a UUIDv4 per logical request and pass it as `X-Idempotency-Key`. If omitted, the server generates one server-side and includes it in `X-Hold-Id`.
+
+---
+
+## Transparency endpoints
+
+### `GET /api/v1/holds`
+
+List the authenticated user's balance holds, most recent first. Useful for rendering a "Reserved / Charged / Refunded" badge per job in the client UI.
+
+**Query parameters:**
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| `status` | `active \| captured \| released \| expired` | — | Filter by lifecycle state |
+| `limit` | int (1-100) | 50 | Page size |
+| `skip` | int (>=0) | 0 | Pagination offset |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 3,
+    "items": [
+      {
+        "id": "507f1f77bcf86cd799439099",
+        "idempotency_key": "post_content_abc123",
+        "operation": "content_generation",
+        "owner": "posts.content",
+        "amount": "0.05",
+        "currency": "USD",
+        "status": "captured",
+        "created_at": "2026-05-19T10:30:00Z",
+        "expires_at": "2026-05-19T10:45:00Z",
+        "captured_at": "2026-05-19T10:33:00Z",
+        "released_at": null,
+        "release_reason": null
+      }
+    ]
+  },
+  "msg": "Balance holds retrieved"
+}
+```
+
+### `GET /api/v1/holds/{hold_id}`
+
+Fetch a single hold by its id. Returns `404` if the hold doesn't exist or belongs to another user.
+
+---
+
+## Headers reference
+
+| Header | Direction | Notes |
+|---|---|---|
+| `X-Plugin-Version` | Request | **Required for hold path.** Format `MAJOR.MINOR.PATCH`. Send `2.36.0` or higher to opt into Authorize+Capture |
+| `X-Idempotency-Key` | Request | Optional UUID/correlation key. If omitted, server generates one |
+| `X-Hold-Id` | Response | ObjectId of the created `BalanceHold` |
+| `X-Operation-Cost` | Response | Decimal string of the reserved amount (preserves precision) |
+| `X-Available-Balance` | Response | Decimal string — `balance - reserved_balance` after authorize |
+
+---
+
+## Error codes
+
+| HTTP | `error_code` (in body) | Triggered by | What the client should do |
+|---|---|---|---|
+| 402 | `insufficient_balance` | `available_balance < amount` at authorize time | Prompt the user to top up |
+| 404 | `billing_not_found` | User has no `Billing` record | Provision billing for the user |
+| 422 | `no_keywords` | Keyword research returned 0 usable titles (the invariant fix for #117) | Suggest a different keyword. The hold is released — no charge |
+| 422 | `content_invariant_violation` | Content pipeline produced output below minimum quality threshold | Retry the job. The hold is released |
+| 429 | `daily_limit_exceeded` | Free-plan user past their daily quota | Upgrade or wait until midnight UTC |
+
+---
+
+## Monetary precision
+
+All monetary fields on the wire are **decimal strings** (e.g., `"49.95"`, not `49.95`). This preserves precision over JSON, which does not have a native exact-decimal type. Clients should parse them with a decimal library (Python `Decimal`, JS `BigInt`-backed money library, PHP `BCMath`, etc.) — never as `float`.
+
+```javascript
+// JS example
+import Big from 'big.js';
+const amount = new Big(response.data.amount); // "0.05" → Big(0.05)
+```
+
+```php
+// PHP example
+$amount = bcadd("0.00", $response["data"]["amount"], 8); // string arithmetic
+```
+
+---
+
+## What's NOT in scope (yet)
+
+- **Partial captures.** Today the whole `amount` is either captured or released. Per-step partial captures are tracked as a follow-up (will allow charging "keywords yes, images no" granularly).
+- **Refund-after-capture.** Once a hold is `CAPTURED`, calling `release` is a no-op (with a logged warning). Reversing a capture requires the existing `consumption_service.refund` path.
+- **Holds on flows other than Post Generator.** The primitive is reusable — future async agents and batch operations will use it — but only `POST /api/v1/posts/content/` is wired today.

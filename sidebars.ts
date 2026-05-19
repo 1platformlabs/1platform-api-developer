@@ -36,6 +36,7 @@ const sidebars: SidebarsConfig = {
         'flows/activity-logs',
         'flows/ai-agents',
         'flows/ai-generations',
+        'flows/billing-holds-and-captures',
         'flows/dashboard-overview',
         'flows/dashboard-settings',
         'flows/domain-management',

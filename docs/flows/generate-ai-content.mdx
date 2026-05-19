@@ -327,10 +327,13 @@ Use Step 2 (by domain) when you already have a website and want to find keywords
 
 **Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
 
+**Billing model (Authorize+Capture, default since v3.1.0):** when the client sends `X-Plugin-Version: 2.36.0` or newer, the API **reserves** the operation cost on the user's balance instead of debiting it. If the background job fails (provider error, no usable keywords, etc.), the reservation is automatically released — the user is not charged for unusable output. See [Billing Holds & Captures](./billing-holds-and-captures.mdx) for the full lifecycle, headers, and transparency endpoints.
+
 ```bash
 curl -X POST "$BASE_URL/posts/content/" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
+  -H "X-Plugin-Version: 2.36.0" \
   -H "Content-Type: application/json" \
   -d '{
     "keyword": "sustainable gardening tips",
@@ -341,7 +344,7 @@ curl -X POST "$BASE_URL/posts/content/" \
   }'
 ```
 
-**Response (202):**
+**Response (202)** — note the new `X-Hold-Id` and `X-Available-Balance` response headers on the hold path:
 
 ```json
 {
@@ -353,7 +356,8 @@ curl -X POST "$BASE_URL/posts/content/" \
     "input": {
       "keyword": "sustainable gardening tips",
       "lang": "en",
-      "image_provider": "default"
+      "image_provider": "default",
+      "hold_id": "507f1f77bcf86cd799439099"
     },
     "created_at": "2026-03-18T10:30:00"
   },
@@ -361,8 +365,14 @@ curl -X POST "$BASE_URL/posts/content/" \
 }
 ```
 
+| Response header | Meaning |
+|---|---|
+| `X-Hold-Id` | `BalanceHold` document id — fetchable via `GET /api/v1/holds/{id}` |
+| `X-Operation-Cost` | Decimal-string of the reserved amount (e.g. `"0.05"`) |
+| `X-Available-Balance` | Decimal-string — `balance - reserved_balance` after the authorize step |
+
 :::note
-Save `data.job_id` as `$JOB_ID`. The job runs asynchronously — poll its status using Step 4.
+Save `data.job_id` as `$JOB_ID`. The job runs asynchronously — poll its status using Step 4. Save `X-Hold-Id` if you want to surface a "Reserved / Charged / Refunded" state in your UI (see [Billing Holds & Captures](./billing-holds-and-captures.mdx)).
 :::
 
 **Common errors:**
@@ -370,11 +380,16 @@ Save `data.job_id` as `$JOB_ID`. The job runs asynchronously — poll its status
 | Code | Cause | Solution |
 |---|---|---|
 | 401 | Authentication failed — invalid or missing token | Regenerate tokens |
-| 402 | Insufficient balance — not enough credits | Top up your account balance |
+| 402 | Insufficient balance — not enough **available** balance (`balance - reserved_balance < amount`) | Top up the account or wait for in-flight holds to settle |
 | 404 | Resource not found | Verify the request parameters |
 | 422 | Validation error — keyword too short or invalid fields | Keyword must be at least 3 characters |
+| 422 | `no_keywords` — keyword research returned nothing usable | Try a more specific keyword. On the hold path the reservation is auto-released; no charge |
 | 429 | Rate limit exceeded (5 req/min) | Wait and retry — this is an AI-intensive endpoint |
 | 500 | Service configuration error or AI provider unavailable | Verify AI and image provider configuration |
+
+:::tip
+**Legacy clients (plugin `< 2.36.0`):** the endpoint falls back to the charge-first behavior automatically — no `X-Hold-Id` is returned and the balance is debited up front. Migration is recommended because the hold path is the only one that automatically refunds on background failure.
+:::
 
 ---
 

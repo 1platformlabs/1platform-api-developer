@@ -17,20 +17,14 @@ const columns: FooterColumn[] = [
   {
     title: 'Solutions',
     links: [
-      {label: 'AI Keywords', href: `${WEBSITE}/solutions/#intelligence`},
-      {label: 'AI Content', href: `${WEBSITE}/solutions/#content`},
-      {label: 'AI Images', href: `${WEBSITE}/solutions/#content`},
-      {label: 'CMS Publishing', href: `${WEBSITE}/solutions/#distribution`},
-      {label: 'Indexing', href: `${WEBSITE}/solutions/#distribution`},
-      {label: 'Link Building', href: `${WEBSITE}/solutions/#distribution`},
-      {label: 'Payments', href: `${WEBSITE}/solutions/#payments`},
-      {label: 'Invoicing (FEL)', href: `${WEBSITE}/solutions/#payments`},
-      {label: 'Website Management', href: `${WEBSITE}/solutions/#intelligence`},
-      {label: 'Domain Management', href: `${WEBSITE}/solutions/#distribution`},
-      {label: 'Analytics', href: `${WEBSITE}/solutions/#intelligence`},
-      {label: 'AI Agents', href: `${WEBSITE}/solutions/#automation`},
-      {label: 'Ad Revenue', href: `${WEBSITE}/solutions/#intelligence`},
-      {label: 'Activity Logs', href: `${WEBSITE}/solutions/#automation`},
+      {label: 'Online Store', href: `${WEBSITE}/solutions/online-store/`},
+      {label: 'Website Builder', href: `${WEBSITE}/solutions/website/`},
+      {label: 'AI Content', href: `${WEBSITE}/solutions/content/`},
+      {label: 'Whitelabel Dashboard', href: `${WEBSITE}/solutions/whitelabel/`},
+      {label: 'Payments & Invoicing', href: `${WEBSITE}/payments-invoicing/`},
+      {label: 'For Agencies', href: `${WEBSITE}/for-agencies/`},
+      {label: 'For Developers', href: `${WEBSITE}/for-developers/`},
+      {label: 'All Solutions', href: `${WEBSITE}/solutions/`},
     ],
   },
   {
@@ -47,7 +41,7 @@ const columns: FooterColumn[] = [
     title: 'Company',
     links: [
       {label: 'About', href: `${WEBSITE}/about/`},
-      {label: 'Why 1Platform', href: `${WEBSITE}/why-1platform/`},
+      {label: 'For Developers', href: `${WEBSITE}/for-developers/`},
       {label: 'Pricing', href: `${WEBSITE}/pricing/`},
     ],
   },
@@ -68,13 +62,13 @@ export default function Footer(): ReactNode {
     <footer className={styles.footer}>
       <div className={styles.container}>
         <div className={styles.cta}>
-          <h2 className={styles.ctaTitle}>Stop Managing 19+ Different Tools</h2>
+          <h2 className={styles.ctaTitle}>Stop Juggling 6 Different Services</h2>
           <p className={styles.ctaLead}>
-            Start with one platform. From keyword research to published, indexed content — all in one API.
+            Start with one platform. Sell online, issue invoices, and publish content — all from one dashboard, one API, one bill.
           </p>
           <div className={styles.ctaActions}>
-            <Link to={APP} className={styles.btnPrimary}>
-              Get Started Free
+            <Link to={`${APP}/app/?intent=store`} className={styles.btnPrimary}>
+              Launch Your Store
             </Link>
             <Link to={`${DEVELOPER}/`} className={styles.btnGhost}>
               View Documentation

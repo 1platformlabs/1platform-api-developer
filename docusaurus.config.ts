@@ -99,10 +99,44 @@ const config: Config = {
       // 1platform-website/src/components/Header.astro.
       items: [
         {
-          href: 'https://1platform.pro/solutions/',
+          type: 'dropdown',
           label: 'Solutions',
           position: 'left',
-          target: '_self',
+          // Parent link target — matches the website Header where the "Solutions"
+          // label itself navigates to /solutions/ while the chevron toggles the menu.
+          href: 'https://1platform.pro/solutions/',
+          items: [
+            {
+              href: 'https://1platform.pro/solutions/online-store/',
+              label: 'Online Store',
+              target: '_self',
+            },
+            {
+              href: 'https://1platform.pro/solutions/website/',
+              label: 'Website Builder',
+              target: '_self',
+            },
+            {
+              href: 'https://1platform.pro/solutions/content/',
+              label: 'AI Content',
+              target: '_self',
+            },
+            {
+              href: 'https://1platform.pro/solutions/whitelabel/',
+              label: 'Whitelabel Dashboard',
+              target: '_self',
+            },
+            {
+              href: 'https://1platform.pro/payments-invoicing/',
+              label: 'Payments & Invoicing',
+              target: '_self',
+            },
+            {
+              href: 'https://1platform.pro/solutions/',
+              label: 'View all solutions',
+              target: '_self',
+            },
+          ],
         },
         {
           href: 'https://1platform.pro/features/',

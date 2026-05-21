@@ -179,6 +179,15 @@ The developer docs **navbar AND footer** **MUST mirror the marketing website** s
 **Navbar contract:**
 - **Item order and labels:** Solutions, Features, Pricing, Docs, Blog — centered between logo and CTA.
 - **Cross-subdomain links:** Solutions/Features/Pricing/Blog point to `https://1platform.pro/<page>/` with `target: '_self'`; external-link icons are hidden.
+- **Solutions dropdown:** `type: 'dropdown'` with parent `href: 'https://1platform.pro/solutions/'`. Items, in this exact order (matches the website `Header.astro` hybrid dropdown):
+  1. **Online Store** → `https://1platform.pro/solutions/online-store/`
+  2. **Website Builder** → `https://1platform.pro/solutions/website/`
+  3. **AI Content** → `https://1platform.pro/solutions/content/`
+  4. **Whitelabel Dashboard** → `https://1platform.pro/solutions/whitelabel/`
+  5. **Payments & Invoicing** → `https://1platform.pro/payments-invoicing/`
+  6. **View all solutions** → `https://1platform.pro/solutions/`
+
+  All sub-items use `target: '_self'`. Adding/removing/reordering any item requires the same change in `../1platform-website/src/components/Header.astro` (the `solutionsSubItems` array) in the same commit.
 - **Docs entry:** Single link (no dropdown). On the developer site it points to `/`; on the website it points to `https://developer.1platform.pro/`.
 - **CTA:** "Get Started Free" → `https://app.1platform.pro`, right-aligned, accent-blue button (`.navbar__cta` on docs mirrors `.btn--primary.btn--sm` on the website).
 - **Logo:** "1Platform" word-mark with the visually distinct "1" — identical on both sites.

@@ -5,6 +5,7 @@ All notable changes to the 1Platform API Developer Docs will be documented in th
 ## [Unreleased]
 
 ### Changed
+- **Solutions navbar item** converted from a single link to a Docusaurus `type: 'dropdown'` so the developer-docs navbar mirrors the website's new hybrid Solutions dropdown. Dropdown items (in order): Online Store, Website Builder, AI Content, Whitelabel Dashboard, Payments & Invoicing, View all solutions. All targets `_self` and point at `https://1platform.pro/...`. Parent `href` keeps Solutions itself navigable to `/solutions/`. Item list documented as source of truth in `CLAUDE.md` Navbar contract and paired with the website's `Header.astro` `solutionsSubItems` array.
 - **`webhooks/configuring-urls`**: Update the example webhook receiver from `api.bowerbird.pro` to `api.bowerfans.com` to match the customer's settled product domain. Documentation example only — no contract change
 
 ## [0.18.0] - 2026-04-29

@@ -33,6 +33,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'flows/generate-invoice',
         'flows/user-onboarding',
+        'flows/admin-operations',
         'flows/activity-logs',
         'flows/ai-agents',
         'flows/ai-generations',

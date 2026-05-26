@@ -17179,6 +17179,198 @@
         }
       }
     },
+    "/api/v1/platform/cors-origins": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Get platform CORS allowlist (superadmin)",
+        "description": "Returns the platform-level CORS origin allowlist stored in MongoDB. Per-app dashboard allowlists are managed separately via `App.config.dashboard.allowed_origins`.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)\n\n**Rate limit:** 60 req/min",
+        "operationId": "getPlatformCorsOrigins",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Allowlist retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_PlatformCorsOriginsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "origins": [
+                      "https://app.1platform.pro",
+                      "https://app-qa.1platform.pro"
+                    ]
+                  },
+                  "msg": "Platform CORS origins retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Replace platform CORS allowlist (superadmin)",
+        "description": "Replaces the platform-level CORS allowlist. The change takes effect within the dynamic CORS middleware cache TTL (~60s) — no redeploy required. Wildcards are rejected and duplicates are collapsed.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)\n\n**Rate limit:** 60 req/min",
+        "operationId": "setPlatformCorsOrigins",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformCorsOriginsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Allowlist updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_PlatformCorsOriginsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "origins": [
+                      "https://app.1platform.pro",
+                      "https://app-qa.1platform.pro"
+                    ]
+                  },
+                  "msg": "Platform CORS origins updated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (e.g. wildcard rejected)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/platform/plugin-heartbeats": {
       "get": {
         "tags": [
@@ -29322,6 +29514,55 @@
           "type": "basic"
         }
       },
+      "PlatformCorsOriginsResponse": {
+        "properties": {
+          "origins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Origins",
+            "description": "Platform-level CORS allowlist managed in MongoDB",
+            "examples": [
+              [
+                "https://app.1platform.pro",
+                "https://app-qa.1platform.pro"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "title": "PlatformCorsOriginsResponse"
+      },
+      "PlatformCorsOriginsUpdateRequest": {
+        "properties": {
+          "origins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Origins",
+            "description": "Full replacement allowlist. Empty strings are dropped, duplicates are collapsed, and the wildcard '*' is rejected.",
+            "examples": [
+              [
+                "https://app.1platform.pro",
+                "https://app-qa.1platform.pro"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "origins"
+        ],
+        "title": "PlatformCorsOriginsUpdateRequest",
+        "example": {
+          "origins": [
+            "https://app.1platform.pro",
+            "https://app-qa.1platform.pro"
+          ]
+        }
+      },
       "PlatformMetricsResponse": {
         "properties": {
           "apps": {
@@ -31970,6 +32211,38 @@
           "msg"
         ],
         "title": "SuccessResponse[PersonData]"
+      },
+      "SuccessResponse_PlatformCorsOriginsResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlatformCorsOriginsResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[PlatformCorsOriginsResponse]"
       },
       "SuccessResponse_PlatformMetricsResponse_": {
         "properties": {

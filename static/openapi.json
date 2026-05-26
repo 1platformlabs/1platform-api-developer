@@ -6420,6 +6420,228 @@
         }
       }
     },
+    "/api/v1/businesses/{businessId}/invoices/{invoiceId}/pdf": {
+      "get": {
+        "tags": [
+          "Electronic Invoicing (FEL)"
+        ],
+        "summary": "Download Invoice PDF",
+        "description": "Stream the certified FEL invoice as a PDF document.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- The invoice must belong to the specified business\n- Returns `404` when the invoice is cancelled or has no FEL UUID yet",
+        "operationId": "downloadInvoicePdf",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Business ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Businessid"
+            },
+            "description": "Business ID"
+          },
+          {
+            "name": "invoiceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Invoice ID",
+              "examples": [
+                "507f1f77bcf86cd799439012"
+              ],
+              "title": "Invoiceid"
+            },
+            "description": "Invoice ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF document streamed",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business or invoice not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FEL provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{businessId}/invoices/{invoiceId}/xml": {
+      "get": {
+        "tags": [
+          "Electronic Invoicing (FEL)"
+        ],
+        "summary": "Download Invoice XML",
+        "description": "Stream the certified FEL invoice as the signed SAT XML document.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- The invoice must belong to the specified business\n- Returns `404` when the invoice is cancelled or has no FEL UUID yet",
+        "operationId": "downloadInvoiceXml",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Business ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Businessid"
+            },
+            "description": "Business ID"
+          },
+          {
+            "name": "invoiceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Invoice ID",
+              "examples": [
+                "507f1f77bcf86cd799439012"
+              ],
+              "title": "Invoiceid"
+            },
+            "description": "Invoice ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "XML document streamed",
+            "content": {
+              "application/xml": {}
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business or invoice not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "FEL provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/identify": {
       "post": {
         "tags": [

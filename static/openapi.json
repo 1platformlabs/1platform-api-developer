@@ -17744,6 +17744,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminUserDetail_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "email": "user@acme.example",
+                    "username": "user",
+                    "is_active": true,
+                    "is_superadmin": false,
+                    "role_ids": [
+                      "507f1f77bcf86cd799439020"
+                    ],
+                    "created_at": "2026-05-20T10:30:00Z",
+                    "roles": [
+                      {
+                        "id": "507f1f77bcf86cd799439020",
+                        "name": "app_admin",
+                        "description": "Tenant administrator"
+                      }
+                    ]
+                  },
+                  "msg": "User retrieved"
                 }
               }
             }
@@ -17829,6 +17851,12 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AdminUserUpdateRequest"
+              },
+              "example": {
+                "is_active": true,
+                "role_ids": [
+                  "507f1f77bcf86cd799439020"
+                ]
               }
             }
           }
@@ -17840,6 +17868,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminUserDetail_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "email": "user@acme.example",
+                    "username": "user",
+                    "is_active": true,
+                    "is_superadmin": false,
+                    "role_ids": [
+                      "507f1f77bcf86cd799439020"
+                    ],
+                    "created_at": "2026-05-20T10:30:00Z",
+                    "roles": []
+                  },
+                  "msg": "User updated"
                 }
               }
             }
@@ -17946,6 +17990,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "is_active": false
+                  },
+                  "msg": "User deactivated"
                 }
               }
             }
@@ -18042,6 +18094,9 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AdminUserInviteRequest"
+              },
+              "example": {
+                "email": "newuser@acme.example"
               }
             }
           }
@@ -18053,6 +18108,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "email": "newuser@acme.example",
+                    "status": "dispatched"
+                  },
+                  "msg": "Invite dispatched"
                 }
               }
             }
@@ -18106,6 +18169,7 @@
           "Tenant Admin"
         ],
         "summary": "List businesses in tenant",
+        "description": "Paginated list of `Business` documents scoped to the caller's app.\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 60 req/min.",
         "operationId": "adminListBusinesses",
         "security": [
           {
@@ -18121,9 +18185,11 @@
               "type": "integer",
               "maximum": 10000,
               "minimum": 1,
+              "description": "1-indexed page number",
               "default": 1,
               "title": "Page"
-            }
+            },
+            "description": "1-indexed page number"
           },
           {
             "name": "page_size",
@@ -18133,9 +18199,11 @@
               "type": "integer",
               "maximum": 200,
               "minimum": 1,
+              "description": "Items per page",
               "default": 50,
               "title": "Page Size"
-            }
+            },
+            "description": "Items per page"
           },
           {
             "name": "owner_user_id",
@@ -18176,11 +18244,35 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Businesses retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminPaginatedItemsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 50,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011"
+                      }
+                    ]
+                  },
+                  "msg": "Items retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -18194,6 +18286,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -18204,6 +18306,7 @@
           "Tenant Admin"
         ],
         "summary": "List invoices in tenant",
+        "description": "Paginated list of `Invoice` documents scoped to the caller's app, optionally filtered by FEL status.\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 60 req/min.",
         "operationId": "adminListInvoices",
         "security": [
           {
@@ -18219,9 +18322,11 @@
               "type": "integer",
               "maximum": 10000,
               "minimum": 1,
+              "description": "1-indexed page number",
               "default": 1,
               "title": "Page"
-            }
+            },
+            "description": "1-indexed page number"
           },
           {
             "name": "page_size",
@@ -18231,9 +18336,11 @@
               "type": "integer",
               "maximum": 200,
               "minimum": 1,
+              "description": "Items per page",
               "default": 50,
               "title": "Page Size"
-            }
+            },
+            "description": "Items per page"
           },
           {
             "name": "status",
@@ -18275,11 +18382,35 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Invoices retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminPaginatedItemsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 50,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011"
+                      }
+                    ]
+                  },
+                  "msg": "Items retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -18293,6 +18424,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -18303,6 +18444,7 @@
           "Tenant Admin"
         ],
         "summary": "List transactions in tenant",
+        "description": "Paginated list of `Transaction` documents scoped to the caller's app, optionally filtered by status.\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 60 req/min.",
         "operationId": "adminListTransactions",
         "security": [
           {
@@ -18318,9 +18460,11 @@
               "type": "integer",
               "maximum": 10000,
               "minimum": 1,
+              "description": "1-indexed page number",
               "default": 1,
               "title": "Page"
-            }
+            },
+            "description": "1-indexed page number"
           },
           {
             "name": "page_size",
@@ -18330,9 +18474,11 @@
               "type": "integer",
               "maximum": 200,
               "minimum": 1,
+              "description": "Items per page",
               "default": 50,
               "title": "Page Size"
-            }
+            },
+            "description": "Items per page"
           },
           {
             "name": "status",
@@ -18374,11 +18520,35 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Transactions retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminPaginatedItemsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 50,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011"
+                      }
+                    ]
+                  },
+                  "msg": "Items retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -18392,6 +18562,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -18402,6 +18582,7 @@
           "Tenant Admin"
         ],
         "summary": "List domains in tenant",
+        "description": "Paginated list of `Domain` documents scoped to the caller's app.\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 60 req/min.",
         "operationId": "adminListDomains",
         "security": [
           {
@@ -18417,9 +18598,11 @@
               "type": "integer",
               "maximum": 10000,
               "minimum": 1,
+              "description": "1-indexed page number",
               "default": 1,
               "title": "Page"
-            }
+            },
+            "description": "1-indexed page number"
           },
           {
             "name": "page_size",
@@ -18429,9 +18612,11 @@
               "type": "integer",
               "maximum": 200,
               "minimum": 1,
+              "description": "Items per page",
               "default": 50,
               "title": "Page Size"
-            }
+            },
+            "description": "Items per page"
           },
           {
             "name": "x-user-token",
@@ -18454,11 +18639,35 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Domains retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminPaginatedItemsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 50,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011"
+                      }
+                    ]
+                  },
+                  "msg": "Items retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -18472,6 +18681,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -18482,6 +18701,7 @@
           "Tenant Admin"
         ],
         "summary": "List background jobs in tenant",
+        "description": "Paginated list of `Job` documents scoped to the caller's app, optionally filtered by status.\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 60 req/min.",
         "operationId": "adminListJobs",
         "security": [
           {
@@ -18497,9 +18717,11 @@
               "type": "integer",
               "maximum": 10000,
               "minimum": 1,
+              "description": "1-indexed page number",
               "default": 1,
               "title": "Page"
-            }
+            },
+            "description": "1-indexed page number"
           },
           {
             "name": "page_size",
@@ -18509,9 +18731,11 @@
               "type": "integer",
               "maximum": 200,
               "minimum": 1,
+              "description": "Items per page",
               "default": 50,
               "title": "Page Size"
-            }
+            },
+            "description": "Items per page"
           },
           {
             "name": "status",
@@ -18553,11 +18777,35 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Jobs retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminPaginatedItemsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 50,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011"
+                      }
+                    ]
+                  },
+                  "msg": "Items retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -18571,6 +18819,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -18581,6 +18839,7 @@
           "Tenant Admin"
         ],
         "summary": "List API call logs in tenant",
+        "description": "Paginated list of `ApiLog` documents scoped to the caller's app, optionally filtered by success/failure and external provider.\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 60 req/min.",
         "operationId": "adminListLogs",
         "security": [
           {
@@ -18596,9 +18855,11 @@
               "type": "integer",
               "maximum": 10000,
               "minimum": 1,
+              "description": "1-indexed page number",
               "default": 1,
               "title": "Page"
-            }
+            },
+            "description": "1-indexed page number"
           },
           {
             "name": "page_size",
@@ -18608,9 +18869,11 @@
               "type": "integer",
               "maximum": 200,
               "minimum": 1,
+              "description": "Items per page",
               "default": 50,
               "title": "Page Size"
-            }
+            },
+            "description": "Items per page"
           },
           {
             "name": "success",
@@ -18671,11 +18934,35 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Logs retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminPaginatedItemsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 1,
+                    "page": 1,
+                    "page_size": 50,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011"
+                      }
+                    ]
+                  },
+                  "msg": "Items retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -18686,6 +18973,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -18750,6 +19047,9 @@
                   }
                 ],
                 "title": "Body"
+              },
+              "example": {
+                "reason": "Reproducing checkout bug for ticket #4521"
               }
             }
           }
@@ -18761,6 +19061,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminImpersonateResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "access_token": "eyJhbGciOi...",
+                    "token_type": "bearer",
+                    "expires_in": 900,
+                    "target_user_id": "507f1f77bcf86cd799439011",
+                    "impersonated_by": "507f1f77bcf86cd799439033",
+                    "expires_at": "2026-05-26T12:15:00Z"
+                  },
+                  "msg": "Impersonation token issued"
                 }
               }
             }
@@ -18858,6 +19170,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminAppResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439040",
+                    "slug": "acme-co",
+                    "name": "Acme Co",
+                    "status": "active",
+                    "is_admin": false,
+                    "owner_id": "507f1f77bcf86cd799439033",
+                    "config": {
+                      "features": {
+                        "dark_mode": true
+                      }
+                    },
+                    "created_at": "2026-05-20T10:30:00Z",
+                    "keys_configured": {
+                      "openai": true,
+                      "migo": false
+                    }
+                  },
+                  "msg": "App retrieved"
                 }
               }
             }
@@ -18922,6 +19256,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AdminAppUpdateRequest"
+              },
+              "example": {
+                "name": "Acme Co",
+                "config_patch": {
+                  "features": {
+                    "dark_mode": true
+                  }
+                }
               }
             }
           }
@@ -18933,6 +19275,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminAppResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439040",
+                    "slug": "acme-co",
+                    "name": "Acme Co",
+                    "status": "active",
+                    "is_admin": false,
+                    "owner_id": "507f1f77bcf86cd799439033",
+                    "config": {
+                      "features": {
+                        "dark_mode": true
+                      }
+                    },
+                    "created_at": "2026-05-20T10:30:00Z",
+                    "keys_configured": {
+                      "openai": true,
+                      "migo": false
+                    }
+                  },
+                  "msg": "App updated"
                 }
               }
             }
@@ -19010,6 +19374,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminAppKeyRotateResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "api_key": "ak-NEW-SHOWN-ONCE-…",
+                    "rotated_at": "2026-05-26T12:00:00Z"
+                  },
+                  "msg": "App api_key rotated"
                 }
               }
             }
@@ -19087,6 +19459,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminMetricsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "users_total": 42,
+                    "users_active": 38,
+                    "businesses_total": 7,
+                    "invoices_mtd": 134,
+                    "credits_consumed_mtd": 9812.5,
+                    "jobs_running": 3,
+                    "jobs_failed_24h": 0,
+                    "top_users": [
+                      {
+                        "user_id": "507f1f77bcf86cd799439011",
+                        "email": "user@acme.example",
+                        "calls": 1204
+                      }
+                    ],
+                    "generated_at": "2026-05-26T12:00:00Z"
+                  },
+                  "msg": "Metrics retrieved"
                 }
               }
             }
@@ -35752,6 +36145,10 @@
     {
       "name": "Platform Admin",
       "description": "Cross-tenant administration for the 1Platform team — provision new apps, list every registered app, inspect a single app, and view platform-wide metrics. Requires the superadmin role."
+    },
+    {
+      "name": "Tenant Admin",
+      "description": "Per-tenant administration scoped to the actor's `app_id`. Lets the tenant `app_admin` role list/manage users, roles and impersonation, plus read business, invoicing, billing, domain and operational data for their own tenant."
     }
   ]
 }

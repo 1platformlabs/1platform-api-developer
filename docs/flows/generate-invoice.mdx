@@ -223,6 +223,28 @@ curl -X POST "$BASE_URL/businesses" \
 Save `data.id` as `$BUSINESS_ID`.
 :::
 
+:::tip Create the business and its first branch in one call
+You can include an optional **`branch`** object in the request body. When present, the
+API creates the branch **and** links the calling user to it (as the branch owner) in the
+same call, so the business is immediately returned by `GET /api/v1/businesses`. Omitting
+`branch` creates a standalone business that is **not** linked to any user — add a branch
+later via [Step 2b](#step-2b--create-branch-optional) to make it appear in listings.
+
+```bash
+curl -X POST "$BASE_URL/businesses" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Company S.A.",
+    "documentType": "NIT",
+    "documentNumber": "12345678",
+    "address": "Zona 10, Guatemala City",
+    "branch": { "name": "Main Branch", "commerceId": "COM-001" }
+  }'
+```
+:::
+
 **Common errors:**
 
 | Code | Cause | Solution |

@@ -5036,7 +5036,7 @@
           "Businesses & Branches"
         ],
         "summary": "Create Business",
-        "description": "Register a new business entity for invoicing.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The business is used as the issuing party on invoices\n- Business identifiers (tax ID) must be unique\n- Optionally set `commerceId` for electronic invoicing (FEL) integration",
+        "description": "Register a new business entity for invoicing.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The business is used as the issuing party on invoices\n- Business identifiers (tax ID) must be unique\n- Optionally include a `branch` object (`name`, `commerceId`). When provided, the branch and an owner link (UserBranch, role `admin`) are created in the same call so the business is immediately visible in `GET /businesses`. Omitting it creates a standalone (unlinked) business; add a branch later via `POST /businesses/{businessId}/branches`.",
         "operationId": "createBusiness",
         "security": [
           {
@@ -5075,7 +5075,11 @@
                 "documentType": "NIT",
                 "documentNumber": "12345678-9",
                 "address": "4a Avenida, Zona 1, Guatemala",
-                "status": "active"
+                "status": "active",
+                "branch": {
+                  "name": "Sucursal Central",
+                  "commerceId": "COM-001"
+                }
               }
             }
           }
@@ -10998,7 +11002,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ReportPeriod",
+              "$ref": "#/components/schemas/app__models__analytics__ReportPeriod",
               "description": "Report time period",
               "examples": [
                 "30d"
@@ -11246,7 +11250,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ReportPeriod",
+              "$ref": "#/components/schemas/app__models__analytics__ReportPeriod",
               "description": "Report time period",
               "examples": [
                 "30d"
@@ -12761,7 +12765,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "$ref": "#/components/schemas/ReportPeriod",
               "description": "Report period",
               "default": "7d"
             },
@@ -12931,7 +12935,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/app__models__adsense__ReportPeriod",
+              "$ref": "#/components/schemas/ReportPeriod",
               "description": "Report period",
               "default": "30d"
             },
@@ -25416,6 +25420,7 @@
           },
           "commerceId": {
             "type": "string",
+            "maxLength": 255,
             "minLength": 1,
             "title": "Commerceid",
             "description": "Commerce ID for FEL integration",
@@ -25481,6 +25486,17 @@
             "examples": [
               "active"
             ]
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreateBranchRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional initial branch. When provided, the branch and an owner link (UserBranch, role=admin) are created in the same call so the business is immediately visible to the caller in GET /businesses. Omit to create a standalone (unlinked) business."
           }
         },
         "type": "object",
@@ -25493,6 +25509,10 @@
         "title": "CreateBusinessRequest",
         "example": {
           "address": "4a Avenida, Zona 1, Guatemala",
+          "branch": {
+            "commerceId": "COM-001",
+            "name": "Sucursal Central"
+          },
           "documentNumber": "12345678-9",
           "documentType": "NIT",
           "name": "Mi Empresa S.A.",
@@ -30786,8 +30806,7 @@
         "enum": [
           "7d",
           "30d",
-          "90d",
-          "12m"
+          "90d"
         ],
         "title": "ReportPeriod"
       },
@@ -35978,12 +35997,13 @@
         "title": "WizardStatus",
         "description": "Status of an agent creation wizard session."
       },
-      "app__models__adsense__ReportPeriod": {
+      "app__models__analytics__ReportPeriod": {
         "type": "string",
         "enum": [
           "7d",
           "30d",
-          "90d"
+          "90d",
+          "12m"
         ],
         "title": "ReportPeriod"
       }

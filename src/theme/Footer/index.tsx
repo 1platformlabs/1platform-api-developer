@@ -22,6 +22,7 @@ const columns: FooterColumn[] = [
       {label: 'AI Content', href: `${WEBSITE}/solutions/content/`},
       {label: 'Whitelabel Dashboard', href: `${WEBSITE}/solutions/whitelabel/`},
       {label: 'Payments & Invoicing', href: `${WEBSITE}/payments-invoicing/`},
+      {label: 'Ads & Traffic', href: `${WEBSITE}/ads-traffic/`},
       {label: 'For Agencies', href: `${WEBSITE}/for-agencies/`},
       {label: 'For Developers', href: `${WEBSITE}/for-developers/`},
       {label: 'All Solutions', href: `${WEBSITE}/solutions/`},

@@ -160,6 +160,13 @@ const quickLinks = [
     primary: false,
   },
   {
+    icon: '🎯',
+    title: 'AdClicker Integration',
+    description: 'Step-by-step flow to integrate AdClicker: single sign-on exchange, the Campaigns contract (CRUD + states), the composed shortener pool, and the signed analytics webhook.',
+    href: '/docs/flows/adclicker-integration',
+    primary: false,
+  },
+  {
     icon: '📄',
     title: 'OpenAPI Spec',
     description: 'Download the raw OpenAPI 3.1 specification for code generation or custom tooling.',

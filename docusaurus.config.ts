@@ -132,6 +132,11 @@ const config: Config = {
               target: '_self',
             },
             {
+              href: 'https://1platform.pro/ads-traffic/',
+              label: 'Ads & Traffic',
+              target: '_self',
+            },
+            {
               href: 'https://1platform.pro/solutions/',
               label: 'View all solutions',
               target: '_self',

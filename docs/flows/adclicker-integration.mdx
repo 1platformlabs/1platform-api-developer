@@ -1,0 +1,767 @@
+---
+title: "AdClicker Integration"
+description: "Step-by-step flow to integrate with AdClicker: single sign-on (system→AdClicker exchange), the Campaigns contract (CRUD + states), the composed shortener pool endpoint, and the signed analytics webhook delivered back to 1Platform."
+sidebar_position: 22
+---
+
+# Flow: AdClicker Integration
+
+## Overview
+
+This flow documents how an integrator wires the **AdClicker** traffic engine into the
+1Platform ecosystem. AdClicker is a standalone product integrated over HTTP only — it
+never imports 1Platform internals, and 1Platform never imports AdClicker internals. Four
+contracts make up the integration:
+
+1. **SSO / exchange** — a system-to-system call that provisions or links an AdClicker
+   account for a 1Platform user and returns an AdClicker JWT.
+2. **Campaigns contract** — the advertiser-facing CRUD surface that describes where to
+   send traffic and with what budget, plus the campaign state machine.
+3. **Composed shortener endpoint** — the existing pool endpoint consumed by plugins,
+   now composing legacy settings ⊕ active campaigns with the response shape unchanged.
+4. **Analytics webhook** — AdClicker reports traffic/campaign events back to 1Platform
+   over a signed, idempotent HTTP contract.
+
+**Use case:** Let 1Platform users open AdClicker without re-registering, run advertiser
+campaigns that feed the traffic pools your plugins already consume, and surface AdClicker
+analytics inside 1Platform.
+
+**End result:** A 1Platform user lands authenticated in AdClicker, advertiser campaigns
+drive the shortener pool, and monetization events flow back to 1Platform analytics.
+
+---
+
+## Response envelope (AdClicker)
+
+Every AdClicker endpoint returns the same envelope:
+
+```json
+{ "code": 200, "valid": true, "msg": "OK", "data": { /* endpoint payload */ } }
+```
+
+When `valid` is `false`, map the response to a UI error and read `msg`:
+
+```json
+{ "code": 401, "valid": false, "msg": "Invalid credentials", "data": null }
+```
+
+:::note
+This is the **AdClicker** envelope (`{ code, valid, msg, data }`). It is distinct from the
+1Platform client-facing wrapper (`{ success, data, msg }`) documented in
+[response format](../reference/response-format). The analytics webhook in Step 9 targets the
+**1Platform** API, so it uses the 1Platform conventions.
+:::
+
+---
+
+## Authentication model
+
+| Caller | Header | Used for |
+|---|---|---|
+| System → AdClicker (server-side, done by `1platform-api`) | `x-access-api-key: <service-key>` | Minting the signed SSO exchange |
+| Plugin → AdClicker (server-side) | `x-access-api-key: <app-key>` | Reading the composed shortener pool |
+| Advertiser user → AdClicker | `x-access-token: <JWT>` | Campaign CRUD, stats, wallet |
+| AdClicker → 1Platform (server-side) | `X-AdClicker-Signature: sha256=<hmac>` + `X-Idempotency-Key` | Delivering analytics events |
+
+:::warning Never expose the service key in client code
+The `x-access-api-key` used for SSO exchange and pool reads is a **server-side** credential.
+The advertiser `x-access-token` JWT is obtained through the SSO exchange (Step 1) and scopes
+every campaign and wallet call to the token's user.
+:::
+
+---
+
+## Variables used in examples
+
+```bash
+ADCLICKER_BASE_URL="https://api.adclicker.pro"   # AdClicker backend base URL
+SERVICE_API_KEY="ak-svc-1platform-2026"          # system→AdClicker service key (server-side)
+SSO_SECRET="sso_shared_secret_demo"              # shared SSO HMAC secret (server-side)
+APP_API_KEY="ak-app-epublibre-2026"              # plugin→AdClicker app key (server-side)
+APP_ID="1platform"                               # appId for internal-traffic campaigns
+ACCESS_TOKEN=""                                  # AdClicker JWT (from Step 1)
+USER_ID=""                                        # AdClicker _id (from Step 1)
+CAMPAIGN_ID=""                                   # captured in Step 3
+
+# 1Platform side (analytics webhook receiver)
+ONEP_BASE_URL="https://api.1platform.pro/api/v1"
+ADCLICKER_WEBHOOK_SECRET="whsec_adclicker_demo"  # shared HMAC secret (server-side)
+```
+
+---
+
+## Data model — Campaign
+
+The `Campaign` object returned by every campaign endpoint:
+
+| Field | Type | Description |
+|---|---|---|
+| `_id` | string | Campaign id |
+| `advertiserUserId` | string | Owner (AdClicker user id) |
+| `appId` | string | App the campaign belongs to (`1platform` for internal traffic) |
+| `name` | string | Human-readable campaign name |
+| `kind` | string | `internal` (1Platform-owned traffic) or `external` (third-party advertiser) |
+| `targetUrl` | string | Destination URL traffic is sent to |
+| `type` | string | Pricing model: `cpc` (cost per click) or `cpm` (cost per mille) |
+| `bid` | number | Bid amount per click (`cpc`) or per 1,000 impressions (`cpm`) |
+| `dailyBudget` | number | Max spend per day |
+| `totalBudget` | number | Max lifetime spend |
+| `spend` | number | Accumulated spend (rounded to 2 decimals) |
+| `impressions` | number | Lifetime impressions |
+| `clicks` | number | Lifetime clicks |
+| `countries` | string[] | ISO-3166 alpha-2 allow list (empty = all) |
+| `excludeCountries` | string[] | ISO-3166 alpha-2 deny list |
+| `schedule` | object | `{ start, end }` delivery window (hours) |
+| `status` | string | See the state machine below |
+| `priority` | number | Pool ordering weight (`internal` campaigns rank first) |
+| `time` | string | Creation timestamp |
+
+### Campaign state machine
+
+| Status | Meaning |
+|---|---|
+| `draft` | Bare model default — not the state external campaigns are created in |
+| `onreview` | Submitted, pending approval |
+| `active` | Approved and delivering (auto for `internal` campaigns) |
+| `paused` | Manually paused by the advertiser |
+| `exhausted` | Daily or total budget reached — removed from pools |
+| `rejected` | Declined in review (terminal) |
+| `done` | Completed / archived (terminal) |
+
+Valid transitions: `draft → onreview → active → paused/exhausted → done`. `rejected` is
+terminal. An invalid transition (for example `done → active`) returns `valid:false` with an
+error code — the status is left unchanged.
+
+:::note
+`external` campaigns are created as `onreview` (pending moderation) — `draft` is only the
+bare model default and is not the create-time state. `internal` campaigns (`kind:'internal'`,
+`appId:'1platform'`) may auto-promote to `active` and can be budget-exempt by configuration,
+so they keep serving even past budget.
+:::
+
+---
+
+## Step-by-step flow
+
+### Step 1 — SSO exchange (system → AdClicker)
+
+**Goal:** Provision or link an AdClicker account for a 1Platform user and obtain an AdClicker
+JWT. This call is performed **server-side by `1platform-api`** with the service key — never
+from a browser.
+
+**Endpoint:** `POST /v2/sso/exchange`
+
+**Auth:** `x-access-api-key: $SERVICE_API_KEY`
+
+The body carries a **signature** so AdClicker can verify the call originated from
+`1platform-api`. The signature is `HMAC-SHA256` over the string
+`${onePlatformUserId}.${email.toLowerCase()}.${source}` (the three fields joined by dots,
+with the email lower-cased), keyed with the shared SSO secret, hex-encoded. AdClicker
+recomputes it server-side and rejects the call if it does not match.
+
+```bash
+# SSO_SECRET is the shared server-side secret (never exposed to clients)
+SSO_USER_ID="u_5f3a9c21"
+SSO_EMAIL="maria@example.com"
+SSO_SOURCE="1platform"
+SSO_MATERIAL="${SSO_USER_ID}.$(printf '%s' "$SSO_EMAIL" | tr '[:upper:]' '[:lower:]').${SSO_SOURCE}"
+SSO_SIG=$(printf '%s' "$SSO_MATERIAL" | openssl dgst -sha256 -hmac "$SSO_SECRET" | sed 's/^.* //')
+
+curl -X POST "$ADCLICKER_BASE_URL/v2/sso/exchange" \
+  -H "x-access-api-key: $SERVICE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "onePlatformUserId": "'"$SSO_USER_ID"'",
+    "email": "'"$SSO_EMAIL"'",
+    "source": "'"$SSO_SOURCE"'",
+    "signature": "'"$SSO_SIG"'"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "code": 200,
+  "valid": true,
+  "msg": "SSO exchange successful",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+    "_id": "63f1a9c2e4b0a1d2c3e4f5a6",
+    "email": "maria@example.com",
+    "role": { "name": "Advertiser", "type": "advertiser", "permissions": [] },
+    "roles": ["63f1a9c2e4b0a1d2c3e4f5b7"],
+    "source": "1platform"
+  }
+}
+```
+
+:::note
+The exchange is **idempotent** by `{ email, source }`: calling it again for the same user
+links/reuses the existing AdClicker account (no duplicate is created) and issues a fresh JWT.
+Save `data.accessToken` as `$ACCESS_TOKEN` and `data._id` as `$USER_ID` for the calls below.
+:::
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 401 | Missing/unverifiable `x-access-api-key`, or `signature` does not match the HMAC material | Mint the credential server-side; recompute the signature over `${onePlatformUserId}.${email.toLowerCase()}.${source}` with the SSO secret |
+| 422 | Missing `onePlatformUserId` / `email` / `source` / `signature` in the body | Send `{ "onePlatformUserId", "email", "source": "1platform", "signature" }` |
+
+---
+
+### Step 2 — List campaigns (advertiser)
+
+**Goal:** Read the advertiser's campaigns. Every query is scoped to the token's user.
+
+**Endpoint:** `GET /v2/users/:userId/campaigns`
+
+**Auth:** `x-access-token: $ACCESS_TOKEN`
+
+```bash
+curl -X GET "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns" \
+  -H "x-access-token: $ACCESS_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "code": 200,
+  "valid": true,
+  "msg": "OK",
+  "data": {
+    "campaigns": [
+      {
+        "_id": "c_8821",
+        "advertiserUserId": "63f1a9c2e4b0a1d2c3e4f5a6",
+        "appId": "epublibre",
+        "name": "Spring promo",
+        "kind": "external",
+        "targetUrl": "https://shop.example.com/spring",
+        "type": "cpc",
+        "bid": 0.12,
+        "dailyBudget": 25.0,
+        "totalBudget": 500.0,
+        "spend": 38.4,
+        "impressions": 12940,
+        "clicks": 320,
+        "countries": ["US", "MX"],
+        "excludeCountries": [],
+        "schedule": { "start": 8, "end": 22 },
+        "status": "active",
+        "priority": 10,
+        "time": "2026-06-01T12:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+:::warning Ownership isolation
+Reading a campaign that belongs to another advertiser returns **404** — the API does not leak
+the existence of campaigns owned by other users.
+:::
+
+---
+
+### Step 3 — Create a campaign (advertiser)
+
+**Goal:** Create an `external` advertiser campaign. It is created as `onreview` (pending moderation).
+
+**Endpoint:** `POST /v2/users/:userId/campaigns`
+
+**Auth:** `x-access-token: $ACCESS_TOKEN`
+
+```bash
+curl -X POST "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns" \
+  -H "x-access-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Spring promo",
+    "kind": "external",
+    "targetUrl": "https://shop.example.com/spring",
+    "type": "cpc",
+    "bid": 0.12,
+    "dailyBudget": 25.0,
+    "totalBudget": 500.0,
+    "countries": ["US", "MX"],
+    "excludeCountries": [],
+    "schedule": { "start": 8, "end": 22 }
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "code": 201,
+  "valid": true,
+  "msg": "Campaign created",
+  "data": {
+    "campaign": {
+      "_id": "c_8821",
+      "advertiserUserId": "63f1a9c2e4b0a1d2c3e4f5a6",
+      "appId": "epublibre",
+      "name": "Spring promo",
+      "kind": "external",
+      "targetUrl": "https://shop.example.com/spring",
+      "type": "cpc",
+      "bid": 0.12,
+      "dailyBudget": 25.0,
+      "totalBudget": 500.0,
+      "spend": 0,
+      "impressions": 0,
+      "clicks": 0,
+      "countries": ["US", "MX"],
+      "excludeCountries": [],
+      "schedule": { "start": 8, "end": 22 },
+      "status": "onreview",
+      "priority": 0,
+      "time": "2026-06-14T15:00:00Z"
+    }
+  }
+}
+```
+
+:::note
+Save `data.campaign._id` as `$CAMPAIGN_ID`. The `kind` field is optional and defaults to
+`external` for advertiser-created campaigns; budget amounts are stored rounded to 2 decimals.
+:::
+
+---
+
+### Step 4 — Read a single campaign (advertiser)
+
+**Endpoint:** `GET /v2/users/:userId/campaigns/:campaignId`
+
+**Auth:** `x-access-token: $ACCESS_TOKEN`
+
+```bash
+curl -X GET "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns/$CAMPAIGN_ID" \
+  -H "x-access-token: $ACCESS_TOKEN"
+```
+
+**Response (200):** `data.campaign` (same shape as Step 3).
+
+---
+
+### Step 5 — Update / pause / resume a campaign (advertiser)
+
+**Goal:** Patch any subset of fields. Sending `status` drives the state machine — for example
+`paused` to pause delivery, `active` to resume.
+
+**Endpoint:** `PUT /v2/users/:userId/campaigns/:campaignId`
+
+**Auth:** `x-access-token: $ACCESS_TOKEN`
+
+```bash
+# Pause
+curl -X PUT "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns/$CAMPAIGN_ID" \
+  -H "x-access-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "paused"}'
+
+# Raise the daily budget
+curl -X PUT "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns/$CAMPAIGN_ID" \
+  -H "x-access-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dailyBudget": 40.0}'
+```
+
+**Response (200):** `data.campaign` with the new values.
+
+**Common errors:**
+
+| Code | Cause | Solution |
+|---|---|---|
+| 400 | Invalid state transition (e.g. `done → active`) | Only follow `draft → onreview → active → paused/exhausted → done` |
+| 404 | Campaign not owned by the token user | Use a `campaignId` from Step 2 |
+
+---
+
+### Step 6 — Delete a campaign (advertiser)
+
+**Goal:** Soft-delete a campaign. It stops appearing in pools.
+
+**Endpoint:** `DELETE /v2/users/:userId/campaigns/:campaignId`
+
+**Auth:** `x-access-token: $ACCESS_TOKEN`
+
+```bash
+curl -X DELETE "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns/$CAMPAIGN_ID" \
+  -H "x-access-token: $ACCESS_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{ "code": 200, "valid": true, "msg": "Campaign deleted.", "data": { "_id": "c_8821" } }
+```
+
+---
+
+### Step 7 — Campaign stats (advertiser)
+
+**Goal:** Read aggregated delivery metrics plus a daily time series.
+
+**Endpoint:** `GET /v2/users/:userId/campaigns/:campaignId/stats`
+
+**Auth:** `x-access-token: $ACCESS_TOKEN`
+
+```bash
+curl -X GET "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns/$CAMPAIGN_ID/stats" \
+  -H "x-access-token: $ACCESS_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{
+  "code": 200,
+  "valid": true,
+  "msg": "OK",
+  "data": {
+    "impressions": 12940,
+    "clicks": 320,
+    "ctr": 0.0247,
+    "spend": 38.4,
+    "series": [
+      { "date": "2026-06-12", "impressions": 4100, "clicks": 96, "spend": 11.52 },
+      { "date": "2026-06-13", "impressions": 4520, "clicks": 110, "spend": 13.20 },
+      { "date": "2026-06-14", "impressions": 4320, "clicks": 114, "spend": 13.68 }
+    ]
+  }
+}
+```
+
+---
+
+### Step 8 — Internal-traffic campaigns (1Platform-owned)
+
+Internal campaigns send 1Platform's own products traffic and are managed under the
+`1platform` app namespace. They are typically created `active` and can be budget-exempt.
+
+**List:** `GET /v2/apps/1platform/campaigns`
+
+```bash
+curl -X GET "$ADCLICKER_BASE_URL/v2/apps/$APP_ID/campaigns" \
+  -H "x-access-token: $ACCESS_TOKEN"
+```
+
+**Create:** `POST /v2/apps/1platform/campaigns`
+
+```bash
+curl -X POST "$ADCLICKER_BASE_URL/v2/apps/$APP_ID/campaigns" \
+  -H "x-access-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Promote epublibre",
+    "targetUrl": "https://epublibre.gratis/",
+    "type": "cpm",
+    "countries": ["MX", "AR", "ES"],
+    "schedule": { "start": 0, "end": 24 }
+  }'
+```
+
+**Response (201):** `data.campaign` with `kind:"internal"`, `appId:"1platform"`, and
+`status:"active"`.
+
+**Delete:** `DELETE /v2/apps/1platform/campaigns/:campaignId`
+
+```bash
+curl -X DELETE "$ADCLICKER_BASE_URL/v2/apps/$APP_ID/campaigns/$CAMPAIGN_ID" \
+  -H "x-access-token: $ACCESS_TOKEN"
+```
+
+---
+
+### Step 9 — Advertiser wallet
+
+Advertisers fund campaigns from a per-user wallet. Ownership is enforced by the JWT user.
+
+**Read balance:** `GET /v2/users/:userId/advertiser/balance`
+
+```bash
+curl -X GET "$ADCLICKER_BASE_URL/v2/users/$USER_ID/advertiser/balance" \
+  -H "x-access-token: $ACCESS_TOKEN"
+```
+
+**Response (200):**
+
+```json
+{ "code": 200, "valid": true, "msg": "OK", "data": { "balance": 461.6, "currency": "USD" } }
+```
+
+**Add funds:** `POST /v2/users/:userId/advertiser/funds`
+
+```bash
+curl -X POST "$ADCLICKER_BASE_URL/v2/users/$USER_ID/advertiser/funds" \
+  -H "x-access-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 100.0}'
+```
+
+**Response (200):**
+
+```json
+{ "code": 200, "valid": true, "msg": "Funds added.", "data": { "balance": 561.6, "currency": "USD" } }
+```
+
+:::note
+Surface this wallet to advertisers with generic labels (for example **Wallet** / **Saldo**,
+**Add funds**). Never render an external payment-provider name on the advertiser surface.
+:::
+
+---
+
+## Composed shortener endpoint (pool)
+
+The existing pool endpoint your plugins already consume is **extended, not replaced**: its
+response shape is unchanged, but the URL pools now compose the **legacy** settings ⊕ the
+**active campaigns** that match the request context.
+
+**Endpoint:** `GET /v2/apps/:appId/settings/shortener`
+
+**Auth:** `x-access-api-key: $APP_API_KEY` (server-side, plugin)
+
+```bash
+curl -X GET "$ADCLICKER_BASE_URL/v2/apps/$APP_ID/settings/shortener" \
+  -H "x-access-api-key: $APP_API_KEY"
+```
+
+**Response (200) — shape unchanged:**
+
+```json
+{
+  "code": 200,
+  "valid": true,
+  "msg": "OK",
+  "data": {
+    "exchangeListUrls": ["https://epublibre.gratis/", "https://shop.example.com/spring"],
+    "exchangeGoUrls": ["https://epublibre.gratis/"],
+    "exchangeCountries": ["MX", "AR", "ES", "US"],
+    "exchangeExcludeCountries": [],
+    "exchangePopupsUrls": ["https://epublibre.gratis/"]
+  }
+}
+```
+
+**Composition rules:**
+
+- The returned keys are exactly `exchangeListUrls`, `exchangeGoUrls`, `exchangeCountries`,
+  `exchangeExcludeCountries`, `exchangePopupsUrls` — **the plugin requires no changes**.
+- `internal` campaigns are **prioritized** at the front of the pool, ahead of legacy entries.
+- A campaign's `targetUrl` is included only when it passes the `countries` / `excludeCountries`
+  filter, falls inside its `schedule` window, and is **not** `exhausted`.
+- **Backward compatible:** when there are no campaigns for an `appId`, the response is identical
+  byte-for-byte to the legacy `exchangeSettings`-only behaviour.
+
+:::note Why the shape is frozen
+Plugins read this exact shape (e.g. `monetizationlink-exchange`) with the `x-access-api-key`
+header. The composition happens server-side; the contract surface stays frozen so existing
+plugin installs keep working without an update.
+:::
+
+---
+
+## Analytics webhook (AdClicker → 1Platform)
+
+AdClicker reports monetization events back to **1Platform** over a signed HTTP contract so the
+analytics stay unified without coupling the two products. AdClicker is the sender;
+`1platform-api` is the receiver.
+
+**Endpoint (on `1platform-api`):** `POST /api/v1/webhooks/adclicker`
+
+**Required headers (sent by AdClicker):**
+
+```
+X-AdClicker-Signature: sha256=<hmac>
+X-Idempotency-Key: <unique-event-id>
+Content-Type: application/json
+```
+
+The signature is `HMAC-SHA256` of the raw request body, keyed with the shared
+`ADCLICKER_WEBHOOK_SECRET`. The secret is read from config/env and is **never** written to logs.
+
+**Event body:** the payload is **nested**, keyed by `type`, with the event details under
+`data`:
+
+```json
+{
+  "type": "traffic.click",
+  "data": {
+    "campaignId": "c_8821",
+    "appId": "epublibre",
+    "country": "US",
+    "cost": 0.05
+  }
+}
+```
+
+Event types: `traffic.click`, `campaign.exhausted`, `campaign.delivered`. The `data` block
+varies per type — for example:
+
+```json
+{ "type": "campaign.exhausted", "data": { "campaignId": "c_8821", "appId": "epublibre", "spend": 25.0 } }
+```
+
+```json
+{ "type": "campaign.delivered", "data": { "campaignId": "c_8821", "appId": "epublibre", "country": "US", "cost": 0.05 } }
+```
+
+**Example POST (sender side):**
+
+```bash
+BODY='{"type":"traffic.click","data":{"campaignId":"c_8821","appId":"epublibre","country":"US","cost":0.05}}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$ADCLICKER_WEBHOOK_SECRET" | sed 's/^.* //')
+
+curl -X POST "$ONEP_BASE_URL/webhooks/adclicker" \
+  -H "X-AdClicker-Signature: sha256=$SIG" \
+  -H "X-Idempotency-Key: evt_3f9a2c71" \
+  -H "Content-Type: application/json" \
+  -d "$BODY"
+```
+
+**Responses:**
+
+| Code | When | Body |
+|---|---|---|
+| `200` | Valid signature, new `X-Idempotency-Key`, event persisted | `{ "success": true, "data": null, "msg": "Event accepted" }` |
+| `400` | Missing `X-Idempotency-Key` (or otherwise malformed request) | `{ "success": false, "data": { "code": "MISSING_IDEMPOTENCY_KEY" }, "msg": "..." }` |
+| `401` | Signature does not match the body | `{ "success": false, "data": { "code": "INVALID_SIGNATURE" }, "msg": "..." }` |
+| `409` | Replay — an event with the same `X-Idempotency-Key` was already processed | `{ "success": false, "data": { "code": "DUPLICATE_EVENT" }, "msg": "..." }` |
+
+:::warning Idempotent by `X-Idempotency-Key`
+The receiver dedupes on `X-Idempotency-Key`. A replayed event returns **409** and is **not**
+persisted twice. Treat `409` as success for delivery purposes — the event is already recorded.
+:::
+
+### Verifying the signature (receiver — Python)
+
+```python
+import hmac
+import hashlib
+
+def verify_adclicker(body: bytes, signature_header: str, secret: str) -> bool:
+    if not signature_header.startswith("sha256="):
+        return False
+    expected = signature_header.removeprefix("sha256=")
+    actual = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, actual)
+```
+
+Once a `200` is recorded, the event is queryable through the 1Platform analytics router —
+unified analytics without either product importing the other's code.
+
+---
+
+## Full end-to-end example
+
+```bash
+# === VARIABLES ===
+ADCLICKER_BASE_URL="https://api.adclicker.pro"
+SERVICE_API_KEY="ak-svc-1platform-2026"
+APP_API_KEY="ak-app-epublibre-2026"
+APP_ID="1platform"
+
+# === STEP 1: SSO exchange (system → AdClicker) ===
+# SSO_SECRET is the shared server-side secret; signature = HMAC-SHA256 over
+# "${onePlatformUserId}.${email.toLowerCase()}.${source}".
+SSO_USER_ID="u_5f3a9c21"; SSO_EMAIL="maria@example.com"; SSO_SOURCE="1platform"
+SSO_MATERIAL="${SSO_USER_ID}.$(printf '%s' "$SSO_EMAIL" | tr '[:upper:]' '[:lower:]').${SSO_SOURCE}"
+SSO_SIG=$(printf '%s' "$SSO_MATERIAL" | openssl dgst -sha256 -hmac "$SSO_SECRET" | sed 's/^.* //')
+SSO=$(curl -s -X POST "$ADCLICKER_BASE_URL/v2/sso/exchange" \
+  -H "x-access-api-key: $SERVICE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"onePlatformUserId":"'"$SSO_USER_ID"'","email":"'"$SSO_EMAIL"'","source":"'"$SSO_SOURCE"'","signature":"'"$SSO_SIG"'"}')
+
+ACCESS_TOKEN=$(echo "$SSO" | jq -r '.data.accessToken')
+USER_ID=$(echo "$SSO" | jq -r '.data._id')
+
+# === STEP 3: Create an advertiser campaign ===
+CAMPAIGN_ID=$(curl -s -X POST "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns" \
+  -H "x-access-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name":"Spring promo","kind":"external","targetUrl":"https://shop.example.com/spring",
+    "type":"cpc","bid":0.12,"dailyBudget":25.0,"totalBudget":500.0,
+    "countries":["US","MX"],"excludeCountries":[],"schedule":{"start":8,"end":22}
+  }' | jq -r '.data.campaign._id')
+
+echo "Created campaign: $CAMPAIGN_ID"
+
+# === STEP 7: Read campaign stats ===
+curl -s -X GET "$ADCLICKER_BASE_URL/v2/users/$USER_ID/campaigns/$CAMPAIGN_ID/stats" \
+  -H "x-access-token: $ACCESS_TOKEN" | jq
+
+# === Composed shortener pool (plugin path, server-side) ===
+curl -s -X GET "$ADCLICKER_BASE_URL/v2/apps/$APP_ID/settings/shortener" \
+  -H "x-access-api-key: $APP_API_KEY" | jq
+```
+
+---
+
+## Idempotency and best practices
+
+### Idempotency
+
+- `POST /v2/sso/exchange` is **idempotent** by `{ email, source }` — re-calls link/reuse the
+  account and re-issue a JWT; no duplicate is created.
+- `GET` campaign/stats/balance/shortener endpoints are naturally idempotent.
+- `POST /v2/users/:userId/campaigns` is **not** idempotent — each call creates a new campaign.
+- `PUT` campaign updates are idempotent — sending the same body converges on the same state.
+- `DELETE` campaign is idempotent — deleting an already-deleted campaign is safe.
+- `POST /api/v1/webhooks/adclicker` is **idempotent by `X-Idempotency-Key`** — replays return
+  `409` and are not double-counted.
+
+### Retries
+
+- For **5xx** and timeouts on the analytics webhook, the sender retries with bounded backoff +
+  jitter up to a configured cap, then parks the event as failed for inspection (no infinite loop).
+- Never retry `POST /campaigns` blindly — list first to check whether the campaign already exists.
+
+### Spend & money
+
+- `spend` is incremented atomically per attributed click/view and exposed rounded to 2 decimals.
+- Budget jobs flip a campaign to `exhausted` when `spend >= totalBudget` or the day's spend
+  reaches `dailyBudget`, and resume it to `active` on the daily reset (unless budget-exempt).
+
+### Secrets
+
+- The SSO service key and `ADCLICKER_WEBHOOK_SECRET` are server-side only — never expose them in
+  client code, and never log the secret value.
+
+---
+
+## Quick endpoint reference
+
+| Area | Method | Endpoint | Auth |
+|---|---|---|---|
+| SSO exchange | `POST` | `/v2/sso/exchange` | `x-access-api-key` |
+| List campaigns | `GET` | `/v2/users/:userId/campaigns` | `x-access-token` |
+| Create campaign | `POST` | `/v2/users/:userId/campaigns` | `x-access-token` |
+| Read campaign | `GET` | `/v2/users/:userId/campaigns/:campaignId` | `x-access-token` |
+| Update / pause / resume | `PUT` | `/v2/users/:userId/campaigns/:campaignId` | `x-access-token` |
+| Delete campaign | `DELETE` | `/v2/users/:userId/campaigns/:campaignId` | `x-access-token` |
+| Campaign stats | `GET` | `/v2/users/:userId/campaigns/:campaignId/stats` | `x-access-token` |
+| List internal campaigns | `GET` | `/v2/apps/1platform/campaigns` | `x-access-token` |
+| Create internal campaign | `POST` | `/v2/apps/1platform/campaigns` | `x-access-token` |
+| Delete internal campaign | `DELETE` | `/v2/apps/1platform/campaigns/:campaignId` | `x-access-token` |
+| Wallet balance | `GET` | `/v2/users/:userId/advertiser/balance` | `x-access-token` |
+| Add funds | `POST` | `/v2/users/:userId/advertiser/funds` | `x-access-token` |
+| Composed shortener pool | `GET` | `/v2/apps/:appId/settings/shortener` | `x-access-api-key` |
+| Analytics webhook (→ 1Platform) | `POST` | `/api/v1/webhooks/adclicker` | `X-AdClicker-Signature` + `X-Idempotency-Key` |
+
+---
+
+## Quick checklist
+
+- [ ] `1platform-api` mints the SSO credential server-side and exchanges it at `/v2/sso/exchange`
+- [ ] The advertiser JWT (`x-access-token`) scopes every campaign and wallet call
+- [ ] Campaign state transitions follow `draft → onreview → active → paused/exhausted → done`
+- [ ] The composed shortener response shape is unchanged and `internal` campaigns rank first
+- [ ] The analytics webhook is signed (`X-AdClicker-Signature`) and idempotent (`X-Idempotency-Key`)
+- [ ] The webhook secret is read from config and never logged
+- [ ] Advertiser-facing surfaces use generic labels (Wallet / Saldo) — no provider names

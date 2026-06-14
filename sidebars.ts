@@ -54,6 +54,7 @@ const sidebars: SidebarsConfig = {
         'flows/support',
         'flows/tasks',
         'flows/webhook-configuration',
+        'flows/adclicker-integration',
       ],
     },
   ],

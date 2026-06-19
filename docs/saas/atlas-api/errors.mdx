@@ -1,0 +1,124 @@
+---
+title: Errors
+description: The Atlas API error contract — a flat { code, message } envelope with stable codes — plus the HTTP status mapping and a reference table of common codes.
+sidebar_position: 11
+---
+
+# Errors
+
+The **Atlas API** returns a single, flat error envelope on every failure:
+
+```json
+{
+  "code": "ENTITLEMENT_DENIED",
+  "message": "Member does not currently have access to the requested item."
+}
+```
+
+- **`code`** — a stable, machine-readable identifier. Branch your logic on this, never on `message`.
+- **`message`** — a human-readable, client-safe description. It never contains internal vendor names
+  or secrets, so it is safe to surface (but it may change wording over time).
+
+> This differs from the 1Platform API. Atlas does **not** use `{ success, data, msg }` — there is no
+> `success` boolean and no `data` wrapper. Errors are always `{ code, message }`.
+
+Some validation errors (notably FastAPI request-shape failures and a few auth routes) nest the same
+shape under a `detail` key — defensively read `body.code ?? body.detail?.code`.
+
+## HTTP status mapping
+
+The HTTP status reflects the category; the `code` gives the specifics.
+
+| Status | Category |
+|---|---|
+| `400` | Bad request / invalid parameter / invalid state transition |
+| `401` | Unauthenticated — missing/invalid/expired token, bad signature |
+| `403` | Authenticated but not allowed — no entitlement, insufficient role |
+| `404` | Not found — tenant, content, member, entitlement |
+| `409` | Conflict — slug taken, optimistic-lock, illegal transition |
+| `422` | Unprocessable — schema/validation failure |
+| `429` | Rate limited |
+| `500` | Internal error |
+| `502` / `503` | Upstream / provider unavailable |
+
+## Common error codes
+
+### Auth & tokens
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `UNAUTHORIZED` | 401 | No valid credential on the request. |
+| `TOKEN_INVALID` | 401 | Malformed token, or issued for another tenant. |
+| `TOKEN_EXPIRED` | 401 | Token past its lifetime — refresh or re-authenticate. |
+| `TOKEN_CONSUMED` | 401 | Single-use magic-link token already used. |
+| `CREDENTIALS_INVALID` | 401 | Admin email/password mismatch. |
+| `TOTP_REQUIRED` / `TOTP_INVALID` | 401 | TOTP enrolled but missing/wrong. |
+| `INSUFFICIENT_ROLE` | 403 | Member lacks the required role for the endpoint. |
+| `EMAIL_DELIVERY_FAILED` | 502 | Magic link was minted but the email could not be sent. |
+
+### Integration keys
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `INTEGRATION_KEY_REQUIRED` | 401 | No `ak-int-…` bearer token. |
+| `INTEGRATION_KEY_INVALID` | 401 | Key not found, inactive, or secret mismatch. |
+| `INTEGRATION_CAPABILITY_MISSING` | 403 | Key lacks the capability the endpoint needs. |
+
+### Tenant
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `TENANT_UNRESOLVED` | 404 | No active tenant matched the host/slug. |
+| `TENANT_NOT_FOUND` | 404 | Tenant id does not exist. |
+| `TENANT_SLUG_TAKEN` | 409 | Slug already used by another tenant. |
+| `TENANT_MISMATCH` | 403 | Token tenant ≠ resolved tenant. |
+
+### Content & delivery
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `CONTENT_NOT_FOUND` | 404 | Item missing, draft, or archived for this tenant. |
+| `CONTENT_SLUG_TAKEN` | 409 | Slug already used in this tenant's catalog. |
+| `ENTITLEMENT_DENIED` | 403 | Member has no active access to the item. |
+| `ASSET_FORMAT_NOT_ALLOWED` | 403 | Requested format isn't in the tenant's allow-list. |
+| `SEARCH_QUERY_EMPTY` / `SEARCH_QUERY_TOO_LONG` | 400 | Bad search input. |
+
+### Entitlements & webhooks
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `ENTITLEMENT_NOT_FOUND` | 404 | Entitlement id doesn't exist for this tenant. |
+| `PROVIDER_UNAVAILABLE` | 503 | The external entitlement provider couldn't be reached. |
+| `WEBHOOK_SIGNATURE_INVALID` | 401 | HMAC signature/timestamp missing or wrong. |
+
+### General
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `RATE_LIMITED` | 429 | Too many requests — back off and retry. |
+| `OPTIMISTIC_LOCK_FAILED` | 409 | Lost a concurrent-update race — refetch and retry. |
+
+## Handling errors
+
+```javascript
+const res = await fetch(`${ATLAS_BASE}/delivery/items/${id}/playback`, {
+  headers: { "X-Tenant-Slug": slug, Authorization: `Bearer ${jwt}` },
+});
+
+if (!res.ok) {
+  const body = await res.json();
+  const code = body.code ?? body.detail?.code;
+  switch (code) {
+    case "ENTITLEMENT_DENIED":   return showPaywall();
+    case "TOKEN_EXPIRED":        return refreshAndRetry();
+    case "RATE_LIMITED":         return backoffAndRetry();
+    default:                     return showGenericError(body.message);
+  }
+}
+```
+
+## See also
+
+- [Rate limits](/docs/saas/atlas-api/rate-limits) — handling `RATE_LIMITED`.
+- [Authentication](/docs/saas/atlas-api/authentication) — token error codes in context.
+- [Best practices](/docs/saas/atlas-api/best-practices) — retries and idempotency.

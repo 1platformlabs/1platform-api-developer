@@ -1,0 +1,166 @@
+---
+title: Entitlements
+description: Grant, revoke, check, and refresh content access on the Atlas API. Entitlement scopes (item, series, plan, live), checkout links, and the local cache fed by webhooks.
+sidebar_position: 9
+---
+
+# Entitlements
+
+An **entitlement** is a row that says "this member may access this content." Atlas keeps a local,
+authoritative `entitlements` table — the cache that the [content delivery](/docs/saas/atlas-api/content-delivery)
+hot path reads on every playback request. Entitlements are written three ways: directly by an operator,
+by an inbound provider [webhook](/docs/saas/atlas-api/webhooks) after a purchase, or by a refresh
+call that reconciles with the external entitlement provider.
+
+All endpoints below are tenant-scoped via `Host` / `X-Tenant-Slug`
+(see [Tenant resolution](/docs/saas/atlas-api/tenant-resolution)).
+
+## Scopes
+
+Every entitlement has a **scope** and a **scope reference**:
+
+| Scope | `scope_ref` is… | Grants access to… |
+|---|---|---|
+| `item` | a content id | a single catalog item |
+| `series` | a series id | all items in a series |
+| `plan` | a plan id (or `*`) | everything covered by the plan |
+| `live` | a live channel/event id | a live stream |
+
+A wildcard `scope_ref` of `*` (common on free-tier `plan` grants) covers the whole catalog.
+
+## Grant (operator)
+
+Operators grant access directly. Requires an `admin`/`operator` JWT.
+
+```bash
+curl -s -X POST "$ATLAS_BASE/entitlements" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "member_id": "1f2e…",
+    "scope": "item",
+    "scope_ref": "a3b4…",
+    "granted_by": "operator",
+    "expires_at": null
+  }'
+```
+
+```json
+{
+  "id": "e5f6…",
+  "member_id": "1f2e…",
+  "scope": "item",
+  "scope_ref": "a3b4…",
+  "granted_by": "operator",
+  "expires_at": null,
+  "created_at": "2026-06-18T12:00:00Z"
+}
+```
+
+(HTTP `201`.) Set `expires_at` for time-bound rentals; omit or `null` for permanent access.
+
+## Check access
+
+The authoritative read used for gating decisions. Reads the **local** entitlements table by default:
+
+```bash
+curl -s "$ATLAS_BASE/entitlements/check?member_id=1f2e…&content_id=a3b4…" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+```json
+{
+  "member_id": "1f2e…",
+  "content_id": "a3b4…",
+  "has_access": true,
+  "reason": "granted"
+}
+```
+
+When `has_access` is `false`, `reason` is `no_active_entitlement`. Add `?source=provider` to force a
+live call to the external entitlement provider (debug only — not the hot path). A provider outage on
+that path returns `503 { "code": "PROVIDER_UNAVAILABLE" }`.
+
+## List a member's entitlements
+
+```bash
+curl -s "$ATLAS_BASE/entitlements/by-member/1f2e…" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+Returns an array of the entitlement shape shown above.
+
+## Revoke
+
+```bash
+curl -s -X DELETE "$ATLAS_BASE/entitlements/<ENTITLEMENT_ID>" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_ADMIN_JWT"
+```
+
+Returns `204` on success, or `404 { "code": "ENTITLEMENT_NOT_FOUND" }` if the id doesn't exist for
+this tenant. Requires an `admin`/`operator` JWT.
+
+## Checkout (paid access)
+
+To sell access, create a checkout link via the configured entitlement provider. Atlas forwards your
+`scope`/`scope_ref` so they echo back on the provider's confirmation webhook:
+
+```bash
+curl -s -X POST "$ATLAS_BASE/entitlements/checkout" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "plan_ref": "annual",
+    "return_url": "https://library.example.com/me/library?refreshed=1",
+    "scope": "item",
+    "scope_ref": "a3b4…"
+  }'
+```
+
+```json
+{ "url": "https://checkout.example/session/…" }
+```
+
+Redirect the member to `url`. After payment, the provider sends a signed
+[webhook](/docs/saas/atlas-api/webhooks) (`access.granted`) that writes the entitlement row.
+
+## Refresh after checkout
+
+The member may return from checkout **before** the webhook lands. Call refresh to reconcile
+immediately — it queries the provider once and persists the row locally so the next access check
+returns `true`:
+
+```bash
+curl -s -X POST "$ATLAS_BASE/entitlements/refresh" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": "item", "scope_ref": "a3b4…" }'
+```
+
+```json
+{ "has_access": true, "refreshed": true }
+```
+
+`refreshed` is `true` only when this call wrote a new local row. The call is idempotent — repeating
+it is cheap and safe.
+
+## How entitlements drive delivery
+
+```text
+checkout → provider payment → webhook (access.granted) → entitlements table row
+                                                              │
+GET /delivery/items/{id}/playback  ── reads has_active ───────┘ → ticket or 403
+```
+
+The same local table backs both `entitlements/check` and the delivery gate, so once a row exists the
+member can play immediately.
+
+## See also
+
+- [Webhooks](/docs/saas/atlas-api/webhooks) — the inbound events that grant/revoke access.
+- [Content delivery](/docs/saas/atlas-api/content-delivery) — entitlement-gated playback tickets.
+- [Errors](/docs/saas/atlas-api/errors) — `ENTITLEMENT_DENIED`, `ENTITLEMENT_NOT_FOUND`, `PROVIDER_UNAVAILABLE`.

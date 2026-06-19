@@ -1,0 +1,82 @@
+---
+title: Best practices
+description: Production guidance for integrating the Atlas API — tenant scoping, token lifecycle, entitlement-driven delivery, idempotent webhooks, caching, and error handling.
+sidebar_position: 13
+---
+
+# Best practices
+
+Patterns that make an **Atlas API** integration correct, resilient, and secure in production. Each
+links to the page that covers the mechanics in depth.
+
+## Tenant scoping
+
+- **Always scope every request.** Use `Host` for browser/domain traffic and `X-Tenant-Slug` for
+  server-to-server calls. Never put a tenant id in the body — Atlas resolves the tenant server-side
+  and ignores body hints. See [Tenant resolution](/docs/saas/atlas-api/tenant-resolution).
+- **Keep tokens and requests on the same tenant.** A JWT or integration key is tenant-bound;
+  presenting it against a different tenant is rejected.
+- **Handle `TENANT_UNRESOLVED` gracefully** — it usually means a misconfigured `Host` or an unknown
+  slug, not a server error.
+
+## Tokens & sessions
+
+- **Treat access tokens as short-lived.** Use the refresh token to mint new pairs; only fall back to
+  a new magic link when refresh fails. See [Authentication](/docs/saas/atlas-api/authentication).
+- **Don't request a magic link per request.** Reuse the session for its lifetime.
+- **Store secrets as secrets.** Integration keys (`ak-int-…`) act for a whole tenant — keep them out
+  of client code, logs, and source control. Rotate (revoke + reissue) if leaked.
+- **Use the narrowest capability.** Issue [integration keys](/docs/saas/atlas-api/integration-keys)
+  with only the capabilities the service needs.
+
+## Delivery & entitlements
+
+- **Browse anonymously, deliver authenticated.** Catalog and item detail need no token; only
+  [content delivery](/docs/saas/atlas-api/content-delivery) requires a JWT and an entitlement.
+- **Treat playback URLs as ephemeral.** Fetch the ticket right before playback, don't cache or share
+  the signed `url`, and re-mint when `expires_in_seconds` elapses.
+- **Drive paywalls from `ENTITLEMENT_DENIED`.** A `403` with that code is the signal to show a
+  checkout flow, not an error toast.
+- **Reconcile after checkout with one `refresh` call.** The member may return before the webhook
+  lands; `entitlements/refresh` is idempotent — call it once instead of polling. See
+  [Entitlements](/docs/saas/atlas-api/entitlements).
+
+## Webhooks
+
+- **Sign the raw body.** Compute the HMAC over the exact request bytes (`"{timestamp}." + body`);
+  re-serializing breaks verification. See [Webhooks](/docs/saas/atlas-api/webhooks).
+- **Send a stable event id.** Atlas dedupes on `(provider, event_id)`, so a stable id makes retries
+  safe — a replay returns `deduplicated: true` without re-applying the change.
+- **Retry only on `5xx`/network errors.** A `2xx` (including a dedup) means Atlas has the event;
+  retrying it just replays.
+- **Fix partial payloads upstream.** Events missing `tenant_id`/`member_id` (or scope on a grant) are
+  acknowledged as a no-op and not re-driven.
+
+## Caching & rate limits
+
+- **Cache slow-changing public reads** (catalog, item detail, branding) on your side and at the CDN.
+- **Debounce type-ahead** against `GET /public/suggest`.
+- **Back off on `429`** with exponential backoff + jitter; retry only idempotent reads. See
+  [Rate limits](/docs/saas/atlas-api/rate-limits).
+
+## Error handling
+
+- **Branch on `code`, not `message`.** Codes are stable; messages may be reworded. Read
+  `body.code ?? body.detail?.code` to cover both envelope shapes. See
+  [Errors](/docs/saas/atlas-api/errors).
+- **Degrade, don't crash, on provider hiccups.** A `503 PROVIDER_UNAVAILABLE` from an entitlement
+  check or a search hiccup (which returns empty results) should render a friendly state, not a hard
+  failure.
+- **Map statuses to UX:** `401` → re-auth, `403`+`ENTITLEMENT_DENIED` → paywall, `404` → not-found,
+  `429` → backoff.
+
+## Environments
+
+- **Build against QA first** (`atlas-api-qa.1platform.pro`); its data is isolated from production.
+- **Pull the contract from OpenAPI.** Generate clients/types from `…/openapi.json` rather than
+  hand-coding shapes. See [Environments](/docs/saas/atlas-api/environments).
+
+## See also
+
+- **[Interactive API reference →](/api-reference/atlas-api)** — every endpoint, live.
+- [Overview](/docs/saas/atlas-api/overview) — how Atlas fits the wider platform.

@@ -1,0 +1,127 @@
+---
+title: Webhooks
+description: How the Atlas API receives entitlement events from an external provider — HMAC-signed, idempotent by event id, and translated into grant/revoke writes.
+sidebar_position: 10
+---
+
+# Webhooks
+
+Atlas receives **inbound** entitlement events from an external entitlement provider (your
+storefront / checkout / billing side). A webhook tells Atlas that a member gained or lost access —
+Atlas verifies the signature, deduplicates the delivery, and writes the corresponding row to its
+local [entitlements](/docs/saas/atlas-api/entitlements) table.
+
+> This page describes events your provider **sends to Atlas**. Atlas exposes one inbound endpoint;
+> your provider is responsible for signing and retrying deliveries.
+
+## Endpoint
+
+```
+POST /api/v1/webhooks/entitlement
+```
+
+```bash
+curl -s -X POST "$ATLAS_BASE/webhooks/entitlement" \
+  -H "Content-Type: application/json" \
+  -H "X-Signature: sha256=<HMAC_HEX>" \
+  -H "X-Signature-Timestamp: 1718712000" \
+  -H "X-Event-Id: evt_01H…" \
+  -d '<RAW_JSON_BODY>'
+```
+
+The exact header names for the signature, timestamp, and event id are configured per deployment.
+The defaults are illustrated above; confirm yours with the operator.
+
+## Event payload
+
+```json
+{
+  "id": "evt_01H…",
+  "type": "access.granted",
+  "occurred_at": "2026-06-18T12:00:00Z",
+  "data": {
+    "tenant_id": "9d1c…",
+    "member_id": "1f2e…",
+    "scope": "item",
+    "scope_ref": "a3b4…",
+    "expires_at": null
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `id` | Provider-side event id. Used for idempotency. |
+| `type` | One of the supported event types below. |
+| `occurred_at` | When the event happened (ISO 8601). |
+| `data.tenant_id` | The Atlas tenant the event applies to. **Required** for a write. |
+| `data.member_id` | The Atlas member. **Required** for a write. |
+| `data.scope` / `data.scope_ref` | The entitlement scope (see [Entitlements](/docs/saas/atlas-api/entitlements)). |
+| `data.expires_at` | Optional expiry for time-bound access. |
+
+## Supported event types
+
+| `type` | Effect in Atlas |
+|---|---|
+| `access.granted` | Grants an entitlement (`scope` + `scope_ref` required). |
+| `access.revoked` | Revokes the matching entitlement. |
+| `subscription.cancelled` | Revokes access. |
+| `rental.expired` | Revokes access. |
+| `subscription.renewed` | Accepted/acknowledged (used for transactional email; no entitlement write on its own). |
+| `subscription.payment_failed` | Accepted/acknowledged (drives a payment-failed email). |
+| `rental.started` | Accepted/acknowledged. |
+
+An accepted-but-unhandled type is recorded and acknowledged as a no-op — it never errors.
+
+## Signature verification (HMAC)
+
+Atlas computes an HMAC-SHA256 over `"{timestamp}." + raw_body` using the shared webhook secret, and
+compares it (constant-time) against the signature header (the `sha256=` prefix is optional):
+
+```text
+signed   = f"{timestamp}." + raw_request_body          # bytes
+expected = hex( HMAC_SHA256(secret, signed) )
+provided = header["X-Signature"].removeprefix("sha256=")
+valid    = constant_time_equals(expected, provided)
+```
+
+Sign the **exact raw bytes** of the body — re-serializing the JSON will change the bytes and break
+verification. A missing or wrong signature/timestamp returns:
+
+```json
+{ "code": "WEBHOOK_SIGNATURE_INVALID" }
+```
+
+(HTTP `401`.)
+
+## Idempotency
+
+Atlas dedupes on `(provider, event_id)`. The event id comes from the `X-Event-Id` header when
+present, otherwise from the payload `id`. The first delivery is processed and acknowledged:
+
+```json
+{ "received": true, "event_id": "evt_01H…", "deduplicated": false }
+```
+
+A **replay** of the same event id is acknowledged without re-running the grant/revoke:
+
+```json
+{ "received": true, "event_id": "evt_01H…", "deduplicated": true }
+```
+
+Send a **stable** event id per logical event so retries are safe to replay.
+
+## Delivery & retry semantics
+
+- Atlas processes the entitlement write inside a transaction, commits, then fires any transactional
+  email **best-effort** afterward — an email failure never turns a processed webhook into a `5xx`.
+- A successful processing (or a dedup) returns `2xx`. Retry only on `5xx` or a network failure.
+- Partial payloads (missing `tenant_id`/`member_id`, or a grant missing `scope`/`scope_ref`) are
+  recorded for dedup and acknowledged as a no-op — they will **not** be re-driven, so fix the
+  payload upstream rather than relying on retries.
+
+## See also
+
+- [Entitlements](/docs/saas/atlas-api/entitlements) — what the events write, and the checkout flow.
+- [Integration keys](/docs/saas/atlas-api/integration-keys) — the outbound side (provisioning members).
+- [Errors](/docs/saas/atlas-api/errors) — `WEBHOOK_SIGNATURE_INVALID` and the global contract.

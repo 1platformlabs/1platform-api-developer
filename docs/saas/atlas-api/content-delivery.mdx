@@ -1,0 +1,104 @@
+---
+title: Content delivery
+description: Mint short-lived, entitlement-checked playback tickets on the Atlas API — signed-URL downloads and HLS streaming envelopes, resolved per tenant archetype.
+sidebar_position: 8
+---
+
+# Content delivery
+
+Atlas never hands out a permanent link to the underlying file. Instead, an authenticated member
+requests a **playback ticket** — a short-lived, entitlement-checked credential that points at the
+asset. Depending on the tenant's [archetype](/docs/saas/atlas-api/tenant-resolution), the ticket is
+either a **signed URL** (downloadable files: ebooks, audio) or an **HLS streaming envelope** (video,
+live, TV) carrying a DRM token.
+
+## Mint a playback ticket
+
+```bash
+curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=epub" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+```json
+{
+  "content_id": "a3b4…",
+  "delivery_kind": "signed_url",
+  "url": "https://storage.example/…?signature=…&expires=…",
+  "expires_in_seconds": 600,
+  "drm_token": null,
+  "renderable": true,
+  "render_format": "epub"
+}
+```
+
+### Response fields
+
+| Field | Description |
+|---|---|
+| `content_id` | The item this ticket is for. |
+| `delivery_kind` | `signed_url` (file download) or `hls` (streaming). |
+| `url` | The asset URL — a signed download link, or an HLS manifest URL. |
+| `expires_in_seconds` | Ticket lifetime (currently ~600s / 10 minutes). Re-request after expiry. |
+| `drm_token` | Present for HLS envelopes; bound to (content, member, expiry). `null` for signed-URL downloads. |
+| `renderable` | `false` only when a format has no renderable representation yet — the client should degrade to download/open-externally instead of opening an in-app reader. |
+| `render_format` | The engine format the client should render with (e.g. `epub`). |
+
+### The `format` hint
+
+The optional `?format=` query selects which uploaded asset to deliver — `pdf`, `epub`, `mobi`,
+`mp3`, `m4a`, etc. When omitted, the strategy picks the first uploaded format from the item's
+metadata, or its strategy default.
+
+```bash
+# Audio download
+curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=mp3" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+A format that is not in the tenant's allow-list returns `403 { "code": "ASSET_FORMAT_NOT_ALLOWED" }`.
+
+## Delivery strategy by archetype
+
+The delivery strategy is resolved from the tenant's archetype — you don't choose it per request:
+
+| Archetypes | `delivery_kind` | Shape |
+|---|---|---|
+| `library`, `podcast`, `education` | `signed_url` | A signed, expiring URL to the file. The client downloads or opens it. |
+| `streaming`, `live`, `tv`, `events` | `hls` | An HLS manifest URL plus a `drm_token` bound to the member and expiry. |
+
+## Access control
+
+Before minting a ticket, Atlas enforces access:
+
+1. **Operators bypass.** A caller with an `admin` or `operator` role skips the entitlement check and
+   format/quota guards (they own the catalog they uploaded). Each bypass is written to the audit log.
+2. **Active entitlement.** A regular member must hold an active entitlement covering the item.
+3. **Lazy auto-grant.** On free-tier tenants, if the member has no entitlement yet, Atlas attempts an
+   inline grant and re-checks — covering the case where the grant at sign-in didn't land.
+4. **Denied.** Otherwise the request fails with the subscription wall:
+
+```json
+{ "code": "ENTITLEMENT_DENIED" }
+```
+
+(HTTP `403`.) See [Entitlements](/docs/saas/atlas-api/entitlements) for how access is granted.
+
+## Client flow
+
+```text
+GET /public/items/{slug}                         → discover the item (anonymous)
+GET /delivery/items/{content_id}/playback        → mint a ticket (JWT required)
+   ├─ delivery_kind = signed_url  → GET url       → download / open the file
+   └─ delivery_kind = hls         → play url       → HLS player uses drm_token
+(ticket expires)                                  → re-request the ticket
+```
+
+Tickets are intentionally short-lived. Treat the `url` as ephemeral: fetch it just before playback,
+don't cache or share it, and re-mint when `expires_in_seconds` elapses.
+
+## See also
+
+- [Entitlements](/docs/saas/atlas-api/entitlements) — granting and checking access.
+- [Catalog browsing](/docs/saas/atlas-api/catalog-browsing) — find the `content_id` / slug to deliver.
+- [Errors](/docs/saas/atlas-api/errors) — `ENTITLEMENT_DENIED`, `ASSET_FORMAT_NOT_ALLOWED`.

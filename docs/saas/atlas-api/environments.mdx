@@ -1,0 +1,65 @@
+---
+title: Environments
+description: Atlas API base URLs for production and QA, where to find the OpenAPI spec, and conventions for the API path prefix and versioning.
+sidebar_position: 5
+---
+
+# Environments
+
+The **Atlas API** runs in two environments. Both expose the same versioned API under the `/api/v1`
+prefix.
+
+| Environment | Base URL |
+|---|---|
+| **Production** | `https://atlas-api.1platform.pro/api/v1` |
+| **QA / staging** | `https://atlas-api-qa.1platform.pro/api/v1` |
+
+```bash
+# Production
+export ATLAS_BASE="https://atlas-api.1platform.pro/api/v1"
+
+# QA
+export ATLAS_BASE="https://atlas-api-qa.1platform.pro/api/v1"
+```
+
+> Develop and test against **QA** first. QA is a separate deployment with its own data — tenants,
+> members, catalog items, and entitlements do **not** carry over to production.
+
+## API path prefix
+
+Every endpoint documented in this section lives under `/api/v1`. For example, the catalog endpoint is:
+
+```
+https://atlas-api.1platform.pro/api/v1/public/catalog
+```
+
+A bare request to the host root (`/`) returns a small service descriptor and is not part of the API
+surface.
+
+## OpenAPI specification
+
+The machine-readable OpenAPI 3.1 document is served at the **host root** (not under `/api/v1`):
+
+| Environment | OpenAPI URL |
+|---|---|
+| Production | `https://atlas-api.1platform.pro/openapi.json` |
+| QA | `https://atlas-api-qa.1platform.pro/openapi.json` |
+
+```bash
+curl -s https://atlas-api.1platform.pro/openapi.json | jq '.info'
+```
+
+You can also browse and try every endpoint interactively in the
+**[Atlas API reference →](/api-reference/atlas-api)**.
+
+## Per-request tenant scoping
+
+Both environments are multitenant. A base URL alone does not identify a tenant — you must scope each
+request via the `Host` header (production traffic through a tenant's own domain) or an explicit
+`X-Tenant-Slug` header. See [Tenant resolution](/docs/saas/atlas-api/tenant-resolution).
+
+## See also
+
+- [Quickstart](/docs/saas/atlas-api/quickstart) — first calls against an environment.
+- [Tenant resolution](/docs/saas/atlas-api/tenant-resolution) — pick the right tenant per request.
+- [Rate limits](/docs/saas/atlas-api/rate-limits) — per-environment limits and backoff.

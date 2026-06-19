@@ -1,0 +1,117 @@
+---
+title: Integration keys
+description: Service-to-service authentication on the Atlas API using long-lived, capability-scoped integration keys (ak-int-…), separate from member JWTs.
+sidebar_position: 4
+---
+
+# Integration keys
+
+Use **integration keys** for **service-to-service** access — backends that provision members, issue
+sign-in URLs, or react to commerce events on behalf of a tenant. They are completely separate from
+the member [JWT flow](/docs/saas/atlas-api/authentication): a key is long-lived, single-tenant, and
+**capability-scoped**.
+
+## Key format
+
+Integration keys use the `ak-int-` scheme prefix:
+
+```
+ak-int-<prefix><secret>
+```
+
+- `ak-int-` — fixed scheme prefix.
+- `<prefix>` — the first 8 characters of the secret, indexed for fast lookup.
+- `<secret>` — hashed at issuance and never stored in plaintext.
+
+Each key is bound to exactly **one tenant**, carries a `vendor` tag, and holds a list of
+**capabilities** that gate which endpoints it may call. Keys are issued out of band by a tenant
+operator; the issuing step decides the capability list — endpoints never widen it.
+
+> Store the key as a secret. Anyone holding it can act for that tenant within its capabilities. If a
+> key is compromised, rotate it (revoke + reissue) — the secret itself can never be recovered from
+> Atlas.
+
+## Authenticating
+
+Send the key as a bearer token. Atlas distinguishes a key from a member JWT by the `ak-int-` prefix:
+
+```bash
+curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
+  -H "Authorization: Bearer ak-int-<PREFIX><SECRET>" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "buyer@example.com", "display_name": "Buyer", "preferred_locale": "en" }'
+```
+
+Because the key already encodes its tenant, integration endpoints resolve the tenant **from the
+key**, not from a `Host` / `X-Tenant-Slug` header.
+
+## Capabilities
+
+A capability is a fine-grained permission string checked per endpoint. Current capabilities on the
+member-provisioning surface:
+
+| Capability | Grants |
+|---|---|
+| `members.upsert` | Create or update a member by email and return a fresh sign-in URL. |
+| `members.issue_magic_link` | Issue a fresh single-use sign-in URL for an existing member. |
+
+If a key calls an endpoint whose required capability it lacks, Atlas returns:
+
+```json
+{ "code": "INTEGRATION_CAPABILITY_MISSING", "required": "members.upsert" }
+```
+
+## Error codes
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| 401 | `INTEGRATION_KEY_REQUIRED` | No `ak-int-…` bearer token present. |
+| 401 | `INTEGRATION_KEY_INVALID` | Key not found, inactive, or secret mismatch. |
+| 403 | `INTEGRATION_CAPABILITY_MISSING` | Key is valid but lacks the capability the endpoint needs. |
+| 404 | `TENANT_NOT_FOUND` / `MEMBER_NOT_FOUND` | The tenant or member tied to the key no longer exists. |
+
+> Cross-tenant member lookups return `404` (not `403`) on purpose — a leaked key cannot enumerate
+> which member ids exist in other tenants.
+
+## Example: provision a buyer and hand them a sign-in URL
+
+A common pattern is a storefront/checkout backend provisioning a member after a successful purchase,
+then showing the buyer a one-click access link:
+
+```bash
+# 1. Upsert the member (idempotent on tenant + email)
+curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
+  -H "Authorization: Bearer ak-int-<PREFIX><SECRET>" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "buyer@example.com" }'
+```
+
+```json
+{
+  "member_id": "7c8d…",
+  "email": "buyer@example.com",
+  "created": true,
+  "sign_in_url": "https://library.example.com/auth/verify?token=…",
+  "sign_in_expires_at": "2026-06-18T12:15:00Z"
+}
+```
+
+```bash
+# 2. Later, render the access page with a *fresh* link (never persist the URL)
+curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/7c8d…/issue-magic-link" \
+  -H "Authorization: Bearer ak-int-<PREFIX><SECRET>"
+```
+
+```json
+{ "sign_in_url": "https://library.example.com/auth/verify?token=…", "expires_at": "2026-06-18T12:30:00Z" }
+```
+
+The `created` flag is informational — treat upsert as idempotent. Each `sign_in_url` is single-use
+and short-lived (typically ~15 minutes); request a new one per access-page render rather than storing
+it, so a leaked storage row can't be replayed.
+
+## See also
+
+- [Authentication](/docs/saas/atlas-api/authentication) — the member JWT flow these URLs feed into.
+- [Webhooks](/docs/saas/atlas-api/webhooks) — the inbound side of an external entitlement provider.
+- [Errors](/docs/saas/atlas-api/errors) — the global error contract.

@@ -1,0 +1,53 @@
+---
+title: Getting started
+description: Make your first authenticated call to the 1Platform API with the two-token model.
+sidebar_position: 2
+---
+
+# Getting started
+
+This guide takes you from zero to your first authenticated response against the **1Platform API**.
+
+## 1. Get your tokens
+
+The 1Platform API uses a **two-token** model:
+
+- **App token** (`ak-...`) — identifies your application. Sent as `Authorization: Bearer ak-...`.
+- **User token** (`sk-...`) — identifies the acting end user. Sent as `x-user-token: sk-...`.
+
+Manage application keys from the [Dashboard → API keys](/docs/products/dashboard/api-keys). User
+tokens are minted through the authentication flow (see
+[User onboarding](/docs/saas/1platform-api/flows/user-onboarding)).
+
+## 2. Pick an environment
+
+| Environment | Base URL |
+|---|---|
+| Production | `https://api.1platform.pro/api/v1` |
+| QA / sandbox | `https://api-qa.1platform.pro/api/v1` |
+
+Full details in [Environments](/docs/saas/1platform-api/reference/environments).
+
+## 3. Make your first call
+
+```bash
+curl https://api-qa.1platform.pro/api/v1/users/me \
+  -H "Authorization: Bearer ak-your-app-token" \
+  -H "x-user-token: sk-the-user-token"
+```
+
+A successful response uses the standard envelope:
+
+```json
+{ "success": true, "data": { /* ... */ }, "msg": "OK" }
+```
+
+If a call requires credits you don't have, you'll receive `402 Payment Required`; if you exceed a
+rate limit, `429 Too Many Requests`. See [Error codes](/docs/saas/1platform-api/reference/error-codes)
+and [Rate limits](/docs/saas/1platform-api/reference/rate-limits).
+
+## 4. Next steps
+
+- **[Interactive API reference →](/api-reference/1platform-api)** — try every endpoint in the browser.
+- **[Integration flows](/docs/saas/1platform-api/flows/generate-invoice)** — complete workflows.
+- **[Webhooks](/docs/saas/1platform-api/webhooks/overview)** — react to events.

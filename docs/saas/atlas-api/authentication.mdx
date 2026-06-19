@@ -1,0 +1,154 @@
+---
+title: Authentication
+description: How members authenticate on the Atlas API — passwordless magic links exchanged for JWT access and refresh tokens, sessions, roles, and admin sign-in.
+sidebar_position: 3
+---
+
+# Authentication
+
+The **Atlas API** authenticates *members* (the end users of your tenant — readers, viewers,
+listeners) with a **passwordless magic link**. The flow issues short-lived **JWT** access tokens you
+send as `Authorization: Bearer <token>`.
+
+> This is **not** the 1Platform two-token model. Atlas uses standard JWT bearer auth for members and
+> separate [integration keys](/docs/saas/atlas-api/integration-keys) for service-to-service calls.
+
+Every auth call is tenant-scoped — send the tenant via the `Host` header or `X-Tenant-Slug`
+(see [Tenant resolution](/docs/saas/atlas-api/tenant-resolution)). Tokens are bound to the tenant
+they were issued for and cannot be replayed against another tenant.
+
+## The magic-link flow
+
+```
+POST /auth/magic-link         → email sent with single-use token
+   (member clicks the link)
+POST /auth/magic-link/verify  → { access_token, refresh_token, member, roles }
+```
+
+### 1. Request a magic link
+
+```bash
+curl -s -X POST "$ATLAS_BASE/auth/magic-link" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "reader@example.com",
+    "return_url": "/me/library",
+    "surface": "web"
+  }'
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `email` | string (email) | Recipient. A new email gets a sign-up template; a returning one gets sign-in. |
+| `return_url` | string | Where to land after verify. Defaults to `/me/library`. |
+| `surface` | `"web"` \| `"app"` | `web` (default) builds a browser verify link; `app` routes through a deep-link bridge for native apps. |
+
+```json
+{ "sent": true, "delivery": "email" }
+```
+
+The token's TTL is tenant-configurable (clamped to 5–1440 minutes; the platform default is typically
+15 minutes). If the email channel fails, you get `502 { "code": "EMAIL_DELIVERY_FAILED" }` — the
+token was still minted, so the member can request a new link.
+
+
+### 2. Verify the token → session
+
+The link delivers a single-use token. Exchange it for a session:
+
+```bash
+curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "<TOKEN_FROM_EMAIL_LINK>",
+    "device_fingerprint": "optional-client-hash",
+    "device_label": "Chrome on macOS"
+  }'
+```
+
+```json
+{
+  "member_id": "1f2e…",
+  "access_token": "<JWT_ACCESS_TOKEN>",
+  "refresh_token": "<JWT_REFRESH_TOKEN>",
+  "expires_in": 86400,
+  "member": { "id": "1f2e…", "email": "reader@example.com", "tenant_id": "9d1c…" },
+  "roles": ["fan"]
+}
+```
+
+Notes:
+
+- Verify **upserts** the member row for the `(tenant, email)` pair — first-time sign-in needs no
+  separate registration step.
+- `expires_in` is the access token lifetime in seconds.
+- An optional `device_fingerprint` that is new for the member triggers a "new device" security email
+  (best-effort; never blocks sign-in).
+- A consumed, expired, or invalid token returns `401` with a code such as `TOKEN_CONSUMED`,
+  `TOKEN_EXPIRED`, or `TOKEN_INVALID`.
+
+## Using the access token
+
+Send the JWT on every authenticated request:
+
+```bash
+curl -s "$ATLAS_BASE/me/library" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer <JWT_ACCESS_TOKEN>"
+```
+
+Browser clients may instead rely on the `atlas_session` HttpOnly cookie set by the dashboard
+sign-in flow — server-to-server callers should always use the bearer header.
+
+## Refreshing a session
+
+Access tokens are short-lived; the refresh token mints a new pair without another magic link:
+
+```bash
+curl -s -X POST "$ATLAS_BASE/auth/refresh" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Content-Type: application/json" \
+  -d '{ "refresh_token": "<JWT_REFRESH_TOKEN>" }'
+```
+
+The response is the same `SessionOut` shape as verify. A refresh token issued for a different tenant
+is rejected with `401 { "code": "TOKEN_INVALID" }`.
+
+## Roles
+
+Sessions carry a `roles` array. Members from the magic-link flow are `["fan"]`. Operators and admins
+(see admin sign-in) carry elevated roles and may bypass some access checks (e.g. an `operator` can
+mint a playback ticket without an entitlement). Endpoints that require a role return
+`403 { "code": "INSUFFICIENT_ROLE" }` when the caller lacks it.
+
+## Admin / operator sign-in
+
+Tenant operators authenticate with email + password (and TOTP when enrolled), not a magic link:
+
+```bash
+curl -s -X POST "$ATLAS_BASE/auth/admin/sign-in" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "admin@example.com", "password": "<PASSWORD>", "totp_code": "123456" }'
+```
+
+Returns the same `SessionOut` shape with elevated roles (`["admin", "operator", "fan"]`). Bad
+credentials return `401 { "code": "CREDENTIALS_INVALID" }`; a TOTP-enrolled account that omits the
+code returns `401 { "code": "TOTP_REQUIRED" }`.
+
+## Signing out
+
+```bash
+curl -s -X POST "$ATLAS_BASE/auth/sign-out" -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+Sign-out is a client-side concern: the dashboard clears its cookie, and the access token simply
+expires on its own. Treat the sliding access TTL as the bound on credential lifetime.
+
+## See also
+
+- [Integration keys](/docs/saas/atlas-api/integration-keys) — long-lived service credentials.
+- [Tenant resolution](/docs/saas/atlas-api/tenant-resolution) — how a request maps to a tenant.
+- [Errors](/docs/saas/atlas-api/errors) — every auth error code.

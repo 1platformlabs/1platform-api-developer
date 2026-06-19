@@ -1,0 +1,147 @@
+---
+title: Catalog browsing
+description: Browse a tenant's published catalog on the Atlas API — paginated listing, filtering by kind/genre/status, item detail by slug, and full-text search.
+sidebar_position: 7
+---
+
+# Catalog browsing
+
+The public catalog is **anonymous** and **tenant-scoped**: it serves whatever content the resolved
+tenant has published, in that tenant's branding. These endpoints are safe to render on
+SEO-indexable, server-rendered pages. Scope each request with `Host` or `X-Tenant-Slug`
+(see [Tenant resolution](/docs/saas/atlas-api/tenant-resolution)).
+
+> No authentication is required to *browse*. Authentication and [entitlements](/docs/saas/atlas-api/entitlements)
+> only gate actual [content delivery](/docs/saas/atlas-api/content-delivery).
+
+## List the catalog
+
+```bash
+curl -s "$ATLAS_BASE/public/catalog?page=1&page_size=20&sort=recent" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+```json
+{
+  "items": [
+    {
+      "id": "a3b4…",
+      "slug": "the-time-machine",
+      "kind": "book",
+      "title": "The Time Machine",
+      "status": "published",
+      "cover_image_url": "https://…/covers/the-time-machine.jpg",
+      "coming_soon": false,
+      "metadata": { "author": "H. G. Wells" }
+    }
+  ],
+  "total": 502,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+### Query parameters
+
+| Param | Default | Description |
+|---|---|---|
+| `page` | `1` | 1-based page index. |
+| `page_size` | `20` | Items per page (1–100). |
+| `status` | `published` | Content status filter. Mutually exclusive with `coming_soon`. |
+| `sort` | `recent` | `recent`, `popular`, `title-asc`, or `rating-desc`. |
+| `kind` | — | Restrict to one kind: `book`, `video`, `episode`, `live`, `podcast`, `article`. |
+| `genre` | — | Repeatable. Items whose `metadata.tags` intersect any supplied genre slug (OR semantics). |
+| `coming_soon` | `false` | List "coming soon" items (scheduled + published with no downloadable asset yet). |
+| `surface` | — | `app` hides `web_only` items; `web` hides `app_only` items. |
+
+> When you narrow results with `kind`, `genre`, `coming_soon`, or `surface`, `total` reflects the
+> returned page rather than a global count — use it for an approximate "X items" label, not for
+> precise pagination math.
+
+### Examples
+
+```bash
+# Only books, alphabetical
+curl -s "$ATLAS_BASE/public/catalog?kind=book&sort=title-asc" -H "X-Tenant-Slug: $TENANT_SLUG"
+
+# Combine genres (OR)
+curl -s "$ATLAS_BASE/public/catalog?genre=sci-fi&genre=classics" -H "X-Tenant-Slug: $TENANT_SLUG"
+
+# Coming-soon rail
+curl -s "$ATLAS_BASE/public/catalog?coming_soon=true" -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+## Fetch an item by slug
+
+Item detail pages are keyed by the human-readable slug:
+
+```bash
+curl -s "$ATLAS_BASE/public/items/the-time-machine" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+A slug that is missing, draft, or archived for this tenant returns:
+
+```json
+{ "code": "CONTENT_NOT_FOUND" }
+```
+
+(HTTP `404`.) Only `published` and `scheduled` items are visible on the public detail surface.
+
+## Search
+
+Full-text search over the published catalog, grouped by kind, with `<mark>`-wrapped highlights:
+
+```bash
+curl -s "$ATLAS_BASE/public/search?q=time%20machine&limit=20" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+```json
+{
+  "query": "time machine",
+  "total": 3,
+  "groups": [
+    {
+      "kind": "book",
+      "total": 3,
+      "items": [
+        { "id": "a3b4…", "slug": "the-time-machine", "title": "The <mark>Time Machine</mark>", "kind": "book" }
+      ]
+    }
+  ]
+}
+```
+
+| Param | Default | Description |
+|---|---|---|
+| `q` | required | Query string (1–120 chars). |
+| `kind` | — | Restrict results to a single kind. |
+| `limit` | `20` | Max hits (1–50). |
+
+Search is **fail-soft**: if the backing store hiccups, you get a normal `200` with `total: 0` and
+empty groups rather than an error — render a "no results" state.
+
+### Type-ahead suggestions
+
+For an autocomplete box, use the lighter, rate-limited suggest endpoint:
+
+```bash
+curl -s "$ATLAS_BASE/public/suggest?q=time&limit=8" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+An empty query returns `400 { "code": "SEARCH_QUERY_EMPTY" }`; an over-long query returns
+`400 { "code": "SEARCH_QUERY_TOO_LONG" }`.
+
+## Other public surfaces
+
+The public router also exposes related rails commonly used to build a storefront — `/public/featured`,
+`/public/related/{slug}`, `/public/genres`, and `/public/plans` among others. Browse them all in the
+**[interactive API reference →](/api-reference/atlas-api)**.
+
+## See also
+
+- [Content delivery](/docs/saas/atlas-api/content-delivery) — turn a catalog item into a playback ticket.
+- [Entitlements](/docs/saas/atlas-api/entitlements) — what gates access to an item.
+- [Tenant resolution](/docs/saas/atlas-api/tenant-resolution) — the catalog is per-tenant.

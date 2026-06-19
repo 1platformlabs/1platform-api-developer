@@ -1,0 +1,71 @@
+---
+title: Rate limits
+description: How the Atlas API rate-limits requests, the 429 RATE_LIMITED envelope, which endpoints are limited, and a backoff-and-retry strategy.
+sidebar_position: 12
+---
+
+# Rate limits
+
+The **Atlas API** applies per-client rate limits to protect shared, public surfaces. When you exceed
+a limit you receive an HTTP `429` with the standard error envelope:
+
+```json
+{ "code": "RATE_LIMITED", "message": "Too many requests" }
+```
+
+Rate limiting is keyed primarily by client IP address; some abuse-prone endpoints add the
+user-agent to the key. Limits are applied at the **edge of specific routes**, not uniformly to every
+endpoint.
+
+## Which endpoints are limited
+
+Limits are concentrated on anonymous, high-volume public surfaces. Examples:
+
+| Endpoint | Limit |
+|---|---|
+| `GET /tenants/by-host` (public branding lookup) | ~60 requests/minute |
+| `GET /public/suggest` (type-ahead suggestions) | ~30 requests/minute |
+
+Other endpoints may carry their own limits. Authenticated, low-volume flows (sign-in, delivery
+tickets) are generally not the bottleneck — but always handle `429` defensively, since limits can be
+tuned per environment.
+
+> Treat exact numbers as operational details that can change. Build your client to **react to `429`**
+> rather than to hard-code thresholds.
+
+## Backoff strategy
+
+On `429`, back off and retry with exponential backoff plus jitter. Only retry idempotent reads
+automatically:
+
+```javascript
+async function getWithBackoff(url, init, { maxRetries = 4 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, init);
+    if (res.status !== 429) return res;
+    if (attempt >= maxRetries) return res; // give up; let the caller handle it
+
+    // exponential backoff with jitter: 0.5s, 1s, 2s, 4s (±20%)
+    const base = 500 * 2 ** attempt;
+    const jitter = base * (Math.random() * 0.4 - 0.2);
+    await new Promise((r) => setTimeout(r, base + jitter));
+  }
+}
+```
+
+## Avoiding limits
+
+- **Cache public reads.** Catalog, item detail, and branding responses change slowly — cache them on
+  your side (and let your CDN cache the SEO surfaces) instead of re-fetching per page view.
+- **Debounce type-ahead.** Wait for a pause in typing before calling `GET /public/suggest`, and cap
+  the request rate per user.
+- **Don't poll tight loops.** After checkout, call `entitlements/refresh` once (it's idempotent)
+  rather than polling `entitlements/check` in a tight loop.
+- **Reuse tokens.** Keep a member's JWT for its lifetime and use the refresh token; don't request a
+  new magic link per request.
+
+## See also
+
+- [Errors](/docs/saas/atlas-api/errors) — the `RATE_LIMITED` code and full error contract.
+- [Best practices](/docs/saas/atlas-api/best-practices) — caching, retries, and idempotency patterns.
+- [Environments](/docs/saas/atlas-api/environments) — limits can differ between QA and production.

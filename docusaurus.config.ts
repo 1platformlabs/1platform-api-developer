@@ -111,6 +111,9 @@ const config: Config = {
       '/openapi/atlas-api.json',
     ),
     // Backward-compat: old single-API route + migrated 1Platform API doc paths.
+    // The root `/` is handled by src/pages/index.tsx (a <Redirect> to /docs/),
+    // since this site is pure documentation — the marketing home lives at
+    // 1platform.pro.
     [
       '@docusaurus/plugin-client-redirects',
       {

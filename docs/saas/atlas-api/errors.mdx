@@ -1,0 +1,124 @@
+---
+title: Errores
+description: El contrato de errores de la Atlas API — un envoltorio plano { code, message } con códigos estables — más el mapeo de estado HTTP y una tabla de referencia de códigos comunes.
+sidebar_position: 12
+---
+
+# Errores
+
+La **Atlas API** devuelve un único envoltorio de error plano en cada fallo:
+
+```json
+{
+  "code": "ENTITLEMENT_DENIED",
+  "message": "Member does not currently have access to the requested item."
+}
+```
+
+- **`code`** — un identificador estable y legible por máquina. Ramifica tu lógica según esto, nunca según `message`.
+- **`message`** — una descripción legible por humanos y segura para el cliente. Nunca contiene nombres internos de proveedores
+  ni secretos, así que es seguro de mostrar (pero su redacción puede cambiar con el tiempo).
+
+> Esto difiere de la 1Platform API. Atlas **no** usa `{ success, data, msg }` — no hay un booleano
+> `success` ni un envoltorio `data`. Los errores son siempre `{ code, message }`.
+
+Algunos errores de validación (notablemente los fallos de forma de solicitud de FastAPI y unas pocas rutas de autenticación) anidan la misma
+forma bajo una clave `detail` — lee de forma defensiva `body.code ?? body.detail?.code`.
+
+## Mapeo de estado HTTP
+
+El estado HTTP refleja la categoría; el `code` da los detalles.
+
+| Estado | Categoría |
+|---|---|
+| `400` | Solicitud incorrecta / parámetro inválido / transición de estado inválida |
+| `401` | No autenticado — token faltante/inválido/expirado, firma incorrecta |
+| `403` | Autenticado pero no permitido — sin entitlement, rol insuficiente |
+| `404` | No encontrado — tenant, contenido, miembro, entitlement |
+| `409` | Conflicto — slug tomado, bloqueo optimista, transición ilegal |
+| `422` | No procesable — fallo de schema/validación |
+| `429` | Límite de uso alcanzado |
+| `500` | Error interno |
+| `502` / `503` | Upstream / proveedor no disponible |
+
+## Códigos de error comunes
+
+### Autenticación y tokens
+
+| Code | HTTP | Significado |
+|---|---|---|
+| `UNAUTHORIZED` | 401 | No hay credencial válida en la solicitud. |
+| `TOKEN_INVALID` | 401 | Token malformado, o emitido para otro tenant. |
+| `TOKEN_EXPIRED` | 401 | Token pasado su vida útil — refresca o vuelve a autenticarte. |
+| `TOKEN_CONSUMED` | 401 | Token de magic link de un solo uso ya usado. |
+| `CREDENTIALS_INVALID` | 401 | Email/contraseña de administrador no coinciden. |
+| `TOTP_REQUIRED` / `TOTP_INVALID` | 401 | TOTP habilitado pero faltante/incorrecto. |
+| `INSUFFICIENT_ROLE` | 403 | El miembro carece del rol requerido para el endpoint. |
+| `EMAIL_DELIVERY_FAILED` | 502 | El magic link se generó pero el email no pudo enviarse. |
+
+### Claves de integración
+
+| Code | HTTP | Significado |
+|---|---|---|
+| `INTEGRATION_KEY_REQUIRED` | 401 | No hay token bearer `ak-int-…`. |
+| `INTEGRATION_KEY_INVALID` | 401 | Clave no encontrada, inactiva o secreto que no coincide. |
+| `INTEGRATION_CAPABILITY_MISSING` | 403 | La clave carece de la capacidad que el endpoint necesita. |
+
+### Tenant
+
+| Code | HTTP | Significado |
+|---|---|---|
+| `TENANT_UNRESOLVED` | 404 | Ningún tenant activo coincidió con el host/slug. |
+| `TENANT_NOT_FOUND` | 404 | El id de tenant no existe. |
+| `TENANT_SLUG_TAKEN` | 409 | Slug ya usado por otro tenant. |
+| `TENANT_MISMATCH` | 403 | Tenant del token ≠ tenant resuelto. |
+
+### Contenido y entrega
+
+| Code | HTTP | Significado |
+|---|---|---|
+| `CONTENT_NOT_FOUND` | 404 | Ítem faltante, en draft o archivado para este tenant. |
+| `CONTENT_SLUG_TAKEN` | 409 | Slug ya usado en el catálogo de este tenant. |
+| `ENTITLEMENT_DENIED` | 403 | El miembro no tiene acceso activo al ítem. |
+| `ASSET_FORMAT_NOT_ALLOWED` | 403 | El formato solicitado no está en la lista de permitidos del tenant. |
+| `SEARCH_QUERY_EMPTY` / `SEARCH_QUERY_TOO_LONG` | 400 | Entrada de búsqueda incorrecta. |
+
+### Entitlements y webhooks
+
+| Code | HTTP | Significado |
+|---|---|---|
+| `ENTITLEMENT_NOT_FOUND` | 404 | El id de entitlement no existe para este tenant. |
+| `PROVIDER_UNAVAILABLE` | 503 | No se pudo alcanzar al proveedor de entitlements externo. |
+| `WEBHOOK_SIGNATURE_INVALID` | 401 | Firma/timestamp HMAC faltante o incorrecto. |
+
+### General
+
+| Code | HTTP | Significado |
+|---|---|---|
+| `RATE_LIMITED` | 429 | Demasiadas solicitudes — aplica backoff y reintenta. |
+| `OPTIMISTIC_LOCK_FAILED` | 409 | Se perdió una carrera de actualización concurrente — vuelve a obtener y reintenta. |
+
+## Manejo de errores
+
+```javascript
+const res = await fetch(`${ATLAS_BASE}/delivery/items/${id}/playback`, {
+  headers: { "X-Tenant-Slug": slug, Authorization: `Bearer ${jwt}` },
+});
+
+if (!res.ok) {
+  const body = await res.json();
+  const code = body.code ?? body.detail?.code;
+  switch (code) {
+    case "ENTITLEMENT_DENIED":   return showPaywall();
+    case "TOKEN_EXPIRED":        return refreshAndRetry();
+    case "RATE_LIMITED":         return backoffAndRetry();
+    default:                     return showGenericError(body.message);
+  }
+}
+```
+
+## Consulta también
+
+- [Límites de uso](/docs/saas/atlas-api/rate-limits) — manejo de `RATE_LIMITED`.
+- [Autenticación](/docs/saas/atlas-api/authentication) — códigos de error de token en contexto.
+- [Buenas prácticas](/docs/saas/atlas-api/best-practices) — reintentos e idempotencia.

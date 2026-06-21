@@ -1,0 +1,496 @@
+---
+title: "Vista general del dashboard"
+description: "Flujo paso a paso para inicializar el dashboard whitelabel, obtener los idiomas soportados, cargar los paquetes de traducción y leer los KPIs agregados mediante la 1Platform API."
+sidebar_position: 14
+---
+
+# Flujo: Vista general del dashboard
+
+## Vista general
+
+Este flujo documenta cómo un dashboard personalizado (o una UI whitelabel) se inicializa contra la 1Platform API. Carga la marca, el tema, el layout, los módulos y los feature flags desde un único endpoint de configuración, obtiene el catálogo de i18n para el idioma del usuario y, finalmente, lee los KPIs de la pantalla de inicio (balance, notificaciones no leídas, conteos).
+
+**Caso de uso:** Construir un dashboard whitelabel o un panel de administración que adapte su marca, tema, módulos e idioma en tiempo de ejecución desde una única fuente de la API.
+
+**Resultado final:** Un dashboard configurado con la marca y el tema de la app, traducido al idioma del usuario y con los KPIs listos para renderizar en la vista de inicio.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Configuración whitelabel | La app debe tener configurada la marca, el tema y el layout whitelabel para que `/dashboard/bootstrap` devuelva datos |
+
+### Headers requeridos para todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
+LANG="es"       # Código de idioma resuelto desde /dashboard/i18n
+```
+
+---
+
+## Datos devueltos por el bootstrap
+
+### Objeto branding
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `name` | string | Sí | Nombre visible de la app |
+| `short_name` | string | Sí | Nombre corto de marca (usado en pestañas, móvil) |
+| `logo_url` | string | Sí | URL del logo principal |
+| `logo_white_url` | string | No | Variante del logo para fondo blanco/modo oscuro |
+| `favicon_url` | string | Sí | URL del favicon |
+| `og_image_url` | string | No | Imagen de Open Graph para compartir |
+| `support_email` | string | Sí | Email de contacto de soporte |
+| `web_url` | string | Sí | URL del sitio de marketing |
+| `tos_url` | string | No | URL de los Términos de Servicio |
+| `privacy_url` | string | No | URL de la Política de Privacidad |
+| `cookies_url` | string | No | URL de la Política de Cookies |
+| `basename` | string | No | Ruta base del dashboard (p. ej., `/app`) |
+
+### Objeto layout
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `sidebar_collapsed_default` | boolean | No | Si la barra lateral inicia colapsada |
+| `show_language_switcher` | boolean | No | Mostrar el selector de idioma en la barra de navegación |
+| `show_theme_toggle` | boolean | No | Mostrar el conmutador de tema claro/oscuro |
+| `show_notifications` | boolean | No | Mostrar la campana de notificaciones |
+
+### Objeto summary
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `app_id` | string | Sí | Identificador de la app |
+| `user_id` | string | Sí | Identificador del usuario |
+| `generated_at` | string | Sí | Timestamp ISO-8601 de cuándo se generó el snapshot |
+| `balance` | number | No | Balance actual del usuario |
+| `currency` | string | No | Código de moneda (p. ej., `GTQ`, `USD`) |
+| `unread_notifications` | integer | No | Número de notificaciones no leídas |
+| `counts` | object | No | Mapa de contadores de recursos (websites, agents, etc.) |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` ausente o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT del usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Inicializar el dashboard
+
+**Objetivo:** Obtener la configuración whitelabel (marca, tema, layout, módulos, feature flags) para la app actual.
+
+**Endpoint:** `GET /api/v1/dashboard/bootstrap`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/dashboard/bootstrap" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "app_id": "507f1f77bcf86cd799439011",
+    "config_version": 7,
+    "branding": {
+      "name": "Acme Demo",
+      "short_name": "Acme",
+      "logo_url": "https://cdn.example.com/acme/logo.svg",
+      "logo_white_url": "https://cdn.example.com/acme/logo-white.svg",
+      "favicon_url": "https://cdn.example.com/acme/favicon.ico",
+      "og_image_url": "https://cdn.example.com/acme/og.png",
+      "support_email": "support@example.com",
+      "web_url": "https://example.com",
+      "tos_url": "https://example.com/terms",
+      "privacy_url": "https://example.com/privacy",
+      "cookies_url": "https://example.com/cookies",
+      "basename": "/app"
+    },
+    "theme": {
+      "palette": {"primary": "#2563eb", "background": "#ffffff"},
+      "typography": {"font_family": "Inter, sans-serif"},
+      "breakpoints": {"sm": 640, "md": 768, "lg": 1024},
+      "shadows": {},
+      "component_overrides": {}
+    },
+    "layout": {
+      "sidebar_collapsed_default": false,
+      "show_language_switcher": true,
+      "show_theme_toggle": true,
+      "show_notifications": true
+    },
+    "modules": [
+      {"key": "websites", "enabled": true},
+      {"key": "agents", "enabled": true},
+      {"key": "billing", "enabled": true}
+    ],
+    "supported_langs": ["es", "en"],
+    "default_lang": "es",
+    "feature_flags": {"agents_v2": true, "fel_export": false},
+    "recaptcha": {"enabled": false, "site_key": null},
+    "analytics": {"ga_measurement_id": null, "sentry_dsn": null},
+    "cookie_banner_enabled": true
+  },
+  "msg": "Dashboard configuration fetched successfully"
+}
+```
+
+:::note
+`config_version` se incrementa cada vez que la configuración cambia. Cachéalo en el cliente y envíalo en las cargas siguientes — la API responde con **304 Not Modified** cuando nada ha cambiado, ahorrando tamaño de payload.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 304 | Configuración sin cambios | Usa la configuración cacheada |
+| 401 | Token de aplicación ausente o inválido | Regenera `$APP_TOKEN` mediante `POST /auth/token` |
+| 404 | La app no tiene configuración whitelabel | Configura la marca/tema/layout de la app |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 3 — Listar los idiomas soportados
+
+**Objetivo:** Descubrir qué idiomas soporta esta app y cuál es el predeterminado.
+
+**Endpoint:** `GET /api/v1/dashboard/i18n`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/dashboard/i18n" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "langs": ["es", "en"],
+    "default": "es"
+  },
+  "msg": "Supported languages fetched successfully"
+}
+```
+
+:::tip
+El campo `supported_langs` que devuelve `/dashboard/bootstrap` es la misma lista. Puedes omitir este paso si ya la cacheaste.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token de aplicación ausente o inválido | Regenera `$APP_TOKEN` |
+| 404 | La app no tiene configuración de i18n | Configura al menos un idioma para la app |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 4 — Obtener el paquete de i18n de un idioma
+
+**Objetivo:** Cargar las cadenas de traducción para el idioma seleccionado por el usuario.
+
+**Endpoint:** `GET /api/v1/dashboard/i18n/{lang}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/dashboard/i18n/$LANG" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "app_id": "507f1f77bcf86cd799439011",
+    "lang": "es",
+    "version": 12,
+    "strings": {
+      "navbar.dashboard": "Panel",
+      "navbar.websites": "Sitios web",
+      "navbar.agents": "Agentes",
+      "common.save": "Guardar",
+      "common.cancel": "Cancelar"
+    }
+  },
+  "msg": "i18n bundle fetched successfully"
+}
+```
+
+:::note
+`version` se incrementa cuando las cadenas cambian. Cachéalo y vuelve a solicitarlo solo cuando difiera de la versión cacheada. La API responde con **304 Not Modified** si el paquete no ha cambiado.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 304 | Paquete sin cambios | Usa el paquete cacheado |
+| 400 | Código de idioma inválido | Pasa un código válido de `/dashboard/i18n` (p. ej., `es`, `en`) |
+| 401 | Token de aplicación ausente o inválido | Regenera `$APP_TOKEN` |
+| 404 | Idioma no configurado para esta app | Usa un idioma listado en `data.langs` |
+| 422 | Parámetro de ruta `lang` malformado | Usa un código ISO de 2 letras |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 5 — Leer los KPIs de inicio
+
+**Objetivo:** Obtener las métricas agregadas de inicio — balance, notificaciones no leídas y contadores de recursos.
+
+**Endpoint:** `GET /api/v1/dashboard/summary`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/dashboard/summary" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "app_id": "507f1f77bcf86cd799439011",
+    "user_id": "507f1f77bcf86cd799439012",
+    "generated_at": "2026-04-27T15:30:00Z",
+    "balance": 250.00,
+    "currency": "GTQ",
+    "unread_notifications": 3,
+    "counts": {
+      "websites": 4,
+      "agents": 2,
+      "open_tasks": 5,
+      "open_tickets": 1
+    }
+  },
+  "msg": "Dashboard summary fetched successfully"
+}
+```
+
+:::note
+`generated_at` refleja el momento del snapshot. Los contadores son baratos de calcular en el servidor — solicítalos cada vez que se abra la vista de inicio.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | Header de token de usuario ausente o malformado | Envía `x-user-token: $USER_TOKEN` |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 2: Inicializar el dashboard ===
+BOOT=$(curl -s -X GET "$BASE_URL/dashboard/bootstrap" \
+  -H "Authorization: Bearer $APP_TOKEN")
+DEFAULT_LANG=$(echo "$BOOT" | jq -r '.data.default_lang')
+
+echo "Default language: $DEFAULT_LANG"
+
+# === PASO 3: Listar los idiomas soportados ===
+curl -s -X GET "$BASE_URL/dashboard/i18n" \
+  -H "Authorization: Bearer $APP_TOKEN" | jq
+
+# === PASO 4: Obtener el paquete de i18n ===
+curl -s -X GET "$BASE_URL/dashboard/i18n/$DEFAULT_LANG" \
+  -H "Authorization: Bearer $APP_TOKEN" | jq '.data.strings'
+
+# === PASO 5: Leer los KPIs de inicio ===
+curl -s -X GET "$BASE_URL/dashboard/summary" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+Todos los endpoints de este flujo son de solo lectura (`GET`) e idempotentes — las llamadas repetidas devuelven los mismos datos.
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, reintenta tras un breve backoff. No hay efectos secundarios, ya que las llamadas son de solo lectura.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
+
+### Timeouts
+- `/dashboard/bootstrap`, `/dashboard/i18n`, `/dashboard/i18n/{lang}` son cacheables como estáticos — define un timeout de cliente de 5 segundos.
+- `/dashboard/summary` agrega datos del usuario — define un timeout de 10 segundos.
+
+### Caché
+- Persiste `config_version` y la `version` del paquete de i18n en el almacenamiento del cliente. Vuelve a obtenerlos solo cuando la versión cacheada esté desactualizada.
+- La API devuelve **304 Not Modified** cuando nada ha cambiado — tu cliente debería tomarlo como señal para seguir usando el payload cacheado.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- `/dashboard/bootstrap`, `/dashboard/i18n` y `/dashboard/i18n/{lang}` solo requieren el token de aplicación; `/dashboard/summary` requiere además el token de usuario.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener token de usuario |
+| 2 | `GET` | `/api/v1/dashboard/bootstrap` | Obtener configuración whitelabel |
+| 3 | `GET` | `/api/v1/dashboard/i18n` | Listar idiomas soportados |
+| 4 | `GET` | `/api/v1/dashboard/i18n/{lang}` | Obtener paquete de i18n |
+| 5 | `GET` | `/api/v1/dashboard/summary` | Leer KPIs de inicio |
+
+---
+
+## Lista de verificación rápida
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Inicialicé el dashboard y cacheé `config_version`
+- [ ] Seleccioné un idioma de `data.supported_langs`
+- [ ] Obtuve el paquete de i18n y cacheé `version`
+- [ ] Leí los KPIs de inicio desde `/dashboard/summary`

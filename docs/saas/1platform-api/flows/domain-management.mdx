@@ -1,0 +1,1276 @@
+---
+title: "Gestión de dominios"
+description: "Flujo paso a paso para verificar disponibilidad de dominios, registrar dominios, gestionar registros DNS, nameservers, transferencias y renovaciones a través de la 1Platform API."
+sidebar_position: 12
+---
+
+# Flujo: Gestión de dominios
+
+## Vista general
+
+Este flujo documenta cómo gestionar dominios a través de la 1Platform API. Cubre la verificación de disponibilidad de dominios, la obtención de precios por TLD, el registro de dominios, la gestión de registros DNS y nameservers, el inicio de transferencias, la renovación de dominios y el seguimiento del historial de operaciones.
+
+**Caso de uso:** Brinda a tus usuarios una experiencia completa de gestión de dominios -- desde la búsqueda y el registro de dominios hasta la configuración de registros DNS y el manejo de transferencias -- todo a través de una única API.
+
+**Resultado final:** Un dominio totalmente registrado con registros DNS configurados, privacidad WHOIS y la capacidad de gestionar nameservers, renovaciones, bloqueos y transferencias de forma programática.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Saldo suficiente | El registro y la renovación de dominios requieren saldo en la cuenta del usuario |
+| Contacto de dominio | Debe configurarse un perfil de contacto antes de registrar dominios |
+
+### Headers requeridos para todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""      # Obtenido en el Paso 0
+USER_TOKEN=""     # Obtenido en el Paso 1
+DOMAIN_ID=""      # Obtenido tras el registro del dominio (Paso 5)
+```
+
+---
+
+## Datos requeridos
+
+### Contacto
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `first_name` | string | Sí | Nombre del contacto (máx. 100 caracteres) |
+| `last_name` | string | Sí | Apellido del contacto (máx. 100 caracteres) |
+| `email` | string | Sí | Email del contacto (máx. 255 caracteres, formato email) |
+| `phone` | string | Sí | Teléfono en formato E.164 con punto: `+N.NNNNNNN` (máx. 20 caracteres) |
+| `address` | string | Sí | Dirección (máx. 255 caracteres) |
+| `city` | string | Sí | Ciudad (máx. 100 caracteres) |
+| `state` | string | Sí | Estado o provincia (máx. 100 caracteres) |
+| `country` | string | Sí | Código de país ISO 3166-1 alpha-2 (exactamente 2 caracteres) |
+| `postal_code` | string | Sí | Código postal/ZIP (máx. 20 caracteres) |
+| `organization` | string o null | No | Nombre de la organización (máx. 255 caracteres) |
+
+### Registro
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `domain` | string | Sí | Nombre de dominio a registrar, p. ej. `"example.com"` (máx. 253 caracteres) |
+| `years` | integer | No | Período de registro, 1-10 (por defecto: 1) |
+| `whois_privacy` | boolean | No | Habilitar privacidad WHOIS (por defecto: true) |
+| `auto_renew` | boolean | No | Habilitar renovación automática (por defecto: false) |
+| `nameservers` | array de strings o null | No | Nameservers personalizados (máx. 12) |
+
+### Registros DNS
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `type` | string | Sí | Tipo de registro: `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `URL_REDIRECT`, `URL_FRAME` |
+| `host` | string | Sí | Hostname, p. ej. `"@"`, `"www"`, `"mail"` (máx. 253 caracteres) |
+| `value` | string | Sí | Valor del registro: IP, hostname, texto, etc. (máx. 1024 caracteres) |
+| `ttl` | integer | No | Tiempo de vida en segundos, 60-86400 (por defecto: 1800) |
+| `mx_pref` | integer o null | No | Prioridad MX, 0-65535 (requerido para registros MX) |
+
+### Transferencia
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `domain` | string | Sí | Dominio a transferir (máx. 253 caracteres) |
+| `epp_code` | string | Sí | Código EPP/auth del registrador actual (máx. 255 caracteres) |
+| `years` | integer | No | Años a añadir en la transferencia, 1-10 (por defecto: 1) |
+| `whois_privacy` | boolean | No | Habilitar privacidad WHOIS (por defecto: true) |
+| `auto_renew` | boolean | No | Habilitar renovación automática (por defecto: false) |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` ausente o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT del usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, créalo con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Crear o actualizar el contacto de dominio
+
+**Objetivo:** Configurar el perfil de contacto usado para el registro de dominios. Esto debe hacerse antes de registrar cualquier dominio.
+
+**Endpoint:** `PUT /api/v1/domains/contact`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PUT "$BASE_URL/domains/contact" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "Carlos",
+    "last_name": "Ejemplo Demo",
+    "email": "carlos@example.com",
+    "phone": "+502.00001234",
+    "address": "Avenida Reforma 10-50",
+    "city": "Guatemala",
+    "state": "Guatemala",
+    "country": "GT",
+    "postal_code": "01010",
+    "organization": null
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "first_name": "Carlos",
+    "last_name": "Ejemplo Demo",
+    "email": "carlos@example.com",
+    "phone": "+502.00001234",
+    "address": "Avenida Reforma 10-50",
+    "city": "Guatemala",
+    "state": "Guatemala",
+    "country": "GT",
+    "postal_code": "01010",
+    "organization": null,
+    "updated_at": "2026-03-18T10:00:00"
+  },
+  "msg": "Contact saved successfully"
+}
+```
+
+:::note
+Este endpoint es idempotente -- llamarlo varias veces actualiza el mismo perfil de contacto. Solo necesitas un contacto por usuario.
+:::
+
+:::warning
+Se **requiere** un perfil de contacto antes de registrar cualquier dominio (Paso 5) o iniciar una transferencia (Paso 13). Si el contacto no está configurado, esos endpoints devuelven un error **404**.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Datos de contacto inválidos (validación fallida) | Verifica todos los campos y formatos requeridos (p. ej., `country` debe tener 2 caracteres, `phone` debe coincidir con `+N.NNNNNNN`) |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Campos ausentes o malformados | Verifica que todos los campos requeridos estén presentes y sean válidos |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 3 — Verificar disponibilidad de dominio
+
+**Objetivo:** Verificar si uno o más dominios están disponibles para registro.
+
+**Endpoint:** `GET /api/v1/domains/check`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/domains/check?domain=example-demo.com&domain=tienda-ejemplo.com" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "domain": "example-demo.com",
+      "available": true,
+      "price": 12.99,
+      "currency": "USD",
+      "period": 1
+    },
+    {
+      "domain": "tienda-ejemplo.com",
+      "available": false,
+      "price": null,
+      "currency": null,
+      "period": null
+    }
+  ],
+  "msg": "Domain availability checked"
+}
+```
+
+:::tip
+Puedes verificar hasta **50 dominios** en una sola solicitud repitiendo el parámetro de consulta `domain`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Formato de dominio inválido o demasiados dominios (máx. 50) | Verifica el formato del dominio y reduce la cantidad de dominios |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Parámetro `domain` ausente o malformado | Proporciona al menos un parámetro de consulta `domain` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | Proveedor de dominios temporalmente no disponible | Reintenta después de unos segundos |
+| 503 | Servicio de dominios deshabilitado | Contacta a soporte -- el servicio de dominios puede estar en mantenimiento |
+
+---
+
+### Paso 4 — Obtener precios por TLD
+
+**Objetivo:** Obtener los precios de registro para uno o más TLDs.
+
+**Endpoint:** `GET /api/v1/domains/pricing`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/domains/pricing?tld=com&tld=io&tld=dev" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "tld": "com",
+      "register_price": 12.99,
+      "renew_price": 12.99,
+      "transfer_price": 9.99,
+      "currency": "USD"
+    },
+    {
+      "tld": "io",
+      "register_price": 39.99,
+      "renew_price": 39.99,
+      "transfer_price": 39.99,
+      "currency": "USD"
+    },
+    {
+      "tld": "dev",
+      "register_price": 15.99,
+      "renew_price": 15.99,
+      "transfer_price": 15.99,
+      "currency": "USD"
+    }
+  ],
+  "msg": "TLD pricing retrieved"
+}
+```
+
+:::note
+Si omites el parámetro `tld`, la API devuelve los precios para el conjunto por defecto: `com`, `net`, `org`, `io`, `co`, `dev`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Parámetro `tld` malformado | Proporciona strings de TLD válidos (p. ej., `com`, `io`) |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | Proveedor de dominios temporalmente no disponible | Reintenta después de unos segundos |
+| 503 | Servicio de dominios deshabilitado | Contacta a soporte |
+
+---
+
+### Paso 5 — Registrar un dominio
+
+**Objetivo:** Registrar un nuevo dominio para el usuario autenticado.
+
+**Endpoint:** `POST /api/v1/domains`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/domains" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "example-demo.com",
+    "years": 1,
+    "whois_privacy": true,
+    "auto_renew": false,
+    "nameservers": null
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "domain": "example-demo.com",
+    "status": "active",
+    "expires_at": "2027-03-18T10:30:00",
+    "created_at": "2026-03-18T10:30:00",
+    "auto_renew": false,
+    "whois_privacy": true,
+    "locked": true,
+    "nameservers": [
+      "ns1.default-dns.com",
+      "ns2.default-dns.com"
+    ]
+  },
+  "msg": "Domain registered successfully"
+}
+```
+
+:::note
+Guarda `data.id` como `$DOMAIN_ID` para las solicitudes siguientes.
+:::
+
+:::warning
+El registro de dominio descuenta del saldo del usuario de inmediato. Verifica la disponibilidad (Paso 3) y el saldo suficiente antes de llamar a este endpoint.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Nombre de dominio inválido | Verifica el formato del dominio (p. ej., `example.com`, máx. 253 caracteres) |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 402 | Saldo insuficiente | Agrega fondos a la cuenta del usuario antes de reintentar |
+| 404 | Contacto no configurado | Crea primero un contacto de dominio (Paso 2) |
+| 409 | Dominio no disponible o ya registrado | Verifica primero la disponibilidad (Paso 3), o el dominio ya está en la cuenta del usuario |
+| 422 | Error de validación en el cuerpo de la solicitud | Verifica los formatos y restricciones de los campos |
+| 429 | Límite de tasa excedido o límite de dominios alcanzado | Espera y reintenta, o verifica los límites de dominios de la cuenta |
+| 502 | El proveedor de dominios no pudo procesar | Reintenta después de unos segundos |
+| 503 | Servicio de dominios deshabilitado | Contacta a soporte |
+
+---
+
+### Paso 6 — Listar dominios del usuario
+
+**Objetivo:** Obtener todos los dominios registrados por el usuario autenticado.
+
+**Endpoint:** `GET /api/v1/domains`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/domains" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "domain": "example-demo.com",
+      "status": "active",
+      "expires_at": "2027-03-18T10:30:00",
+      "created_at": "2026-03-18T10:30:00",
+      "auto_renew": false,
+      "whois_privacy": true,
+      "locked": true
+    }
+  ],
+  "msg": "Domains retrieved successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Solicitud inválida | Verifica los headers y el formato del token |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 7 — Obtener detalles del dominio
+
+**Objetivo:** Obtener todos los detalles de un dominio específico.
+
+**Endpoint:** `GET /api/v1/domains/{domain_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/domains/$DOMAIN_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "domain": "example-demo.com",
+    "status": "active",
+    "expires_at": "2027-03-18T10:30:00",
+    "created_at": "2026-03-18T10:30:00",
+    "updated_at": "2026-03-18T10:30:00",
+    "auto_renew": false,
+    "whois_privacy": true,
+    "locked": true,
+    "nameservers": [
+      "ns1.default-dns.com",
+      "ns2.default-dns.com"
+    ],
+    "contact": {
+      "first_name": "Carlos",
+      "last_name": "Ejemplo Demo",
+      "email": "carlos@example.com",
+      "phone": "+502.00001234",
+      "country": "GT"
+    }
+  },
+  "msg": "Domain details retrieved"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Dominio no encontrado | Verifica que el `domain_id` sea correcto |
+| 422 | Solicitud inválida | Verifica el formato del `domain_id` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 8 — Obtener registros DNS
+
+**Objetivo:** Obtener los registros DNS actuales de un dominio.
+
+**Endpoint:** `GET /api/v1/domains/{domain_id}/dns`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/domains/$DOMAIN_ID/dns" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "records": [
+      {
+        "type": "A",
+        "host": "@",
+        "value": "93.184.216.34",
+        "ttl": 1800,
+        "mx_pref": null
+      },
+      {
+        "type": "CNAME",
+        "host": "www",
+        "value": "example-demo.com",
+        "ttl": 1800,
+        "mx_pref": null
+      }
+    ]
+  },
+  "msg": "DNS records retrieved"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Dominio no encontrado | Verifica el `domain_id` |
+| 422 | Solicitud inválida | Verifica el formato del `domain_id` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | Error del proveedor DNS | Reintenta después de unos segundos |
+
+---
+
+### Paso 9 — Establecer registros DNS
+
+**Objetivo:** Reemplazar todos los registros DNS de un dominio con un nuevo conjunto de registros.
+
+**Endpoint:** `PUT /api/v1/domains/{domain_id}/dns`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PUT "$BASE_URL/domains/$DOMAIN_ID/dns" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "records": [
+      {
+        "type": "A",
+        "host": "@",
+        "value": "93.184.216.34",
+        "ttl": 3600
+      },
+      {
+        "type": "CNAME",
+        "host": "www",
+        "value": "example-demo.com",
+        "ttl": 3600
+      },
+      {
+        "type": "MX",
+        "host": "@",
+        "value": "mail.example-demo.com",
+        "ttl": 3600,
+        "mx_pref": 10
+      },
+      {
+        "type": "TXT",
+        "host": "@",
+        "value": "v=spf1 include:_spf.google.com ~all",
+        "ttl": 3600
+      }
+    ]
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "records": [
+      {
+        "type": "A",
+        "host": "@",
+        "value": "93.184.216.34",
+        "ttl": 3600,
+        "mx_pref": null
+      },
+      {
+        "type": "CNAME",
+        "host": "www",
+        "value": "example-demo.com",
+        "ttl": 3600,
+        "mx_pref": null
+      },
+      {
+        "type": "MX",
+        "host": "@",
+        "value": "mail.example-demo.com",
+        "ttl": 3600,
+        "mx_pref": 10
+      },
+      {
+        "type": "TXT",
+        "host": "@",
+        "value": "v=spf1 include:_spf.google.com ~all",
+        "ttl": 3600,
+        "mx_pref": null
+      }
+    ]
+  },
+  "msg": "DNS records updated"
+}
+```
+
+:::warning
+Este endpoint **reemplaza todos los registros existentes**. Incluye siempre todos los registros deseados en la solicitud, no solo los que quieres agregar o cambiar. Obtén primero los registros actuales (Paso 8) para evitar eliminar accidentalmente registros existentes.
+:::
+
+:::tip
+Los registros MX requieren el campo `mx_pref`. Para otros tipos de registro, `mx_pref` puede omitirse o establecerse en `null`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Registro DNS inválido (tipo, host, valor o TTL incorrectos) | Verifica el formato del registro -- comprueba el enum `type`, la longitud de `host`, la longitud de `value` y el rango de `ttl` (60-86400) |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Dominio no encontrado | Verifica el `domain_id` |
+| 422 | Error de validación | Verifica que el array `records` tenga de 1 a 100 elementos y todos los campos requeridos |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | Error del proveedor DNS | Reintenta después de unos segundos |
+
+---
+
+### Paso 10 — Establecer nameservers del dominio
+
+**Objetivo:** Cambiar entre nameservers por defecto y personalizados para un dominio.
+
+**Endpoint:** `PUT /api/v1/domains/{domain_id}/nameservers`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PUT "$BASE_URL/domains/$DOMAIN_ID/nameservers" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "custom",
+    "nameservers": [
+      "ns1.cloudflare.com",
+      "ns2.cloudflare.com"
+    ]
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "type": "custom",
+    "nameservers": [
+      "ns1.cloudflare.com",
+      "ns2.cloudflare.com"
+    ]
+  },
+  "msg": "Nameservers updated"
+}
+```
+
+:::note
+Cuando `type` es `"default"`, el campo `nameservers` se ignora y el dominio vuelve a los nameservers por defecto del proveedor. Cuando `type` es `"custom"`, el array `nameservers` es requerido.
+:::
+
+:::warning
+Cambiar los nameservers a valores personalizados significa que los registros DNS gestionados a través de esta API (Pasos 8-9) ya no se aplicarán. El DNS será resuelto por el proveedor de nameservers personalizado en su lugar.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Formato de nameserver inválido | Verifica que los hostnames de los nameservers sean FQDNs válidos |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Dominio no encontrado | Verifica el `domain_id` |
+| 422 | Error de validación | Verifica que `type` sea `"default"` o `"custom"`, y que el array `nameservers` tenga máx. 12 elementos |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | El proveedor no pudo actualizar los nameservers | Reintenta después de unos segundos |
+
+---
+
+### Paso 11 — Renovar un dominio
+
+**Objetivo:** Extender el período de registro de un dominio existente.
+
+**Endpoint:** `POST /api/v1/domains/{domain_id}/renew`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/domains/$DOMAIN_ID/renew" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "years": 1
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "domain": "example-demo.com",
+    "status": "active",
+    "expires_at": "2028-03-18T10:30:00",
+    "renewed_at": "2026-03-18T14:00:00"
+  },
+  "msg": "Domain renewed successfully"
+}
+```
+
+:::note
+La fecha `expires_at` se extiende por la cantidad de años especificada. La renovación descuenta del saldo del usuario de inmediato.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 402 | Saldo insuficiente | Agrega fondos a la cuenta del usuario antes de reintentar |
+| 404 | Dominio no encontrado | Verifica el `domain_id` |
+| 409 | Dominio en estado inválido para renovación | El dominio debe estar en estado `active` o `expiring` para renovar |
+| 422 | Error de validación | Verifica que `years` esté entre 1 y 10 |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | El proveedor no pudo procesar la renovación | Reintenta después de unos segundos |
+
+---
+
+### Paso 12 — Establecer el bloqueo de registrador
+
+**Objetivo:** Bloquear o desbloquear un dominio para prevenir transferencias no autorizadas.
+
+**Endpoint:** `PATCH /api/v1/domains/{domain_id}/lock`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PATCH "$BASE_URL/domains/$DOMAIN_ID/lock" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "locked": false
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "domain": "example-demo.com",
+    "locked": false
+  },
+  "msg": "Domain lock updated"
+}
+```
+
+:::warning
+Desbloquear un dominio es necesario antes de iniciar una transferencia saliente. Vuelve a bloquear siempre el dominio después de que una transferencia sea cancelada o completada para prevenir transferencias no autorizadas.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Dominio no encontrado | Verifica el `domain_id` |
+| 409 | Dominio en estado inválido para cambio de bloqueo | El dominio debe estar en estado `active` |
+| 422 | Error de validación | Verifica que `locked` sea un boolean |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | El proveedor no pudo actualizar el bloqueo | Reintenta después de unos segundos |
+
+---
+
+### Paso 13 — Iniciar transferencia de dominio
+
+**Objetivo:** Transferir un dominio desde otro registrador hacia tu cuenta.
+
+**Endpoint:** `POST /api/v1/domains/transfer`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/domains/transfer" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "tienda-ejemplo.com",
+    "epp_code": "EPP-DEMO-12345",
+    "years": 1,
+    "whois_privacy": true,
+    "auto_renew": false
+  }'
+```
+
+**Respuesta (202):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439012",
+    "domain": "tienda-ejemplo.com",
+    "status": "transfer_pending",
+    "transfer_started_at": "2026-03-18T15:00:00",
+    "created_at": "2026-03-18T15:00:00"
+  },
+  "msg": "Domain transfer initiated"
+}
+```
+
+:::note
+Guarda `data.id` como el ID del dominio para verificar el estado de la transferencia (Paso 14). Las transferencias suelen tardar de 5 a 7 días en completarse.
+:::
+
+:::tip
+Antes de iniciar una transferencia, asegúrate de que:
+1. El dominio esté desbloqueado en el registrador actual
+2. Tengas el código EPP/autorización correcto
+3. El dominio no esté dentro de los 60 días de su registro o de una transferencia previa
+4. Haya un perfil de contacto configurado (Paso 2)
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Dominio o código EPP inválido | Verifica el formato del dominio y el código EPP del registrador actual |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 402 | Saldo insuficiente | Agrega fondos a la cuenta del usuario |
+| 404 | Contacto no configurado | Crea primero un contacto de dominio (Paso 2) |
+| 409 | Dominio no elegible para transferencia | El dominio puede estar bloqueado, recién registrado o recién transferido |
+| 422 | Error de validación | Verifica los campos y formatos requeridos |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | El proveedor no pudo iniciar la transferencia | Reintenta después de unos segundos |
+
+---
+
+### Paso 14 — Verificar el estado de la transferencia
+
+**Objetivo:** Monitorear el progreso de una transferencia de dominio.
+
+**Endpoint:** `GET /api/v1/domains/{domain_id}/transfer/status`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/domains/$DOMAIN_ID/transfer/status" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "domain": "tienda-ejemplo.com",
+    "status": "transfer_pending",
+    "transfer_started_at": "2026-03-18T15:00:00",
+    "estimated_completion": "2026-03-25T15:00:00",
+    "last_checked_at": "2026-03-19T08:00:00"
+  },
+  "msg": "Transfer status retrieved"
+}
+```
+
+:::tip
+Consulta este endpoint periódicamente (p. ej., cada pocas horas) para monitorear el progreso de la transferencia. Estados comunes: `transfer_pending`, `transfer_approved`, `transfer_completed`, `transfer_failed`, `transfer_cancelled`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Dominio no encontrado o sin transferencia activa | Verifica el `domain_id` y que se haya iniciado una transferencia |
+| 409 | Dominio no está en estado de transferencia | El dominio no tiene ninguna transferencia activa en curso |
+| 422 | Solicitud inválida | Verifica el formato del `domain_id` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 502 | Falló la verificación de estado del proveedor | El proveedor de dominios está temporalmente no disponible; reintenta después de unos segundos |
+
+---
+
+### Paso 15 — Listar historial de operaciones
+
+**Objetivo:** Obtener el historial de todas las operaciones de dominio (registros, renovaciones, transferencias, cambios de DNS, etc.).
+
+**Endpoint:** `GET /api/v1/domains/operations`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/domains/operations" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "60a1b2c3d4e5f6789abcdef0",
+      "type": "registration",
+      "domain": "example-demo.com",
+      "status": "completed",
+      "amount": 12.99,
+      "currency": "USD",
+      "created_at": "2026-03-18T10:30:00"
+    },
+    {
+      "id": "60a1b2c3d4e5f6789abcdef1",
+      "type": "dns_update",
+      "domain": "example-demo.com",
+      "status": "completed",
+      "amount": null,
+      "currency": null,
+      "created_at": "2026-03-18T11:00:00"
+    }
+  ],
+  "msg": "Operations retrieved"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Solicitud inválida | Verifica los headers y el formato del token |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 16 — Obtener el contacto de dominio
+
+**Objetivo:** Obtener el perfil de contacto de dominio configurado actualmente.
+
+**Endpoint:** `GET /api/v1/domains/contact`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/domains/contact" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "first_name": "Carlos",
+    "last_name": "Ejemplo Demo",
+    "email": "carlos@example.com",
+    "phone": "+502.00001234",
+    "address": "Avenida Reforma 10-50",
+    "city": "Guatemala",
+    "state": "Guatemala",
+    "country": "GT",
+    "postal_code": "01010",
+    "organization": null,
+    "updated_at": "2026-03-18T10:00:00"
+  },
+  "msg": "Contact retrieved"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Contacto de dominio no configurado | Crea primero un contacto con `PUT /domains/contact` (Paso 2) |
+| 422 | Solicitud inválida | Verifica los headers y el formato del token |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes (Pasos 0-9: auth, contacto, verificación, precios, registro, listado, detalles, obtener DNS, establecer DNS).
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-carlos-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 2: Crear el contacto de dominio ===
+curl -s -X PUT "$BASE_URL/domains/contact" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "Carlos",
+    "last_name": "Ejemplo Demo",
+    "email": "carlos@example.com",
+    "phone": "+502.00001234",
+    "address": "Avenida Reforma 10-50",
+    "city": "Guatemala",
+    "state": "Guatemala",
+    "country": "GT",
+    "postal_code": "01010"
+  }' | jq .
+
+# === PASO 3: Verificar disponibilidad de dominio ===
+curl -s -X GET "$BASE_URL/domains/check?domain=example-demo.com" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 4: Obtener precios por TLD ===
+curl -s -X GET "$BASE_URL/domains/pricing?tld=com&tld=io" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 5: Registrar un dominio ===
+DOMAIN_ID=$(curl -s -X POST "$BASE_URL/domains" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "example-demo.com",
+    "years": 1,
+    "whois_privacy": true,
+    "auto_renew": false
+  }' \
+  | jq -r '.data.id')
+
+echo "DOMAIN_ID: $DOMAIN_ID"
+
+# === PASO 6: Listar dominios del usuario ===
+curl -s -X GET "$BASE_URL/domains" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 7: Obtener detalles del dominio ===
+curl -s -X GET "$BASE_URL/domains/$DOMAIN_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 8: Obtener los registros DNS actuales ===
+curl -s -X GET "$BASE_URL/domains/$DOMAIN_ID/dns" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 9: Establecer registros DNS ===
+curl -s -X PUT "$BASE_URL/domains/$DOMAIN_ID/dns" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "records": [
+      {
+        "type": "A",
+        "host": "@",
+        "value": "93.184.216.34",
+        "ttl": 3600
+      },
+      {
+        "type": "CNAME",
+        "host": "www",
+        "value": "example-demo.com",
+        "ttl": 3600
+      },
+      {
+        "type": "MX",
+        "host": "@",
+        "value": "mail.example-demo.com",
+        "ttl": 3600,
+        "mx_pref": 10
+      },
+      {
+        "type": "TXT",
+        "host": "@",
+        "value": "v=spf1 include:_spf.google.com ~all",
+        "ttl": 3600
+      }
+    ]
+  }' | jq .
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+
+:::warning[Sin mecanismo de idempotencia]
+La API no admite un header `Idempotency-Key`. Si una solicitud de registro de dominio falla por timeout, lista los dominios del usuario (`GET /domains`) antes de reintentar para evitar cargos duplicados. El mismo dominio no puede registrarse dos veces -- la API devuelve un error **409**.
+:::
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, verifica el estado del recurso antes de reintentar.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
+- Para **502** (proveedor no disponible), espera unos segundos y reintenta -- el proveedor externo puede estar temporalmente sobrecargado.
+
+### Timeouts
+- Las verificaciones de disponibilidad de dominio suelen completarse en **2-5 segundos**.
+- El registro de dominio puede tardar **5-15 segundos** según el TLD y el proveedor.
+- Las actualizaciones de registros DNS suelen completarse en **2-5 segundos**.
+- Las transferencias de dominio son asíncronas y tardan **5-7 días** -- consulta periódicamente el endpoint de estado de la transferencia.
+- Configura tu cliente HTTP con al menos **30 segundos** de timeout para los endpoints de registro y renovación.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de gestión de dominios.
+
+### Validaciones importantes
+- Un contacto de dominio **debe** configurarse antes de registrar dominios o iniciar transferencias.
+- Los nombres de dominio deben ser FQDNs válidos (máx. 253 caracteres).
+- Los números de teléfono deben usar el formato E.164 con punto: `+N.NNNNNNN` (p. ej., `+502.00001234`).
+- Los códigos de país deben tener exactamente 2 caracteres (ISO 3166-1 alpha-2).
+- Los registros DNS se reemplazan por completo en cada `PUT` -- incluye siempre todos los registros deseados.
+- Los registros MX requieren el campo `mx_pref`.
+- Los cambios de nameserver surten efecto en minutos, pero pueden tardar hasta 48 horas en propagarse globalmente.
+- Los cargos por registro y renovación de dominios no son reembolsables.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener token de usuario |
+| 2 | `PUT` | `/api/v1/domains/contact` | Crear o actualizar contacto de dominio |
+| 3 | `GET` | `/api/v1/domains/check` | Verificar disponibilidad de dominio |
+| 4 | `GET` | `/api/v1/domains/pricing` | Obtener precios por TLD |
+| 5 | `POST` | `/api/v1/domains` | Registrar un dominio |
+| 6 | `GET` | `/api/v1/domains` | Listar dominios del usuario |
+| 7 | `GET` | `/api/v1/domains/{domain_id}` | Obtener detalles del dominio |
+| 8 | `GET` | `/api/v1/domains/{domain_id}/dns` | Obtener registros DNS |
+| 9 | `PUT` | `/api/v1/domains/{domain_id}/dns` | Establecer registros DNS |
+| 10 | `PUT` | `/api/v1/domains/{domain_id}/nameservers` | Establecer nameservers |
+| 11 | `POST` | `/api/v1/domains/{domain_id}/renew` | Renovar un dominio |
+| 12 | `PATCH` | `/api/v1/domains/{domain_id}/lock` | Establecer bloqueo de registrador |
+| 13 | `POST` | `/api/v1/domains/transfer` | Iniciar transferencia de dominio |
+| 14 | `GET` | `/api/v1/domains/{domain_id}/transfer/status` | Verificar estado de la transferencia |
+| 15 | `GET` | `/api/v1/domains/operations` | Listar historial de operaciones |
+| 16 | `GET` | `/api/v1/domains/contact` | Obtener contacto de dominio |
+
+---
+
+## Lista de verificación rápida
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Configuré el contacto de dominio (`PUT /domains/contact`)
+- [ ] Verifiqué la disponibilidad del dominio (`GET /domains/check`)
+- [ ] Revisé los precios por TLD (`GET /domains/pricing`)
+- [ ] Registré el dominio (`POST /domains`)
+- [ ] Verifiqué los detalles del dominio (`GET /domains/{domain_id}`)
+- [ ] Configuré los registros DNS (`PUT /domains/{domain_id}/dns`)
+- [ ] Establecí los nameservers si era necesario (`PUT /domains/{domain_id}/nameservers`)

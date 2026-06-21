@@ -1,0 +1,147 @@
+---
+title: Exploración del catálogo
+description: Explora el catálogo publicado de un tenant en la Atlas API — listado paginado, filtrado por kind/genre/status, detalle de ítem por slug y búsqueda de texto completo.
+sidebar_position: 7
+---
+
+# Exploración del catálogo
+
+El catálogo público es **anónimo** y está **acotado al tenant**: sirve cualquier contenido que el tenant resuelto
+haya publicado, con el branding de ese tenant. Estos endpoints son seguros para renderizar en
+páginas indexables por SEO y renderizadas en servidor. Acota cada solicitud con `Host` o `X-Tenant-Slug`
+(consulta [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)).
+
+> No se requiere autenticación para *explorar*. La autenticación y los [entitlements](/docs/saas/atlas-api/entitlements)
+> solo controlan la [entrega de contenido](/docs/saas/atlas-api/content-delivery) real.
+
+## Listar el catálogo
+
+```bash
+curl -s "$ATLAS_BASE/public/catalog?page=1&page_size=20&sort=recent" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+```json
+{
+  "items": [
+    {
+      "id": "a3b4…",
+      "slug": "the-time-machine",
+      "kind": "book",
+      "title": "The Time Machine",
+      "status": "published",
+      "cover_image_url": "https://…/covers/the-time-machine.jpg",
+      "coming_soon": false,
+      "metadata": { "author": "H. G. Wells" }
+    }
+  ],
+  "total": 502,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+### Parámetros de consulta
+
+| Param | Por defecto | Descripción |
+|---|---|---|
+| `page` | `1` | Índice de página basado en 1. |
+| `page_size` | `20` | Ítems por página (1–100). |
+| `status` | `published` | Filtro de estado del contenido. Mutuamente excluyente con `coming_soon`. |
+| `sort` | `recent` | `recent`, `popular`, `title-asc` o `rating-desc`. |
+| `kind` | — | Restringe a un kind: `book`, `video`, `episode`, `live`, `podcast`, `article`. |
+| `genre` | — | Repetible. Ítems cuyos `metadata.tags` intersectan cualquier slug de género provisto (semántica OR). |
+| `coming_soon` | `false` | Lista ítems "coming soon" (programados + publicados sin asset descargable todavía). |
+| `surface` | — | `app` oculta los ítems `web_only`; `web` oculta los ítems `app_only`. |
+
+> Cuando acotas resultados con `kind`, `genre`, `coming_soon` o `surface`, `total` refleja la
+> página devuelta en lugar de un conteo global — úsalo para una etiqueta aproximada de "X ítems", no para
+> cálculos precisos de paginación.
+
+### Ejemplos
+
+```bash
+# Solo libros, alfabético
+curl -s "$ATLAS_BASE/public/catalog?kind=book&sort=title-asc" -H "X-Tenant-Slug: $TENANT_SLUG"
+
+# Combinar géneros (OR)
+curl -s "$ATLAS_BASE/public/catalog?genre=sci-fi&genre=classics" -H "X-Tenant-Slug: $TENANT_SLUG"
+
+# Riel de próximamente
+curl -s "$ATLAS_BASE/public/catalog?coming_soon=true" -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+## Obtener un ítem por slug
+
+Las páginas de detalle de ítem se identifican por el slug legible por humanos:
+
+```bash
+curl -s "$ATLAS_BASE/public/items/the-time-machine" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+Un slug que falte, esté en draft o archivado para este tenant devuelve:
+
+```json
+{ "code": "CONTENT_NOT_FOUND" }
+```
+
+(HTTP `404`.) Solo los ítems `published` y `scheduled` son visibles en la superficie de detalle pública.
+
+## Búsqueda
+
+Búsqueda de texto completo sobre el catálogo publicado, agrupada por kind, con resaltados envueltos en `<mark>`:
+
+```bash
+curl -s "$ATLAS_BASE/public/search?q=time%20machine&limit=20" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+```json
+{
+  "query": "time machine",
+  "total": 3,
+  "groups": [
+    {
+      "kind": "book",
+      "total": 3,
+      "items": [
+        { "id": "a3b4…", "slug": "the-time-machine", "title": "The <mark>Time Machine</mark>", "kind": "book" }
+      ]
+    }
+  ]
+}
+```
+
+| Param | Por defecto | Descripción |
+|---|---|---|
+| `q` | requerido | Cadena de consulta (1–120 caracteres). |
+| `kind` | — | Restringe los resultados a un único kind. |
+| `limit` | `20` | Máximo de coincidencias (1–50). |
+
+La búsqueda es **fail-soft**: si el almacén de respaldo tiene un hipo, recibes un `200` normal con `total: 0` y
+grupos vacíos en lugar de un error — renderiza un estado de "sin resultados".
+
+### Sugerencias de type-ahead
+
+Para una caja de autocompletado, usa el endpoint de sugerencias más ligero y con límite de uso:
+
+```bash
+curl -s "$ATLAS_BASE/public/suggest?q=time&limit=8" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+Una consulta vacía devuelve `400 { "code": "SEARCH_QUERY_EMPTY" }`; una consulta demasiado larga devuelve
+`400 { "code": "SEARCH_QUERY_TOO_LONG" }`.
+
+## Otras superficies públicas
+
+El router público también expone rieles relacionados comúnmente usados para construir una storefront — `/public/featured`,
+`/public/related/{slug}`, `/public/genres` y `/public/plans`, entre otros. Explóralos todos en la
+**[referencia interactiva de la API →](/api-reference/atlas-api)**.
+
+## Consulta también
+
+- [Entrega de contenido](/docs/saas/atlas-api/content-delivery) — convierte un ítem del catálogo en un ticket de reproducción.
+- [Entitlements](/docs/saas/atlas-api/entitlements) — qué controla el acceso a un ítem.
+- [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution) — el catálogo es por tenant.

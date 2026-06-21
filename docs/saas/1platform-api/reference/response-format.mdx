@@ -1,0 +1,83 @@
+---
+title: Formato de respuesta
+description: El envoltorio de respuesta estándar, la excepción del namespace de webhooks y cómo leer errores de forma consistente.
+sidebar_position: 7
+---
+
+# Formato de respuesta
+
+La 1Platform API usa **dos** formas de respuesta, según el namespace.
+
+## Envoltorio 1 — endpoints orientados al cliente (`{ success, data, msg }`)
+
+Cada endpoint bajo `/auth/*`, `/users/*`, `/posts/*`, `/agents/*`, etc.
+envuelve la respuesta en:
+
+```json
+{
+  "success": true,
+  "data": { /* endpoint-specific payload, can be null */ },
+  "msg": "Human-readable summary"
+}
+```
+
+En caso de error:
+
+```json
+{
+  "success": false,
+  "data": { "code": "PAYMENT_GATEWAY_NOT_CONFIGURED" },
+  "msg": "This account does not have a payment gateway configured. ..."
+}
+```
+
+Cuando `data.code` está presente, ramifica según él para la lógica del cliente. Cuando está ausente,
+trata el código de estado HTTP como la fuente de verdad y muestra `msg` al
+operador.
+
+## Envoltorio 2 — namespace de webhook entrante (`{ status, message }`)
+
+`POST /webhooks/transactions` (el receptor **entrante** desde el proveedor
+upstream) usa una forma plana porque el proveedor la espera así:
+
+```json
+{ "status": "ok", "message": "Webhook accepted" }
+```
+
+Normalmente no interactúas directamente con este endpoint — lo hace el proveedor
+upstream.
+
+## Webhooks salientes — ningún envoltorio
+
+Los webhooks salientes (1Platform → comercio) usan una carga útil específica del dominio, no
+ninguno de los envoltorios anteriores. Consulta
+[recibir notificaciones → carga útil canónica](../webhooks/receiving-notifications#canonical-payload).
+
+## Errores 422 de Pydantic
+
+La validación automática de esquema de FastAPI devuelve **su propia** forma, no el
+envoltorio:
+
+```json
+{
+  "detail": [
+    { "type": "missing", "loc": ["body", "amount"], "msg": "Field required" }
+  ],
+  "message": "Validation error"
+}
+```
+
+Estos son errores del cliente (campo faltante, tipo incorrecto) — corrige la solicitud, nunca
+reintentes a ciegas.
+
+## Qué leer
+
+| Quieres saber... | Lee |
+|---|---|
+| ¿La solicitud tuvo éxito? | Código de estado HTTP (`2xx` = sí) |
+| ¿La respuesta es un envoltorio? | Campo `success` — presente significa sí |
+| ¿Qué tipo de fallo de negocio? | `data.code` si está presente |
+| ¿Qué mostrar al operador? | `msg` |
+| ¿Qué campo de mi solicitud está mal? | `detail[].loc` (solo Pydantic 422) |
+
+Consulta también: [referencia de códigos de error](./error-codes).

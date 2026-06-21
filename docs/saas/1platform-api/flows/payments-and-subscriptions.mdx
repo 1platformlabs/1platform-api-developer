@@ -1,0 +1,814 @@
+---
+title: "Pagos y suscripciones"
+description: "Flujo paso a paso para consultar la facturación, crear transacciones de pago, ver el historial de transacciones, consultar los detalles de la suscripción y hacer seguimiento del consumo mediante la 1Platform API."
+sidebar_position: 7
+---
+
+# Flujo: Pagos y suscripciones
+
+## Vista general
+
+Este flujo documenta cómo gestionar pagos y suscripciones mediante la 1Platform API. Cubre la consulta del saldo de facturación, la creación de transacciones de pago, la visualización del historial de transacciones, la obtención de los detalles de la suscripción y el seguimiento del consumo de la API.
+
+**Caso de uso:** Permitir que los usuarios recarguen el saldo de su cuenta mediante el servicio de pago integrado, hagan seguimiento del historial de transacciones y gestionen su plan de suscripción.
+
+**Resultado final:** Una transacción de pago completada con el saldo acreditado en la cuenta del usuario, con visibilidad total de la facturación, el estado de la suscripción y un seguimiento detallado del consumo.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) — consulta [Entornos](../reference/environments) |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Pasarela de pago configurada | **La facturación del usuario debe tener una pasarela activa** — consulta el aviso a continuación |
+
+:::warning[La pasarela de pago debe estar configurada]
+`POST /users/transactions` devuelve **`422`** con `data.code: "PAYMENT_GATEWAY_NOT_CONFIGURED"`
+cuando el usuario no tiene una pasarela activa.
+
+Para configurar una:
+
+1. Aprovisiona una pasarela mediante el dashboard del operador (la acción del operador vive
+   fuera de la API — contacta a tu gestor de cuenta para obtener la URL del dashboard de QA).
+2. Verifica con `GET /users/billing` — `data.billing.payment_gateway_id` debe
+   ser **distinto de null**.
+
+La **moneda del comercio** se lee de la configuración de la aplicación, no del
+cuerpo de la solicitud. Para cobrar en una moneda distinta, registra una aplicación separada.
+:::
+
+### Headers requeridos en todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""          # Obtenido en el Paso 0
+USER_TOKEN=""         # Obtenido en el Paso 1
+TRANSACTION_ID=""     # Obtenido en el Paso 3
+SUBSCRIPTION_ID=""    # Obtenido en el Paso 2 (de la respuesta de facturación)
+```
+
+---
+
+## Datos requeridos para crear una transacción
+
+### Transacción
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `amount` | number | Sí | Monto de la transacción (debe ser positivo) |
+| `description` | string | No | Descripción de la transacción (máx. 500 caracteres) |
+| `metadata` | object | No | Metadatos adicionales (pares clave-valor). **Se devuelven sin cambios** en el payload del webhook saliente. |
+| `merchant_reference` | string | No | Identificador libre del comercio (máx. 128 caracteres). **Se devuelve sin cambios** en el webhook saliente — asígnale el ID de tu pedido local para una correlación determinista. |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+### Patrón de cacheo de tokens {#token-caching-pattern}
+Ambos tokens tienen un **TTL de 30 minutos** (`expires_in: 1800`). Comportamiento recomendado del cliente:
+
+1. **Cachea** el token tras generarlo, con expiración = `expires_in - 60` (margen de seguridad de 60 segundos).
+2. **Refresco anticipado:** cuando estés dentro del margen de seguridad, genera un token nuevo antes de la siguiente solicitud.
+3. **401 reactivo:** ante un 401, genera un token nuevo y reintenta la solicitud original **una vez** (no dos — eso enmascara errores reales de autenticación).
+4. **Por usuario vs. central:** el token de aplicación se puede cachear de forma central (una caché compartida). El token de usuario está asociado a un solo usuario — cachéalo por usuario.
+
+Los endpoints de autenticación tienen un límite de tasa de **10 / min**, así que no generes un token en cada llamada.
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o aplicación inactiva | Verifica que `apiKey` sea correcta y que la aplicación esté activa |
+| 422 | Campo `apiKey` ausente o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Consultar la información de facturación
+
+**Objetivo:** Obtener el saldo actual del usuario y su suscripción activa.
+
+**Endpoint:** `GET /api/v1/users/billing`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/billing" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "billing": {
+      "id": "65a1b2c3d4e5f6789abcdef4",
+      "user_id": "507f1f77bcf86cd799439011",
+      "balance": 25.50,
+      "currency": "USD",
+      "payment_gateway_id": "65a1b2c3d4e5f6789abcdef0",
+      "updated_at": "2026-03-18T10:00:00Z"
+    },
+    "subscription": {
+      "id": "65a1b2c3d4e5f6789abcdef3",
+      "plan_id": "plan_free",
+      "status": "active",
+      "user_id": "507f1f77bcf86cd799439011",
+      "start_date": "2026-01-01T00:00:00Z",
+      "auto_renew": false
+    }
+  },
+  "msg": "Billing information retrieved successfully"
+}
+```
+
+:::note
+Guarda `data.subscription.id` como `$SUBSCRIPTION_ID` si necesitas consultar los detalles de la suscripción más adelante.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
+| 500 | Error al obtener la información de facturación | Contacta a soporte |
+
+---
+
+### Paso 3 — Crear una transacción de pago {#step-3--create-payment-transaction}
+**Objetivo:** Crear una transacción de pago y obtener una URL de checkout donde el usuario completa el pago.
+
+**Endpoint:** `POST /api/v1/users/transactions`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/transactions" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 10.00,
+    "description": "Account top-up - March 2026",
+    "metadata": {
+      "source": "web",
+      "campaign_id": "spring-promo-2026"
+    }
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65a1b2c3d4e5f6789abcdef0",
+    "user_id": "507f1f77bcf86cd799439011",
+    "usd_amount": 10.00,
+    "amount": 78.00,
+    "currency": "USD",
+    "currency_provider": "GTQ",
+    "status": "created",
+    "payment_url": "https://checkout.payment-service.com/pay/abc123",
+    "reference": null,
+    "description": "Account top-up - March 2026",
+    "created_at": "2026-03-18T10:30:00Z",
+    "updated_at": "2026-03-18T10:30:00Z"
+  },
+  "msg": "Transaction created — redirect user to payment URL"
+}
+```
+
+:::note
+Redirige al usuario a `data.payment_url` para completar el pago. Guarda `data.id` como `$TRANSACTION_ID`.
+:::
+
+**Campos clave:**
+
+- `usd_amount` — monto que enviaste (en tu **moneda del comercio**, p. ej. USD).
+  **Úsalo para la contabilidad / acreditar a los vendedores.**
+- `amount` — monto que cobrará el proveedor upstream (en **moneda del
+  proveedor**, p. ej. GTQ — convertido por 1Platform en el momento de la solicitud). Solo
+  informativo; el tipo de cambio es opaco.
+- `currency_provider` — la moneda del proveedor para `amount` (p. ej. `GTQ`).
+- `payment_url` — URL de checkout donde el usuario completa el pago. Válida por un
+  tiempo limitado — redirige sin demora.
+- `status` — comienza como `"created"`. El estado final llega vía webhook —
+  consulta [recibir notificaciones](../webhooks/receiving-notifications).
+
+:::warning[Sin clave de idempotencia en este endpoint]
+`POST /users/transactions` **no** acepta un header `Idempotency-Key`.
+Si tu llamada agota el tiempo de espera, podrías terminar con una transacción duplicada en el
+proveedor upstream.
+
+Solución alternativa:
+1. Establece `merchant_reference` en cada llamada de creación.
+2. Antes de reintentar tras un timeout, consulta
+   `GET /users/transactions?metadata.merchant_reference=<your_ref>&limit=1`
+   para reconciliar.
+3. Si existe una transacción con tu `merchant_reference` con estado
+   `created` o `approved`, trata la llamada original como exitosa.
+:::
+
+**Errores comunes:**
+
+| Código | `data.code` | Causa | Solución |
+|---|---|---|---|
+| 400 | — | Datos de la solicitud inválidos | Verifica que `amount` sea un número positivo |
+| 401 | — | Se requiere autenticación | Regenera los tokens. Consulta [cacheo de tokens](#token-caching-pattern) |
+| 404 | — | No se encontró el registro de facturación del usuario | Asegúrate de que el usuario tenga un registro de facturación (creado durante el registro del usuario) |
+| 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El tenant no tiene una pasarela activa | Configura primero una pasarela — consulta el aviso de requisitos previos más arriba |
+| 422 | (`detail` de Pydantic) | Error de validación de esquema | Corrige el cuerpo de la solicitud |
+| 429 | — | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 502 | — | Proveedor de pago temporalmente no disponible | Reintenta tras un breve retraso (máx. 3 intentos, backoff exponencial) |
+
+---
+
+### Paso 4 — Obtener el historial de transacciones
+
+**Objetivo:** Obtener el historial paginado de transacciones del usuario.
+
+**Endpoint:** `GET /api/v1/users/transactions`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/transactions?limit=10&skip=0" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 25,
+    "transactions": [
+      {
+        "id": "65a1b2c3d4e5f6789abcdef0",
+        "user_id": "507f1f77bcf86cd799439011",
+        "usd_amount": 10.00,
+        "amount": 78.00,
+        "currency": "USD",
+        "currency_provider": "GTQ",
+        "status": "approved",
+        "payment_url": null,
+        "reference": "MIGOGT123456",
+        "description": "Account top-up - March 2026",
+        "created_at": "2026-03-18T10:30:00Z",
+        "updated_at": "2026-03-18T10:35:00Z"
+      }
+    ]
+  },
+  "msg": "Transaction history retrieved successfully"
+}
+```
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `limit` | integer | `50` | Máximo de transacciones a devolver (1-100) |
+| `skip` | integer | `0` | Número de transacciones a omitir para la paginación |
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Reembolsos {#refunds}
+`POST /api/v1/users/transactions/{transaction_id}/refund` está **reservado pero
+aún no implementado**. Siempre devuelve:
+
+```json
+{
+  "success": false,
+  "data": { "code": "REFUND_NOT_SUPPORTED" },
+  "msg": "Refund via API is not yet supported. Issue refunds via the operator dashboard until this endpoint is implemented."
+}
+```
+
+Estado HTTP: **`501 Not Implemented`**. Los clientes no deben reintentar. Para reembolsar una
+transacción mientras tanto, emítela mediante el dashboard del operador. Hoy **no** existe
+un webhook saliente automático para los reembolsos.
+
+---
+
+### Paso 5 — Obtener los detalles de la suscripción
+
+**Objetivo:** Obtener los detalles del plan de suscripción del usuario.
+
+**Endpoint:** `GET /api/v1/users/subscriptions/{subscription_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/subscriptions/$SUBSCRIPTION_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65a1b2c3d4e5f6789abcdef3",
+    "plan_id": "plan_free",
+    "status": "active",
+    "user_id": "507f1f77bcf86cd799439011"
+  },
+  "msg": "Subscription details retrieved"
+}
+```
+
+:::note
+Este endpoint es un placeholder — la gestión completa de suscripciones estará disponible en una versión futura.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Suscripción no encontrada | Verifica el `subscription_id` de la respuesta de facturación |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
+
+---
+
+### Paso 6 — Listar los planes disponibles
+
+**Objetivo:** Obtener el catálogo de planes de facturación activos a los que pueden suscribirse tus usuarios.
+
+**Endpoint:** `GET /api/v1/plans`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/plans" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "65a1b2c3d4e5f6789abcdef0",
+      "plan_id": "plan_free",
+      "name": "Free",
+      "type": "free",
+      "price": 0.00,
+      "currency": "USD",
+      "billing_cycle_days": 30
+    },
+    {
+      "id": "65a1b2c3d4e5f6789abcdef1",
+      "plan_id": "plan_payg",
+      "name": "Pay As You Go",
+      "type": "payg",
+      "price": 0.00,
+      "currency": "USD",
+      "billing_cycle_days": 30
+    },
+    {
+      "id": "65a1b2c3d4e5f6789abcdef2",
+      "plan_id": "plan_pro",
+      "name": "Pro",
+      "type": "subscription",
+      "price": 29.00,
+      "currency": "USD",
+      "billing_cycle_days": 30
+    }
+  ],
+  "msg": "Plans retrieved successfully"
+}
+```
+
+:::tip
+Usa `plan_id` como identificador estable al mostrar las opciones de plan o iniciar una mejora de plan. El campo `type` indica si el plan es `free`, `payg` (basado en consumo) o `subscription` (recurrente).
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Parámetros de consulta inválidos | No se esperan — el endpoint no recibe parámetros |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Paso 7 — Obtener el historial de consumo
+
+**Objetivo:** Obtener una lista paginada de los eventos de consumo de la API del usuario, opcionalmente filtrada por tipo de operación y rango de fechas.
+
+**Endpoint:** `GET /api/v1/users/consumption`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/consumption?limit=10&skip=0" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+
+# Con filtros
+curl -X GET "$BASE_URL/users/consumption?operation=content_generation&from_date=2026-03-01&to_date=2026-03-31&limit=20&skip=0" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `limit` | integer | `50` | Máximo de elementos a devolver (1-100) |
+| `skip` | integer | `0` | Desplazamiento de paginación |
+| `operation` | string | — | Filtrar por tipo de operación (p. ej., `content_generation`, `keyword_extraction`) |
+| `from_date` | string | — | Filtro de fecha de inicio (`YYYY-MM-DD`) |
+| `to_date` | string | — | Filtro de fecha de fin (`YYYY-MM-DD`) |
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 42,
+    "items": [
+      {
+        "id": "507f1f77bcf86cd799439011",
+        "operation": "content_generation",
+        "endpoint": "POST /api/v1/posts/content/",
+        "cost_usd": 0.15,
+        "balance_after": 25.35,
+        "status": "charged",
+        "metadata": {
+          "keyword": "marketing digital guatemala",
+          "lang": "es",
+          "domain": "example-demo.com"
+        },
+        "created_at": "2026-03-18T14:30:00Z"
+      },
+      {
+        "id": "507f1f77bcf86cd799439012",
+        "operation": "keyword_extraction",
+        "endpoint": "POST /api/v1/posts/keywords/",
+        "cost_usd": 0.05,
+        "balance_after": 25.50,
+        "status": "charged",
+        "metadata": {
+          "domain": "example-demo.com",
+          "lang": "es",
+          "country": "GT"
+        },
+        "created_at": "2026-03-18T10:15:00Z"
+      }
+    ]
+  },
+  "msg": "Consumption history retrieved successfully"
+}
+```
+
+:::note
+Cada evento de consumo registra una sola operación de la API con su costo. Campos clave: `cost_usd` es el cargo en USD, `balance_after` muestra el saldo restante, y `status` puede ser `charged`, `free_tier`, `charge_failed` o `refunded`. Usa el filtro `operation` para aislar tipos de operación específicos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Parámetros de consulta inválidos | Revisa el formato de fecha (`YYYY-MM-DD`) y los rangos numéricos |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Paso 8 — Obtener el resumen de consumo
+
+**Objetivo:** Obtener un resumen agregado del consumo agrupado por tipo de operación, útil para dashboards de facturación y análisis de costos.
+
+**Endpoint:** `GET /api/v1/users/consumption/summary`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/consumption/summary" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+
+# Con rango de fechas
+curl -X GET "$BASE_URL/users/consumption/summary?from_date=2026-03-01&to_date=2026-03-31" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `from_date` | string | — | Fecha de inicio (`YYYY-MM-DD`) |
+| `to_date` | string | — | Fecha de fin (`YYYY-MM-DD`) |
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "period": "2026-03",
+    "total_spent": 3.50,
+    "total_operations": 42,
+    "by_operation": [
+      {
+        "operation": "content_generation",
+        "count": 15,
+        "total_cost": 2.25,
+        "avg_cost": 0.15
+      },
+      {
+        "operation": "keyword_extraction",
+        "count": 20,
+        "total_cost": 1.00,
+        "avg_cost": 0.05
+      },
+      {
+        "operation": "image_generation",
+        "count": 7,
+        "total_cost": 0.25,
+        "avg_cost": 0.04
+      }
+    ]
+  },
+  "msg": "Consumption summary retrieved successfully"
+}
+```
+
+:::tip
+Usa este endpoint para construir dashboards de facturación que muestren el desglose de costos por operación. Combínalo con filtros de fecha para reportes mensuales o semanales.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Parámetros de consulta inválidos | Revisa el formato de fecha (`YYYY-MM-DD`) |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 2: Consultar la información de facturación ===
+BILLING_RESPONSE=$(curl -s -X GET "$BASE_URL/users/billing" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN")
+
+echo "Saldo actual: $(echo $BILLING_RESPONSE | jq '.data.billing.balance')"
+
+SUBSCRIPTION_ID=$(echo $BILLING_RESPONSE | jq -r '.data.subscription.id')
+echo "SUBSCRIPTION_ID: $SUBSCRIPTION_ID"
+
+# === PASO 3: Crear una transacción de pago ===
+TRANSACTION_RESPONSE=$(curl -s -X POST "$BASE_URL/users/transactions" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 25.00,
+    "description": "Account top-up"
+  }')
+
+PAYMENT_URL=$(echo $TRANSACTION_RESPONSE | jq -r '.data.payment_url')
+echo "Redirige al usuario a: $PAYMENT_URL"
+
+# === PASO 4: Obtener el historial de transacciones ===
+curl -s -X GET "$BASE_URL/users/transactions?limit=5" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 5: Obtener los detalles de la suscripción ===
+curl -s -X GET "$BASE_URL/users/subscriptions/$SUBSCRIPTION_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 6: Listar los planes disponibles ===
+curl -s -X GET "$BASE_URL/plans" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 7: Obtener el historial de consumo ===
+curl -s -X GET "$BASE_URL/users/consumption?limit=5" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 8: Obtener el resumen de consumo ===
+curl -s -X GET "$BASE_URL/users/consumption/summary" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+```
+
+---
+
+## Idempotencia, reintentos y tokens
+
+Consulta las páginas de referencia dedicadas para la guía canónica:
+
+- [Patrón de cacheo de tokens](#token-caching-pattern) — más arriba en el Paso 0.
+- [Idempotencia y `merchant_reference`](#step-3--create-payment-transaction)
+  — el aviso en el Paso 3.
+- [Verificación de firma de webhooks](../webhooks/security) — incluye un
+  verificador en `Python`/`TypeScript`/`PHP`.
+- [Recibir notificaciones](../webhooks/receiving-notifications) — forma canónica
+  del payload saliente y mapeo de la FSM.
+- [Semántica de reintentos y entrega](../webhooks/retry-and-delivery) — at-least-once,
+  programación de backoff, comportamiento de dead-letter.
+- [Referencia de códigos de error](../reference/error-codes) — cada `data.code`.
+- [Límites de tasa](../reference/rate-limits) — cuotas por endpoint.
+- [Solución de problemas](../reference/troubleshooting) — diagnóstico basado en síntomas.
+
+### Reglas prácticas rápidas
+
+- **Timeouts.** La creación de transacciones implica una llamada externa y puede tardar
+  **5–15 segundos**. Configura un timeout de cliente de **30s**.
+- **Reintentos en 5xx.** Backoff exponencial, máx. 3 intentos. **Nunca** reintentes
+  a ciegas sin establecer `merchant_reference`.
+- **`amount` debe ser positivo.** `description` tiene un máximo de 500 caracteres.
+- **`payment_url` expira rápido** — redirige de inmediato, no lo almacenes.
+- **Los webhooks se disparan solo en estados terminales** (`approved` / `denied` /
+  `cancelled` / `expired` / `dismiss`). El estado `created` nunca dispara un
+  webhook.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `GET` | `/api/v1/users/billing` | Consultar la información de facturación |
+| 3 | `POST` | `/api/v1/users/transactions` | Crear una transacción de pago |
+| 4 | `GET` | `/api/v1/users/transactions` | Obtener el historial de transacciones |
+| 5 | `GET` | `/api/v1/users/subscriptions/{subscription_id}` | Obtener los detalles de la suscripción |
+| 6 | `GET` | `/api/v1/plans` | Listar los planes de facturación disponibles |
+| 7 | `GET` | `/api/v1/users/consumption` | Obtener el historial de consumo |
+| 8 | `GET` | `/api/v1/users/consumption/summary` | Obtener el resumen de consumo |
+
+---
+
+## Checklist rápido
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Consulté la información de facturación del usuario (`GET /users/billing`)
+- [ ] Creé una transacción de pago (`POST /users/transactions`)
+- [ ] Redirigí al usuario al `payment_url`
+- [ ] Configuré un listener de webhooks para las actualizaciones de estado de las transacciones
+- [ ] Verifiqué el saldo actualizado tras la aprobación del pago
+- [ ] Listé los planes de facturación disponibles (`GET /plans`)
+- [ ] Revisé el historial de consumo (`GET /users/consumption`)
+- [ ] Consulté el resumen de consumo para el análisis de costos (`GET /users/consumption/summary`)

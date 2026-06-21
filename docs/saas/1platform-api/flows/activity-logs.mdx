@@ -1,0 +1,559 @@
+---
+title: "Registros de actividad"
+description: "Flujo paso a paso para listar, inspeccionar, registrar y limpiar registros de actividad de la API mediante la 1Platform API."
+sidebar_position: 8
+---
+
+# Flujo: Registros de actividad
+
+## Vista general
+
+Este flujo documenta cómo gestionar los registros de actividad de la API mediante la 1Platform API. Los registros capturan cada interacción con la API — solicitudes, respuestas, errores y eventos del lado del cliente — proporcionando observabilidad completa para depuración y auditoría.
+
+**Caso de uso:** Monitorear el uso de la API, diagnosticar errores inspeccionando entradas individuales de registro, registrar eventos del lado del cliente para una observabilidad unificada y limpiar registros obsoletos.
+
+**Resultado final:** Visibilidad completa de la actividad de la API con la capacidad de filtrar, inspeccionar, registrar eventos personalizados y gestionar la retención de registros.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+
+### Headers requeridos para todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
+LOG_ID=""       # Obtenido en el Paso 2
+```
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` ausente o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Listar registros
+
+**Objetivo:** Recuperar una lista paginada y filtrada de los registros de actividad de la API.
+
+**Endpoint:** `GET /api/v1/logs/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+# Listar registros recientes (página 1, tamaño de página por defecto)
+curl -X GET "$BASE_URL/logs/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+
+# Con filtros
+curl -X GET "$BASE_URL/logs/?provider=openai&success=false&from_date=2026-03-01T00:00:00Z&to_date=2026-03-21T23:59:59Z&page=1&page_size=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `website_id` | string | — | Filtrar por ID de sitio web |
+| `provider` | string | — | Filtrar por proveedor |
+| `success` | boolean | — | Filtrar por estado de éxito (`true` o `false`) |
+| `error_type` | string | — | Filtrar por tipo de error |
+| `status_code` | integer | — | Filtrar por código de estado HTTP de respuesta |
+| `endpoint` | string | — | Filtrar por ruta del endpoint |
+| `source_type` | string | — | Filtrar por tipo de origen (p. ej., `"server"`, `"client"`) |
+| `trace_id` | string | — | Filtrar por ID de traza |
+| `from_date` | datetime | — | Fecha de inicio (formato ISO 8601) |
+| `to_date` | datetime | — | Fecha de fin (formato ISO 8601) |
+| `page` | integer | `1` | Número de página |
+| `page_size` | integer | `20` | Resultados por página |
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "logs": [
+      {
+        "id": "65f1a2b3c4d5e6f7a8b9c0d1",
+        "timestamp": "2026-03-21T14:30:00Z",
+        "method": "POST",
+        "endpoint": "/api/v1/posts/content/",
+        "action": "generate_content",
+        "source_module": "content",
+        "website_id": "507f1f77bcf86cd799439011",
+        "provider": "openai",
+        "response_status": 200,
+        "response_message": "Content generated successfully",
+        "success": true,
+        "error_type": null,
+        "trace_id": "tr-abc123",
+        "source_type": "server"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "page_size": 20,
+      "total_items": 150,
+      "total_pages": 8
+    }
+  },
+  "msg": "Logs retrieved successfully"
+}
+```
+
+:::note
+Guarda el `id` de cualquier entrada de registro que quieras inspeccionar como `$LOG_ID`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Autenticación requerida | Regenera los tokens |
+| 422 | Formato de parámetro de consulta inválido | Revisa los formatos de fecha (ISO 8601) y los valores booleanos |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Paso 3 — Obtener el detalle de un registro
+
+**Objetivo:** Recuperar los detalles completos de una entrada de registro específica, incluyendo el contexto de la solicitud.
+
+**Endpoint:** `GET /api/v1/logs/{log_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/logs/$LOG_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "65f1a2b3c4d5e6f7a8b9c0d1",
+    "timestamp": "2026-03-21T14:30:00Z",
+    "method": "POST",
+    "endpoint": "/api/v1/posts/content/",
+    "action": "generate_content",
+    "source_module": "content",
+    "website_id": "507f1f77bcf86cd799439011",
+    "provider": "openai",
+    "response_status": 200,
+    "response_message": "Content generated successfully",
+    "success": true,
+    "error_type": null,
+    "trace_id": "tr-abc123",
+    "source_type": "server",
+    "request_context": {
+      "keyword": "best restaurants in guatemala",
+      "lang": "es",
+      "country": "GT"
+    }
+  },
+  "msg": "Log detail retrieved successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Autenticación requerida | Regenera los tokens |
+| 404 | Registro no encontrado | Verifica el `log_id` |
+| 422 | Formato de ID de registro inválido | Verifica que el `log_id` sea un identificador válido |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Paso 4 — Registrar registros del lado del cliente
+
+**Objetivo:** Enviar un lote de entradas de registro del lado del cliente a la API para una observabilidad unificada. Útil para rastrear eventos, errores y métricas del frontend junto con los registros del lado del servidor.
+
+**Endpoint:** `POST /api/v1/logs/client`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/logs/client" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entries": [
+      {
+        "timestamp": "2026-03-21T14:25:00Z",
+        "endpoint": "/api/v1/posts/keywords/",
+        "method": "POST",
+        "action": "extract_keywords",
+        "source_module": "seo-dashboard",
+        "website_id": "507f1f77bcf86cd799439011",
+        "provider": "valueserp",
+        "response_status": 200,
+        "response_message": "Keywords extracted",
+        "success": true,
+        "error_type": "none",
+        "trace_id": "tr-client-001"
+      },
+      {
+        "timestamp": "2026-03-21T14:26:00Z",
+        "endpoint": "/api/v1/posts/content/",
+        "method": "POST",
+        "action": "generate_content",
+        "source_module": "content-editor",
+        "response_status": 500,
+        "response_message": "Timeout waiting for content generation",
+        "success": false,
+        "error_type": "timeout",
+        "trace_id": "tr-client-002"
+      }
+    ]
+  }'
+```
+
+**Campos de una entrada de registro del cliente:**
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `timestamp` | datetime | Sí | Marca de tiempo del evento (ISO 8601) |
+| `endpoint` | string | Sí | Ruta del endpoint de la API (máx. 500 caracteres) |
+| `response_message` | string | Sí | Respuesta o descripción del evento (máx. 2000 caracteres) |
+| `error_type` | string | Sí | Categoría de error (máx. 50 caracteres, p. ej., `"timeout"`, `"validation"`, `"none"`) |
+| `method` | string | No | Método HTTP (máx. 10 caracteres) |
+| `action` | string | No | Nombre de la acción (máx. 100 caracteres) |
+| `source_module` | string | No | Módulo o funcionalidad de origen (máx. 100 caracteres) |
+| `website_id` | string | No | ID del sitio web asociado (máx. 100 caracteres) |
+| `provider` | string | No | Nombre del proveedor (máx. 50 caracteres) |
+| `response_status` | integer | No | Código de estado HTTP (0-599, por defecto: `0`) |
+| `success` | boolean | No | Si la operación tuvo éxito (por defecto: `false`) |
+| `trace_id` | string | No | ID de traza de correlación (máx. 20 caracteres) |
+| `request_context` | object | No | Datos de contexto adicionales |
+
+:::warning
+Máximo **50 entradas** por solicitud de lote. Superar este límite resultará en un error 422.
+:::
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "accepted": 2,
+    "rejected": 0,
+    "errors": []
+  },
+  "msg": "Client logs processed"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Autenticación requerida | Regenera los tokens |
+| 422 | Datos de solicitud inválidos o más de 50 entradas | Revisa los formatos de las entradas y el tamaño del lote |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Paso 5 — Limpiar registros
+
+**Objetivo:** Eliminar los registros que coincidan con filtros opcionales. Úsalo con precaución — esta operación es irreversible.
+
+**Endpoint:** `DELETE /api/v1/logs/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+# Limpiar registros anteriores a una fecha específica para un sitio web
+curl -X DELETE "$BASE_URL/logs/?confirm=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "website_id": "507f1f77bcf86cd799439011",
+    "older_than": "2026-01-01T00:00:00Z"
+  }'
+```
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `confirm` | boolean | Sí | Debe ser `true` para confirmar la eliminación |
+
+**Cuerpo de la solicitud (filtros opcionales):**
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `website_id` | string | No | Solo limpiar registros de este sitio web |
+| `provider` | string | No | Solo limpiar registros de este proveedor |
+| `older_than` | datetime | No | Solo limpiar registros anteriores a esta fecha (ISO 8601) |
+
+:::warning
+Si no se proporcionan filtros, se limpiarán **todos los registros** del contexto autenticado. Usa siempre filtros para evitar la pérdida accidental de datos.
+:::
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "deleted_count": 42
+  },
+  "msg": "Logs cleared successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Autenticación requerida | Regenera los tokens |
+| 422 | Falta el parámetro de consulta `confirm=true` | Agrega `?confirm=true` a la URL |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 2: Listar registros de error recientes ===
+LOGS_RESPONSE=$(curl -s -X GET "$BASE_URL/logs/?success=false&page_size=5" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN")
+
+echo "Error logs: $(echo $LOGS_RESPONSE | jq '.data.pagination.total_items') total"
+
+LOG_ID=$(echo $LOGS_RESPONSE | jq -r '.data.logs[0].id')
+echo "LOG_ID: $LOG_ID"
+
+# === PASO 3: Obtener el detalle de un registro ===
+curl -s -X GET "$BASE_URL/logs/$LOG_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 4: Registrar registros del lado del cliente ===
+curl -s -X POST "$BASE_URL/logs/client" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entries": [
+      {
+        "timestamp": "2026-03-21T14:25:00Z",
+        "endpoint": "/api/v1/posts/keywords/",
+        "method": "POST",
+        "response_status": 200,
+        "response_message": "Keywords extracted successfully",
+        "success": true,
+        "error_type": "none"
+      }
+    ]
+  }' | jq .
+
+# === PASO 5: Limpiar registros antiguos ===
+curl -s -X DELETE "$BASE_URL/logs/?confirm=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "older_than": "2026-01-01T00:00:00Z"
+  }' | jq .
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+- Los endpoints `GET` (lista, detalle) son idempotentes por naturaleza.
+- `POST /logs/client` es idempotente si envías las mismas entradas — pueden crearse duplicados, así que usa `trace_id` para correlacionar eventos.
+- `DELETE /logs/` **no es idempotente** — una vez que los registros se limpian, no se pueden recuperar.
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, verifica el estado del recurso antes de reintentar para evitar duplicados.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
+
+### Timeouts
+- Los endpoints de listado y detalle de registros normalmente responden en **2-5 segundos**.
+- El registro de logs del cliente puede tardar hasta **10 segundos** para lotes grandes (50 entradas).
+- La limpieza de registros puede tardar más según el volumen — configura al menos **30 segundos** de timeout.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa una renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de registros.
+
+### Validaciones importantes
+- Los lotes de registros del cliente tienen un máximo de **50 entradas** por solicitud.
+- El parámetro de consulta `confirm=true` es requerido para limpiar registros — sin él, la API devuelve un error 422.
+- Usa `trace_id` para correlacionar los registros del lado del cliente y del servidor de una misma operación.
+- Filtra por `error_type` y `success=false` para identificar rápidamente las operaciones que fallan.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `GET` | `/api/v1/logs/` | Listar registros |
+| 3 | `GET` | `/api/v1/logs/{log_id}` | Obtener el detalle de un registro |
+| 4 | `POST` | `/api/v1/logs/client` | Registrar registros del lado del cliente |
+| 5 | `DELETE` | `/api/v1/logs/` | Limpiar registros |
+
+---
+
+## Lista de verificación rápida
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Puedo listar y filtrar registros (`GET /logs/`)
+- [ ] Puedo inspeccionar el detalle de registros individuales (`GET /logs/{log_id}`)
+- [ ] Puedo registrar eventos del lado del cliente (`POST /logs/client`)
+- [ ] Entiendo que limpiar registros es irreversible (`DELETE /logs/`)

@@ -167,45 +167,44 @@
   margin: 0 auto;
 }
 
-/* Center the nav items between logo and CTA — mirrors the website layout.
-   Docusaurus bundles [logo + links] into one flex container and [CTA + toggle]
-   into another, each with flex: 1, so normal CSS can only center within each
-   half. We lift the right group and the brand out of flex flow with absolute
-   positioning; the remaining links then center naturally across the full
-   navbar width via `justify-content: center`. */
+/* Center the nav links between the logo and the right-hand actions — mirrors
+   the website layout. Three-zone flex flow: brand (left), links (centered in
+   the available band), actions [locale + CTA + search] (right). Everything
+   stays in normal flow, so items can NEVER overlap — the link group simply
+   centers within whatever space is left after the brand and the action group,
+   even as that action group grows. (A previous version lifted the right group
+   and brand out of flow with absolute positioning and centered links across
+   the FULL navbar width; once the locale dropdown widened the action group,
+   the centered links overlapped it.) */
 @media (min-width: 997px) {
-  .navbar__inner {
-    position: relative;
+  /* Left container holds the brand + the centered links; let it absorb the
+     free space so the action group is pushed to the right edge. */
+  .navbar__items:not(.navbar__items--right) {
+    flex: 1;
+    min-width: 0;
+    column-gap: 0.5rem;
+  }
+
+  /* Center the link group in the band between the brand and the action group:
+     auto-margins on the first and last link split the remaining free space. */
+  .navbar__items:not(.navbar__items--right) > .navbar__brand + .navbar__item {
+    margin-left: auto;
+  }
+
+  .navbar__items:not(.navbar__items--right) > .navbar__item:last-child {
+    margin-right: auto;
   }
 
   .navbar__items--right {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-  }
-
-  .navbar__items:not(.navbar__items--right) {
-    flex: 1;
-    justify-content: center;
-    position: relative;
-  }
-
-  .navbar__items:not(.navbar__items--right) .navbar__brand {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    margin: 0;
-    transform: translateY(-50%);
+    flex: 0 0 auto;
+    column-gap: 0.25rem;
   }
 }
 
 /* Hide the external-link arrow icon Docusaurus auto-appends to absolute URLs.
    The navbar uses cross-subdomain links to 1platform.pro that the user should
    perceive as in-product navigation, not "leaving the site" affordances. */
-.navbar__item.navbar__link svg[class*='iconExternalLink'],
+.navbar__items svg[class*='iconExternalLink'],
 .navbar__cta svg[class*='iconExternalLink'] {
   display: none;
 }
@@ -297,6 +296,90 @@
 
 [data-theme='dark'] .menu__list-item-collapsible:hover {
   background-color: rgba(59, 130, 246, 0.06);
+}
+
+/* ─── Migo-style sidebar IA ────────────────────────────────────────────────────
+   Top: a quiet "Overview" link. Then audience groups rendered as non-collapsible
+   uppercase section labels, each containing flush-left product/API sections with
+   an icon badge + title + one-line description (see the DocSidebarItem/Category
+   swizzle). */
+
+/* Overview entry — home icon badge, first item. */
+.sidebar-overview {
+  margin-bottom: 0.25rem;
+}
+.sidebar-overview > .menu__link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+  color: var(--1p-text);
+}
+.sidebar-overview > .menu__link::before {
+  content: '🏠';
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  font-size: 0.95rem;
+  background: var(--1p-bg-elevated);
+}
+[data-theme='dark'] .sidebar-overview > .menu__link::before {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Audience section label (Products (per tenant) / SaaS & API). */
+.sidebar-section {
+  margin-top: 1.5rem;
+}
+.sidebar-section > .menu__list-item-collapsible {
+  cursor: default;
+}
+.sidebar-section > .menu__list-item-collapsible:hover {
+  background: transparent;
+}
+.sidebar-section > .menu__list-item-collapsible > .menu__link,
+.sidebar-section > .menu__list-item-collapsible > .menu__link.menu__link--active {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--1p-text-muted) !important;
+  background: transparent !important;
+  padding: 0.25rem 0.5rem;
+  pointer-events: none;
+}
+/* Flush-left product sections within a group (no nested indentation). */
+.sidebar-section > .menu__list {
+  padding-left: 0;
+}
+
+/* Rich product/API category: icon badge + title + description. */
+.sidebar-product {
+  margin: 0.1rem 0;
+}
+.sidebar-product > .menu__list-item-collapsible > .menu__link {
+  align-items: flex-start;
+  height: auto;
+  padding: 0.5rem;
+}
+.sidebar-product > .menu__list-item-collapsible > .menu__link.menu__link--sublist-caret::after {
+  align-self: flex-start;
+  /* Nudge the caret down to sit on the title row (the link is top-aligned to
+     fit the 2-line title+description). Tracks .richTitle's first-line center:
+     link padding-top (0.5rem) + ~half the title cap height. */
+  margin-top: 0.55rem;
+  opacity: 0.6;
+}
+/* Doc pages within a product align under the title (past the 30px icon). */
+.sidebar-product > .menu__list {
+  padding-left: 2.5rem;
+}
+.sidebar-product > .menu__list .menu__link {
+  font-size: 0.825rem;
 }
 
 /* ─── Headings ─────────────────────────────────────────────────────────────── */
@@ -398,6 +481,17 @@ table th {
 .markdown a:hover {
   color: var(--1p-accent-hover);
   text-decoration: underline;
+}
+
+/* Whole-card links (landing-page HomeCards) wrap the card's own title +
+   description, so the prose-link rules above would tint every line accent
+   blue and underline them on hover. Opt these links out — the card keeps its
+   own typography; only the explicit ".cardArrow" stays accent-colored. */
+.markdown a.homeCard,
+.markdown a.homeCard:hover,
+.markdown a.homeCard:focus {
+  color: inherit;
+  text-decoration: none;
 }
 
 /* ─── Blockquotes ──────────────────────────────────────────────────────────── */
@@ -617,4 +711,23 @@ blockquote {
 /* ─── Sidebar border ──────────────────────────────────────────────────────── */
 .theme-doc-sidebar-container {
   border-right: 1px solid var(--1p-border) !important;
+}
+
+/* ─── Two-audience IA: top-level group labels read as section headers ──────── */
+.theme-doc-sidebar-menu
+  > .theme-doc-sidebar-item-category-level-1
+  > .menu__list-item-collapsible
+  > .menu__link {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--1p-text-tertiary, #94a3b8);
+}
+
+/* Product categories (level 2) highlight the accent when active. */
+.theme-doc-sidebar-item-category-level-2
+  > .menu__list-item-collapsible
+  > .menu__link--active {
+  color: var(--1p-accent);
 }

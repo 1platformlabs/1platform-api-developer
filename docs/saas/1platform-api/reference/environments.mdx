@@ -1,0 +1,61 @@
+---
+title: Entornos
+description: Entornos de producción y QA — URLs base, alcance de claves y credenciales.
+sidebar_position: 1
+---
+
+# Entornos
+
+La 1Platform API se despliega en dos entornos aislados. Las claves de API están limitadas
+a un único entorno — una clave de QA devuelve `401` contra producción y viceversa.
+
+| Entorno | URL base | OpenAPI |
+|---|---|---|
+| Producción | `https://api.1platform.pro/api/v1` | [openapi.json](https://api.1platform.pro/openapi.json) |
+| QA / sandbox | `https://api-qa.1platform.pro/api/v1` | [openapi.json](https://api-qa.1platform.pro/openapi.json) |
+
+## Cómo elegir un entorno
+
+- **QA** — pruebas de integración, pasarela de pago en sandbox, tenants desechables.
+- **Producción** — tenants en vivo, pagos reales. Se provisiona solo después de que la
+  integración pasa la aceptación.
+
+Para solicitar credenciales de QA, contacta a tu gestor de cuenta. Tanto las claves de QA como las de prod
+llevan los mismos prefijos `ak-` (aplicación) / `sk-` (usuario) — la única diferencia es
+el host contra el que se autentican.
+
+:::warning[No mezcles entornos en un mismo código]
+Trata la URL base y las claves de API como un único conjunto. El patrón más simple
+son dos archivos `.env` distintos (`.env.qa` / `.env.prod`) más una única
+variable `API_BASE_URL` que el constructor de tu cliente lea al iniciar.
+:::
+
+## Qué difiere entre QA y prod
+
+| Aspecto | QA | Producción |
+|---|---|---|
+| URL base | `api-qa.1platform.pro` | `api.1platform.pro` |
+| Límites de uso | Idénticos | Idénticos |
+| Pasarela de pago | Solo sandbox — no fluye dinero real | Pasarela real |
+| Números de tarjeta de prueba | Consulta [Pruebas](./testing) | N/D |
+| Datos de tenant | Aislados; nada migra entre entornos | Datos en vivo |
+| Firma de webhooks | `webhook_secret` por dominio | `webhook_secret` por dominio |
+
+## Errores comunes
+
+- **`401` contra prod con claves de QA** — la causa más común de "mi clave
+  es válida pero no puedo autenticarme". Inspecciona el header `Host:` que tu cliente
+  está enviando.
+- **Formatos de clave antiguos** — las claves generadas antes del 2026-04-29 son hex crudo de 64 caracteres.
+  Las claves más nuevas llevan prefijos `sk-` / `ak-`. Ambas funcionan; la API hace una
+  búsqueda por coincidencia exacta contra `User.api_key` / `App.api_key`.
+
+## Descubrimiento programático
+
+Para distinguir entornos en tiempo de ejecución, llama a `GET /health` e inspecciona el
+campo `environment` devuelto:
+
+```bash
+curl -s https://api-qa.1platform.pro/api/v1/health | jq '.data.environment'
+# "qa"
+```

@@ -1,0 +1,237 @@
+---
+title: "Referidos"
+description: "Flujo paso a paso para resolver un código de referido a su payload de destino (referente, URL de registro) a través de la 1Platform API."
+sidebar_position: 18
+---
+
+# Flujo: Referidos
+
+## Vista general
+
+Este flujo documenta cómo una landing page pública o un widget de registro resuelve un código de referido a su destino — normalmente el nombre de usuario del referente y una URL de registro pre-rellenada — para que la página pueda mostrar "Invitado por María García" y recompensar a ambas partes cuando el nuevo usuario se registra.
+
+**Caso de uso:** Renderizar una página de registro personalizada cuando un visitante llega a través de un enlace de referido como `https://example.com/r/MARIA2026`.
+
+**Resultado final:** Tu cliente sabe si el código de referido es válido y, de ser así, quién refirió al visitante y a dónde enviarlo a continuación.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| Código de referido | El código capturado de la URL o del enlace compartido |
+
+### Headers requeridos en todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+Content-Type: application/json
+```
+
+:::note
+Esta es una consulta pública — no se requiere token de usuario. El endpoint es seguro de llamar desde una landing page pública (del lado del servidor) usando el token de aplicación.
+:::
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+APP_TOKEN=""             # Obtenido en el Paso 0
+REFERRAL_CODE="MARIA2026"  # Capturado de la ruta de la URL o de la cadena de consulta
+```
+
+---
+
+## Modelo de datos
+
+### Objeto de resolución de referido
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `code` | string | Sí | El código de referido original |
+| `valid` | boolean | Sí | `true` si el código se resuelve, `false` en caso contrario |
+| `referrer_username` | string \| null | No | Nombre de usuario público del referente (cuando `valid` es `true`) |
+| `signup_url` | string \| null | No | URL de registro pre-rellenada opcional (p. ej., con `?ref=...`) |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcto y que la app esté activa |
+| 422 | Campo `apiKey` faltante o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Resolver el código de referido
+
+**Objetivo:** Consultar la información del referente y el destino de registro para un código dado.
+
+**Endpoint:** `GET /api/v1/referrals/{code}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/referrals/$REFERRAL_CODE" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Respuesta (200) — código válido:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "code": "MARIA2026",
+    "valid": true,
+    "referrer_username": "maria_demo",
+    "signup_url": "https://app.example.com/signup?ref=MARIA2026"
+  },
+  "msg": "Referral code resolved successfully"
+}
+```
+
+**Respuesta (200) — código inválido:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "code": "BADCODE",
+    "valid": false,
+    "referrer_username": null,
+    "signup_url": null
+  },
+  "msg": "Referral code resolved successfully"
+}
+```
+
+:::note
+El endpoint siempre devuelve **200** con `valid: false` para códigos desconocidos — esto evita filtrar si un código existe a través de los códigos de estado HTTP. Inspecciona `data.valid` en tu cliente para decidir cómo renderizar la página.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | Parámetro de ruta `code` malformado (vacío o con caracteres inválidos) | Usa un código alfanumérico no vacío |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+REFERRAL_CODE="MARIA2026"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Resolver el código de referido ===
+RESPONSE=$(curl -s -X GET "$BASE_URL/referrals/$REFERRAL_CODE" \
+  -H "Authorization: Bearer $APP_TOKEN")
+
+VALID=$(echo "$RESPONSE" | jq -r '.data.valid')
+REFERRER=$(echo "$RESPONSE" | jq -r '.data.referrer_username')
+SIGNUP_URL=$(echo "$RESPONSE" | jq -r '.data.signup_url')
+
+if [ "$VALID" = "true" ]; then
+  echo "Invitado por: $REFERRER"
+  echo "URL de registro: $SIGNUP_URL"
+else
+  echo "El código de referido es inválido — usa el registro predeterminado."
+fi
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+El endpoint es de solo lectura e idempotente — las llamadas repetidas devuelven los mismos datos.
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera y reintenta.
+- Para errores **5xx**, reintenta con backoff exponencial.
+- Para **401**, regenera el token de aplicación y reintenta.
+
+### Timeouts
+Establece un timeout de cliente de 5 segundos.
+
+### Caché
+Los códigos resueltos pueden cachearse durante **5 minutos** del lado del servidor sin perder frescura — los nombres de usuario de los referentes rara vez cambian. Si cacheas del lado del cliente, almacena solo pares `(code, referrer_username, signup_url)` y refresca al fallar la caché.
+
+### Tokens
+El token de aplicación expira en **30 minutos** (1800 segundos). Implementa una renovación automática antes de la expiración.
+
+### Validaciones importantes
+- Valida el parámetro `code` en el cliente antes de llamar a la API — elimina los espacios en blanco, rechaza basura evidente para evitar desperdiciar solicitudes.
+- Siempre comprueba `data.valid` antes de mostrar contenido personalizado. Los códigos desconocidos devuelven **200** con `valid: false`, no 404.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `GET` | `/api/v1/referrals/{code}` | Resolver el código de referido |
+
+---
+
+## Checklist rápido
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Extraje el código de referido de la URL
+- [ ] Llamé a `/referrals/{code}` e inspeccioné `data.valid`
+- [ ] Rendericé la página de registro personalizada cuando es válido, y el fallback en caso contrario

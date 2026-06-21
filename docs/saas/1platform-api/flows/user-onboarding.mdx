@@ -1,0 +1,394 @@
+---
+title: "Onboarding de usuarios"
+description: "Flujo paso a paso para registrar un nuevo usuario, autenticarlo y recuperar su perfil mediante la 1Platform API."
+sidebar_position: 2
+---
+
+# Flujo: Onboarding de usuarios
+
+## Vista general
+
+Este flujo documenta el proceso paso a paso para hacer el onboarding de un nuevo usuario en la 1Platform API. Cubre la creación de una cuenta de usuario, la obtención de tokens de autenticación y la recuperación del perfil del usuario.
+
+**Caso de uso:** Registra nuevos usuarios desde tu aplicación, configura su facturación y suscripción, y autentícalos para las llamadas posteriores a la API.
+
+**Resultado final:** Un usuario completamente registrado con una API key, tokens autenticados y un perfil recuperable.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+
+### Headers requeridos en todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+APP_TOKEN=""       # Obtenido en el Paso 0
+USER_API_KEY=""    # Obtenido en el Paso 1 (de la respuesta de creación de usuario)
+USER_TOKEN=""      # Obtenido en el Paso 2
+```
+
+---
+
+## Datos requeridos para crear un usuario
+
+### Usuario
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `email` | string | Sí | Dirección de correo del usuario (única, mínimo 5 caracteres) |
+| `currency` | string | No | Código de moneda de facturación (por defecto: `"USD"`) |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` faltante o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Crear usuario
+
+**Objetivo:** Registrar un nuevo usuario con configuración automática de facturación y suscripción.
+
+**Endpoint:** `POST /api/v1/users`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "carlos.mendez@example.com",
+    "currency": "USD"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "email": "carlos.mendez@example.com",
+    "username": "carlos_mendez",
+    "api_key": "sk-abc123xyz",
+    "is_active": true,
+    "billing_id": "507f1f77bcf86cd799439012",
+    "created_at": "2026-03-18T10:30:00"
+  },
+  "msg": "User created successfully with billing and subscription"
+}
+```
+
+:::note
+Guarda `data.api_key` como `$USER_API_KEY`. Esta es la API key permanente del usuario que se usa para generar tokens de usuario.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Formato de email inválido o error de validación | Verifica el formato de la dirección de correo |
+| 401 | Se requiere autenticación (token de aplicación) | Verifica que el token de aplicación sea válido |
+| 409 | Email ya registrado | Usa el usuario existente; obtén su token con `POST /users/token` |
+| 422 | Campo `email` faltante | Envía `{"email": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Paso 2 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` faltante | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
+:::
+
+---
+
+### Paso 3 — Obtener el perfil del usuario
+
+**Objetivo:** Recuperar la información de perfil del usuario autenticado para verificar que el onboarding fue exitoso.
+
+**Endpoint:** `GET /api/v1/users/profile`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "username": "carlos_mendez",
+    "email": "carlos.mendez@example.com",
+    "is_active": true,
+    "created_at": "2026-03-18T10:30:00"
+  },
+  "msg": "User profile retrieved successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación — token inválido o faltante | Regenera los tokens (Pasos 0 y 2) |
+| 422 | Error de validación | Revisa el formato de la solicitud |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
+
+---
+
+### Paso 4 — Revocar todos los tokens del usuario
+
+**Objetivo:** Invalidar todos los tokens JWT existentes del usuario. Después de esta llamada, el usuario debe obtener un nuevo token mediante `POST /users/token`.
+
+**Endpoint:** `POST /api/v1/users/revoke-tokens`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/revoke-tokens" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "All tokens revoked successfully",
+    "token_version": 2
+  },
+  "msg": "All tokens revoked successfully"
+}
+```
+
+:::warning
+Tras revocar los tokens, el `$USER_TOKEN` actual deja de ser válido. Debes llamar nuevamente a `POST /users/token` para obtener un nuevo token.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token inválido o ya revocado | Obtén un nuevo token mediante `POST /users/token` |
+| 422 | Error de validación | Revisa el formato de la solicitud |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes, desde la autenticación hasta la verificación del perfil.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Crear usuario ===
+USER_RESPONSE=$(curl -s -X POST "$BASE_URL/users" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "carlos.mendez@example.com",
+    "currency": "USD"
+  }')
+
+echo "USER_RESPONSE: $USER_RESPONSE"
+
+USER_API_KEY=$(echo $USER_RESPONSE | jq -r '.data.api_key')
+echo "USER_API_KEY: $USER_API_KEY"
+
+# === PASO 2: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 3: Obtener el perfil del usuario ===
+curl -s -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 4: Revocar todos los tokens (opcional — para rotación de seguridad) ===
+curl -s -X POST "$BASE_URL/users/revoke-tokens" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# Tras revocar, obtén un nuevo token de usuario
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}' \
+  | jq -r '.data.access_token')
+
+echo "NEW USER_TOKEN: $USER_TOKEN"
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+
+:::warning[Sin mecanismo de idempotencia]
+La API no admite una cabecera `Idempotency-Key`. Si una solicitud de creación de usuario falla por timeout, verifica con `POST /users/token` usando la API key esperada antes de reintentar, para evitar cuentas duplicadas. Los emails duplicados devolverán un error **409**.
+:::
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, verifica el estado del usuario antes de reintentar.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
+
+### Timeouts
+- La creación de usuario es síncrona y normalmente se completa en **2-3 segundos** (crea registros de User, Billing y Subscription).
+- Configura tu cliente HTTP con al menos **10 segundos** de timeout para el endpoint de creación.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints protegidos (excepto la creación de usuario y la generación de tokens, que solo necesitan el token de aplicación).
+
+### Validaciones importantes
+- El email del usuario debe ser único en toda la plataforma.
+- El email debe tener al menos 5 caracteres y un formato válido.
+- El campo `currency` toma el valor por defecto `"USD"` si no se especifica.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users` | Crear usuario |
+| 2 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 3 | `GET` | `/api/v1/users/profile` | Obtener el perfil del usuario |
+| 4 | `POST` | `/api/v1/users/revoke-tokens` | Revocar todos los tokens del usuario |
+
+---
+
+## Checklist rápido
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Creé el usuario (`POST /users`) y guardé la `api_key`
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Verifiqué el perfil del usuario (`GET /users/profile`)
+- [ ] Almacené la `api_key` del usuario de forma segura para generar tokens en el futuro
+- [ ] Puedo revocar tokens cuando sea necesario (`POST /users/revoke-tokens`)

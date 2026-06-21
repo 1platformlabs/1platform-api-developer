@@ -1,0 +1,1016 @@
+---
+title: "Generar factura (FEL)"
+description: "Flujo paso a paso para emitir una factura electrónica (FEL) mediante la 1Platform API, registrada en el sistema tributario guatemalteco a través de TribuTax."
+sidebar_position: 1
+---
+
+# Flujo: Generar factura
+
+## Vista general
+
+Este flujo documenta el proceso paso a paso para emitir una factura electrónica (FEL) a través de la 1Platform API. La factura se registra en el sistema tributario guatemalteco mediante la integración con TribuTax.
+
+**Caso de uso:** Emitir facturas electrónicas desde tu aplicación, asociadas a un Business previamente configurado.
+
+**Resultado final:** Una factura con estado `issued`, registrada en TribuTax con su FEL UUID, serie, número fiscal y los metadatos completos del reporte FEL (receptor, emisor, certificación, impuestos, etc.).
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| TribuTax configurado | La App debe tener `keys.tributax` configurado con `api_url`, `token` y `login` (almacenado en el documento de la App, no en variables de entorno) |
+| Business creado | Necesitas un business con un `documentNumber` (NIT) válido |
+
+### Headers requeridos para todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
+BUSINESS_ID=""  # Obtenido en el Paso 2
+BRANCH_ID=""    # Obtenido en el Paso 2b (opcional)
+```
+
+---
+
+## Datos requeridos para crear una factura
+
+### Receptor (cliente)
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `name` | string | Sí | Nombre legal del receptor |
+| `documentType` | string | Sí | Tipo de documento (p. ej., `"NIT"`, `"CUI"`, `"Pasaporte"`) |
+| `documentNumber` | string | Sí | Número de documento (NIT sin guion) |
+| `email` | string | Sí | Correo del receptor (para el envío de la factura) |
+| `address` | string | No | Dirección del receptor (por defecto: `"Ciudad"`) |
+
+### Items (líneas de la factura)
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `description` | string | Sí | Descripción del bien o servicio |
+| `unit_price` | float | Sí | Precio unitario |
+| `quantity` | int | Sí | Cantidad |
+| `discounts` | float | No | Descuentos aplicados (por defecto: `0`) |
+| `type` | string | No | `"S"` = Servicio, `"B"` = Bien (por defecto: `"S"`) |
+
+### Opciones de la factura
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `items` | array | Sí | Lista de items (mínimo 1) |
+| `receptorInfo` | object | Sí | Datos del receptor |
+| `date` | string | No | Fecha en formato `YYYY-MM-DD` (por defecto: hoy) |
+| `emitOnCreate` | bool | No | Emitir vía TribuTax al crear (por defecto: `true`) |
+| `currency` | string | No | Moneda (por defecto: `"GTQ"`) |
+| `description` | string | No | Descripción general de la factura |
+
+:::warning
+`branchId` ya no se acepta. Si se envía, la API devuelve un error **422**. Las facturas se asocian directamente al business mediante el `businessId` en la ruta de la URL.
+:::
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcto y que la app esté activa |
+| 422 | Campo `apiKey` ausente o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Crear el Business
+
+**Objetivo:** Registrar el business emisor de facturas. Solo necesitas hacerlo una vez.
+
+**Endpoint:** `POST /api/v1/businesses`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/businesses" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Company S.A.",
+    "documentType": "NIT",
+    "documentNumber": "12345678",
+    "address": "Zona 10, Guatemala City"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "My Company S.A.",
+    "documentType": "NIT",
+    "documentNumber": "12345678",
+    "address": "Zona 10, Guatemala City",
+    "status": "active",
+    "created_at": "2026-02-17T10:00:00Z",
+    "updated_at": "2026-02-17T10:00:00Z"
+  },
+  "msg": "Business created successfully"
+}
+```
+
+:::note
+Guarda `data.id` como `$BUSINESS_ID`.
+:::
+
+:::tip[Crea el business y su primera sucursal en una sola llamada]
+Puedes incluir un objeto **`branch`** opcional en el cuerpo de la solicitud. Cuando está presente, la
+API crea la sucursal **y** vincula al usuario que llama (como propietario de la sucursal) en la
+misma llamada, de modo que el business es devuelto de inmediato por `GET /api/v1/businesses`. Omitir
+`branch` crea un business independiente que **no** está vinculado a ningún usuario; agrega una sucursal
+más adelante mediante [el Paso 2b](#step-2b--create-branch-optional) para que aparezca en los listados.
+
+```bash
+curl -X POST "$BASE_URL/businesses" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Company S.A.",
+    "documentType": "NIT",
+    "documentNumber": "12345678",
+    "address": "Zona 10, Guatemala City",
+    "branch": { "name": "Main Branch", "commerceId": "COM-001" }
+  }'
+```
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token inválido o expirado | Regenera los tokens (Pasos 0 y 1) |
+| 409 | Ya existe un Business con ese `documentNumber` | Usa el Business existente; recupéralo con `GET /api/v1/businesses/{businessId}` |
+| 422 | Faltan campos requeridos | Verifica que `name`, `documentType`, `documentNumber` y `address` estén presentes |
+
+---
+
+### Paso 2b — Crear sucursal (opcional) {#step-2b--create-branch-optional}
+**Objetivo:** Registrar una sucursal bajo el business. Las sucursales tienen un `commerceId` requerido por TribuTax para business con múltiples establecimientos. Si tu business opera desde una sola ubicación, puedes omitir este paso.
+
+**Endpoint:** `POST /api/v1/businesses/{businessId}/branches`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/branches" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Sucursal Central",
+    "commerceId": "COM-001"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "607f1f77bcf86cd799439022",
+    "business_id": "507f1f77bcf86cd799439011",
+    "name": "Sucursal Central",
+    "commerceId": "COM-001",
+    "status": "active",
+    "assigned_users": [],
+    "created_at": "2026-02-17T10:05:00Z",
+    "updated_at": "2026-02-17T10:05:00Z"
+  },
+  "msg": "Branch created successfully"
+}
+```
+
+:::note
+Guarda `data.id` como `$BRANCH_ID`. El `commerceId` es el identificador de comercio de TribuTax para esta sucursal.
+:::
+
+**Datos de la sucursal:**
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `name` | string | Sí | Nombre visible de la sucursal (máx. 255 caracteres) |
+| `commerceId` | string | Sí | ID de comercio para la integración con TribuTax |
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token inválido o expirado | Regenera los tokens (Pasos 0 y 1) |
+| 404 | Business no encontrado | Verifica el `businessId` en la URL |
+| 422 | Faltan campos requeridos | Verifica que `name` y `commerceId` estén presentes |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Paso 2c — Obtener detalles de la sucursal
+
+**Objetivo:** Recuperar los detalles de una sucursal específica.
+
+**Endpoint:** `GET /api/v1/businesses/{businessId}/branches/{branchId}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/branches/$BRANCH_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "607f1f77bcf86cd799439022",
+    "business_id": "507f1f77bcf86cd799439011",
+    "name": "Sucursal Central",
+    "commerceId": "COM-001",
+    "status": "active",
+    "assigned_users": [
+      {
+        "user_id": "64a1b2c3d4e5f6a7b8c9d0e1",
+        "email": "maria@example.com",
+        "role": "admin",
+        "assigned_at": "2026-02-17T10:05:00Z"
+      }
+    ],
+    "created_at": "2026-02-17T10:05:00Z",
+    "updated_at": "2026-02-17T10:05:00Z"
+  },
+  "msg": "Branch retrieved successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | La sucursal no pertenece a este business | Verifica que el `branchId` pertenezca al `businessId` especificado |
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business o sucursal no encontrados | Verifica ambos IDs |
+| 422 | Parámetros de ruta inválidos | Verifica que `businessId` y `branchId` sean identificadores válidos |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 2d — Buscar persona por documento (opcional)
+
+**Objetivo:** Recuperar los datos personales de una persona usando su número de CUI/DPI. Útil para pre-rellenar los campos del receptor de la factura (`name`, `documentNumber`) sin pedirle al cliente que los escriba manualmente.
+
+**Endpoint:** `POST /api/v1/identify`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/identify" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_number": "2943817650101"
+  }'
+```
+
+**Cuerpo de la solicitud:**
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `document_number` | string | Sí | Número de CUI/DPI — exactamente 13 dígitos |
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "document_number": "2943817650101",
+    "first_name": "María",
+    "second_name": "Fernanda",
+    "third_name": null,
+    "first_surname": "López",
+    "second_surname": "García",
+    "married_surname": null,
+    "date_of_birth": "15/08/1985",
+    "date_of_death": null,
+    "gender": "F",
+    "marital_status": "SO",
+    "nationality": "guatemalteca",
+    "birth_country": "Guatemala",
+    "birth_department": "Guatemala",
+    "birth_municipality": "Guatemala",
+    "residence": "12 Avenida 3-40, Zona 1, Guatemala",
+    "occupation": "Comerciante",
+    "expiration_date": "15/08/2030"
+  },
+  "msg": "Person found"
+}
+```
+
+:::note
+Combina `first_name`, `second_name`, `first_surname` y `second_surname` para construir el campo `name` del receptor. El `document_number` de la respuesta es el CUI, que puede pasarse como `documentNumber` en el receptor de la factura con `documentType: "CUI"`.
+
+Para facturas emitidas a empresas, usa en su lugar la ruta de búsqueda por NIT (el `documentType` del receptor debe ser `"NIT"`).
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token inválido o expirado | Regenera los tokens (Pasos 0 y 1) |
+| 404 | No se encontraron registros para el número de documento | Verifica que el CUI/DPI sea correcto (13 dígitos) |
+| 422 | Integración no configurada o error en la búsqueda | Asegúrate de que la App tenga habilitada la integración de búsqueda de personas |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
+
+---
+
+### Paso 3 — Crear la factura
+
+**Objetivo:** Emitir una factura electrónica (FEL) asociada a un business. El NIT del business se usa como emisor en TribuTax.
+
+**Endpoint:** `POST /api/v1/businesses/{businessId}/invoices`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+#### cURL mínimo
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {
+        "description": "Consulting service",
+        "unit_price": 1000.00,
+        "quantity": 1
+      }
+    ],
+    "receptorInfo": {
+      "name": "Client S.A.",
+      "documentType": "NIT",
+      "documentNumber": "98765432",
+      "email": "client@example.com"
+    }
+  }'
+```
+
+#### cURL completo (todos los campos)
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {
+        "description": "Monthly consulting service",
+        "unit_price": 5000.00,
+        "quantity": 1,
+        "discounts": 0,
+        "type": "S"
+      },
+      {
+        "description": "Software license",
+        "unit_price": 1200.00,
+        "quantity": 3,
+        "discounts": 200.00,
+        "type": "B"
+      }
+    ],
+    "receptorInfo": {
+      "name": "ABC Corporation S.A.",
+      "documentType": "NIT",
+      "documentNumber": "12349876",
+      "email": "accounting@example.com",
+      "address": "4th Avenue 12-30, Zone 1, Guatemala"
+    },
+    "date": "2026-02-17",
+    "emitOnCreate": true,
+    "currency": "GTQ",
+    "description": "Invoice for February 2026 services"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "709f1f77bcf86cd799439033",
+    "business_id": "507f1f77bcf86cd799439011",
+    "created_by": "64a1b2c3d4e5f6a7b8c9d0e1",
+    "externalId": 48291,
+    "uid": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+    "invoiceUrl": "https://report.feel.com.gt/ingfacereport/ingfacereport_documento?uuid=A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+    "serieFEL": "3FA02638",
+    "numeroFEL": "1234567890",
+    "items": [
+      {
+        "description": "Monthly consulting service",
+        "unit_price": 5000.00,
+        "quantity": 1,
+        "discounts": 0,
+        "type": "S"
+      },
+      {
+        "description": "Software license",
+        "unit_price": 1200.00,
+        "quantity": 3,
+        "discounts": 200.00,
+        "type": "B"
+      }
+    ],
+    "amount": 8400.00,
+    "description": "Invoice for February 2026 services",
+    "receptorInfo": {
+      "name": "ABC Corporation S.A.",
+      "documentType": "NIT",
+      "documentNumber": "12349876",
+      "email": "accounting@example.com",
+      "address": "4th Avenue 12-30, Zone 1, Guatemala"
+    },
+    "currency": "GTQ",
+    "status": "issued",
+    "issued_at": "2026-02-17T10:10:00Z",
+    "cancelled_at": null,
+    "cancellation_reason": null,
+    "fel_synced": true,
+    "document_type": "FACT",
+    "total_in_words_es": "ocho mil cuatrocientos quetzales exactos",
+    "total_in_words_en": "eight thousand four hundred quetzales exact",
+    "fel_receiver": {
+      "receiver_tax_id": "12349876",
+      "receiver_name": "ABC Corporation S.A.",
+      "receiver_address": "4th Avenue 12-30, Zone 1, Guatemala",
+      "receiver_city": null,
+      "receiver_state": null,
+      "receiver_country": "GT",
+      "receiver_phone": null,
+      "receiver_email": "accounting@example.com"
+    },
+    "fel_issuer": {
+      "issuer_tax_id": "55667788",
+      "issuer_name": "Global Technology S.A.",
+      "issuer_trade_name": "Global Technology S.A.",
+      "issuer_vat_affiliation": "GEN",
+      "issuer_address": "Boulevard Los Proceres 15-80, Zone 10, Guatemala",
+      "issuer_city": "Guatemala",
+      "issuer_state": "Guatemala",
+      "issuer_country": "GT",
+      "issuer_phone": null,
+      "issuer_email": null,
+      "issuer_establishment_code": "1",
+      "issuer_currency": "GTQ"
+    },
+    "fel_items": [
+      {
+        "quantity": 1,
+        "description": "Monthly consulting service",
+        "unit_price": 5000.00,
+        "discount": 0,
+        "price": 5000.00,
+        "line_total": 5000.00,
+        "unit_measure": "UND",
+        "item_kind": "S",
+        "taxes": [
+          {
+            "tax_short_name": "IVA",
+            "taxable_amount": 4464.29,
+            "tax_amount": 535.71
+          }
+        ]
+      }
+    ],
+    "fel_cancellation": null,
+    "fel_certification": {
+      "certifier_tax_id": "12521337",
+      "certifier_name": "INFILE, S.A.",
+      "authorization_number": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+      "series": "3FA02638",
+      "certified_number": "1234567890",
+      "certified_at": "2026-02-17T10:10:05-06:00"
+    },
+    "fel_phrases": [
+      {
+        "phrase_type": "1",
+        "scenario_code": "1",
+        "description": "Sujeto a pagos trimestrales ISR"
+      }
+    ],
+    "fel_general_taxes": [
+      {
+        "tax_short_name": "IVA",
+        "tax_amount": 535.71
+      }
+    ],
+    "fel_addendum": {
+      "document": "TRI_10838655-295502784"
+    },
+    "created_at": "2026-02-17T10:10:00Z",
+    "updated_at": "2026-02-17T10:10:05Z"
+  },
+  "msg": "Invoice created successfully"
+}
+```
+
+:::note
+Guarda `data.id` como `$INVOICE_ID` para consultas posteriores.
+
+**Campos fiscales clave:**
+- `uid` — UUID de la factura FEL
+- `invoiceUrl` — Enlace directo para ver la factura en FEEL
+- `serieFEL` — Serie de la factura FEL
+- `numeroFEL` — Número de la factura FEL
+- `externalId` — ID de TribuTax (requerido para la anulación)
+
+**Los metadatos del reporte FEL** se obtienen automáticamente de FEEL y se incluyen en la respuesta. Si la obtención falla, la factura se crea igualmente con éxito con `fel_synced: false` y los campos FEL como `null`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business no encontrado | Verifica el `businessId` en la URL |
+| 422 | Error de validación de TribuTax, campos inválidos o `branchId` obsoleto enviado | Revisa los datos del receptor (NIT válido), los items (al menos 1). **No** envíes `branchId` en el cuerpo |
+| 500 | Error interno | Contacta a soporte. La factura puede haberse guardado con estado `failed` |
+
+---
+
+### Paso 4 — Obtener detalles de la factura
+
+**Objetivo:** Recuperar los detalles completos de una factura emitida. La respuesta se lee directamente de la base de datos — los metadatos FEL ya se obtuvieron durante la creación (o la anulación).
+
+**Endpoint:** `GET /api/v1/businesses/{businessId}/invoices/{invoiceId}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+La respuesta tiene la misma estructura que la respuesta de creación (Paso 3), incluyendo todos los campos del reporte FEL (`fel_synced`, `fel_receiver`, `fel_issuer`, `fel_items`, `fel_certification`, `fel_phrases`, `fel_general_taxes`, `fel_addendum`, `fel_cancellation`, `document_type`, `total_in_words_es`, `total_in_words_en`).
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "709f1f77bcf86cd799439033",
+    "business_id": "507f1f77bcf86cd799439011",
+    "created_by": "64a1b2c3d4e5f6a7b8c9d0e1",
+    "externalId": 48291,
+    "uid": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+    "invoiceUrl": "https://report.feel.com.gt/ingfacereport/ingfacereport_documento?uuid=A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+    "serieFEL": "3FA02638",
+    "numeroFEL": "1234567890",
+    "items": [ "..." ],
+    "amount": 8400.00,
+    "description": "Invoice for February 2026 services",
+    "receptorInfo": { "..." : "..." },
+    "currency": "GTQ",
+    "status": "issued",
+    "issued_at": "2026-02-17T10:10:00Z",
+    "cancelled_at": null,
+    "cancellation_reason": null,
+    "fel_synced": true,
+    "document_type": "FACT",
+    "total_in_words_es": "ocho mil cuatrocientos quetzales exactos",
+    "total_in_words_en": "eight thousand four hundred quetzales exact",
+    "fel_receiver": { "..." : "..." },
+    "fel_issuer": { "..." : "..." },
+    "fel_items": [ "..." ],
+    "fel_cancellation": null,
+    "fel_certification": { "..." : "..." },
+    "fel_phrases": [ "..." ],
+    "fel_general_taxes": [ "..." ],
+    "fel_addendum": { "..." : "..." },
+    "created_at": "2026-02-17T10:10:00Z",
+    "updated_at": "2026-02-17T10:10:05Z"
+  },
+  "msg": "Invoice retrieved successfully"
+}
+```
+
+:::note
+Si `fel_synced` es `false`, significa que la obtención del reporte FEL falló durante la creación. Los campos fiscales (`uid`, `serieFEL`, `numeroFEL`) siguen disponibles, pero los campos de metadatos FEL serán `null`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business o factura no encontrados | Verifica los IDs |
+
+---
+
+### Paso 5 — Listar facturas
+
+**Objetivo:** Recuperar una lista paginada de facturas del business.
+
+**Endpoint:** `GET /api/v1/businesses/{businessId}/invoices`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+# Listar todas las facturas (página 1, 20 por página)
+curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+
+# Con filtros
+curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices?status=issued&date_from=2026-02-01&date_to=2026-02-28&page=1&limit=50&sort_by=created_at&sort_order=desc" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `page` | int | `1` | Número de página (mínimo 1) |
+| `limit` | int | `20` | Resultados por página (máximo 100) |
+| `status` | string | — | Filtrar por estado: `issued`, `cancelled`, `failed` |
+| `date_from` | string | — | Fecha de inicio (formato ISO) |
+| `date_to` | string | — | Fecha de fin (formato ISO) |
+| `sort_by` | string | `created_at` | Campo por el cual ordenar |
+| `sort_order` | string | `desc` | Orden: `asc` o `desc` |
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": "709f1f77bcf86cd799439033",
+        "business_id": "507f1f77bcf86cd799439011",
+        "externalId": 48291,
+        "uid": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+        "invoiceUrl": "https://report.feel.com.gt/ingfacereport/ingfacereport_documento?uuid=A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+        "serieFEL": "3FA02638",
+        "numeroFEL": "1234567890",
+        "amount": 8400.00,
+        "currency": "GTQ",
+        "status": "issued",
+        "issued_at": "2026-02-17T10:10:00Z",
+        "created_at": "2026-02-17T10:10:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total_items": 1,
+      "total_pages": 1
+    }
+  },
+  "msg": "Invoices retrieved successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business no encontrado | Verifica el `businessId` |
+
+---
+
+### Paso 6 — Anular factura
+
+**Objetivo:** Anular una factura emitida. Si fue registrada en TribuTax, también se anulará allí. Tras la anulación, el reporte FEL se vuelve a obtener para capturar los datos de anulación actualizados de FEL (`fel_cancellation`).
+
+**Endpoint:** `DELETE /api/v1/businesses/{businessId}/invoices/{invoiceId}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "Error in receptor data"
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "709f1f77bcf86cd799439033",
+    "status": "cancelled",
+    "cancellation_reason": "Error in receptor data",
+    "cancelled_at": "2026-02-17T12:00:00Z",
+    "updated_at": "2026-02-17T12:00:00Z"
+  },
+  "msg": "Invoice cancelled successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | La factura ya está anulada | No se puede anular dos veces |
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business o factura no encontrados | Verifica los IDs |
+| 422 | Error de TribuTax durante la anulación | Verifica que la factura tenga un `externalId` válido. Contacta a soporte si persiste |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes, desde la autenticación hasta la emisión de la factura.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 2: Crear el Business ===
+BUSINESS_ID=$(curl -s -X POST "$BASE_URL/businesses" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Global Technology S.A.",
+    "documentType": "NIT",
+    "documentNumber": "55667788",
+    "address": "Boulevard Los Proceres 15-80, Zone 10, Guatemala"
+  }' \
+  | jq -r '.data.id')
+
+echo "BUSINESS_ID: $BUSINESS_ID"
+
+# === PASO 3: Crear la factura ===
+INVOICE_RESPONSE=$(curl -s -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {
+        "description": "Mobile app development - Phase 1",
+        "unit_price": 15000.00,
+        "quantity": 1,
+        "type": "S"
+      },
+      {
+        "description": "Annual hosting and domain",
+        "unit_price": 1500.00,
+        "quantity": 1,
+        "discounts": 150.00,
+        "type": "S"
+      }
+    ],
+    "receptorInfo": {
+      "name": "El Exito Distribution S.A.",
+      "documentType": "NIT",
+      "documentNumber": "11223344",
+      "email": "invoices@example.com",
+      "address": "6th Street 3-25, Zone 4, Quetzaltenango"
+    },
+    "date": "2026-02-17",
+    "emitOnCreate": true,
+    "currency": "GTQ",
+    "description": "Development and hosting services - February 2026"
+  }')
+
+echo "INVOICE_RESPONSE: $INVOICE_RESPONSE"
+
+INVOICE_ID=$(echo $INVOICE_RESPONSE | jq -r '.data.id')
+echo "INVOICE_ID: $INVOICE_ID"
+
+# === PASO 4: Verificar la factura ===
+curl -s -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+```
+
+---
+
+## Endpoints no implementados (brechas detectadas)
+
+| Funcionalidad | Estado | Notas |
+|---|---|---|
+| Descargar PDF de la factura | No implementado | No existe un endpoint para recuperar el PDF. Debería implementarse en `app/api/v1/endpoints/invoicing.py` o consumirse directamente desde TribuTax |
+| Enviar factura por correo | No implementado | El campo `email` del receptor se envía a TribuTax, pero no hay un endpoint explícito para reenviar |
+| Reemitir factura fallida | No implementado | Si una factura se guardó con `status: "failed"`, no hay un endpoint para reintentar la emisión. Debe crearse una nueva factura |
+| Asignar/desasignar usuarios a una sucursal | No implementado | Solo el creador se asigna automáticamente. No existe un endpoint para gestionar asignaciones adicionales |
+| Actualizar Business | No implementado | No existe un endpoint PUT/PATCH para modificar un business tras su creación |
+| Actualizar sucursal | No implementado | No existe un endpoint PUT/PATCH para modificar una sucursal tras su creación |
+| Listar sucursales | No implementado | No hay un endpoint para listar todas las sucursales de un business |
+| Listar los Business del usuario | No implementado | No hay un endpoint para listar todos los business. El usuario debe conocer el `businessId` |
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+
+:::warning[Sin mecanismo de idempotencia]
+La API no admite un header `Idempotency-Key`. Si una solicitud falla por timeout, verifica con `GET /invoices` antes de reintentar para evitar facturas duplicadas.
+:::
+
+### Reintentos
+
+- Si recibes un **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes un **500** o un **timeout**, **no reintentes la creación de inmediato**. Primero consulta `GET /invoices?status=issued` para verificar si la factura se creó. Las facturas que fallaron en TribuTax se guardan con `status: "failed"`.
+- Para un **401** (token expirado), regenera el token y reintenta la solicitud original.
+
+### Timeouts
+
+:::warning
+La emisión de facturas implica una llamada externa a TribuTax con un timeout configurable (por defecto: **30 segundos**, definido en `App.keys.tributax.timeout`). Además, el reporte FEL se obtiene de FEEL después de la emisión. Configura tu cliente HTTP con un timeout de al menos **60 segundos** para el endpoint de creación.
+:::
+
+### Tokens
+
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de facturación.
+
+### Validaciones importantes
+
+- El `documentNumber` del Business debe coincidir con el NIT registrado en TribuTax.
+- El `documentNumber` del receptor debe ser un NIT válido para la facturación electrónica guatemalteca.
+- Se requiere al menos **1 item** en la factura.
+- **No** envíes `branchId` en el cuerpo de la solicitud — será rechazado con un error 422.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `POST` | `/api/v1/businesses` | Crear business |
+| 2b | `POST` | `/api/v1/businesses/{businessId}/branches` | Crear sucursal (opcional) |
+| 2c | `GET` | `/api/v1/businesses/{businessId}/branches/{branchId}` | Obtener detalles de la sucursal |
+| 2d | `POST` | `/api/v1/identify` | Buscar persona por CUI/DPI (opcional) |
+| — | `GET` | `/api/v1/businesses/{businessId}` | Obtener business (recuperación de un 409) |
+| 3 | `POST` | `/api/v1/businesses/{businessId}/invoices` | Crear factura |
+| 4 | `GET` | `/api/v1/businesses/{businessId}/invoices/{invoiceId}` | Obtener detalles de la factura |
+| 5 | `GET` | `/api/v1/businesses/{businessId}/invoices` | Listar facturas |
+| 6 | `DELETE` | `/api/v1/businesses/{businessId}/invoices/{invoiceId}` | Anular factura |
+
+---
+
+## Lista de verificación rápida
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Creé el Business o tengo su ID (`POST /businesses`)
+- [ ] Creé una sucursal si fue necesario (`POST /businesses/{id}/branches`) (opcional)
+- [ ] Busqué los datos personales del receptor vía CUI/DPI si fue necesario (`POST /identify`) (opcional)
+- [ ] Tengo los datos del receptor (nombre, número de documento, correo)
+- [ ] Tengo al menos 1 item con descripción, precio unitario y cantidad
+- [ ] Emití la factura (`POST /businesses/{id}/invoices`)
+- [ ] Verifiqué el estado de la factura (`status: "issued"`) y la sincronización FEL (`fel_synced: true`)
+- [ ] Guardé el `uid`, `serieFEL`, `numeroFEL` e `invoiceUrl` como referencia fiscal

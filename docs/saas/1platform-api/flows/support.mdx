@@ -1,0 +1,573 @@
+---
+title: "Soporte"
+description: "Flujo paso a paso para listar y crear tickets de soporte, agregar respuestas y leer o publicar entradas de FAQ mediante la 1Platform API."
+sidebar_position: 19
+---
+
+# Flujo: Soporte
+
+## Vista general
+
+Este flujo documenta cómo un centro de ayuda o un widget de soporte se integra con el subsistema de soporte de 1Platform: listar los tickets abiertos del usuario, abrir un nuevo ticket, agregar mensajes de respuesta a un hilo existente y leer o publicar el catálogo público de FAQ.
+
+**Caso de uso:** Construir un centro de soporte dentro de la aplicación donde los usuarios pueden leer FAQs, abrir tickets y mantener conversaciones de ida y vuelta con el equipo de soporte.
+
+**Resultado final:** Los usuarios pueden autoatenderse mediante las FAQs, escalar a un ticket cuando lo necesiten y continuar conversaciones en hilo hasta que el problema se resuelva.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) entregada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Rol admin | Publicar FAQs requiere privilegios de admin en la app |
+
+### Headers requeridos en todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""        # Obtenido en el Paso 0
+USER_TOKEN=""       # Obtenido en el Paso 1
+TICKET_ID=""        # Obtenido en el Paso 3
+```
+
+---
+
+## Modelo de datos
+
+### Objeto Ticket
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id` | string | Sí | ObjectId de MongoDB del ticket |
+| `subject` | string | Sí | Línea de asunto corta del ticket |
+| `status` | string | Sí | Uno de `open`, `in_progress`, `resolved` |
+| `priority` | string | Sí | Uno de `low`, `normal`, `high` |
+| `user_id` | string | Sí | Propietario del ticket |
+| `assignee_id` | string \| null | Sí | Agente de soporte asignado al ticket |
+| `messages` | array | Sí | Lista de mensajes en hilo (del más antiguo al más reciente) |
+| `created_at` | string | Sí | Marca de tiempo de creación ISO-8601 |
+| `updated_at` | string | Sí | Marca de tiempo de la última actualización ISO-8601 |
+
+### Objeto FAQ
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id` | string | Sí | ObjectId de MongoDB de la FAQ |
+| `question` | string | Sí | Texto de la pregunta visible al público |
+| `answer` | string | Sí | Respuesta visible al público (se permite Markdown) |
+| `category` | string \| null | Sí | Categoría de agrupación opcional |
+| `order_index` | integer | Sí | Orden de clasificación dentro de una categoría |
+| `published` | boolean | Sí | Si la FAQ es visible públicamente |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcto y que la app esté activa |
+| 422 | Campo `apiKey` faltante o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT del usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo el token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` faltante | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Leer el catálogo público de FAQ
+
+**Objetivo:** Mostrar a los usuarios las FAQs publicadas antes de que abran un ticket. Este es el paso de "deflexión".
+
+**Endpoint:** `GET /api/v1/support/faqs`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/support/faqs" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "question": "¿Cómo cambio mi contraseña?",
+      "answer": "Ve a Ajustes y haz clic en \"Cambiar contraseña\".",
+      "category": "cuenta",
+      "order_index": 0,
+      "published": true
+    },
+    {
+      "id": "507f1f77bcf86cd799439012",
+      "question": "¿Cómo solicito una factura?",
+      "answer": "Genera una factura desde la pantalla de transacciones.",
+      "category": "facturacion",
+      "order_index": 0,
+      "published": true
+    }
+  ],
+  "msg": "FAQs fetched successfully"
+}
+```
+
+:::tip
+Agrupa la respuesta del lado del cliente por `category` y ordena cada grupo por `order_index` para renderizar un centro de ayuda limpio.
+:::
+
+---
+
+### Paso 3 — Abrir un nuevo ticket de soporte
+
+**Objetivo:** Crear un ticket con un mensaje de apertura cuando la FAQ no resuelve el problema del usuario.
+
+**Endpoint:** `POST /api/v1/support/tickets`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/support/tickets" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "No puedo conectar mi cuenta de Search Console",
+    "initial_body": "Sigo el flujo del dashboard pero el OAuth me devuelve error 400. Ya intenté en Chrome y Safari.",
+    "priority": "normal"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439020",
+    "subject": "No puedo conectar mi cuenta de Search Console",
+    "status": "open",
+    "priority": "normal",
+    "user_id": "507f1f77bcf86cd799439001",
+    "assignee_id": null,
+    "messages": [
+      {
+        "author_id": "507f1f77bcf86cd799439001",
+        "author_role": "user",
+        "body": "Sigo el flujo del dashboard pero el OAuth me devuelve error 400. Ya intenté en Chrome y Safari.",
+        "created_at": "2026-04-27T15:30:00Z"
+      }
+    ],
+    "created_at": "2026-04-27T15:30:00Z",
+    "updated_at": "2026-04-27T15:30:00Z"
+  },
+  "msg": "Ticket created successfully"
+}
+```
+
+:::note
+Guarda `data.id` como `$TICKET_ID`. El estado comienza en `open` y el asignado es `null` hasta que un agente de soporte lo toma.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | Falta `subject` o `initial_body`, o `priority` inválido | Proporciona ambos campos requeridos y usa `low`/`normal`/`high` |
+
+---
+
+### Paso 4 — Listar los tickets del usuario
+
+**Objetivo:** Mostrar al usuario su historial de tickets, paginado.
+
+**Endpoint:** `GET /api/v1/support/tickets`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `skip` | integer | No | Desplazamiento para la paginación (por defecto `0`) |
+| `limit` | integer | No | Tamaño de página (por defecto `20`) |
+
+```bash
+curl -X GET "$BASE_URL/support/tickets?skip=0&limit=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439020",
+      "subject": "No puedo conectar mi cuenta de Search Console",
+      "status": "in_progress",
+      "priority": "normal",
+      "user_id": "507f1f77bcf86cd799439001",
+      "assignee_id": "507f1f77bcf86cd799439099",
+      "messages": [
+        {
+          "author_id": "507f1f77bcf86cd799439001",
+          "author_role": "user",
+          "body": "Sigo el flujo...",
+          "created_at": "2026-04-27T15:30:00Z"
+        },
+        {
+          "author_id": "507f1f77bcf86cd799439099",
+          "author_role": "agent",
+          "body": "Hola María, ¿puedes confirmar si tu cuenta tiene acceso de propietario en Search Console?",
+          "created_at": "2026-04-27T16:00:00Z"
+        }
+      ],
+      "created_at": "2026-04-27T15:30:00Z",
+      "updated_at": "2026-04-27T16:00:00Z"
+    }
+  ],
+  "msg": "Tickets fetched successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | Parámetros de paginación inválidos | Pasa `skip`/`limit` como enteros |
+
+---
+
+### Paso 5 — Agregar una respuesta a un ticket
+
+**Objetivo:** Añadir un mensaje a un hilo de ticket existente.
+
+**Endpoint:** `POST /api/v1/support/tickets/{ticket_id}/reply`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/support/tickets/$TICKET_ID/reply" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "body": "Sí, soy propietaria verificada. Adjunto captura del error."
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439020",
+    "subject": "No puedo conectar mi cuenta de Search Console",
+    "status": "in_progress",
+    "priority": "normal",
+    "user_id": "507f1f77bcf86cd799439001",
+    "assignee_id": "507f1f77bcf86cd799439099",
+    "messages": [
+      {
+        "author_id": "507f1f77bcf86cd799439001",
+        "author_role": "user",
+        "body": "Sigo el flujo...",
+        "created_at": "2026-04-27T15:30:00Z"
+      },
+      {
+        "author_id": "507f1f77bcf86cd799439099",
+        "author_role": "agent",
+        "body": "Hola María, ¿puedes confirmar...?",
+        "created_at": "2026-04-27T16:00:00Z"
+      },
+      {
+        "author_id": "507f1f77bcf86cd799439001",
+        "author_role": "user",
+        "body": "Sí, soy propietaria verificada. Adjunto captura del error.",
+        "created_at": "2026-04-27T16:30:00Z"
+      }
+    ],
+    "created_at": "2026-04-27T15:30:00Z",
+    "updated_at": "2026-04-27T16:30:00Z"
+  },
+  "msg": "Reply appended successfully"
+}
+```
+
+:::note
+Se devuelve el ticket completo (con el mensaje agregado); tu cliente no necesita volver a consultar el ticket por separado.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 404 | El ticket no existe o pertenece a otro usuario | Verifica `$TICKET_ID` |
+| 422 | Falta el campo `body` | Envía `{"body": "..."}` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 6 — Publicar una nueva FAQ (admin)
+
+**Objetivo:** Añadir una entrada al catálogo público de FAQ. Útil cuando aparecen patrones de tickets similares.
+
+**Endpoint:** `POST /api/v1/support/faqs`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/support/faqs" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "¿Por qué falla la conexión con Search Console?",
+    "answer": "La cuenta debe ser propietaria verificada del sitio. Sigue [esta guía](https://example.com/help/sc).",
+    "category": "integraciones",
+    "order_index": 1,
+    "published": true
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439030",
+    "question": "¿Por qué falla la conexión con Search Console?",
+    "answer": "La cuenta debe ser propietaria verificada del sitio. Sigue [esta guía](https://example.com/help/sc).",
+    "category": "integraciones",
+    "order_index": 1,
+    "published": true
+  },
+  "msg": "FAQ created successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | Falta `question` o `answer` | Proporciona ambos campos requeridos |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+# === PASO 2: Leer las FAQs ===
+curl -s -X GET "$BASE_URL/support/faqs" \
+  -H "Authorization: Bearer $APP_TOKEN" | jq
+
+# === PASO 3: Abrir un nuevo ticket ===
+TICKET_ID=$(curl -s -X POST "$BASE_URL/support/tickets" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "Demo: necesito ayuda",
+    "initial_body": "Mensaje de prueba",
+    "priority": "normal"
+  }' | jq -r '.data.id')
+
+echo "TICKET_ID: $TICKET_ID"
+
+# === PASO 4: Listar mis tickets ===
+curl -s -X GET "$BASE_URL/support/tickets?limit=5" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+
+# === PASO 5: Agregar una respuesta ===
+curl -s -X POST "$BASE_URL/support/tickets/$TICKET_ID/reply" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"body": "Aquí va información adicional."}' | jq
+
+# === PASO 6 (admin): Publicar una nueva FAQ ===
+curl -s -X POST "$BASE_URL/support/faqs" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Demo question?",
+    "answer": "Demo answer.",
+    "category": "demo",
+    "order_index": 0,
+    "published": true
+  }' | jq
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+- `POST /support/tickets` **no** es idempotente: cada llamada crea un nuevo ticket. Envía un identificador de deduplicación en tu capa de aplicación si necesitas semántica de exactamente-una-vez.
+- `POST /support/tickets/{id}/reply` **no** es idempotente: cada llamada agrega un nuevo mensaje.
+- `POST /support/faqs` **no** es idempotente: se permiten preguntas duplicadas; deduplica en la capa de la UI de admin.
+- `GET /support/faqs` y `GET /support/tickets` son de solo lectura e idempotentes.
+
+### Reintentos
+- Para errores **5xx** en endpoints `POST`, reintenta con cuidado: el intento anterior puede haber tenido éxito. Usa claves de idempotencia a nivel de cliente si los duplicados exactos son inaceptables.
+- Para **429**, aplica back-off y reintenta.
+- Para **401**, regenera los tokens.
+
+### Timeouts
+- Todos los endpoints son CRUD simples: configura un timeout de cliente de 5 segundos.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+
+### Validaciones importantes
+- `priority` debe ser uno de `low`, `normal`, `high`.
+- `status` está controlado por el servidor: no puedes establecerlo desde el cliente.
+- Las entradas de FAQ con `published: false` solo son visibles para los admins, no en la respuesta pública de `GET /support/faqs`.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `GET` | `/api/v1/support/faqs` | Listar las FAQs publicadas |
+| 3 | `POST` | `/api/v1/support/tickets` | Abrir un nuevo ticket |
+| 4 | `GET` | `/api/v1/support/tickets` | Listar mis tickets |
+| 5 | `POST` | `/api/v1/support/tickets/{ticket_id}/reply` | Agregar una respuesta |
+| 6 | `POST` | `/api/v1/support/faqs` | Publicar una nueva FAQ (admin) |
+
+---
+
+## Checklist rápido
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Rendericé el catálogo público de FAQ
+- [ ] Abrí un ticket mediante `POST /support/tickets`
+- [ ] Listé el historial de tickets del usuario
+- [ ] Agregué al menos una respuesta a un ticket
+- [ ] (Admin) Publiqué una nueva entrada de FAQ

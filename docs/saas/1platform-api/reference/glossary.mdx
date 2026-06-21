@@ -1,0 +1,52 @@
+---
+title: Glosario de identificadores
+description: Nombres canónicos de cada ID en la 1Platform API — quién es dueño de cada uno y qué alias existen.
+sidebar_position: 2
+---
+
+# Glosario
+
+Varios IDs fluyen a lo largo del ciclo de vida del pago. Se parecen pero significan
+cosas distintas. Esta página es el mapeo canónico.
+
+| Término | Dueño | Definición | Alias |
+|---|---|---|---|
+| `transaction_id` | 1Platform | ID interno de la transacción. Se devuelve como `data.id` en `POST /users/transactions` y como `transaction_id` en el webhook saliente. | `id` (en el cuerpo de la respuesta) |
+| `external_transaction_id` | proveedor upstream | El ID de transacción propio del proveedor (p. ej. Migo). Se devuelve en las cargas útiles del webhook como `external_transaction_id`. Lo usa el soporte del operador para localizar el cargo en el dashboard del proveedor. | `externalId` (alias obsoleto en cargas útiles de webhook heredadas) |
+| `merchant_reference` | comercio | Cadena de texto libre que el comercio adjunta al crear. **Se devuelve sin cambios** en el webhook saliente. La clave de correlación determinista de tu lado. | (ninguno) |
+| `metadata` | comercio | Objeto JSON de texto libre que se devuelve sin cambios en el webhook saliente. Úsalo para contexto que no necesita ser una sola cadena. | (ninguno) |
+| `payment_gateway_id` | 1Platform | ObjectId de un documento `PaymentGateway`. Lo configura el operador, no quien llama a la API. | (ninguno) |
+| `app_token` | 1Platform | JWT de corta duración (30 min). Emitido por `POST /auth/token`. | `access_token` (en el cuerpo de la respuesta) |
+| `user_token` | 1Platform | JWT de corta duración (30 min). Emitido por `POST /users/token`. | `access_token` (en el cuerpo de la respuesta) |
+| `webhook_secret` | 1Platform | Clave de firma HMAC para webhooks salientes. Se devuelve **una sola vez** al registrar o rotar. No hay un endpoint `GET` para recuperarla después. | (ninguno) |
+
+## Cuál usar para correlacionar
+
+Cuando llega un webhook, tienes tres IDs con los que potencialmente hacer coincidencia:
+
+1. **`merchant_reference`** — el tuyo, determinista. La mejor clave de correlación
+   cuando lo estableces al crear.
+2. **`transaction_id`** — interno de 1Platform. Siempre presente, siempre único.
+   El mejor respaldo cuando `merchant_reference` es null.
+3. **`external_transaction_id`** — útil para tickets de soporte pero **no**
+   garantizado que esté presente en la carga útil entrante del proveedor upstream.
+   Evita depender de él para la correlación.
+
+:::caution[`externalId` es ambiguo]
+El campo de webhook heredado `externalId` se describe como "ID de transacción local
+(enviado durante la creación de la transacción)" — pero el cuerpo de la solicitud de
+creación de transacción **no acepta** un campo `externalId`. El valor del webhook es
+lo que el proveedor upstream le estampa, no algo que tú controles. En su lugar, haz
+coincidencia con `transaction_id` (o `merchant_reference`).
+:::
+
+## Referencia de formato de IDs
+
+| Campo | Formato | Ejemplo |
+|---|---|---|
+| `transaction_id` / `id` | ObjectId de MongoDB hex de 24 caracteres | `65a1b2c3d4e5f6789abcdef0` |
+| `external_transaction_id` | específico del proveedor | `MIGOGT123456` |
+| `app_token` / `user_token` | JWT | `eyJhbGciOiJIUzI1NiIs...` |
+| Clave de API de aplicación | `ak-` + 64 caracteres hex | `ak-a1b2c3...` |
+| Clave de API de usuario | `sk-` + 64 caracteres hex | `sk-d4e5f6...` |
+| `webhook_secret` | `whsec_` + cadena opaca | `whsec_demo_abc123` |

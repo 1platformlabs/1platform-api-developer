@@ -1,0 +1,341 @@
+---
+title: Gestión de contenido
+description: Crea, actualiza, publica, archiva y sube assets para ítems del catálogo en la Atlas API — la contraparte de escritura de la exploración del catálogo, con RBAC, la máquina de estados draft→published y registro de auditoría.
+sidebar_position: 8
+---
+
+# Gestión de contenido
+
+La [exploración del catálogo](/docs/saas/atlas-api/catalog-browsing) es el lado de **lectura** del catálogo de un tenant.
+Esta guía cubre el lado de **escritura**: cómo un operador o una integración crea programáticamente
+ítems de catálogo, edita sus metadatos, los mueve por el ciclo de vida de publicación y adjunta los
+archivos descargables e imágenes de portada que los miembros consumen realmente.
+
+Cada endpoint aquí está **acotado al tenant** (resuelto desde `Host` o `X-Tenant-Slug` — consulta
+[Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)), **controlado por RBAC** y **registrado en auditoría**:
+cada mutación registra quién cambió qué. Nunca pones un id de tenant en el cuerpo — el tenant resuelto
+es dueño del registro.
+
+> Estos son endpoints de operador. Autentícate con un **JWT de sesión de operador/administrador**
+> (consulta [Autenticación › inicio de sesión de administrador](/docs/saas/atlas-api/authentication)) o una
+> [clave de integración](/docs/saas/atlas-api/integration-keys) que porte la capacidad de contenido
+> requerida. El catálogo público anónimo no puede mutar contenido.
+
+## Configuración
+
+```bash
+export ATLAS_BASE="https://atlas-api.1platform.pro/api/v1"   # QA: https://atlas-api-qa.1platform.pro/api/v1
+export TENANT_SLUG="your-tenant"
+export ATLAS_JWT="<operator-or-admin-access-token>"          # del inicio de sesión de administrador
+```
+
+Todos los ejemplos a continuación envían estos tres headers en cada escritura:
+
+```bash
+-H "X-Tenant-Slug: $TENANT_SLUG"
+-H "Authorization: Bearer $ATLAS_JWT"
+-H "Content-Type: application/json"
+```
+
+## Permisos
+
+Cada endpoint que muta requiere un permiso específico. Los roles se mapean a permisos del lado del servidor; un token
+que carezca del permiso obtiene `403 INSUFFICIENT_ROLE`.
+
+| Permiso | Concede |
+|---|---|
+| `content.write` | Crear y actualizar ítems; subir assets e imágenes de portada. |
+| `content.publish` | Mover un ítem a `published`. |
+| `content.delete` | Soft-delete y archivado de un ítem. |
+
+> Listar y leer ítems solo requiere una sesión autenticada de **administrador/operador** — sin permiso
+> de contenido adicional. Las mutaciones requieren el permiso nombrado arriba.
+
+## El ciclo de vida
+
+Cada ítem lleva un `status` que se mueve por una pequeña máquina de estados:
+
+```
+draft ──┐
+        ├──▶ published ──▶ archived
+scheduled┘        ▲           │
+                  └───────────┘  (re-publicar desde archived)
+```
+
+- **`draft`** — creado pero no visible en el catálogo público.
+- **`scheduled`** — preparado para su lanzamiento (visible en páginas de detalle, oculto de la grilla principal hasta estar en vivo).
+- **`published`** — en vivo y controlado por entitlement para su entrega.
+- **`archived`** — retirado; preservado en almacenamiento pero oculto del catálogo.
+
+Las transiciones se exponen como acciones explícitas:
+
+| Acción | Endpoint | Efecto |
+|---|---|---|
+| Publicar | `POST /content/items/{id}/publish` | `draft \| scheduled \| archived` → `published`. `409` si ya está `published`. |
+| Archivar | `POST /content/items/{id}/archive` | Cualquier estado → `archived`. Idempotente (re-archivar devuelve `200`). |
+| Soft-delete | `DELETE /content/items/{id}` | Cualquier estado → `archived`, el registro se preserva. Idempotente (`204`). |
+
+No hay borrado físico — `DELETE` es un archivado suave para que los enlaces, el historial de auditoría y los entitlements queden
+intactos.
+
+## Crear un ítem
+
+```bash
+curl -s -X POST "$ATLAS_BASE/content/items" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "slug": "the-time-machine",
+    "kind": "book",
+    "title": "The Time Machine",
+    "status": "draft",
+    "metadata": {
+      "summary": "A Victorian scientist travels to the year 802,701.",
+      "language": "en",
+      "year": 1895,
+      "genres": ["sci-fi", "classics"],
+      "people": [{ "name": "H. G. Wells", "role": "author" }]
+    }
+  }'
+```
+
+**Respuesta (`201`):**
+
+```json
+{
+  "id": "a3b4c5d6-…",
+  "tenant_id": "11111111-…",
+  "slug": "the-time-machine",
+  "kind": "book",
+  "title": "The Time Machine",
+  "status": "draft",
+  "cover_image_url": null,
+  "metadata": { "summary": "A Victorian scientist…", "language": "en", "year": 1895, "genres": ["sci-fi", "classics"], "people": [{ "name": "H. G. Wells", "role": "author" }] },
+  "created_at": "2026-06-20T12:00:00Z",
+  "updated_at": "2026-06-20T12:00:00Z"
+}
+```
+
+### Cuerpo de la solicitud
+
+| Campo | Requerido | Notas |
+|---|---|---|
+| `slug` | sí | 1–255 caracteres, único por tenant. Normalizado a minúsculas. `409 CONTENT_SLUG_TAKEN` ante colisión. |
+| `kind` | sí | Uno de `book`, `video`, `episode`, `live`, `podcast`, `article`. |
+| `title` | sí | 1–255 caracteres. |
+| `status` | no | Por defecto `draft`. |
+| `cover_image_url` | no | Una URL. Prefiere [subir una portada](#imágenes-de-portada) para que el archivo sea propiedad del tenant. |
+| `metadata` | no | Objeto de forma libre; las claves conocidas se validan — consulta [Metadatos](#metadatos). |
+
+## Listar ítems
+
+Listado de operador (todos los estados, incluyendo `draft` y `archived`), paginado:
+
+```bash
+curl -s "$ATLAS_BASE/content/items?page=1&page_size=20" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+```json
+{
+  "items": [ { "id": "a3b4…", "slug": "the-time-machine", "kind": "book", "title": "The Time Machine", "status": "draft", "metadata": {} } ],
+  "total": 503,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+| Param | Por defecto | Descripción |
+|---|---|---|
+| `page` | `1` | Índice de página basado en 1 (`≥ 1`). |
+| `page_size` | `20` | Ítems por página (1–100). |
+
+> Este es el listado de **operador** — devuelve cada estado. Para renderizar la grilla pública, solo de publicados y
+> filtrable para usuarios finales, usa [`GET /public/catalog`](/docs/saas/atlas-api/catalog-browsing) en su lugar.
+
+## Leer un único ítem
+
+Por id (vista de operador, cualquier estado):
+
+```bash
+curl -s "$ATLAS_BASE/content/items/$ITEM_ID" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+O por slug:
+
+```bash
+curl -s "$ATLAS_BASE/content/items/by-slug/the-time-machine" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+Un id/slug ausente para este tenant devuelve `404 { "code": "CONTENT_NOT_FOUND" }`.
+
+## Actualizar un ítem
+
+`PATCH` es una actualización parcial — envía solo los campos que quieres cambiar. Los campos omitidos (y los valores
+`null`) se dejan intactos. `id`, `tenant_id` y `created_at` son inmutables y no se aceptan.
+
+```bash
+curl -s -X PATCH "$ATLAS_BASE/content/items/$ITEM_ID" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{ "title": "The Time Machine (Annotated)", "metadata": { "tags": ["annotated"] } }'
+```
+
+Devuelve el `ContentItemOut` completo actualizado (`200`). Notas:
+
+- Cambiar `slug` revuelve a verificar la unicidad por tenant y devuelve un `409 CONTENT_SLUG_TAKEN` estable
+  en lugar de un `500` ante colisión.
+- `metadata` se **reemplaza**, no se fusiona en profundidad — envía el objeto de metadatos completo que quieres persistir.
+- Para borrar una imagen de portada, usa [`DELETE …/cover-image`](#imágenes-de-portada), no un `null` en `PATCH`
+  (para que el archivo almacenado se elimine de forma atómica junto con la columna).
+
+## Publicar, archivar, borrar
+
+```bash
+# Poner en vivo
+curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/publish" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+
+# Retirar (conserva el registro)
+curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/archive" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+
+# Borrado suave → archived (204, idempotente)
+curl -s -X DELETE "$ATLAS_BASE/content/items/$ITEM_ID" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+`publish` devuelve `409 { "code": "CONTENT_ALREADY_PUBLISHED" }` si el ítem ya está en vivo, así que puedes
+ramificar según un código estable en lugar de adivinar. `archive` y `DELETE` son idempotentes — seguros de reintentar.
+
+## Assets descargables
+
+Para tenants cuya estrategia de entrega sirve archivos (la estrategia DOWNLOAD — e-books, podcasts), adjunta
+el binario que el miembro descarga. La subida es **multipart**, así que omite el content-type JSON:
+
+```bash
+curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/assets" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT" \
+  -F "format=epub" \
+  -F "file=@the-time-machine.epub"
+```
+
+**Respuesta (`201`):**
+
+```json
+{
+  "format": "epub",
+  "key": "items/a3b4…/file.epub",
+  "size_bytes": 412300,
+  "content_type": "application/epub+zip",
+  "uploaded_at": "2026-06-20T12:05:00Z",
+  "item": { "id": "a3b4…", "slug": "the-time-machine", "status": "draft", "metadata": { "assets": { "epub": { "key": "items/a3b4…/file.epub" } } } }
+}
+```
+
+- **Formatos soportados:** `pdf`, `epub`, `mobi`, `mp3`, `m4a`. El campo `format` decide la extensión
+  almacenada; el `Content-Type` se valida contra él.
+- El archivo aterriza en la clave canónica `items/{item_id}/file.{format}`, así que la
+  [estrategia de entrega](/docs/saas/atlas-api/content-delivery) puede firmar una URL sin más cableado.
+- Re-subir el mismo `format` **sobrescribe** el payload anterior (la clave es determinista) y
+  actualiza `metadata.assets[format]`.
+
+La subida valida **antes** de leer el cuerpo, así que un desajuste falla rápido sin gastar ancho de banda:
+
+| HTTP | Code | Cuándo |
+|---|---|---|
+| `400` | `ASSET_FORMAT_INVALID` | `format` o `Content-Type` no es un tipo descargable permitido. |
+| `400` | `ASSET_STRATEGY_MISMATCH` | La estrategia de entrega del tenant o el `kind` del ítem no puede consumir una subida de archivo único en ese formato. |
+| `413` | `ASSET_TOO_LARGE` | El archivo excede el límite de tamaño configurado (la respuesta incluye `max_bytes`/`size_bytes`). |
+| `502` | `ASSET_STORAGE_FAILED` | El almacenamiento de objetos rechazó o falló la escritura (usualmente un problema de política/credencial del bucket). |
+
+## Imágenes de portada
+
+Sube una portada pública para las pantallas de catálogo y detalle. Multipart, solo JPEG/PNG/WebP:
+
+```bash
+curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/cover-image" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT" \
+  -F "file=@cover.jpg"
+```
+
+Devuelve el `ContentItemOut` actualizado (`201`) con `cover_image_url` establecido a una URL **pública** — Atlas
+lo persiste en el ítem para que las respuestas del catálogo expongan la portada sin un roundtrip de URL firmada
+por solicitud. Re-subir reemplaza el archivo anterior.
+
+Eliminar una portada (borra la columna **y** elimina el objeto almacenado; idempotente `204`):
+
+```bash
+curl -s -X DELETE "$ATLAS_BASE/content/items/$ITEM_ID/cover-image" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+| HTTP | Code | Cuándo |
+|---|---|---|
+| `400` | `COVER_IMAGE_FORMAT_INVALID` | `Content-Type` no es `image/jpeg`, `image/png` ni `image/webp`. |
+| `413` | `COVER_IMAGE_TOO_LARGE` | La imagen excede el límite de tamaño configurado. |
+| `502` | `COVER_IMAGE_STORAGE_FAILED` | El almacenamiento de objetos rechazó o falló la escritura. |
+
+## Metadatos
+
+`metadata` es un objeto de forma libre — las claves desconocidas hacen round-trip intactas — pero un conjunto de claves conocidas se
+valida y normaliza para que las pantallas de catálogo y detalle puedan apoyarse en ellas:
+
+| Clave | Tipo | Notas |
+|---|---|---|
+| `summary` | string | ≤ 4000 caracteres. |
+| `genres` | string[] | ≤ 12 entradas, en minúsculas y sin duplicados. |
+| `language` / `original_language` | string | tipo BCP, 2–12 caracteres. |
+| `year` | int | 0–2100. |
+| `runtime_minutes` | int | 0–10000. |
+| `isbn` | string | 10–17 caracteres que coincidan con `[0-9Xx-]`. |
+| `publisher` | string | ≤ 200 caracteres. |
+| `people` | object[] | `{ id?, name, role? }` — autores, narradores, directores, etc. |
+| `tags` | string[] | ≤ 40 entradas, en minúsculas y sin duplicados. |
+| `access` | object | Flags orientativas: `is_free`, `requires_subscription`, `requires_purchase`, `download_allowed`, `read_inline_allowed`. |
+
+> Las flags `access.*` son pistas **orientativas** para la UI. El acceso real siempre se hace cumplir
+> del lado del servidor por la pila de [entitlement + entrega](/docs/saas/atlas-api/entitlements) — nunca confíes en
+> estas flags para el control de acceso.
+
+## Un flujo mínimo de punta a punta
+
+```bash
+# 1. Crear como borrador
+ITEM_ID=$(curl -s -X POST "$ATLAS_BASE/content/items" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{ "slug": "the-time-machine", "kind": "book", "title": "The Time Machine" }' \
+  | jq -r '.id')
+
+# 2. Adjuntar el archivo descargable y una portada
+curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/assets" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT" \
+  -F "format=epub" -F "file=@the-time-machine.epub"
+
+curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/cover-image" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT" \
+  -F "file=@cover.jpg"
+
+# 3. Poner en vivo
+curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/publish" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+El ítem ahora aparece en [`GET /public/catalog`](/docs/saas/atlas-api/catalog-browsing) y los miembros con entitlement
+pueden generar un [ticket de reproducción](/docs/saas/atlas-api/content-delivery) para él.
+
+## Consulta también
+
+- [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing) — el lado de lectura de los mismos ítems.
+- [Entrega de contenido](/docs/saas/atlas-api/content-delivery) — convierte un ítem publicado en un ticket de reproducción.
+- [Entitlements](/docs/saas/atlas-api/entitlements) — lo que realmente controla el acceso.
+- [Errores](/docs/saas/atlas-api/errors) — el contrato completo `{ code, message }`.
+- **[Referencia interactiva de la API →](/api-reference/atlas-api)** — explora y prueba cada endpoint.

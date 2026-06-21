@@ -1,0 +1,153 @@
+---
+title: Inicio rápido
+description: Resuelve un tenant, inicia sesión con un magic link, explora el catálogo y genera tu primer ticket de reproducción en la Atlas API en minutos.
+sidebar_position: 2
+---
+
+# Inicio rápido
+
+Este recorrido te lleva de cero a una integración funcional con la **Atlas API**: elige un entorno,
+resuelve un tenant, inicia la sesión de un miembro con un magic link, explora el catálogo público y genera un ticket de
+reproducción para un ítem con entitlement.
+
+> Atlas es multitenant. **Cada** solicitud está acotada a un tenant resuelto del lado del servidor a partir del
+> header `Host` (o un override explícito `X-Tenant-Slug`) — consulta
+> [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution). Nunca pones un id de tenant en el cuerpo.
+
+## 1. Establece tu URL base
+
+```bash
+# Producción
+export ATLAS_BASE="https://atlas-api.1platform.pro/api/v1"
+
+# QA / staging
+# export ATLAS_BASE="https://atlas-api-qa.1platform.pro/api/v1"
+
+# El tenant contra el que estás integrando, por slug o por su dominio primario:
+export TENANT_SLUG="your-tenant"
+```
+
+Consulta [Entornos](/docs/saas/atlas-api/environments) para la lista completa.
+
+## 2. Resuelve el tenant (verificación opcional)
+
+El endpoint de branding público confirma que tu tenant se resuelve y devuelve su arquetipo y configuración:
+
+```bash
+curl -s "$ATLAS_BASE/tenants/by-host?host=library.example.com"
+```
+
+```json
+{
+  "id": "9d1c…",
+  "slug": "your-tenant",
+  "name": "Example Library",
+  "archetype": "library",
+  "primary_domain": "library.example.com",
+  "config": { "appearance": "light" },
+  "is_active": true
+}
+```
+
+## 3. Inicia la sesión de un miembro (magic link → JWT)
+
+Atlas autentica a los miembros con un **magic link sin contraseña**. Solicita el enlace, el miembro hace clic
+en él (entregando un token de un solo uso), y luego intercambia ese token por una sesión JWT.
+
+```bash
+# (a) Emite el magic link — el miembro recibe un email
+curl -s -X POST "$ATLAS_BASE/auth/magic-link" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "reader@example.com", "return_url": "/me/library" }'
+
+# (b) Intercambia el token de un solo uso (del enlace del email) por una sesión
+curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Content-Type: application/json" \
+  -d '{ "token": "<TOKEN_FROM_EMAIL_LINK>" }'
+```
+
+```json
+{
+  "member_id": "1f2e…",
+  "access_token": "<JWT_ACCESS_TOKEN>",
+  "refresh_token": "<JWT_REFRESH_TOKEN>",
+  "expires_in": 86400,
+  "member": { "id": "1f2e…", "email": "reader@example.com", "tenant_id": "9d1c…" },
+  "roles": ["fan"]
+}
+```
+
+Guarda el token de acceso y envíalo en las llamadas posteriores:
+
+```bash
+export ATLAS_JWT="<JWT_ACCESS_TOKEN>"
+```
+
+Todos los detalles (refresco, sesiones, inicio de sesión de administrador) en [Autenticación](/docs/saas/atlas-api/authentication).
+
+## 4. Explora el catálogo
+
+El catálogo es público (anónimo) y está acotado al tenant:
+
+```bash
+curl -s "$ATLAS_BASE/public/catalog?page=1&page_size=20" \
+  -H "X-Tenant-Slug: $TENANT_SLUG"
+```
+
+```json
+{
+  "items": [
+    {
+      "id": "a3b4…",
+      "slug": "the-time-machine",
+      "kind": "book",
+      "title": "The Time Machine",
+      "status": "published",
+      "cover_image_url": "https://…/covers/the-time-machine.jpg",
+      "coming_soon": false,
+      "metadata": { "author": "H. G. Wells" }
+    }
+  ],
+  "total": 502,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+Más patrones de consulta en [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing).
+
+## 5. Genera un ticket de reproducción
+
+Con un JWT, solicita un **ticket de reproducción** de corta duración para un ítem. Atlas verifica el
+entitlement del miembro primero, y luego devuelve una URL firmada (o un envoltorio HLS, dependiendo del arquetipo del tenant):
+
+```bash
+curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=epub" \
+  -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+```json
+{
+  "content_id": "a3b4…",
+  "delivery_kind": "signed_url",
+  "url": "https://storage.example/…?signature=…&expires=…",
+  "expires_in_seconds": 600,
+  "drm_token": null,
+  "renderable": true,
+  "render_format": "epub"
+}
+```
+
+Un miembro sin acceso obtiene `403 { "code": "ENTITLEMENT_DENIED" }`. Consulta
+[Entitlements](/docs/saas/atlas-api/entitlements) y [Entrega de contenido](/docs/saas/atlas-api/content-delivery).
+
+## Próximos pasos
+
+- [Autenticación](/docs/saas/atlas-api/authentication) — ciclo de vida del magic link, refresco, roles.
+- [Claves de integración](/docs/saas/atlas-api/integration-keys) — acceso de servicio a servicio.
+- [Webhooks](/docs/saas/atlas-api/webhooks) — recibe eventos de entitlement.
+- [Errores](/docs/saas/atlas-api/errors) — el contrato `{ code, message }`.
+- **[Referencia interactiva de la API →](/api-reference/atlas-api)** — explora y prueba cada endpoint.

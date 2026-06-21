@@ -1,0 +1,106 @@
+---
+title: Recibir notificaciones
+description: Payload canónico del webhook saliente, enum de status y mapeo de la FSM del lado del comercio.
+sidebar_position: 3
+---
+
+# Recibir notificaciones
+
+Cuando una transacción transiciona a un estado terminal, 1Platform dispara un
+webhook a la URL que configuraste para ese evento (consulta
+[Configurar URLs](./configuring-urls)).
+
+## Payload canónico {#canonical-payload}
+
+Si configuraste el manejador de eventos **sin** un `body_template`, el payload
+sigue esta forma canónica:
+
+```json
+{
+  "event": "on_approved",
+  "transaction_id": "65a1b2c3d4e5f6789abcdef0",
+  "external_transaction_id": "MIGOGT123456",
+  "status": "approved",
+  "amount": 78.00,
+  "currency": "GTQ",
+  "merchant_amount": 10.00,
+  "merchant_currency": "USD",
+  "metadata": { "order_id": "...", "campaign_id": "..." },
+  "merchant_reference": "bower_order_xyz",
+  "reference": "GT123456",
+  "timestamp": "2026-04-29T10:35:00+00:00"
+}
+```
+
+Si configuraste un `body_template`, el dispatcher emite lo que tú definiste —
+el cuerpo canónico es el **valor por defecto** cuando renuncias al uso de plantillas.
+
+## Referencia de campos
+
+| Campo | Origen | Úsalo para |
+|---|---|---|
+| `event` | 1Platform | Enrutamiento dentro de tu manejador cuando una URL atiende los cinco eventos |
+| `transaction_id` | 1Platform | Correlacionar con el `data.id` que almacenaste al momento de crear |
+| `external_transaction_id` | proveedor upstream | Tickets de soporte del operador — el valor que muestra el panel del proveedor |
+| `status` | 1Platform | Estado final de la transacción. Ver el enum más abajo |
+| `amount` | moneda del proveedor | Solo informativo — el monto que cobró el proveedor upstream |
+| `currency` | moneda del proveedor | El código de moneda del proveedor (p. ej. `GTQ`) |
+| `merchant_amount` | **tu** moneda | **Úsalo para el ledger**. El monto que cotizaste originalmente |
+| `merchant_currency` | tu moneda | P. ej. `USD` |
+| `metadata` | reflejado | El objeto de forma libre que enviaste al momento de crear |
+| `merchant_reference` | reflejado | El ID de forma libre que enviaste al crear. Úsalo como clave determinista para idempotencia |
+| `reference` | proveedor upstream | Referencia interna del proveedor (p. ej. ID de autorización de la tarjeta) |
+| `timestamp` | 1Platform | Hora de la última actualización de la transacción (ISO 8601 con offset) |
+
+:::warning[amount vs merchant_amount]
+El campo `amount` está en la moneda del **proveedor** (a menudo GTQ) porque el
+procesador de pagos upstream convierte USD a GTQ al momento del cobro. **Nunca
+acredites a un vendedor usando `amount`** — usa `merchant_amount` +
+`merchant_currency`. El `amount` es informativo; el tipo de cambio es opaco para
+el comercio.
+:::
+
+## Enum de status
+
+| `status` entrante | ¿Final? | Significado |
+|---|---|---|
+| `created` | No | Transacción creada, el comprador aún no ha pagado (no se dispara webhook para este estado) |
+| `approved` | Sí | El comprador pagó; los fondos se liquidaron |
+| `denied` | Sí | Tarjeta rechazada |
+| `cancelled` | Sí | El comprador canceló antes de pagar |
+| `expired` | Sí | La URL de pago expiró |
+| `dismiss` | Sí | El comprador cerró la ventana de pago |
+
+## Mapeo de la FSM del lado del comercio
+
+La mayoría de los marketplaces solo necesitan tres estados (`pending`, `paid`,
+`failed`). Mapea los cinco valores terminales de `status` así:
+
+| `status` del proveedor | Estado de la FSM del comercio |
+|---|---|
+| `approved` | `paid` (y procede al cumplimiento) |
+| `denied` | `failed` |
+| `cancelled` | `failed` |
+| `expired` | `failed` |
+| `dismiss` | `failed` |
+
+Si implementas reembolsos fuera de banda (vía el panel del operador), exponlos
+como un estado adicional `refunded`; aún no hay un webhook automático para
+reembolsos. Consulta [la nota dedicada en payments-and-subscriptions](../flows/payments-and-subscriptions#refunds).
+
+## El envoltorio de respuesta difiere del resto de la API
+
+Los payloads de webhooks salientes **no** se envuelven en `{ success, data, msg }`.
+Son objetos planos (canónicos o con plantilla). Esto refleja lo que la mayoría de
+los integradores esperan de un receptor de webhooks y se mantiene compatible con
+la firma HMAC sobre el cuerpo crudo. Consulta [formato de respuesta](../reference/response-format)
+para la regla completa.
+
+## Idempotencia del lado del comercio {#idempotency-on-the-merchant-side}
+
+1Platform entrega los webhooks at-least-once con reintentos — consulta
+[Reintentos y entrega](./retry-and-delivery). Tu manejador **debe** deduplicar.
+
+La clave de deduplicación recomendada es `(transaction_id, event)`. Si fijas
+`merchant_reference` al momento de crear, también puedes deduplicar por
+`(merchant_reference, event)` para alinearte con tus propios IDs de pedido.

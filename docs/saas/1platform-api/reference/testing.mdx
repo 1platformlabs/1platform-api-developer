@@ -1,0 +1,90 @@
+---
+title: Pruebas
+description: Tenants en sandbox, números de tarjeta de prueba y reproducción de webhooks contra localhost.
+sidebar_position: 6
+---
+
+# Pruebas
+
+Recetas prácticas para integrar sin tocar dinero real ni usuarios reales.
+
+## Tenant en sandbox
+
+URL base de QA: `https://api-qa.1platform.pro/api/v1`. Solicita credenciales a través de
+tu gestor de cuenta — recibirás una clave `ak-` (aplicación) y `sk-` (usuario)
+limitada solo a QA. Consulta [Entornos](./environments) para las diferencias.
+
+## Números de tarjeta de prueba
+
+El sandbox del proveedor de pagos integrado acepta los números de prueba Visa
+estándar:
+
+| Número | Resultado |
+|---|---|
+| `4111 1111 1111 1111` | Aprobada (`status: "approved"`) |
+| `4000 0000 0000 0002` | Rechazada (`status: "denied"`) |
+| `4000 0000 0000 0119` | Expirada (`status: "expired"`) |
+
+Usa cualquier fecha de expiración futura y cualquier CVV de 3 dígitos.
+
+## Reproducir webhooks contra localhost
+
+Tres pasos:
+
+1. **Crea un túnel a localhost.** Ejecuta `ngrok http 3000` (o `smee`, `cloudflared`, etc.)
+   para exponer tu manejador local en una URL pública.
+2. **Registra la URL pública.**
+   ```bash
+   curl -X POST "$BASE_URL/webhooks/config/domains" \
+     -H "Authorization: Bearer $APP_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"domain": "abc123.ngrok-free.app"}'
+
+   curl -X PUT "$BASE_URL/webhooks/config/events" \
+     -H "Authorization: Bearer $APP_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "on_approved": { "url": "https://abc123.ngrok-free.app/webhooks/payments", "method": "POST" }
+     }'
+   ```
+3. **Dispara una transacción** en QA con `4111 1111 1111 1111` y observa cómo el
+   webhook llega a tu manejador local.
+
+## Reproducir cargas útiles capturadas sin conexión
+
+Una vez que hayas capturado una carga útil real (headers + cuerpo), puedes reproducirla
+contra tu manejador sin pasar por la API:
+
+```bash
+curl -X POST http://localhost:3000/webhooks/payments \
+  -H "X-Webhook-Signature: sha256=..." \
+  -H "X-Webhook-Timestamp: 1714389600" \
+  -H "Content-Type: application/json" \
+  --data-binary @captured.json
+```
+
+:::caution[Las reproducciones expiran después de 5 minutos]
+Las cargas útiles capturadas pasan la verificación de firma solo dentro de la ventana de reproducción.
+Si necesitas reproducir la misma carga útil una y otra vez (p. ej. mientras depuras
+tu manejador), amplía temporalmente la ventana en tu verificador de **pruebas** — nunca
+en prod.
+:::
+
+## Pruebas de humo
+
+Prueba de humo mínima para una nueva integración:
+
+1. Genera tokens de aplicación + usuario (`POST /auth/token`, `POST /users/token`).
+2. `GET /users/billing` y confirma que `data.billing.payment_gateway_id` no sea
+   null. Si es null, consulta [solución de problemas](./troubleshooting).
+3. `POST /users/transactions` con `merchant_reference` establecido a una cadena
+   única.
+4. Abre la `payment_url` devuelta en un navegador; paga con la tarjeta de prueba
+   aprobada.
+5. Verifica que tu manejador de webhooks reciba `event: on_approved` con el mismo
+   `merchant_reference`.
+6. Confirma que la verificación de firma pasa y que tu manejador deduplica correctamente
+   en una reproducción forzada.
+
+Si algún paso falla, la entrada correspondiente de [solución de problemas](./troubleshooting)
+debería explicar qué revisar.

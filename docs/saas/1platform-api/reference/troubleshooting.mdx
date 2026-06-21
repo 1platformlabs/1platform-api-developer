@@ -1,0 +1,85 @@
+---
+title: Solución de problemas
+description: Modos de fallo comunes y no evidentes — organizados por síntoma.
+sidebar_position: 5
+---
+
+# Solución de problemas
+
+Esta página está organizada por **síntoma**, para que puedas buscar el error que estás
+viendo en lugar de adivinar la causa raíz.
+
+## "Obtengo 502 Bad Gateway con HTML al crear una transacción"
+
+**Lo más probable:** tu tenant no tiene una pasarela de pago configurada. Desde el
+2026-04-29 la API devuelve **`422`** con JSON `data.code: PAYMENT_GATEWAY_NOT_CONFIGURED`
+en lugar de `502 HTML`.
+
+Si aún ves HTML 502:
+1. Llama a `GET /health` y confirma que el despliegue incluye la corrección
+   (`version >= 0.x.x`).
+2. Inspecciona `GET /users/billing` — `data.billing.payment_gateway_id` debería ser
+   no null.
+3. Si es null, configura una pasarela a través del dashboard del operador y vuelve a crear la
+   transacción.
+
+## "401 en cada llamada aunque mi clave es válida"
+
+Dos causas comunes:
+
+1. **Discordancia de entorno.** Las claves de QA no se autentican contra prod ni
+   viceversa. Consulta [Entornos](./environments) — inspecciona el header `Host:`
+   que tu cliente envía.
+2. **Clave truncada.** Las claves recién emitidas llevan prefijos `ak-` / `sk-`. Copia
+   la cadena completa incluyendo el prefijo; las claves heredadas sin prefijo aún
+   funcionan mediante búsqueda por coincidencia exacta.
+
+## "La verificación de firma de mi webhook sigue fallando"
+
+Tres trampas:
+
+1. **Re-serializar el cuerpo.** 1Platform firma la re-serialización canónica
+   del cuerpo, pero debes verificar contra los **bytes crudos** que llegaron por
+   la red. Usa `request.body` / `php://input` / `express.raw()` de Express —
+   nunca `JSON.stringify(JSON.parse(body))`.
+2. **Desfase de reloj.** El material firmado incluye el header `X-Webhook-Timestamp`.
+   Rechaza cualquier cosa más antigua de 5 minutos. Sincronizar tus servidores con NTP
+   previene la mayoría de los falsos positivos de la ventana de reproducción.
+3. **Comparar el prefijo.** Elimina el prefijo `sha256=` de `X-Webhook-Signature`
+   **antes** de comparar. No lo incluyas en el valor calculado.
+
+Consulta [seguridad de webhooks](../webhooks/security) para código de verificación en tres lenguajes.
+
+## "Estoy alcanzando 429 en desarrollo"
+
+Probablemente estás generando un token nuevo en cada solicitud. Los endpoints de auth
+están limitados a 10 / min. Guarda los tokens en caché por `expires_in - 60s` y reutilízalos
+en todas las llamadas — consulta el
+[patrón de caché de tokens](../flows/payments-and-subscriptions#token-caching-pattern).
+
+## "El webhook llegó pero mi manejador se ejecutó dos veces"
+
+Los webhooks se entregan **al menos una vez**. Tu manejador debe ser idempotente.
+Deduplica con `(transaction_id, event)` — consulta
+[recibir notificaciones → idempotencia](../webhooks/receiving-notifications#idempotency-on-the-merchant-side).
+
+## "Roté el secreto del webhook y ahora los webhooks legítimos fallan la verificación"
+
+El secreto antiguo se invalida de inmediato cuando llamas a
+`POST /webhooks/config/rotate-secret`. Los webhooks en vuelo firmados con el secreto
+antiguo fallarán la verificación de tu lado.
+
+Mitigación: conserva el secreto anterior en tu verificador durante **24 horas** (acepta
+cualquiera de los dos) antes de eliminarlo. Consulta
+[seguridad de webhooks → rotación de secretos](../webhooks/security#secret-rotation).
+
+## "El `amount` de la transacción se ve 7-8 veces más grande que lo que envié"
+
+Estás leyendo la **moneda del proveedor** (a menudo GTQ) en lugar de la moneda del
+comercio (USD). La carga útil del webhook incluye ambas:
+
+- `amount` + `currency` — la moneda del proveedor upstream
+- `merchant_amount` + `merchant_currency` — lo que originalmente enviaste
+
+**Acredita siempre a tu vendedor usando `merchant_amount`.** El campo `amount` es
+solo informativo — la tasa de cambio es opaca y se aplica al momento del cargo.

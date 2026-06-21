@@ -1,0 +1,464 @@
+---
+title: "Operaciones de administración"
+description: "Flujo paso a paso para gestionar usuarios del tenant, ajustes de la App, lecturas agregadas, suplantación y métricas mediante la API de administración de 1Platform."
+sidebar_position: 22
+---
+
+# Flujo: Operaciones de administración
+
+## Vista general
+
+Este flujo documenta la **superficie de administración del tenant** (`/api/v1/admin/*`) — los endpoints que un administrador de espacio de trabajo usa para gestionar su propio tenant: listar/invitar/actualizar usuarios, editar los ajustes de la App, rotar la API key del espacio de trabajo, ejecutar lecturas agregadas (negocios, facturas, transacciones, dominios, trabajos, registros), emitir tokens de suplantación de corta duración y obtener métricas a nivel de tenant.
+
+Cada endpoint está protegido por el **rol `app_admin`**. Un usuario debe tener este rol para su App antes de que cualquier llamada a `/admin/*` tenga éxito. Las búsquedas entre tenants devuelven **404**, nunca 403, de modo que nunca se filtra la existencia de recursos fuera del alcance del actor.
+
+**Caso de uso:** Construir un panel de administración del espacio de trabajo — invitar a compañeros, auditar la actividad, solucionar problemas con los datos de un cliente "viendo como" él, rotar la API key de integración tras una filtración.
+
+**Resultado final:** Control programático completo de un único espacio de trabajo, con suplantación apta para auditoría y un límite estricto de tenant en cada lectura.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) perteneciente a una cuenta que tenga el rol `app_admin` |
+| Rol `app_admin` asignado | El administrador inicial de `provision_app` ya lo tiene; de lo contrario, un administrador existente debe otorgarlo mediante `PATCH /admin/users/{id}` |
+
+### Headers requeridos para todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+:::tip
+El rol `app_admin` está **acotado al tenant**. Es distinto del flag `is_superadmin` a nivel de plataforma, que protege `/api/v1/platform/*`. Un superadmin puede, además, llamar a cualquier endpoint `/admin/*` de cualquier tenant (el guard hace un short-circuit para él); un `app_admin` normal solo ve su propio espacio de trabajo.
+:::
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-admin-abc123"
+APP_TOKEN=""              # Obtenido en el Paso 0
+USER_TOKEN=""             # Obtenido en el Paso 1
+TARGET_USER_ID=""         # Capturado en el Paso 2 (listar usuarios)
+IMPERSONATION_TOKEN=""    # Capturado en el Paso 6
+NEW_API_KEY=""            # Capturado en el Paso 5
+```
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+```bash
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d "{\"apiKey\":\"$APP_API_KEY\"}" \
+  | jq -r '.data.access_token')
+```
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario administrador.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+```bash
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"apiKey\":\"$USER_API_KEY\"}" \
+  | jq -r '.data.access_token')
+```
+
+:::note
+Si el usuario NO tiene el rol `app_admin`, **cada** solicitud a `/admin/*` de abajo devuelve `403 Forbidden` con `"Tenant admin privileges required"`.
+:::
+
+---
+
+### Paso 2 — Listar usuarios
+
+**Objetivo:** Paginar los usuarios del espacio de trabajo, opcionalmente filtrados por término de búsqueda, estado o nombre de rol.
+
+**Endpoint:** `GET /api/v1/admin/users`
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `page` | int (1–1000) | 1 | Página indexada desde 1 |
+| `page_size` | int (1–200) | 50 | Elementos por página |
+| `search` | string | — | Coincidencia por prefijo contra email + username (anclada por regex, escapada) |
+| `status` | `active` \| `inactive` | — | Filtrar por estado de activación |
+| `role` | string | — | Filtrar por nombre de rol (p. ej. `app_admin`) |
+
+```bash
+curl -s "$BASE_URL/admin/users?page=1&page_size=25&search=alice" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta de ejemplo:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 12,
+    "page": 1,
+    "page_size": 25,
+    "items": [
+      {
+        "id": "507f1f77bcf86cd799439011",
+        "email": "alice@acme.example",
+        "username": "alice",
+        "is_active": true,
+        "role_ids": ["507f1f77bcf86cd799439020"],
+        "verified_at": "2026-05-12T08:14:02Z",
+        "created_at": "2026-05-10T11:22:00Z"
+      }
+    ]
+  },
+  "msg": "Users retrieved"
+}
+```
+
+---
+
+### Paso 3 — Invitar a un usuario
+
+**Objetivo:** Emitir una invitación por magic link mediante email. Idempotente sobre el email; las reinvitaciones simplemente generan un enlace nuevo.
+
+**Endpoint:** `POST /api/v1/admin/users/invite`
+
+**Límite de tasa:** 10 invitaciones / hora por llamante.
+
+```bash
+curl -s -X POST "$BASE_URL/admin/users/invite" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"newcomer@acme.example"}'
+```
+
+**Respuesta de ejemplo (202 Accepted):**
+
+```json
+{
+  "success": true,
+  "data": { "email": "newcomer@acme.example" },
+  "msg": "Invite dispatched"
+}
+```
+
+:::warning
+Si el email del magic link no puede enviarse (p. ej. proveedor de correo caído), el endpoint devuelve **502 Bad Gateway** e invalida en la base de datos el enlace recién emitido. Reintenta la llamada cuando el servicio upstream esté sano. No se filtra ningún token desde el cuerpo de la respuesta, y el enlace huérfano se consume para que no pueda reproducirse desde los registros.
+:::
+
+---
+
+### Paso 4 — Modificar un usuario (patch)
+
+**Objetivo:** Alternar la activación o reemplazar la lista de roles del usuario.
+
+**Endpoint:** `PATCH /api/v1/admin/users/{user_id}`
+
+**Campos del cuerpo (todos opcionales, al menos uno requerido):**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `is_active` | bool | Alternar la activación. `false` desactiva al usuario de forma suave (soft-deactivate). |
+| `role_ids` | string[] | Reemplazar la lista de roles. Los ids de rol fuera del alcance del tenant se rechazan con `400`. |
+
+```bash
+curl -s -X PATCH "$BASE_URL/admin/users/$TARGET_USER_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"is_active": false}'
+```
+
+**Salvaguardas:**
+
+- **409 Conflict — "Cannot remove the last active app_admin"** cuando la modificación dejaría al tenant con cero administradores activos.
+- **404 Not Found** cuando el usuario objetivo no está en el tenant del llamante.
+
+---
+
+### Paso 5 — Rotar la API key del espacio de trabajo
+
+**Objetivo:** Emitir una nueva `api_key` de App. Se devuelve **una sola vez** — guárdala de inmediato.
+
+**Endpoint:** `POST /api/v1/admin/app/keys/rotate`
+
+**Límite de tasa:** 3 rotaciones / hora.
+
+```bash
+ROTATE_RESP=$(curl -s -X POST "$BASE_URL/admin/app/keys/rotate" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN")
+
+NEW_API_KEY=$(echo "$ROTATE_RESP" | jq -r '.data.api_key')
+```
+
+**Respuesta de ejemplo (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "api_key": "ak-NEW-shiny-key-shown-once",
+    "rotated_at": "2026-05-20T13:42:00Z"
+  },
+  "msg": "App api_key rotated"
+}
+```
+
+:::warning
+**La nueva clave invalida inmediatamente todos los tokens de integración activos.** Actualiza tus pipelines de CI y la configuración del plugin de WordPress antes de que se dispare el siguiente tick del cron. La respuesta incluye `Cache-Control: no-store`, de modo que los intermediarios nunca deberían cachear el cuerpo.
+:::
+
+---
+
+### Paso 6 — Suplantar a un usuario
+
+**Objetivo:** Emitir un JWT de 15 minutos que el administrador puede usar como el `x-user-token` del usuario objetivo. El id del administrador original se preserva en el claim `impersonated_by` del token para la atribución de auditoría.
+
+**Endpoint:** `POST /api/v1/admin/users/{user_id}/impersonate`
+
+**Límite de tasa:** 5 suplantaciones / hora.
+
+```bash
+IMP_RESP=$(curl -s -X POST "$BASE_URL/admin/users/$TARGET_USER_ID/impersonate" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason":"debug customer issue #4242"}')
+
+IMPERSONATION_TOKEN=$(echo "$IMP_RESP" | jq -r '.data.access_token')
+```
+
+**Respuesta de ejemplo:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "token_type": "bearer",
+    "expires_in": 900,
+    "target_user_id": "507f1f77bcf86cd799439011",
+    "impersonated_by": "507f1f77bcf86cd799439099",
+    "expires_at": "2026-05-20T13:57:00Z"
+  },
+  "msg": "Impersonation token issued"
+}
+```
+
+**Salvaguardas (todas devuelven 4xx):**
+
+| Caso | Estado | Detalle |
+|---|---|---|
+| Auto-suplantación | 400 | `"Cannot impersonate yourself"` |
+| Objetivo no está en el tenant | 404 | `"Resource not found"` |
+| El objetivo es el dueño de la App | 403 | `"Cannot impersonate the app owner"` |
+| El objetivo es otro administrador | 403 | `"Cannot impersonate another tenant admin"` |
+
+**Usar el token:**
+
+```bash
+# Las solicitudes posteriores llevan el JWT de suplantación como x-user-token.
+curl -s "$BASE_URL/users/me" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $IMPERSONATION_TOKEN"
+```
+
+:::warning
+Los tokens de suplantación son **rechazados** en un conjunto curado de endpoints sensibles — `/auth/*`, `/auth-user/*`, `/admin/*`, `/platform/*`, `/billing/*`, `/payments/*` y `/users/me/api-key`. El administrador no puede rotar las credenciales del objetivo, recargar su saldo ni anidar otra suplantación mientras "ve como" él.
+
+El token también se revoca automáticamente cuando:
+- el **actor** es desactivado, degradado fuera de `app_admin` o movido a un tenant diferente
+- el **objetivo** rota sus tokens (logout/revocación incrementa su `token_version`)
+:::
+
+---
+
+### Paso 7 — Lecturas agregadas
+
+**Objetivo:** Obtener listas acotadas al tenant a lo largo del catálogo de recursos sin filtrar datos entre tenants. Cada endpoint pagina con `page` + `page_size`.
+
+| Endpoint | Notas |
+|---|---|
+| `GET /admin/businesses?owner_user_id=…` | Filtro opcional por usuario propietario |
+| `GET /admin/invoices?status=draft|emitted|cancelled` | |
+| `GET /admin/transactions?status=created|approved|denied|cancelled|expired` | |
+| `GET /admin/domains` | |
+| `GET /admin/jobs?status=pending|running|completed|failed|cancelled` | |
+| `GET /admin/logs?provider=&success=true|false` | |
+
+```bash
+curl -s "$BASE_URL/admin/invoices?page=1&page_size=50&status=emitted" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta de ejemplo:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 87,
+    "page": 1,
+    "page_size": 50,
+    "items": [
+      {
+        "id": "660ab4f9-ce11-4d50-a8d4-7a2c1b30ee10",
+        "user_id": "507f1f77bcf86cd799439011",
+        "status": "emitted",
+        "total": 1234.56,
+        "currency": "GTQ",
+        "created_at": "2026-05-19T10:30:00Z"
+      }
+    ]
+  },
+  "msg": "Invoices retrieved"
+}
+```
+
+:::note
+Los elementos de la respuesta se proyectan contra una **lista de campos permitidos (allowlist)** por recurso del lado del servidor. Las nuevas columnas agregadas a los documentos subyacentes no se filtran automáticamente a través de `/admin/*` — deben incluirse explícitamente en la allowlist.
+:::
+
+---
+
+### Paso 8 — Métricas del tenant
+
+**Objetivo:** Obtener una instantánea de la actividad del espacio de trabajo para los widgets del dashboard.
+
+**Endpoint:** `GET /api/v1/admin/metrics`
+
+```bash
+curl -s "$BASE_URL/admin/metrics" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta de ejemplo:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "users_total": 18,
+    "users_active": 16,
+    "businesses_total": 4,
+    "invoices_mtd": 87,
+    "credits_consumed_mtd": 412.5,
+    "jobs_running": 2,
+    "jobs_failed_24h": 0,
+    "top_users": [
+      { "user_id": "507f...", "email": "alice@acme.example", "calls": 1240 }
+    ],
+    "generated_at": "2026-05-20T13:42:01Z"
+  },
+  "msg": "Metrics retrieved"
+}
+```
+
+:::note
+La respuesta se **cachea en memoria durante 60 segundos por tenant**. Las llamadas sucesivas dentro de esa ventana devuelven la misma instantánea — útil para dashboards que se refrescan en un intervalo corto.
+:::
+
+---
+
+## Manejo de errores
+
+| HTTP | Cuándo |
+|---|---|
+| **401** | Token ausente / expirado / revocado |
+| **403** | El usuario autenticado no tiene `app_admin`, o el objetivo es el dueño / otro administrador (suplantación) |
+| **404** | Recurso no está en el tenant del llamante (NUNCA 403 — no se filtra la existencia) |
+| **409** | Eliminación del dueño, degradación del último administrador, colisión de slug |
+| **429** | Limitado por tasa (`10/h` invitaciones, `5/h` suplantaciones, `3/h` rotaciones, `30/min` escrituras, `60/min` lecturas) |
+| **502** | Falló el envío del email de magic link durante la invitación |
+
+Cada endpoint envuelve las respuestas en el sobre estándar:
+
+```json
+{ "success": true|false, "data": …, "msg": "human-readable status" }
+```
+
+Las respuestas de error establecen `data: null` y colocan la descripción en `msg`.
+
+---
+
+## Buenas prácticas
+
+- **Audita la suplantación.** Etiqueta tus registros de acceso con el claim `impersonated_by` del payload del JWT para que cada acción tenga un actor atribuible incluso cuando el sujeto del token sea el usuario objetivo.
+- **Confirma antes de rotar.** Muestra un modal de confirmación antes de llamar a `POST /admin/app/keys/rotate` — la nueva clave se muestra una sola vez y la antigua se invalida de inmediato.
+- **No consultes las métricas con más frecuencia que una vez por minuto.** El endpoint ya cachea durante 60 s, así que un sondeo más rápido devuelve el mismo payload y desperdicia el presupuesto de tasa que podrías necesitar en otro lugar.
+- **Detecta bloqueos del último administrador en el cliente.** Antes de enviar `PATCH` con `is_active: false` sobre un administrador conocido, cuenta los administradores activos del espacio de trabajo (con `?role=app_admin&status=active`) y deshabilita la acción cuando el conteo sea 1. El backend también lo rechazará con 409, pero la retroalimentación de UX se muestra mejor de forma anticipada.
+- **Rechaza la suplantación cuando tu token de sesión local sea desconocido.** Un cliente que guarda una cadena vacía como el "token original" no podrá restaurar la sesión del administrador al salir. Lee el token de acceso actual desde tu capa de almacenamiento antes de emitir la suplantación; aborta si es `null`.
+
+---
+
+## Ejemplo de extremo a extremo
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-admin-abc123"
+
+# 0. Token de aplicación
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d "{\"apiKey\":\"$APP_API_KEY\"}" | jq -r '.data.access_token')
+
+# 1. Token de usuario
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"apiKey\":\"$USER_API_KEY\"}" | jq -r '.data.access_token')
+
+AUTH=(-H "Authorization: Bearer $APP_TOKEN" -H "x-user-token: $USER_TOKEN")
+
+# 2. Listar usuarios
+curl -s "$BASE_URL/admin/users?page=1&page_size=10" "${AUTH[@]}" | jq '.data.items[].email'
+
+# 3. Invitar a un nuevo compañero
+curl -s -X POST "$BASE_URL/admin/users/invite" \
+  "${AUTH[@]}" -H "Content-Type: application/json" \
+  -d '{"email":"newcomer@acme.example"}' | jq
+
+# 4. Obtener una instantánea de métricas
+curl -s "$BASE_URL/admin/metrics" "${AUTH[@]}" | jq '.data | {users_total, users_active, jobs_running}'
+
+# 5. Rotar la clave del espacio de trabajo (comentado — esto invalida los tokens activos)
+# curl -s -X POST "$BASE_URL/admin/app/keys/rotate" "${AUTH[@]}" | jq '.data.api_key'
+```
+
+---
+
+## Flujos relacionados
+
+- [Autenticación con magic link](./magic-link-authentication.mdx) — el magic link enviado por `/admin/users/invite` consume el mismo endpoint de verificación.
+- [Registros de actividad](./activity-logs.mdx) — `/admin/logs` es la proyección acotada al tenant de la misma colección `ApiLog` subyacente.
+- [Pagos y suscripciones](./payments-and-subscriptions.mdx) — los administradores pueden leer transacciones mediante `/admin/transactions` pero no pueden disparar flujos de pago mientras suplantan.

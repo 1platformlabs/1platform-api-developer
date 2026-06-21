@@ -15,42 +15,42 @@ const APP = 'https://app.1platform.pro';
 
 const columns: FooterColumn[] = [
   {
-    title: 'Solutions',
+    title: 'Soluciones',
     links: [
-      {label: 'Online Store', href: `${WEBSITE}/solutions/online-store/`},
-      {label: 'Website Builder', href: `${WEBSITE}/solutions/website/`},
-      {label: 'AI Content', href: `${WEBSITE}/solutions/content/`},
-      {label: 'Whitelabel Dashboard', href: `${WEBSITE}/solutions/whitelabel/`},
-      {label: 'Payments & Invoicing', href: `${WEBSITE}/payments-invoicing/`},
-      {label: 'For Agencies', href: `${WEBSITE}/for-agencies/`},
-      {label: 'For Developers', href: `${WEBSITE}/for-developers/`},
-      {label: 'All Solutions', href: `${WEBSITE}/solutions/`},
+      {label: 'Tienda online', href: `${WEBSITE}/solutions/online-store/`},
+      {label: 'Creador de sitios web', href: `${WEBSITE}/solutions/website/`},
+      {label: 'Contenido con IA', href: `${WEBSITE}/solutions/content/`},
+      {label: 'Panel white-label', href: `${WEBSITE}/solutions/whitelabel/`},
+      {label: 'Pagos y facturación', href: `${WEBSITE}/payments-invoicing/`},
+      {label: 'Para agencias', href: `${WEBSITE}/for-agencies/`},
+      {label: 'Para desarrolladores', href: `${WEBSITE}/for-developers/`},
+      {label: 'Todas las soluciones', href: `${WEBSITE}/solutions/`},
     ],
   },
   {
-    title: 'Resources',
+    title: 'Recursos',
     links: [
-      {label: 'Documentation', href: `${DEVELOPER}/`},
-      {label: 'API Reference', href: `${DEVELOPER}/api-docs`},
-      {label: 'Code Examples', href: `${DEVELOPER}/`},
+      {label: 'Documentación', href: `${DEVELOPER}/`},
+      {label: 'Referencia de la API', href: `${DEVELOPER}/api-docs`},
+      {label: 'Ejemplos de código', href: `${DEVELOPER}/`},
       {label: 'Blog', href: `${WEBSITE}/blog/`},
       {label: 'Changelog', href: `${WEBSITE}/changelog/`},
     ],
   },
   {
-    title: 'Company',
+    title: 'Empresa',
     links: [
-      {label: 'About', href: `${WEBSITE}/about/`},
-      {label: 'For Developers', href: `${WEBSITE}/for-developers/`},
-      {label: 'Pricing', href: `${WEBSITE}/pricing/`},
+      {label: 'Acerca de', href: `${WEBSITE}/about/`},
+      {label: 'Para desarrolladores', href: `${WEBSITE}/for-developers/`},
+      {label: 'Precios', href: `${WEBSITE}/pricing/`},
     ],
   },
   {
     title: 'Legal',
     links: [
-      {label: 'Terms of Service', href: `${WEBSITE}/terms/`},
-      {label: 'Privacy Policy', href: `${WEBSITE}/privacy/`},
-      {label: 'Cookie Policy', href: `${WEBSITE}/cookies/`},
+      {label: 'Términos del servicio', href: `${WEBSITE}/terms/`},
+      {label: 'Política de privacidad', href: `${WEBSITE}/privacy/`},
+      {label: 'Política de cookies', href: `${WEBSITE}/cookies/`},
     ],
   },
 ];
@@ -62,16 +62,16 @@ export default function Footer(): ReactNode {
     <footer className={styles.footer}>
       <div className={styles.container}>
         <div className={styles.cta}>
-          <h2 className={styles.ctaTitle}>Stop Juggling 6 Different Services</h2>
+          <h2 className={styles.ctaTitle}>Deja de hacer malabares con 6 servicios distintos</h2>
           <p className={styles.ctaLead}>
-            Start with one platform. Sell online, issue invoices, and publish content — all from one dashboard, one API, one bill.
+            Empieza con una sola plataforma. Vende en línea, emite facturas y publica contenido, todo desde un panel, una API y una sola factura.
           </p>
           <div className={styles.ctaActions}>
             <Link to={`${APP}/app/?intent=store`} className={styles.btnPrimary}>
-              Launch Your Store
+              Lanza tu tienda
             </Link>
             <Link to={`${DEVELOPER}/`} className={styles.btnGhost}>
-              View Documentation
+              Ver documentación
             </Link>
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function Footer(): ReactNode {
         <hr className={styles.divider} />
 
         <div className={styles.bottom}>
-          <p>&copy; {year} 1Platform Labs. All rights reserved.</p>
+          <p>&copy; {year} 1Platform Labs. Todos los derechos reservados.</p>
         </div>
       </div>
     </footer>

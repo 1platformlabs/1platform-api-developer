@@ -1,0 +1,441 @@
+---
+title: "Autenticación con Magic Link"
+description: "Flujo paso a paso para autenticar a usuarios finales mediante magic link por correo, intercambiar el token por un par de access/refresh, rotar tokens de refresco y revocar sesiones a través de la 1Platform API."
+sidebar_position: 16
+---
+
+# Flujo: Autenticación con Magic Link
+
+## Vista general
+
+Este flujo documenta cómo iniciar sesión de usuarios sin contraseña mediante un **magic link** enviado a su correo, intercambiar el token del enlace por un par de tokens de access/refresh, rotar los tokens antes de que expiren y revocarlos al cerrar sesión.
+
+Esta es una alternativa al flujo de API key usado por integraciones servidor a servidor. La autenticación con magic link está pensada para clientes de usuario final (web, móvil) que necesitan tokens de acceso de corta duración acotados a un usuario específico, con rotación de tokens de refresco para sesiones de larga duración.
+
+**Caso de uso:** Iniciar sesión de usuarios en un dashboard whitelabel o una app móvil sin gestionar contraseñas.
+
+**Resultado final:** El usuario queda autenticado, el cliente conserva un token de acceso fresco más un token de refresco para renovar, y un endpoint de cierre de sesión puede revocar ambos en cualquier momento.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+| Envío de correo configurado | La app debe tener credenciales de envío de correo configuradas para entregar el magic link |
+| Cuenta de usuario existente | El correo debe pertenecer a un usuario ya registrado en la app |
+
+### Headers requeridos en todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+Content-Type: application/json
+```
+
+:::note
+Los endpoints de magic link solo requieren el **token de aplicación** — el objetivo de este flujo es justamente obtener tokens de usuario, así que aún no tienes uno. El header opcional `x-user-token` en `/auth/user/logout` se envía al revocar la sesión activa.
+:::
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+APP_TOKEN=""           # Obtenido en el Paso 0
+USER_EMAIL="maria@example.com"
+MAGIC_LINK_TOKEN=""    # Capturado del enlace del correo en el Paso 2
+ACCESS_TOKEN=""        # Obtenido en el Paso 3
+REFRESH_TOKEN=""       # Obtenido en el Paso 3
+```
+
+---
+
+## Datos requeridos por paso
+
+### Solicitud de magic link
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `email` | string | Sí | Dirección de correo del usuario — debe estar ya registrada |
+
+### Verificación de magic link
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `token` | string | Sí | Token de un solo uso incluido en la cadena de consulta del enlace del correo |
+
+### Refresh / Logout
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `token` | string | Sí | El token de refresco (o el token de acceso, para `/logout`) |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` faltante o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Solicitar un magic link
+
+**Objetivo:** Disparar un correo con un enlace de inicio de sesión de un solo uso a la bandeja de entrada del usuario.
+
+**Endpoint:** `POST /api/v1/auth/user/magic-link/request`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/auth/user/magic-link/request" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "'$USER_EMAIL'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": null,
+  "msg": "If the email exists, a magic link has been sent"
+}
+```
+
+:::tip
+La respuesta es intencionalmente genérica — no revela si el correo está registrado. Esto evita la enumeración de cuentas. Muestra siempre un mensaje neutral del tipo "Revisa tu bandeja de entrada" en la interfaz.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | Formato de correo faltante o inválido | Envía un cuerpo válido `{"email": "..."}` |
+| 429 | Demasiadas solicitudes de magic link para el mismo correo | Espera y reintenta — informa al usuario con cortesía |
+
+---
+
+### Paso 2 — El usuario hace clic en el enlace del correo
+
+El correo contiene un enlace con la forma:
+
+```
+https://app.example.com/auth/callback?token=eyJhbGciOiJIUzI1NiIs...
+```
+
+Tu cliente extrae el parámetro de consulta `token` y lo usa en el siguiente paso. El token es de **un solo uso** y **expira** rápidamente (típicamente 15 minutos).
+
+:::warning
+Este paso ocurre en el cliente de correo y el navegador del usuario — no hay llamada a la API desde tu backend. No intentes consumir el token desde tu servidor a menos que también redirijas al usuario; de lo contrario el enlace se quemará antes de que llegue a tu dashboard.
+:::
+
+---
+
+### Paso 3 — Intercambiar el token del magic link
+
+**Objetivo:** Intercambiar el token de un solo uso del magic link por un par de tokens access + refresh.
+
+**Endpoint:** `POST /api/v1/auth/user/magic-link/verify`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/auth/user/magic-link/verify" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$MAGIC_LINK_TOKEN'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "Magic-link verified, tokens issued"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$ACCESS_TOKEN` (úsalo como `x-user-token` para endpoints protegidos) y `data.refresh_token` como `$REFRESH_TOKEN`. El token de acceso expira en 30 minutos; el token de refresco tiene una vida útil mayor, configurada por app.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Token mal formado | Verifica que el token se haya extraído correctamente de la URL del correo |
+| 410 | Token ya usado o expirado | Solicita un nuevo magic link mediante el Paso 1 |
+| 422 | Campo `token` faltante | Envía `{"token": "..."}` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error del servidor durante la verificación | Reintenta con backoff exponencial |
+
+---
+
+### Paso 4 — Usar el token de acceso para llamadas protegidas
+
+El token de acceso devuelto en el Paso 3 ES el token de usuario que usa cualquier otro endpoint de 1Platform. Pásalo mediante el header `x-user-token` (junto con el token de aplicación en `Authorization`):
+
+```bash
+curl -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $ACCESS_TOKEN"
+```
+
+:::tip
+El token de acceso de este flujo es intercambiable con el token de usuario de `POST /users/token` — ambos son JWT que portan el mismo claim `user_id`. Elige el flujo de magic link para interfaces de usuario final y el flujo de API key para integraciones servidor a servidor.
+:::
+
+---
+
+### Paso 5 — Rotar el token de refresco antes de que expire
+
+**Objetivo:** Intercambiar el token de refresco por un nuevo par access + refresh, extendiendo la sesión del usuario sin forzar un nuevo inicio de sesión.
+
+**Endpoint:** `POST /api/v1/auth/user/refresh`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/auth/user/refresh" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "Tokens rotated successfully"
+}
+```
+
+:::warning
+El token de refresco anterior queda **invalidado** en el momento en que se emite uno nuevo. Reemplaza `$REFRESH_TOKEN` de inmediato y nunca reutilices el antiguo — las repeticiones devuelven **409 Conflict**.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Token mal formado | Verifica que el token de refresco no se haya truncado |
+| 409 | Token de refresco ya rotado (repetición) | Fuerza al usuario a reautenticarse mediante el Paso 1 |
+| 422 | Campo `token` faltante | Envía `{"token": "..."}` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error del servidor | Reintenta con backoff exponencial |
+
+---
+
+### Paso 6 — Cerrar sesión (revocar un token)
+
+**Objetivo:** Revocar un token de acceso o de refresco activo. El token ya no podrá usarse después de esta llamada.
+
+**Endpoint:** `POST /api/v1/auth/user/logout`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $ACCESS_TOKEN` (opcional)
+
+```bash
+curl -X POST "$BASE_URL/auth/user/logout" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "revoked": true
+  },
+  "msg": "Token revoked successfully"
+}
+```
+
+:::note
+Puedes revocar el token de acceso o el token de refresco. Buena práctica: revoca el token de **refresco** en el cuerpo y el token de **acceso** mediante el header `x-user-token` en la misma llamada para invalidar por completo la sesión.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Token ya inválido o desconocido | Trátalo como un cierre de sesión exitoso — se alcanzó el estado deseado |
+| 422 | Campo `token` faltante | Envía `{"token": "..."}` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes. El token del magic link se captura manualmente porque el usuario hace clic en el enlace del correo en su navegador.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+USER_EMAIL="maria@example.com"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Solicitar un magic link ===
+curl -s -X POST "$BASE_URL/auth/user/magic-link/request" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "'$USER_EMAIL'"}' | jq
+
+# === PASO 2: El usuario hace clic en el enlace del correo ===
+# Captura el token de la cadena de consulta de la URL y asígnalo manualmente:
+# MAGIC_LINK_TOKEN="eyJhbGciOi..." (pégalo desde el enlace)
+MAGIC_LINK_TOKEN="paste-the-token-from-the-email-here"
+
+# === PASO 3: Verificar el magic link, obtener tokens access + refresh ===
+TOKENS=$(curl -s -X POST "$BASE_URL/auth/user/magic-link/verify" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$MAGIC_LINK_TOKEN'"}')
+
+ACCESS_TOKEN=$(echo "$TOKENS" | jq -r '.data.access_token')
+REFRESH_TOKEN=$(echo "$TOKENS" | jq -r '.data.refresh_token')
+
+echo "ACCESS_TOKEN: $ACCESS_TOKEN"
+echo "REFRESH_TOKEN: $REFRESH_TOKEN"
+
+# === PASO 4: Usar el token de acceso para endpoints protegidos ===
+curl -s -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $ACCESS_TOKEN" | jq
+
+# === PASO 5: Rotar el token de refresco ===
+ROTATED=$(curl -s -X POST "$BASE_URL/auth/user/refresh" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}')
+
+ACCESS_TOKEN=$(echo "$ROTATED" | jq -r '.data.access_token')
+REFRESH_TOKEN=$(echo "$ROTATED" | jq -r '.data.refresh_token')
+
+# === PASO 6: Cerrar sesión ===
+curl -s -X POST "$BASE_URL/auth/user/logout" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}' | jq
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+- `/auth/user/magic-link/request` está limitado por tasa pero por lo demás es idempotente — llamadas repetidas dentro de una ventana corta devuelven la misma respuesta sin enviar correos duplicados.
+- `/auth/user/magic-link/verify` **no** es idempotente — el token del magic link es de un solo uso. Trata la respuesta como el resultado autoritativo.
+- `/auth/user/refresh` **no** es idempotente — cada llamada rota e invalida el token de refresco anterior.
+- `/auth/user/logout` es idempotente en espíritu — revocar un token ya revocado devuelve el mismo estado final (o 401 — maneja ambos casos).
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta. NO reintentes solicitudes de magic link de forma agresiva — eso inunda la bandeja del usuario.
+- Si recibes **500** o un **timeout** en `/refresh`, NO reintentes a ciegas — tu token de refresco puede ya haber sido rotado. Reautentica mediante el Paso 1 si tienes dudas.
+- Ante un **401** durante llamadas normales a la API, intenta un único refresco mediante el Paso 5 antes de forzar un nuevo inicio de sesión.
+
+### Timeouts
+- Configura timeouts de cliente de 10 segundos en la solicitud/verificación del magic link (para dar margen al encolado de correo).
+- Configura timeouts de 5 segundos en `/refresh` y `/logout`.
+
+### Tokens
+- Los **tokens de magic link** expiran rápidamente (~15 minutos) y son de un solo uso.
+- Los **tokens de acceso** expiran en 30 minutos (1800 segundos).
+- Los **tokens de refresco** tienen una vida útil mayor, configurada por app — rótalos proactivamente antes de que expiren.
+- Almacena los tokens de refresco en **cookies httpOnly seguras** o en almacenamiento seguro de la plataforma (Keychain, Keystore) — nunca en `localStorage`.
+
+### Validaciones importantes
+- La misma dirección de correo está limitada por tasa en el endpoint de magic link para prevenir abusos — aplica backoff cuando se devuelva 429 y muestra un mensaje amistoso en la interfaz.
+- Trata siempre un 410 en `/verify` como "el usuario debe solicitar un nuevo enlace" en lugar de un error duro.
+- Un 409 en `/refresh` es una señal fuerte de repetición del token de refresco (posible robo de token) — invalida todas las sesiones del usuario mediante `POST /api/v1/users/revoke-tokens` y fuerza un nuevo inicio de sesión.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/auth/user/magic-link/request` | Enviar el magic link al correo |
+| 3 | `POST` | `/api/v1/auth/user/magic-link/verify` | Intercambiar el token del magic link por access + refresh |
+| 5 | `POST` | `/api/v1/auth/user/refresh` | Rotar el token de refresco |
+| 6 | `POST` | `/api/v1/auth/user/logout` | Revocar un token |
+
+---
+
+## Checklist rápido
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Solicité un magic link para el correo del usuario
+- [ ] El usuario hizo clic en el enlace del correo y mi cliente capturó el parámetro de consulta `token`
+- [ ] Intercambié el token del magic link por tokens access + refresh
+- [ ] Llamé exitosamente a un endpoint protegido con el token de acceso
+- [ ] Roté el token de refresco al menos una vez antes de cerrar sesión
+- [ ] Revoqué la sesión mediante `/auth/user/logout` al cerrar sesión

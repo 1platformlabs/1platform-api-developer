@@ -1,0 +1,179 @@
+---
+title: Ejemplos de código
+description: Implementaciones de receptores listas para producción en Python (FastAPI), TypeScript (Express) y PHP (estilo Laravel).
+sidebar_position: 6
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Ejemplos de código
+
+Receptores de webhooks de extremo a extremo que verifican la firma, deduplican por
+`(transaction_id, event)` y encolan el cumplimiento para procesamiento asíncrono.
+
+<Tabs groupId="lang" queryString>
+<TabItem value="python" label="Python (FastAPI)">
+
+```python
+import hmac
+import hashlib
+import time
+import os
+
+from fastapi import FastAPI, Header, HTTPException, Request, status
+
+app = FastAPI()
+WEBHOOK_SECRET = os.environ["WEBHOOK_SECRET"]
+REPLAY_WINDOW = 300  # segundos
+
+# Reemplaza con un SET de Redis en producción
+SEEN: set[tuple[str, str]] = set()
+
+
+def verify(body: bytes, signature: str, ts: str, secret: str) -> bool:
+    if not signature.startswith("sha256="):
+        return False
+    try:
+        ts_int = int(ts)
+    except ValueError:
+        return False
+    if abs(time.time() - ts_int) > REPLAY_WINDOW:
+        return False
+    expected = signature.removeprefix("sha256=")
+    signed = f"{ts}.".encode() + body
+    actual = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, actual)
+
+
+@app.post("/webhooks/payments", status_code=status.HTTP_200_OK)
+async def receive_webhook(
+    request: Request,
+    x_webhook_signature: str = Header(...),
+    x_webhook_timestamp: str = Header(...),
+):
+    body = await request.body()
+    if not verify(body, x_webhook_signature, x_webhook_timestamp, WEBHOOK_SECRET):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid signature")
+
+    payload = await request.json()
+    key = (payload["transaction_id"], payload["event"])
+    if key in SEEN:
+        return {"status": "duplicate"}
+    SEEN.add(key)
+
+    # Ack rápido — difiere el cumplimiento a una cola en segundo plano
+    # await queue.enqueue(payload)
+    return {"status": "ok"}
+```
+
+</TabItem>
+<TabItem value="ts" label="TypeScript (Express)">
+
+```ts
+import express from "express";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const app = express();
+const SECRET = process.env.WEBHOOK_SECRET!;
+const REPLAY_WINDOW = 300; // segundos
+
+const seen = new Set<string>();
+
+// IMPORTANTE: captura el cuerpo crudo antes del parseo JSON
+app.use(
+  "/webhooks/payments",
+  express.raw({ type: "application/json", limit: "1mb" }),
+);
+
+function verify(body: Buffer, sig: string, ts: string, secret: string) {
+  if (!sig.startsWith("sha256=")) return false;
+  const tsInt = Number.parseInt(ts, 10);
+  if (!Number.isFinite(tsInt)) return false;
+  if (Math.abs(Date.now() / 1000 - tsInt) > REPLAY_WINDOW) return false;
+
+  const expected = sig.slice("sha256=".length);
+  const signed = Buffer.concat([Buffer.from(`${ts}.`), body]);
+  const actual = createHmac("sha256", secret).update(signed).digest("hex");
+  return (
+    expected.length === actual.length &&
+    timingSafeEqual(Buffer.from(expected), Buffer.from(actual))
+  );
+}
+
+app.post("/webhooks/payments", (req, res) => {
+  const sig = req.header("X-Webhook-Signature") ?? "";
+  const ts = req.header("X-Webhook-Timestamp") ?? "";
+  if (!verify(req.body as Buffer, sig, ts, SECRET)) {
+    return res.status(401).json({ error: "invalid signature" });
+  }
+
+  const payload = JSON.parse((req.body as Buffer).toString("utf8"));
+  const key = `${payload.transaction_id}:${payload.event}`;
+  if (seen.has(key)) return res.json({ status: "duplicate" });
+  seen.add(key);
+
+  // queue.enqueue(payload);
+  res.json({ status: "ok" });
+});
+
+app.listen(3000);
+```
+
+:::tip[Captura el cuerpo crudo]
+Express parsea JSON de forma anticipada por defecto, lo que pierde la igualdad
+byte a byte. Monta `express.raw` solo para la ruta del webhook.
+:::
+
+</TabItem>
+<TabItem value="php" label="PHP">
+
+```php
+<?php
+// /webhooks/payments — asume un router que te entrega el cuerpo crudo de la solicitud.
+const REPLAY_WINDOW = 300;
+
+function verify(string $body, string $sig, string $ts, string $secret): bool {
+    if (strpos($sig, 'sha256=') !== 0) return false;
+    $tsInt = (int) $ts;
+    if (abs(time() - $tsInt) > REPLAY_WINDOW) return false;
+
+    $expected = substr($sig, strlen('sha256='));
+    $actual = hash_hmac('sha256', $ts . '.' . $body, $secret);
+    return hash_equals($expected, $actual);
+}
+
+$rawBody = file_get_contents('php://input');
+$sig = $_SERVER['HTTP_X_WEBHOOK_SIGNATURE'] ?? '';
+$ts  = $_SERVER['HTTP_X_WEBHOOK_TIMESTAMP'] ?? '';
+$secret = getenv('WEBHOOK_SECRET');
+
+if (!verify($rawBody, $sig, $ts, $secret)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'invalid signature']);
+    exit;
+}
+
+$payload = json_decode($rawBody, true);
+// Reemplaza con una caché real (Redis, Memcached o un índice único en la BD)
+$cacheKey = "webhook:{$payload['transaction_id']}:{$payload['event']}";
+if (apcu_exists($cacheKey)) {
+    echo json_encode(['status' => 'duplicate']);
+    exit;
+}
+apcu_store($cacheKey, true, 86400);
+
+// queue->dispatch($payload);
+echo json_encode(['status' => 'ok']);
+```
+
+</TabItem>
+</Tabs>
+
+## Qué debe hacer todo receptor
+
+1. **Verificar el HMAC contra los bytes crudos** — nunca re-parsees el JSON antes de verificar.
+2. **Rechazar por skew de la ventana de replay** — rechaza cualquier cosa fuera de ±5 minutos.
+3. **Comparación de tiempo constante** — nunca uses `==`.
+4. **Deduplicar por `(transaction_id, event)`** — los webhooks son at-least-once.
+5. **Acusar recibo con 2xx rápidamente** — difiere el trabajo pesado a una cola en segundo plano.

@@ -1,0 +1,68 @@
+---
+title: Vista general de la integración de webhooks
+description: Cómo funcionan los webhooks salientes — eventos, ciclo de vida y la secuencia completa de comprador a comercio.
+sidebar_position: 1
+---
+
+# Vista general de la integración de webhooks
+
+1Platform envía callbacks HTTP firmados a tu backend cada vez que un pago cambia
+de estado. Esto evita el polling y te permite cumplir pedidos, enviar recibos o
+actualizar tu CRM casi en tiempo real.
+
+## Entrantes vs salientes
+
+| Dirección | Endpoint | Quién llama | Auth |
+|---|---|---|---|
+| **Entrante** (proveedor → 1Platform) | `POST /api/v1/webhooks/transactions` | Proveedor de pagos upstream | Verificado con HMAC dentro de la API |
+| **Saliente** (1Platform → comercio) | Cualquier URL que registres vía `PUT /api/v1/webhooks/config/events` | 1Platform | Firmado con HMAC; lo verificas antes de confiar |
+
+Esta sección trata exclusivamente sobre la ruta **saliente**. La ruta entrante es
+un detalle de implementación — solo ves sus consecuencias.
+
+## Eventos del ciclo de vida
+
+Cada transacción puede disparar uno de cinco eventos terminales:
+
+| Evento | Significado |
+|---|---|
+| `on_approved` | El comprador pagó; los fondos se liquidaron |
+| `on_denied` | Tarjeta rechazada |
+| `on_cancelled` | El comprador abandonó la ventana de checkout |
+| `on_expired` | El `payment_url` expiró antes del pago |
+| `on_dismiss` | El comprador cerró el overlay de pago |
+
+Configuras una URL distinta por evento vía `PUT /webhooks/config/events`. Las
+cinco pueden apuntar al mismo endpoint — el campo `event` del cuerpo canónico te
+indica cuál se disparó.
+
+## Secuencia de extremo a extremo
+
+```mermaid
+sequenceDiagram
+  participant B as Buyer
+  participant M as Merchant backend
+  participant P as 1Platform API
+  participant U as Upstream provider
+
+  B->>M: Clic en "Pagar"
+  M->>P: POST /users/transactions { amount, metadata, merchant_reference }
+  P->>U: Crear transacción
+  U-->>P: { id, payment_url }
+  P-->>M: 201 { id, payment_url, status: "created" }
+  M-->>B: Redirige a payment_url
+  B->>U: Completar pago
+  U-->>P: Webhook entrante /webhooks/transactions { externalId, status: "approved" }
+  P->>P: Actualiza Transaction.status = approved
+  P->>M: Webhook saliente on_approved { transaction_id, status, ... }
+  M-->>P: 200 OK
+  P->>P: Acredita ledger / cumple pedido
+```
+
+## Qué leer a continuación
+
+1. [Seguridad de webhooks](./security) — esquema HMAC, encabezados, protección contra replay.
+2. [Recibir notificaciones](./receiving-notifications) — forma del payload canónico, enum de status, FSM.
+3. [Configurar URLs](./configuring-urls) — registro de dominios, manejadores de eventos, rotación del secreto.
+4. [Reintentos y entrega](./retry-and-delivery) — semántica at-least-once, backoff, dead-letter.
+5. [Ejemplos de código](./code-samples) — verificadores en Python, TypeScript, PHP.

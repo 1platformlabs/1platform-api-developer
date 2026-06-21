@@ -1,0 +1,82 @@
+---
+title: Buenas prácticas
+description: Guía de producción para integrar la Atlas API — acotamiento por tenant, ciclo de vida del token, entrega impulsada por entitlements, webhooks idempotentes, caché y manejo de errores.
+sidebar_position: 14
+---
+
+# Buenas prácticas
+
+Patrones que hacen que una integración con la **Atlas API** sea correcta, resiliente y segura en producción. Cada uno
+enlaza a la página que cubre los mecanismos en profundidad.
+
+## Acotamiento por tenant
+
+- **Acota siempre cada solicitud.** Usa `Host` para tráfico de navegador/dominio y `X-Tenant-Slug` para
+  llamadas de servidor a servidor. Nunca pongas un id de tenant en el cuerpo — Atlas resuelve el tenant del lado del servidor
+  e ignora las pistas del cuerpo. Consulta [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution).
+- **Mantén tokens y solicitudes en el mismo tenant.** Un JWT o una clave de integración está ligada a un tenant;
+  presentarla contra un tenant distinto se rechaza.
+- **Maneja `TENANT_UNRESOLVED` con elegancia** — usualmente significa un `Host` mal configurado o un slug
+  desconocido, no un error del servidor.
+
+## Tokens y sesiones
+
+- **Trata los tokens de acceso como de corta duración.** Usa el token de refresco para generar nuevos pares; solo recurre a
+  un nuevo magic link cuando el refresco falle. Consulta [Autenticación](/docs/saas/atlas-api/authentication).
+- **No solicites un magic link por solicitud.** Reutiliza la sesión durante toda su vida útil.
+- **Guarda los secretos como secretos.** Las claves de integración (`ak-int-…`) actúan por todo un tenant — mantenlas fuera
+  del código del cliente, los logs y el control de versiones. Rótalas (revoca + reemite) si se filtran.
+- **Usa la capacidad más estrecha.** Emite [claves de integración](/docs/saas/atlas-api/integration-keys)
+  solo con las capacidades que el servicio necesita.
+
+## Entrega y entitlements
+
+- **Explora de forma anónima, entrega autenticado.** El catálogo y el detalle de ítem no necesitan token; solo
+  la [entrega de contenido](/docs/saas/atlas-api/content-delivery) requiere un JWT y un entitlement.
+- **Trata las URL de reproducción como efímeras.** Obtén el ticket justo antes de la reproducción, no caches ni compartas
+  la `url` firmada, y vuelve a generarla cuando transcurra `expires_in_seconds`.
+- **Activa los paywalls desde `ENTITLEMENT_DENIED`.** Un `403` con ese código es la señal para mostrar un
+  flujo de checkout, no un toast de error.
+- **Reconcilia tras el checkout con una sola llamada a `refresh`.** El miembro puede regresar antes de que el webhook
+  llegue; `entitlements/refresh` es idempotente — llámalo una vez en lugar de hacer polling. Consulta
+  [Entitlements](/docs/saas/atlas-api/entitlements).
+
+## Webhooks
+
+- **Firma el cuerpo crudo.** Calcula el HMAC sobre los bytes exactos de la solicitud (`"{timestamp}." + body`);
+  re-serializar rompe la verificación. Consulta [Webhooks](/docs/saas/atlas-api/webhooks).
+- **Envía un id de evento estable.** Atlas deduplica por `(provider, event_id)`, así que un id estable hace que los reintentos
+  sean seguros — un replay devuelve `deduplicated: true` sin volver a aplicar el cambio.
+- **Reintenta solo ante errores `5xx`/de red.** Un `2xx` (incluyendo una deduplicación) significa que Atlas tiene el evento;
+  reintentarlo solo lo vuelve a reproducir.
+- **Corrige los payloads parciales aguas arriba.** Los eventos que carecen de `tenant_id`/`member_id` (o de scope en un grant) se
+  reconocen como no-op y no se vuelven a procesar.
+
+## Caché y límites de uso
+
+- **Cachea lecturas públicas de cambio lento** (catálogo, detalle de ítem, branding) en tu lado y en el CDN.
+- **Aplica debounce al type-ahead** contra `GET /public/suggest`.
+- **Aplica backoff ante `429`** con backoff exponencial + jitter; reintenta solo lecturas idempotentes. Consulta
+  [Límites de uso](/docs/saas/atlas-api/rate-limits).
+
+## Manejo de errores
+
+- **Ramifica según `code`, no según `message`.** Los códigos son estables; los mensajes pueden reformularse. Lee
+  `body.code ?? body.detail?.code` para cubrir ambas formas de envoltorio. Consulta
+  [Errores](/docs/saas/atlas-api/errors).
+- **Degrada, no colapses, ante hipos del proveedor.** Un `503 PROVIDER_UNAVAILABLE` de una verificación de entitlement
+  o un hipo de búsqueda (que devuelve resultados vacíos) debería renderizar un estado amigable, no un fallo
+  duro.
+- **Mapea estados a UX:** `401` → re-autenticar, `403`+`ENTITLEMENT_DENIED` → paywall, `404` → no encontrado,
+  `429` → backoff.
+
+## Entornos
+
+- **Construye primero contra QA** (`atlas-api-qa.1platform.pro`); sus datos están aislados de producción.
+- **Obtén el contrato desde OpenAPI.** Genera clientes/tipos desde `…/openapi.json` en lugar de
+  codificar las formas a mano. Consulta [Entornos](/docs/saas/atlas-api/environments).
+
+## Consulta también
+
+- **[Referencia interactiva de la API →](/api-reference/atlas-api)** — cada endpoint, en vivo.
+- [Vista general](/docs/saas/atlas-api/overview) — cómo encaja Atlas en la plataforma más amplia.

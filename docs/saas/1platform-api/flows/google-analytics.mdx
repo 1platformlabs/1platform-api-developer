@@ -1,0 +1,1055 @@
+---
+title: "Google Analytics"
+description: "Flujo paso a paso para conectar Google Analytics 4, aprovisionar propiedades, instalar el seguimiento, ver métricas y enviar eventos del lado del servidor a través de la 1Platform API."
+sidebar_position: 10
+---
+
+# Flujo: Google Analytics
+
+## Vista general
+
+Este flujo documenta cómo integrar Google Analytics 4 (GA4) con tus sitios web a través de la 1Platform API. Cubre la autorización OAuth, el aprovisionamiento de propiedades, la instalación de la etiqueta de seguimiento, la obtención de métricas (vista general, en tiempo real, por página), dimensiones personalizadas, eventos clave y eventos del lado del servidor mediante el Measurement Protocol.
+
+**Caso de uso:** Conecta los sitios web de tus usuarios a Google Analytics 4, aprovisiona automáticamente propiedades con dimensiones personalizadas y eventos clave, obtén métricas de tráfico y envía eventos de conversión del lado del servidor — todo a través de una API unificada.
+
+**Resultado final:** Una propiedad GA4 totalmente aprovisionada con el seguimiento instalado, dimensiones personalizadas para contenido con IA, eventos clave para conversiones y acceso a métricas de vista general, en tiempo real y por página.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Sitio web registrado | Primero se debe registrar un sitio web mediante `POST /users/websites` |
+| Cuenta de Google | El usuario necesita una cuenta de Google con acceso a Google Analytics |
+
+### Headers requeridos en todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""       # Obtenido en el Paso 0
+USER_TOKEN=""      # Obtenido en el Paso 1
+WEBSITE_ID=""      # De un sitio web ya registrado
+ACCOUNT_ID=""      # Obtenido en el Paso 3
+PROPERTY_ID=""     # Obtenido en el Paso 5
+```
+
+---
+
+## Datos requeridos para aprovisionar analytics
+
+### Solicitud de configuración
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `website_id` | string | Sí | ID del sitio web para el que aprovisionar analytics |
+| `account_id` | string | Sí | ID de la cuenta de analytics (formato: `accounts/123456789`) |
+| `timezone` | string | No | Zona horaria de la propiedad (por defecto: `"America/Guatemala"`) |
+| `currency` | string | No | Código de moneda ISO 4217 (por defecto: `"GTQ"`) |
+| `create_content_dimensions` | boolean | No | Crear dimensiones personalizadas para contenido con IA (por defecto: `true`) |
+| `create_key_events` | boolean | No | Crear eventos clave por defecto (por defecto: `true`) |
+| `create_mp_secret` | boolean | No | Crear el secreto del Measurement Protocol (por defecto: `true`) |
+
+### Evento del Measurement Protocol
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `website_id` | string | Sí | ID del sitio web |
+| `event_name` | string | Sí | Nombre del evento del lado del servidor |
+| `params` | object | No | Parámetros del evento (pares clave-valor) |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` faltante o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` faltante | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Iniciar la autorización OAuth
+
+**Objetivo:** Generar una URL de consentimiento OAuth para que el usuario autorice el acceso a su cuenta de Google Analytics. La URL usa PKCE por seguridad.
+
+**Endpoint:** `GET /api/v1/analytics/oauth/authorize`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/oauth/authorize?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=..."
+  },
+  "msg": "Open this URL to authorize analytics"
+}
+```
+
+:::note
+Abre `data.authorize_url` en un popup del navegador. Después de que el usuario concede el permiso, el callback de OAuth (`GET /analytics/oauth/callback`) maneja el intercambio del código automáticamente y envía un `postMessage` a la ventana que lo abrió.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 2b — Verificar el estado de OAuth
+
+**Objetivo:** Verificar que la conexión OAuth se estableció correctamente.
+
+**Endpoint:** `GET /api/v1/analytics/oauth/status`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/oauth/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "connected": true,
+    "email": "user@example.com",
+    "status": "connected",
+    "authorized_at": "2026-03-28T10:30:00Z"
+  },
+  "msg": "OAuth status"
+}
+```
+
+:::note
+Espera hasta que `data.connected` sea `true` antes de avanzar a los siguientes pasos. Si es `false`, el usuario aún no ha completado el flujo OAuth — redirígelo de nuevo a la URL de autorización.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (30 req/min) | Espera y reintenta |
+
+---
+
+### Paso 3 — Listar cuentas de analytics
+
+**Objetivo:** Listar todas las cuentas de Google Analytics accesibles para el usuario autorizado. Se usa para seleccionar una cuenta para el aprovisionamiento de la propiedad.
+
+**Endpoint:** `GET /api/v1/analytics/accounts`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/accounts?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "name": "accounts/123456789",
+      "display_name": "My Account"
+    }
+  ],
+  "msg": "Analytics accounts"
+}
+```
+
+:::note
+Guarda el valor `name` deseado (p. ej., `"accounts/123456789"`) como `$ACCOUNT_ID` para usarlo en el paso de configuración.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (30 req/min) | Espera y reintenta |
+
+---
+
+### Paso 4 — Aprovisionar la propiedad de analytics
+
+**Objetivo:** Crear una nueva propiedad GA4 para el sitio web. El aprovisionamiento se ejecuta en segundo plano — consulta `GET /analytics/status` para verificar su finalización.
+
+**Endpoint:** `POST /api/v1/analytics/setup`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/analytics/setup" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "website_id": "'$WEBSITE_ID'",
+    "account_id": "'$ACCOUNT_ID'",
+    "timezone": "America/Guatemala",
+    "currency": "GTQ",
+    "create_content_dimensions": true,
+    "create_key_events": true,
+    "create_mp_secret": true
+  }'
+```
+
+**Respuesta (202):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "property_id": "properties/123456789",
+    "measurement_id": "G-ABCDEF1234",
+    "status": "provisioning"
+  },
+  "msg": "Analytics provisioning started. Poll GET /status for completion."
+}
+```
+
+:::note
+Guarda `data.property_id` como `$PROPERTY_ID` y `data.measurement_id` para la instalación de la etiqueta de seguimiento. El aprovisionamiento se ejecuta de forma asíncrona — consulta `GET /analytics/status` hasta que el estado cambie a `"active"`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 409 | Analytics ya activo para este sitio web | Usa la propiedad existente; revisa `GET /analytics/status` |
+| 422 | Error de validación — formato de `account_id` inválido | Debe coincidir con el patrón `accounts/\d+` |
+| 429 | Límite de tasa excedido o cooldown de aprovisionamiento (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 5 — Verificar el estado de analytics
+
+**Objetivo:** Consultar el estado del aprovisionamiento hasta que la propiedad esté activa.
+
+**Endpoint:** `GET /api/v1/analytics/status`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "active",
+    "property_id": "properties/123456789",
+    "measurement_id": "G-ABCDEF1234"
+  },
+  "msg": "Analytics status"
+}
+```
+
+:::tip
+**Intervalo de sondeo recomendado:** 3 segundos. El campo `status` transita por: `provisioning` → `active` (o `error`).
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (30 req/min) | Espera y reintenta |
+
+---
+
+### Paso 6 — Obtener detalles de la propiedad
+
+**Objetivo:** Obtener información detallada sobre la propiedad de analytics aprovisionada.
+
+**Endpoint:** `GET /api/v1/analytics/property`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/property?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "property_id": "properties/123456789",
+    "display_name": "My Website",
+    "timezone": "America/Guatemala",
+    "currency": "GTQ"
+  },
+  "msg": "Property details"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (30 req/min) | Espera y reintenta |
+
+---
+
+### Paso 7 — Listar flujos de datos
+
+**Objetivo:** Listar todos los flujos de datos configurados para la propiedad de analytics. Cada flujo corresponde a una fuente de datos web.
+
+**Endpoint:** `GET /api/v1/analytics/streams`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/streams?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "stream_id": "dataStreams/987654321",
+      "measurement_id": "G-ABCDEF1234",
+      "display_name": "Web Stream"
+    }
+  ],
+  "msg": "Data streams"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (30 req/min) | Espera y reintenta |
+
+---
+
+### Paso 8 — Obtener el fragmento de la etiqueta del sitio
+
+**Objetivo:** Obtener el fragmento de etiqueta JavaScript para incrustar el seguimiento de analytics en el sitio web. La etiqueta debe colocarse en la sección `<head>` del HTML.
+
+**Endpoint:** `GET /api/v1/analytics/streams/tag`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/streams/tag?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "tag_html": "<script async src='https://www.googletagmanager.com/gtag/js?id=G-ABCDEF1234'></script>"
+  },
+  "msg": "Site tag"
+}
+```
+
+:::note
+Inserta el fragmento `data.tag_html` en la sección `<head>` del HTML del sitio web para habilitar el seguimiento.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (30 req/min) | Espera y reintenta |
+
+---
+
+### Paso 9 — Listar dimensiones personalizadas
+
+**Objetivo:** Listar todas las dimensiones personalizadas configuradas para la propiedad de analytics. Las dimensiones personalizadas rastrean atributos adicionales en los eventos (p. ej., fuente del contenido, autor).
+
+**Endpoint:** `GET /api/v1/analytics/dimensions`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/dimensions?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "param_name": "content_source",
+      "display_name": "Content Source",
+      "scope": "EVENT"
+    }
+  ],
+  "msg": "Custom dimensions"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (30 req/min) | Espera y reintenta |
+
+---
+
+### Paso 10 — Listar eventos clave
+
+**Objetivo:** Listar todos los eventos clave (conversiones) configurados para la propiedad de analytics. Los eventos clave rastrean acciones importantes del usuario en el sitio web.
+
+**Endpoint:** `GET /api/v1/analytics/key-events`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/key-events?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "event_name": "article_view",
+      "create_time": "2026-01-15T10:30:00Z"
+    }
+  ],
+  "msg": "Key events"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (30 req/min) | Espera y reintenta |
+
+---
+
+### Paso 11 — Obtener métricas de vista general del sitio
+
+**Objetivo:** Obtener métricas agregadas del sitio, incluyendo sesiones, usuarios, vistas de página y tasa de rebote para un período dado.
+
+**Endpoint:** `GET /api/v1/analytics/overview`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/overview?website_id=$WEBSITE_ID&period=30d&compare=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `website_id` | string | — | ID del sitio web (requerido) |
+| `period` | string | `"30d"` | Período del reporte: `"7d"`, `"30d"`, `"90d"` o `"12m"` |
+| `compare` | boolean | `true` | Incluir comparación con el período anterior |
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessions": 1250,
+    "users": 980,
+    "pageviews": 3400,
+    "bounce_rate": 0.42
+  },
+  "msg": "Site overview"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido, valor de `period` inválido | Usa uno de `7d`, `30d`, `90d`, `12m` |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+
+---
+
+### Paso 12 — Obtener métricas en tiempo real
+
+**Objetivo:** Obtener datos de analytics en tiempo real, incluyendo usuarios activos, páginas principales, fuentes de tráfico y países de los últimos 30 minutos.
+
+**Endpoint:** `GET /api/v1/analytics/realtime`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/realtime?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "active_users": 12,
+    "top_pages": ["/blog/seo-tips"],
+    "top_sources": ["google"]
+  },
+  "msg": "Realtime metrics"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 13 — Obtener métricas de una sola página
+
+**Objetivo:** Obtener métricas de analytics para una ruta de página específica del sitio web.
+
+**Endpoint:** `GET /api/v1/analytics/page`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/analytics/page?website_id=$WEBSITE_ID&page_path=/blog/seo-tips&period=30d" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `website_id` | string | — | ID del sitio web (requerido) |
+| `page_path` | string | — | Ruta de la página a analizar (requerido, p. ej., `/blog/seo-tips`) |
+| `period` | string | `"30d"` | Período del reporte: `"7d"`, `"30d"`, `"90d"` o `"12m"` |
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "page_path": "/blog/seo-tips",
+    "views": 320,
+    "unique_views": 280,
+    "avg_time_on_page": 145.5
+  },
+  "msg": "Page metrics"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` o `page_path` faltante o inválido | Proporciona valores válidos |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+
+---
+
+### Paso 14 — Enviar un evento del Measurement Protocol
+
+**Objetivo:** Enviar un evento del lado del servidor mediante el Measurement Protocol. Útil para rastrear conversiones y eventos que ocurren fuera del navegador (p. ej., artículo publicado, contenido generado).
+
+**Endpoint:** `POST /api/v1/analytics/mp-event`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/analytics/mp-event" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "website_id": "'$WEBSITE_ID'",
+    "event_name": "article_published",
+    "params": {
+      "article_id": "507f1f77bcf86cd799439011",
+      "category": "technology"
+    }
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": null,
+  "msg": "Event sent"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Error de validación — `website_id` o `event_name` faltante | Ambos campos son requeridos |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 15 — Desconectar analytics (opcional)
+
+**Objetivo:** Desconectar la propiedad de analytics de un sitio web sin eliminarla. La propiedad puede reconectarse más adelante.
+
+**Endpoint:** `DELETE /api/v1/analytics/disconnect`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/analytics/disconnect?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": null,
+  "msg": "Analytics disconnected"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 16 — Desaprovisionar analytics (destructivo)
+
+**Objetivo:** Desaprovisionar permanentemente la propiedad de analytics de un sitio web. Esta acción no se puede deshacer.
+
+**Endpoint:** `DELETE /api/v1/analytics/deprovision`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/analytics/deprovision?website_id=$WEBSITE_ID&confirm=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": null,
+  "msg": "Analytics deprovisioned"
+}
+```
+
+:::warning
+Esta acción es permanente y no se puede deshacer. El parámetro `confirm=true` es obligatorio. Sin él, la API rechazará la solicitud.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Falta `confirm=true` o `website_id` inválido | Agrega `confirm=true` a la cadena de consulta |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 17 — Revocar OAuth (opcional)
+
+**Objetivo:** Revocar los tokens de OAuth de la conexión de analytics del sitio web. El usuario deberá volver a autorizar para reconectarse.
+
+**Endpoint:** `POST /api/v1/analytics/oauth/revoke`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/analytics/oauth/revoke?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "msg": "OAuth revoked"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | OAuth no configurado para este sitio web | Verifica que el sitio web tenga una conexión OAuth activa |
+| 422 | `website_id` faltante o inválido | Proporciona un ID de sitio web válido |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo desde la autorización OAuth hasta la visualización de métricas.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+WEBSITE_ID="65b2c3d4e5f6a789bcdef012"  # De un sitio web registrado previamente
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 2: Iniciar OAuth ===
+AUTHORIZE_URL=$(curl -s -X GET "$BASE_URL/analytics/oauth/authorize?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq -r '.data.authorize_url')
+
+echo "Abrir en el navegador: $AUTHORIZE_URL"
+# ... el usuario completa OAuth en el navegador ...
+
+# === PASO 2b: Verificar el estado de OAuth ===
+curl -s -X GET "$BASE_URL/analytics/oauth/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 3: Listar cuentas ===
+ACCOUNT_ID=$(curl -s -X GET "$BASE_URL/analytics/accounts?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq -r '.data[0].name')
+
+echo "ACCOUNT_ID: $ACCOUNT_ID"
+
+# === PASO 4: Aprovisionar analytics ===
+curl -s -X POST "$BASE_URL/analytics/setup" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "website_id": "'$WEBSITE_ID'",
+    "account_id": "'$ACCOUNT_ID'",
+    "timezone": "America/Guatemala",
+    "currency": "GTQ",
+    "create_content_dimensions": true,
+    "create_key_events": true,
+    "create_mp_secret": true
+  }' | jq .
+
+# === PASO 5: Sondear el estado ===
+while true; do
+  STATUS=$(curl -s -X GET "$BASE_URL/analytics/status?website_id=$WEBSITE_ID" \
+    -H "Authorization: Bearer $APP_TOKEN" \
+    -H "x-user-token: $USER_TOKEN" \
+    | jq -r '.data.status')
+
+  echo "Estado de analytics: $STATUS"
+
+  if [ "$STATUS" = "active" ] || [ "$STATUS" = "error" ]; then
+    break
+  fi
+
+  sleep 3
+done
+
+# === PASO 8: Obtener la etiqueta del sitio ===
+curl -s -X GET "$BASE_URL/analytics/streams/tag?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq -r '.data.tag_html'
+
+# === PASO 11: Obtener métricas de vista general ===
+curl -s -X GET "$BASE_URL/analytics/overview?website_id=$WEBSITE_ID&period=30d&compare=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 12: Obtener métricas en tiempo real ===
+curl -s -X GET "$BASE_URL/analytics/realtime?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  | jq .
+
+# === PASO 14: Enviar un evento del lado del servidor ===
+curl -s -X POST "$BASE_URL/analytics/mp-event" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "website_id": "'$WEBSITE_ID'",
+    "event_name": "article_published",
+    "params": {
+      "article_id": "507f1f77bcf86cd799439011",
+      "category": "technology"
+    }
+  }' | jq .
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+- El aprovisionamiento (`POST /analytics/setup`) devuelve **409** si analytics ya está activo — es seguro reintentar.
+- Los endpoints de obtención de métricas (`GET`) son naturalmente idempotentes.
+- Los eventos del Measurement Protocol (`POST /analytics/mp-event`) **no** son idempotentes — cada llamada envía un nuevo evento.
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, verifica el estado de analytics antes de reintentar el aprovisionamiento.
+- Ante un **401** (token expirado), regenera el token y reintenta la solicitud original.
+
+### Timeouts
+- La autorización OAuth es interactiva con el usuario — no aplica timeout al flujo del usuario.
+- El aprovisionamiento de la propiedad se ejecuta de forma asíncrona y puede tardar **10-30 segundos**. Consulta `GET /analytics/status`.
+- Los endpoints de obtención de métricas suelen responder en **3-10 segundos**.
+- Configura tu cliente HTTP con al menos **30 segundos** de timeout para el aprovisionamiento y **15 segundos** para los endpoints de métricas.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de analytics.
+
+### Validaciones importantes
+- El sitio web debe estar registrado en la plataforma (`POST /users/websites`) antes de conectar analytics.
+- El `account_id` debe coincidir con el formato `accounts/\d+`.
+- La `currency` debe ser un código ISO 4217 válido (3 letras mayúsculas).
+- El parámetro `period` debe ser uno de: `7d`, `30d`, `90d`, `12m`.
+- El desaprovisionamiento requiere `confirm=true` y es irreversible.
+- OAuth debe completarse antes de listar cuentas o aprovisionar.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `GET` | `/api/v1/analytics/oauth/authorize` | Iniciar la autorización OAuth |
+| 2b | `GET` | `/api/v1/analytics/oauth/status` | Verificar el estado de OAuth |
+| 3 | `GET` | `/api/v1/analytics/accounts` | Listar cuentas de analytics |
+| 4 | `POST` | `/api/v1/analytics/setup` | Aprovisionar la propiedad de analytics |
+| 5 | `GET` | `/api/v1/analytics/status` | Verificar el estado del aprovisionamiento |
+| 6 | `GET` | `/api/v1/analytics/property` | Obtener detalles de la propiedad |
+| 7 | `GET` | `/api/v1/analytics/streams` | Listar flujos de datos |
+| 8 | `GET` | `/api/v1/analytics/streams/tag` | Obtener el fragmento de la etiqueta del sitio |
+| 9 | `GET` | `/api/v1/analytics/dimensions` | Listar dimensiones personalizadas |
+| 10 | `GET` | `/api/v1/analytics/key-events` | Listar eventos clave |
+| 11 | `GET` | `/api/v1/analytics/overview` | Obtener métricas de vista general del sitio |
+| 12 | `GET` | `/api/v1/analytics/realtime` | Obtener métricas en tiempo real |
+| 13 | `GET` | `/api/v1/analytics/page` | Obtener métricas de una sola página |
+| 14 | `POST` | `/api/v1/analytics/mp-event` | Enviar un evento del Measurement Protocol |
+| 15 | `DELETE` | `/api/v1/analytics/disconnect` | Desconectar analytics |
+| 16 | `DELETE` | `/api/v1/analytics/deprovision` | Desaprovisionar analytics |
+| 17 | `POST` | `/api/v1/analytics/oauth/revoke` | Revocar OAuth |
+
+---
+
+## Checklist rápido
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Tengo un sitio web registrado con su `website_id`
+- [ ] Completé la autorización OAuth (`GET /analytics/oauth/authorize`)
+- [ ] Verifiqué que OAuth está conectado (`GET /analytics/oauth/status`)
+- [ ] Seleccioné una cuenta de analytics (`GET /analytics/accounts`)
+- [ ] Aprovisioné la propiedad de analytics (`POST /analytics/setup`)
+- [ ] Verifiqué que la propiedad está activa (`GET /analytics/status`)
+- [ ] Obtuve la etiqueta del sitio para su instalación (`GET /analytics/streams/tag`)
+- [ ] Puedo ver las métricas del sitio (`GET /analytics/overview`)
+- [ ] Puedo enviar eventos del lado del servidor (`POST /analytics/mp-event`)

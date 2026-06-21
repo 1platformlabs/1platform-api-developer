@@ -1,0 +1,465 @@
+---
+title: "Generaciones con IA"
+description: "Flujo paso a paso para generar comentarios ficticios, imágenes con IA y fichas de perfil a través de la 1Platform API."
+sidebar_position: 3
+---
+
+# Flujo: Generaciones con IA
+
+## Vista general
+
+Este flujo documenta cómo usar los endpoints de generación con IA de 1Platform para crear comentarios ficticios, generar imágenes y construir fichas de perfil completas.
+
+**Caso de uso:** Sembrar tu sitio web con comentarios ficticios realistas, generar imágenes con IA para tu contenido y crear fichas de perfil completas con biografía, enlaces de redes sociales y fotos.
+
+**Resultado final:** Comentarios, imágenes y fichas de perfil generados, listos para integrarse en tu aplicación.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Proveedor de IA configurado | La App debe tener configuradas las claves del proveedor de IA |
+| Proveedor de imágenes configurado | Requerido para la generación de imágenes con IA |
+| Proveedor de búsqueda configurado | Requerido para el descubrimiento de redes sociales en la ficha de perfil |
+
+### Headers requeridos para todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
+```
+
+---
+
+## Datos requeridos para las generaciones
+
+### Comentarios
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `count` | integer | Sí | Número de comentarios a generar (1-50) |
+| `lang` | string | Sí | Idioma: `"es"` o `"en"` |
+| `context` | string | Sí | Contexto para orientar el contenido del comentario (mín. 5 caracteres) |
+
+### Imágenes
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `count` | integer | Sí | Número de imágenes a generar (1-10) |
+| `context` | string | Sí | Contexto para orientar la generación de imágenes (mín. 3 caracteres) |
+
+### Perfil
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `owner` | string | Sí | Nombre completo de la persona (mín. 1 carácter) |
+| `lang` | string | Sí | Idioma: `"es"` o `"en"` |
+| `context` | string | No | Contexto adicional para influir en la generación de la biografía (por defecto: `""`) |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguno (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` faltante o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` faltante | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si todavía no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Generar comentarios
+
+**Objetivo:** Generar comentarios ficticios realistas para sembrar el contenido del sitio web.
+
+**Endpoint:** `POST /api/v1/users/generations/comments`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/generations/comments" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 5,
+    "lang": "en",
+    "context": "Article about sustainable gardening tips"
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "507f1f77bcf86cd799439011",
+    "lang": "en",
+    "count": 5,
+    "comments": [
+      {
+        "full_name": "Sarah Mitchell",
+        "content": "I've been composting for three years now and this article really captures the essence of why it matters. The tip about companion planting was new to me!"
+      },
+      {
+        "full_name": "James Rodriguez",
+        "content": "Great read! My balcony garden has thrived since I started using organic mulch. Would love to see a follow-up on vertical gardening."
+      },
+      {
+        "full_name": "Emily Chen",
+        "content": "The section on water conservation techniques is exactly what I needed. Living in a drought-prone area, every drop counts."
+      },
+      {
+        "full_name": "David Okafor",
+        "content": "Shared this with my local gardening community. The pest management tips without chemicals are brilliant."
+      },
+      {
+        "full_name": "Ana Petrova",
+        "content": "As a beginner gardener, I found this incredibly helpful. Clear, practical advice that I can actually implement this weekend."
+      }
+    ]
+  },
+  "msg": "Successfully generated 5 comments"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Entrada inválida o falló la generación con IA | Verifica los valores de `count`, `lang` y `context` |
+| 401 | Autenticación requerida | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 422 | Error de validación — campos faltantes o inválidos | `count` debe ser 1-50, `lang` debe ser `"es"` o `"en"`, `context` mín. 5 caracteres |
+| 429 | Límite de tasa excedido (5 req/min) | Espera y reintenta — este es un endpoint intensivo en IA |
+
+---
+
+### Paso 3 — Generar imágenes
+
+**Objetivo:** Generar imágenes con IA a partir de una descripción de contexto.
+
+**Endpoint:** `POST /api/v1/users/generations/images`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/generations/images" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 3,
+    "context": "Professional headshot for LinkedIn"
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 3,
+    "provider": "openai",
+    "images": [
+      {
+        "url": "https://storage.1platform.pro/images/gen-abc123-1.png",
+        "prompt": "Professional headshot portrait, clean background, business attire, warm lighting"
+      },
+      {
+        "url": "https://storage.1platform.pro/images/gen-abc123-2.png",
+        "prompt": "Corporate headshot, neutral background, confident expression, studio lighting"
+      },
+      {
+        "url": "https://storage.1platform.pro/images/gen-abc123-3.png",
+        "prompt": "Professional profile photo, office setting, natural lighting, approachable expression"
+      }
+    ]
+  },
+  "msg": "Successfully generated 3 images"
+}
+```
+
+:::note
+Cada imagen incluye la `url` donde se puede acceder y el `prompt` que se usó para generarla. Se pueden devolver resultados parciales si algunos intentos de generación fallan.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Autenticación requerida | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 422 | Error de validación — `count` debe ser 1-10, `context` mín. 3 caracteres | Revisa los valores de los campos |
+| 429 | Límite de tasa excedido (5 req/min) | Espera y reintenta — este es un endpoint intensivo en IA |
+| 500 | Todos los intentos de generación de imágenes fallaron | Verifica la configuración del proveedor de IA |
+
+---
+
+### Paso 4 — Generar ficha de perfil
+
+**Objetivo:** Generar una ficha de perfil completa que incluye detección de género, biografía con IA, enlaces de redes sociales y una imagen de perfil.
+
+**Endpoint:** `POST /api/v1/users/generations/profile`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/users/generations/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "owner": "Maria Garcia",
+    "lang": "en",
+    "context": "Software engineer specializing in AI"
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "fullname": "Maria Garcia",
+    "gender": "female",
+    "bio": "<p>Maria Garcia is a passionate software engineer with deep expertise in artificial intelligence and machine learning. She has contributed to open-source projects and spoken at international tech conferences about responsible AI development.</p>",
+    "rrss": "<a href='https://linkedin.com/in/mariagarcia'>LinkedIn</a> <a href='https://github.com/mariagarcia'>GitHub</a>",
+    "profile_image_url": "https://storage.1platform.pro/images/profile-maria-garcia.jpg"
+  },
+  "msg": "Profile generated successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Nombre de owner faltante o inválido | Proporciona un nombre de persona válido (mín. 1 carácter) |
+| 401 | Autenticación requerida | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 422 | Error de validación — `owner` y `lang` son requeridos | Revisa los campos requeridos |
+| 429 | Límite de tasa excedido (5 req/min) | Espera y reintenta |
+| 500 | Falló la generación con IA | Verifica la configuración de los proveedores de IA, búsqueda e imágenes |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 2: Generar comentarios ===
+curl -s -X POST "$BASE_URL/users/generations/comments" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 3,
+    "lang": "es",
+    "context": "Blog de tecnología sobre inteligencia artificial"
+  }' \
+  | jq .
+
+# === PASO 3: Generar imágenes ===
+curl -s -X POST "$BASE_URL/users/generations/images" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "count": 2,
+    "context": "Modern office workspace with plants"
+  }' \
+  | jq .
+
+# === PASO 4: Generar ficha de perfil ===
+curl -s -X POST "$BASE_URL/users/generations/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "owner": "Carlos Mendez",
+    "lang": "es",
+    "context": "Experto en marketing digital y SEO"
+  }' \
+  | jq .
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+
+:::warning[Sin mecanismo de idempotencia]
+Los endpoints de generación crean contenido nuevo en cada llamada. No hay deduplicación. Almacena los resultados generados en tu aplicación para evitar regeneraciones innecesarias.
+:::
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, no reintentes de inmediato — pueden haberse generado resultados parciales.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
+
+### Timeouts
+- La generación de comentarios suele tardar **5-10 segundos** según la cantidad.
+- La generación de imágenes puede tardar **10-30 segundos** por imagen.
+- La generación de perfiles implica múltiples llamadas a la IA y puede tardar **15-30 segundos**.
+- Configura tu cliente HTTP con al menos **60 segundos** de timeout para los endpoints de generación.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de generación.
+
+### Validaciones importantes
+- El `count` de comentarios debe estar entre 1 y 50.
+- El `count` de imágenes debe estar entre 1 y 10.
+- El `context` de comentarios debe tener al menos 5 caracteres.
+- El `context` de imágenes debe tener al menos 3 caracteres.
+- El `lang` de perfil debe ser `"es"` o `"en"`.
+- Todos los endpoints de generación son intensivos en IA con un límite de tasa de **5 req/min**.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener token de usuario |
+| 2 | `POST` | `/api/v1/users/generations/comments` | Generar comentarios |
+| 3 | `POST` | `/api/v1/users/generations/images` | Generar imágenes |
+| 4 | `POST` | `/api/v1/users/generations/profile` | Generar ficha de perfil |
+
+---
+
+## Lista de verificación rápida
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Generé comentarios (`POST /users/generations/comments`)
+- [ ] Generé imágenes (`POST /users/generations/images`)
+- [ ] Generé una ficha de perfil (`POST /users/generations/profile`)
+- [ ] Almacené el contenido generado en mi aplicación

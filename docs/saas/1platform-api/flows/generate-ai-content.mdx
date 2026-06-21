@@ -1,0 +1,641 @@
+---
+title: "Generar contenido con IA"
+description: "Flujo paso a paso para extraer keywords, generar contenido potenciado por IA y enviar URLs para indexación en Google a través de la 1Platform API."
+sidebar_position: 5
+---
+
+# Flujo: Generar contenido con IA
+
+## Vista general
+
+Este flujo documenta el proceso de extremo a extremo para la creación de contenido potenciado por IA a través de la 1Platform API. Cubre la extracción de keywords de un dominio, la generación asíncrona de contenido y el envío de URLs para indexación.
+
+**Caso de uso:** Genera automáticamente artículos optimizados para SEO para tu sitio web a partir del análisis de keywords, y luego envía la URL publicada para indexación en Google.
+
+**Resultado final:** Un artículo completo con título, contenido, slug e imágenes — más un envío de indexación en Google para la URL publicada.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Proveedor de IA configurado | La app debe tener claves de proveedor de IA configuradas |
+| Proveedor de imágenes configurado | La app debe tener claves de proveedor de imágenes configuradas (para la generación de contenido) |
+| Google Search Console | Cuenta de servicio con acceso a Search Console (solo para indexación) |
+
+### Headers requeridos para todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
+JOB_ID=""       # Obtenido en el Paso 3
+```
+
+---
+
+## Datos requeridos para generar contenido
+
+### Extracción de keywords (por dominio)
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `domain` | string | Sí | URL del dominio del que extraer keywords (mín. 3 caracteres) |
+| `country` | string | No | Código de país para el análisis de búsqueda (por defecto: `"es"`) |
+| `lang` | string | No | Código de idioma para la categorización (por defecto: `"en"`) |
+
+### Extracción de keywords (por tema)
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `topic` | string | Sí | Tema o temática para investigar keywords (mín. 2 caracteres) |
+| `country` | string | No | Código de país (por defecto: `"es"`) |
+| `lang` | string | No | Código de idioma para la categorización (por defecto: `"en"`) |
+
+### Generación de contenido
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `keyword` | string | Sí | Keyword para la que generar contenido (mín. 3 caracteres) |
+| `lang` | string | No | Código de idioma (por defecto: `"en"`) |
+| `country` | string | No | Código de país para el contexto de búsqueda |
+| `image_provider` | string | No | Proveedor de imágenes: `"default"` o `"alternative"` (por defecto: `"default"`) |
+| `categories` | array | No | Lista de nombres de categorías para la clasificación del contenido |
+
+### Indexación
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `url` | string | Sí | URL publicada a enviar para indexación en Google (mín. 3 caracteres) |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` ausente o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT del usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si aún no tienes un usuario, créalo con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Extraer keywords
+
+**Objetivo:** Analizar un dominio y extraer keywords SEO con datos de volumen de búsqueda y categorización.
+
+**Endpoint:** `POST /api/v1/posts/keywords/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/posts/keywords/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "ecologiaverde.com",
+    "country": "es",
+    "lang": "en"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 50,
+    "categories": [
+      "Wildlife",
+      "Insects"
+    ],
+    "country": "es",
+    "lang": "en",
+    "lookup_key": "ecologiaverde.com",
+    "keywords": [
+      {
+        "keyword": "black panther",
+        "title": "Black Panther: characteristics and habitat",
+        "original_title": "Pantera negra: que animal es, caracteristicas y habitat",
+        "original_keyword": "pantera negra",
+        "volume": 20000,
+        "url": "https://ecologiaverde.com/pantera-negra.html"
+      },
+      {
+        "keyword": "types of crickets",
+        "title": "10 Types of Crickets - Names and Photos",
+        "original_title": "10 tipos de grillos - Nombres y fotos",
+        "original_keyword": "tipos de grillos",
+        "volume": 19000,
+        "url": "https://ecologiaverde.com/tipos-de-grillos.html"
+      }
+    ]
+  },
+  "msg": "Successfully generated 50 keywords"
+}
+```
+
+:::note
+Elige una keyword con alto volumen de búsqueda de entre los resultados para la generación de contenido. El array `categories` puede pasarse al endpoint de generación de contenido.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Dominio inválido o error de validación | Verifica el formato del dominio |
+| 401 | Autenticación fallida — token inválido o ausente | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 404 | Recurso no encontrado | Verifica los parámetros de la solicitud |
+| 422 | Error de validación — campos ausentes o malformados | Verifica los campos requeridos |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+| 500 | Error de configuración del servicio o proveedor no disponible | Verifica la configuración del proveedor de IA |
+
+---
+
+### Paso 2b — Extraer keywords por tema (alternativa)
+
+**Objetivo:** Descubrir keywords SEO para un tema o temática en lugar de analizar un dominio existente. Útil cuando no tienes un dominio para analizar o quieres explorar un nuevo nicho.
+
+**Endpoint:** `POST /api/v1/posts/keywords/topic/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/posts/keywords/topic/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "sustainable gardening tips",
+    "country": "us",
+    "lang": "en"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 25,
+    "categories": [
+      "Gardening",
+      "Sustainability"
+    ],
+    "country": "us",
+    "lang": "en",
+    "lookup_key": "sustainable gardening tips",
+    "keywords": [
+      {
+        "keyword": "sustainable gardening tips",
+        "title": "Sustainable Gardening Tips for Beginners",
+        "original_title": "Sustainable Gardening Tips for Beginners",
+        "original_keyword": "sustainable gardening tips",
+        "volume": 1200,
+        "url": ""
+      }
+    ]
+  },
+  "msg": "Keywords extracted successfully"
+}
+```
+
+:::tip
+Usa el Paso 2 (por dominio) cuando ya tengas un sitio web y quieras encontrar keywords relacionadas con tu contenido existente. Usa el Paso 2b (por tema) cuando explores nuevos nichos o generes contenido para temas aún no cubiertos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Tema inválido o error de validación | Verifica que el tema tenga al menos 2 caracteres |
+| 401 | Autenticación fallida — token inválido o ausente | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 404 | Recurso no encontrado | Verifica los parámetros de la solicitud |
+| 422 | Error de validación — campos ausentes o malformados | Verifica los campos requeridos |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+| 502 | Proveedor de búsqueda no disponible | Reintenta tras una breve demora |
+| 504 | La extracción de keywords excedió el tiempo de espera | Reintenta con un tema más simple |
+
+---
+
+### Paso 3 — Enviar trabajo de generación de contenido
+
+**Objetivo:** Enviar un trabajo asíncrono de generación de contenido para una keyword objetivo.
+
+**Endpoint:** `POST /api/v1/posts/content/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+**Modelo de facturación (Authorize+Capture, por defecto desde v3.1.0):** cuando el cliente envía `X-Plugin-Version: 2.36.0` o más reciente, la API **reserva** el costo de la operación en el saldo del usuario en lugar de debitarlo. Si el trabajo en segundo plano falla (error del proveedor, sin keywords usables, etc.), la reserva se libera automáticamente — no se le cobra al usuario por una salida inutilizable. Consulta [Holds y capturas de facturación](./billing-holds-and-captures.mdx) para conocer el ciclo de vida completo, los headers y los endpoints de transparencia.
+
+```bash
+curl -X POST "$BASE_URL/posts/content/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "X-Plugin-Version: 2.36.0" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keyword": "sustainable gardening tips",
+    "lang": "en",
+    "country": "us",
+    "image_provider": "default",
+    "categories": ["Home & Garden"]
+  }'
+```
+
+**Respuesta (202)** — observa los nuevos headers de respuesta `X-Hold-Id` y `X-Available-Balance` en la ruta con hold:
+
+```json
+{
+  "success": true,
+  "data": {
+    "job_id": "507f1f77bcf86cd799439011",
+    "type": "content",
+    "status": "pending",
+    "input": {
+      "keyword": "sustainable gardening tips",
+      "lang": "en",
+      "image_provider": "default",
+      "hold_id": "507f1f77bcf86cd799439099"
+    },
+    "created_at": "2026-03-18T10:30:00"
+  },
+  "msg": "Content generation job created for keyword: sustainable gardening tips"
+}
+```
+
+| Header de respuesta | Significado |
+|---|---|
+| `X-Hold-Id` | id del documento `BalanceHold` — obtenible vía `GET /api/v1/holds/{id}` |
+| `X-Operation-Cost` | String decimal del monto reservado (p. ej. `"0.05"`) |
+| `X-Available-Balance` | String decimal — `balance - reserved_balance` tras el paso de autorización |
+
+:::note
+Guarda `data.job_id` como `$JOB_ID`. El trabajo se ejecuta de forma asíncrona — consulta su estado usando el Paso 4. Guarda `X-Hold-Id` si quieres mostrar un estado "Reservado / Cobrado / Reembolsado" en tu interfaz (consulta [Holds y capturas de facturación](./billing-holds-and-captures.mdx)).
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | Autenticación fallida — token inválido o ausente | Regenera los tokens |
+| 402 | Saldo insuficiente — saldo **disponible** insuficiente (`balance - reserved_balance < amount`) | Recarga la cuenta o espera a que los holds en curso se liquiden |
+| 404 | Recurso no encontrado | Verifica los parámetros de la solicitud |
+| 422 | Error de validación — keyword demasiado corta o campos inválidos | La keyword debe tener al menos 3 caracteres |
+| 422 | `no_keywords` — la investigación de keywords no devolvió nada usable | Prueba con una keyword más específica. En la ruta con hold la reserva se libera automáticamente; sin cargo |
+| 429 | Límite de tasa excedido (5 req/min) | Espera y reintenta — este es un endpoint intensivo en IA |
+| 500 | Error de configuración del servicio o proveedor de IA no disponible | Verifica la configuración del proveedor de IA y de imágenes |
+
+:::tip
+**Clientes legacy (plugin `< 2.36.0`):** el endpoint recurre automáticamente al comportamiento de cobro-primero — no se devuelve ningún `X-Hold-Id` y el saldo se debita por adelantado. Se recomienda migrar porque la ruta con hold es la única que reembolsa automáticamente ante una falla en segundo plano.
+:::
+
+---
+
+### Paso 4 — Consultar el estado del trabajo
+
+**Objetivo:** Verificar el estado del trabajo de generación de contenido hasta que se complete.
+
+**Endpoint:** `GET /api/v1/posts/content/jobs/{job_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X GET "$BASE_URL/posts/content/jobs/$JOB_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200) — Trabajo completado:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "job_id": "507f1f77bcf86cd799439011",
+    "type": "content",
+    "status": "completed",
+    "input": {
+      "keyword": "sustainable gardening tips",
+      "lang": "en",
+      "image_provider": "default"
+    },
+    "result": {
+      "title": "Sustainable Gardening Tips for 2026",
+      "content": "<h2>Introduction</h2><p>Sustainable gardening...</p>...",
+      "slug": "sustainable-gardening-tips-2026"
+    },
+    "timing": {
+      "total_ms": 8420
+    },
+    "created_at": "2026-03-18T10:30:00",
+    "started_at": "2026-03-18T10:30:01",
+    "completed_at": "2026-03-18T10:30:09"
+  },
+  "msg": "Job status: completed"
+}
+```
+
+:::tip
+**Intervalo de consulta recomendado:** 5 segundos. El campo `status` transiciona a través de: `pending` → `processing` → `completed` (o `failed`).
+:::
+
+:::warning
+Si el `status` del trabajo es `"failed"`, revisa `data.error` para más detalles. Es posible que debas reintentar con parámetros diferentes o verificar la configuración de tu proveedor de IA.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Formato de ID de trabajo inválido | Verifica que el ID del trabajo sea un ObjectId válido |
+| 401 | Autenticación fallida — token inválido o ausente | Regenera los tokens |
+| 404 | Trabajo no encontrado | Verifica el `job_id` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 5 — Enviar URL para indexación
+
+**Objetivo:** Enviar la URL del artículo publicado a la Google Indexing API para un rastreo más rápido.
+
+**Endpoint:** `POST /api/v1/posts/indexing/`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/posts/indexing/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://myblog.com/sustainable-gardening-tips-2026"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "submitted",
+    "url": "https://myblog.com/sustainable-gardening-tips-2026"
+  },
+  "msg": "URL successfully submitted for indexing"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 400 | Formato de URL inválido o URL inaccesible | Verifica que la URL sea públicamente accesible |
+| 401 | Autenticación fallida — token inválido o ausente | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 404 | Recurso no encontrado | Verifica los parámetros de la solicitud |
+| 422 | Error de validación — campo URL ausente | Envía `{"url": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 500 | Error de la Google Indexing API o servicio no disponible | Verifica la configuración de Search Console |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes, desde la autenticación hasta la indexación.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "APP_TOKEN: $APP_TOKEN"
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+echo "USER_TOKEN: $USER_TOKEN"
+
+# === PASO 2: Extraer keywords ===
+KEYWORDS_RESPONSE=$(curl -s -X POST "$BASE_URL/posts/keywords/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "myblog.com",
+    "country": "us",
+    "lang": "en"
+  }')
+
+echo "KEYWORDS: $(echo $KEYWORDS_RESPONSE | jq '.data.keywords[:3]')"
+
+# === PASO 3: Enviar trabajo de generación de contenido ===
+JOB_ID=$(curl -s -X POST "$BASE_URL/posts/content/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keyword": "sustainable gardening tips",
+    "lang": "en",
+    "country": "us",
+    "image_provider": "default",
+    "categories": ["Home & Garden"]
+  }' \
+  | jq -r '.data.job_id')
+
+echo "JOB_ID: $JOB_ID"
+
+# === PASO 4: Sondear el estado del trabajo ===
+while true; do
+  STATUS=$(curl -s -X GET "$BASE_URL/posts/content/jobs/$JOB_ID" \
+    -H "Authorization: Bearer $APP_TOKEN" \
+    -H "x-user-token: $USER_TOKEN" \
+    | jq -r '.data.status')
+
+  echo "Job status: $STATUS"
+
+  if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
+    break
+  fi
+
+  sleep 5
+done
+
+# === PASO 5: Enviar para indexación ===
+curl -s -X POST "$BASE_URL/posts/indexing/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://myblog.com/sustainable-gardening-tips-2026"}' \
+  | jq .
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+
+:::warning[Sin mecanismo de idempotencia]
+La API no admite un header `Idempotency-Key`. Los trabajos de generación de contenido son únicos por envío. Si una solicitud falla por timeout, no reintentes de inmediato — el trabajo puede haberse creado. Consulta primero el endpoint de estado del trabajo.
+:::
+
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, verifica el estado del trabajo antes de reintentar para evitar trabajos duplicados.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
+
+### Timeouts
+- La extracción de keywords puede tardar **10-20 segundos** según la complejidad del dominio.
+- La generación de contenido es asíncrona — el envío retorna de inmediato, pero el trabajo puede tardar **10-60 segundos** en completarse.
+- Configura tu cliente HTTP con al menos **30 segundos** de timeout para la extracción de keywords y **10 segundos** para los demás endpoints.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de contenido.
+
+### Validaciones importantes
+- La `keyword` debe tener al menos 3 caracteres.
+- El `domain` debe ser un nombre de dominio válido (mín. 3 caracteres).
+- El `image_provider` debe ser `"default"` o `"alternative"`.
+- El campo `lang` debe ser un código de idioma de 2 caracteres.
+- La URL de indexación debe ser públicamente accesible y pertenecer a una propiedad verificada en Google Search Console.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener token de usuario |
+| 2 | `POST` | `/api/v1/posts/keywords/` | Extraer keywords de un dominio |
+| 2b | `POST` | `/api/v1/posts/keywords/topic/` | Extraer keywords por tema (alternativa) |
+| 3 | `POST` | `/api/v1/posts/content/` | Enviar trabajo de generación de contenido |
+| 4 | `GET` | `/api/v1/posts/content/jobs/{job_id}` | Consultar estado del trabajo |
+| 5 | `POST` | `/api/v1/posts/indexing/` | Enviar URL para indexación |
+
+---
+
+## Lista de verificación rápida
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Extraje keywords de mi dominio (`POST /posts/keywords/`) o por tema (`POST /posts/keywords/topic/`)
+- [ ] Seleccioné una keyword con buen volumen de búsqueda
+- [ ] Envié un trabajo de generación de contenido (`POST /posts/content/`)
+- [ ] Consulté el trabajo hasta su finalización (`GET /posts/content/jobs/{job_id}`)
+- [ ] Publiqué el contenido generado en mi sitio web
+- [ ] Envié la URL publicada para indexación (`POST /posts/indexing/`)

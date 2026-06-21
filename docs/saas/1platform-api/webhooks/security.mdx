@@ -1,0 +1,147 @@
+---
+title: Seguridad de webhooks
+description: Esquema de firma HMAC-SHA256 para webhooks salientes — encabezados, material firmado y ejemplos de verificación.
+sidebar_position: 2
+---
+
+# Seguridad de webhooks
+
+Cada webhook saliente se firma con HMAC-SHA256 usando el `webhook_secret`
+compartido que se devuelve al momento del registro del dominio (o de la
+rotación). Verifica la firma **antes** de confiar en el payload.
+
+## Esquema de firma
+
+| Propiedad | Valor |
+|---|---|
+| Encabezado de firma | `X-Webhook-Signature` |
+| Formato de la firma | `sha256=<hex>` |
+| Encabezado complementario | `X-Webhook-Timestamp` (segundos epoch unix, string) |
+| Algoritmo | `HMAC-SHA256` |
+| Material firmado | `f"{timestamp}.".encode() + payload_bytes` |
+| Canonicalización del cuerpo (emisor) | `json.dumps(body, sort_keys=True, separators=(",",":"))` |
+| Ventana de replay | 5 minutos (skew de `X-Webhook-Timestamp`) |
+
+:::warning[Verifica contra los bytes crudos que recibes]
+1Platform firma la re-serialización canónica del cuerpo, pero tú **debes
+verificar contra los bytes crudos que llegaron por el cable** — no contra el
+resultado de re-stringificar un objeto JSON ya parseado. Cualquier diferencia de
+espacios en blanco romperá el HMAC.
+:::
+
+## Verificación — Python (httpx + hmac)
+
+```python
+import hmac
+import hashlib
+import time
+
+REPLAY_WINDOW_SECONDS = 300  # 5 minutos
+
+def verify_webhook(
+    *,
+    body: bytes,                   # cuerpo crudo de la solicitud
+    signature_header: str,         # valor de X-Webhook-Signature
+    timestamp_header: str,         # valor de X-Webhook-Timestamp
+    secret: str,                   # tu webhook_secret
+) -> bool:
+    if not signature_header.startswith("sha256="):
+        return False
+
+    # Rechaza cualquier cosa fuera de la ventana de replay
+    try:
+        ts = int(timestamp_header)
+    except ValueError:
+        return False
+    if abs(time.time() - ts) > REPLAY_WINDOW_SECONDS:
+        return False
+
+    expected = signature_header.removeprefix("sha256=")
+    signed = f"{timestamp_header}.".encode() + body
+    actual = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, actual)
+```
+
+## Verificación — TypeScript (Node 22+)
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+const REPLAY_WINDOW_SECONDS = 300;
+
+export function verifyWebhook(opts: {
+  body: Buffer;
+  signatureHeader: string;
+  timestampHeader: string;
+  secret: string;
+}): boolean {
+  const { body, signatureHeader, timestampHeader, secret } = opts;
+  if (!signatureHeader.startsWith("sha256=")) return false;
+
+  const ts = Number.parseInt(timestampHeader, 10);
+  if (!Number.isFinite(ts)) return false;
+  if (Math.abs(Date.now() / 1000 - ts) > REPLAY_WINDOW_SECONDS) return false;
+
+  const expected = signatureHeader.slice("sha256=".length);
+  const signed = Buffer.concat([Buffer.from(`${timestampHeader}.`), body]);
+  const actual = createHmac("sha256", secret).update(signed).digest("hex");
+
+  return (
+    expected.length === actual.length &&
+    timingSafeEqual(Buffer.from(expected), Buffer.from(actual))
+  );
+}
+```
+
+## Verificación — PHP
+
+```php
+<?php
+const REPLAY_WINDOW_SECONDS = 300;
+
+function verifyWebhook(string $rawBody, string $signatureHeader, string $timestampHeader, string $secret): bool {
+    if (strpos($signatureHeader, 'sha256=') !== 0) {
+        return false;
+    }
+    $ts = (int) $timestampHeader;
+    if (abs(time() - $ts) > REPLAY_WINDOW_SECONDS) {
+        return false;
+    }
+
+    $expected = substr($signatureHeader, strlen('sha256='));
+    $signed = $timestampHeader . '.' . $rawBody;
+    $actual = hash_hmac('sha256', $signed, $secret);
+
+    return hash_equals($expected, $actual);
+}
+```
+
+## Modos de falla comunes
+
+- **Re-stringificar el cuerpo antes de verificar** — consulta la advertencia de arriba.
+- **Recortar el prefijo `sha256=` en el lugar equivocado** — quítalo de
+  `signature_header`, no del valor calculado.
+- **Ventana de replay ausente** — sin una comprobación de timestamp, un atacante
+  puede repetir indefinidamente un payload capturado.
+- **Comparación de strings en lugar de comparación de tiempo constante** — usa
+  `hmac.compare_digest`, `timingSafeEqual`, `hash_equals`.
+
+## Rotación del secreto {#secret-rotation}
+:::danger[El secreto del webhook se muestra solo una vez]
+`POST /webhooks/config/rotate-secret` devuelve el nuevo `webhook_secret`
+exactamente una vez. No existe un endpoint `GET`. Si pierdes la respuesta, debes
+rotar de nuevo — y cualquier webhook en vuelo firmado con el secreto anterior
+fallará la verificación de tu lado.
+
+**Siempre canaliza la respuesta a una escritura en el gestor de secretos antes de
+cualquier otra acción.**
+:::
+
+Un runbook de rotación seguro:
+
+1. Llama a `POST /webhooks/config/rotate-secret` en un script que capture `stdout`
+   directamente a tu gestor de secretos (p. ej. `vault kv put`, `gcloud secrets`).
+2. Mantén el secreto anterior en tu verificador durante **24 horas** (acepta
+   cualquiera de los dos) para absorber los reintentos en vuelo previos a la
+   rotación.
+3. Después de 24 h, elimina el secreto viejo del verificador.

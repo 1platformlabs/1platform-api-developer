@@ -1,0 +1,60 @@
+---
+title: Configurar URLs
+description: Registro de dominios, declaración de manejadores de eventos y rotación del secreto. Página guía que enlaza al flujo completo.
+sidebar_position: 4
+---
+
+# Configurar URLs
+
+La configuración de webhooks es un bootstrap único por entorno. La guía completa
+paso a paso está en [el flujo de Configuración de Webhooks](../flows/webhook-configuration).
+
+## De un vistazo
+
+| Paso | Endpoint | Propósito |
+|---|---|---|
+| 1 | `GET /webhooks/config/` | Leer el estado actual |
+| 2 | `POST /webhooks/config/domains` | Registrar un dominio (devuelve el `webhook_secret` inicial **una sola vez**) |
+| 3 | `PUT /webhooks/config/events` | Mapear cada evento `on_*` a una de tus URLs |
+| 4 | `DELETE /webhooks/config/domains/{domain}` | Dar de baja un dominio |
+| 5 | `POST /webhooks/config/rotate-secret` | Rotar el secreto de firma (devuelve el nuevo valor **una sola vez**) |
+
+## A dónde apunta cada URL
+
+Patrón de marketplace de Bower: registra un dominio de comercio (p. ej.
+`api.bowerfans.com`) y luego mapea los cinco eventos a un único endpoint que use
+el campo `event` del payload canónico para el enrutamiento interno.
+
+```bash
+curl -X PUT "$BASE_URL/webhooks/config/events" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "on_approved":  { "url": "https://api.bowerfans.com/webhooks/payments", "method": "POST" },
+    "on_denied":    { "url": "https://api.bowerfans.com/webhooks/payments", "method": "POST" },
+    "on_cancelled": { "url": "https://api.bowerfans.com/webhooks/payments", "method": "POST" },
+    "on_expired":   { "url": "https://api.bowerfans.com/webhooks/payments", "method": "POST" },
+    "on_dismiss":   { "url": "https://api.bowerfans.com/webhooks/payments", "method": "POST" }
+  }'
+```
+
+## body_template — renunciar al cuerpo canónico
+
+Cada manejador de eventos acepta un objeto opcional `body_template`. Cuando está
+presente, el dispatcher emite **lo que tú definas** en lugar del cuerpo canónico
+— puedes interpolar las siguientes variables con la sintaxis `{{var}}`:
+
+`transaction_id`, `status`, `amount`, `usd_amount`, `currency`,
+`currency_provider`, `user_id`, `billing_id`, `provider`, `reference`,
+`external_transaction_id`.
+
+Cuando `body_template` está **ausente o vacío**, el dispatcher recurre al
+[cuerpo canónico](./receiving-notifications#canonical-payload). Esta es la ruta
+recomendada para integraciones nuevas.
+
+## Referencias cruzadas
+
+- [Seguridad de webhooks](./security) — encabezados HMAC y verificación.
+- [Recibir notificaciones](./receiving-notifications) — forma del cuerpo canónico.
+- [Reintentos y entrega](./retry-and-delivery) — qué pasa cuando tu manejador
+  devuelve algo distinto de 2xx.

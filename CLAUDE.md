@@ -75,7 +75,7 @@ npm run clear            # Clear Docusaurus cache
 - **OpenAPI spec:** Served from `/openapi.json` (local static copy to avoid CORS)
 - **Scalar proxy:** `https://proxy.scalar.com` (for browser API testing)
 - **Blog:** Disabled
-- **i18n:** English only
+- **i18n:** Spanish only (`defaultLocale: 'es'`, `locales: ['es']`). Spanish is the **canonical source** of the docs (audited and improved in Spanish first); English will be re-introduced later as a translated, non-default locale. Single locale ⇒ the navbar locale switcher is hidden. Source content (`docs/**`), navbar/footer labels, and the `HomeCards`/`Footer` swizzles are authored directly in Spanish.
 
 ### OpenAPI Spec Pipeline
 

@@ -1,0 +1,64 @@
+---
+title: Entornos
+description: URLs base de la Atlas API para producción y QA, dónde encontrar la especificación OpenAPI y convenciones para el prefijo de ruta de la API y el versionado.
+sidebar_position: 5
+---
+
+# Entornos
+
+La **Atlas API** corre en dos entornos. Ambos exponen la misma API versionada bajo el prefijo `/api/v1`.
+
+| Entorno | URL base |
+|---|---|
+| **Producción** | `https://atlas-api.1platform.pro/api/v1` |
+| **QA / staging** | `https://atlas-api-qa.1platform.pro/api/v1` |
+
+```bash
+# Producción
+export ATLAS_BASE="https://atlas-api.1platform.pro/api/v1"
+
+# QA
+export ATLAS_BASE="https://atlas-api-qa.1platform.pro/api/v1"
+```
+
+> Desarrolla y prueba primero contra **QA**. QA es un despliegue separado con sus propios datos — tenants,
+> miembros, ítems del catálogo y entitlements **no** se trasladan a producción.
+
+## Prefijo de ruta de la API
+
+Cada endpoint documentado en esta sección vive bajo `/api/v1`. Por ejemplo, el endpoint del catálogo es:
+
+```
+https://atlas-api.1platform.pro/api/v1/public/catalog
+```
+
+Una solicitud directa a la raíz del host (`/`) devuelve un pequeño descriptor de servicio y no es parte de la superficie de
+la API.
+
+## Especificación OpenAPI
+
+El documento OpenAPI 3.1 legible por máquina se sirve en la **raíz del host** (no bajo `/api/v1`):
+
+| Entorno | URL de OpenAPI |
+|---|---|
+| Producción | `https://atlas-api.1platform.pro/openapi.json` |
+| QA | `https://atlas-api-qa.1platform.pro/openapi.json` |
+
+```bash
+curl -s https://atlas-api.1platform.pro/openapi.json | jq '.info'
+```
+
+También puedes explorar y probar cada endpoint de forma interactiva en la
+**[referencia de la Atlas API →](/api-reference/atlas-api)**.
+
+## Acotamiento por tenant por solicitud
+
+Ambos entornos son multitenant. Una URL base por sí sola no identifica un tenant — debes acotar cada
+solicitud mediante el header `Host` (tráfico de producción a través del propio dominio de un tenant) o un header explícito
+`X-Tenant-Slug`. Consulta [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution).
+
+## Consulta también
+
+- [Inicio rápido](/docs/saas/atlas-api/quickstart) — primeras llamadas contra un entorno.
+- [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution) — elige el tenant correcto por solicitud.
+- [Límites de uso](/docs/saas/atlas-api/rate-limits) — límites por entorno y backoff.

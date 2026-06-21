@@ -1,0 +1,86 @@
+---
+title: Reintentos y entrega
+description: Semántica de entrega at-least-once, calendario de reintentos, comportamiento dead-letter y los códigos de respuesta que 1Platform espera de tu manejador.
+sidebar_position: 5
+---
+
+# Reintentos y entrega
+
+## Garantías de entrega
+
+1Platform entrega los webhooks salientes con semántica **at-least-once**. Tu
+manejador **debe** ser idempotente — consulta
+[Recibir notificaciones → idempotencia](./receiving-notifications#idempotency-on-the-merchant-side).
+
+## Calendario de reintentos
+
+Cuando 1Platform recibe cualquier respuesta no exitosa (o la solicitud falla por
+completo), reintenta con backoff exponencial:
+
+| Intento | Espera antes del reintento | Tiempo acumulado |
+|---|---|---|
+| 1 | — | 0 |
+| 2 | 5 s | 5 s |
+| 3 | 30 s | 35 s |
+| 4 | 120 s | 155 s |
+
+Después de que el cuarto intento falla, el webhook se registra como
+`payment_webhook.exhausted_retries` y se descarta. Hoy no hay una cola
+dead-letter automática — los operadores deben reconciliar vía
+`GET /users/transactions` y un replay manual.
+
+:::caution[Planifica para caídas]
+Si tu backend está caído por más de ~3 minutos, espera perder algunas entregas
+de webhooks. Reconcilia periódicamente con
+`GET /users/transactions?from=...&to=...` para reponer los eventos perdidos.
+:::
+
+## Códigos de respuesta que 1Platform espera
+
+| Status | Comportamiento |
+|---|---|
+| `2xx` | Éxito. Sin reintento. |
+| `3xx` | **Se trata como falla** — tu manejador no debe redirigir, ni siquiera en duplicados. |
+| `4xx` | **Se trata como falla y se reintenta.** Aunque la solicitud sea "culpa tuya", 1Platform reintenta porque un encabezado `Authorization` mal configurado no debería descartar el evento silenciosamente. |
+| `5xx` | Se reintenta (esta es la ruta esperada para fallas transitorias). |
+| Conexión rechazada / falla de DNS / timeout | Se reintenta. |
+
+:::tip[Devuelve siempre 200 rápidamente]
+Acusa recibo con `200 OK` (o `202 Accepted`) y un cuerpo mínimo **antes** de
+ejecutar trabajo pesado. Difiere el cumplimiento a una cola en segundo plano para
+que un manejador lento no dispare reintentos espurios que amplifiquen la carga
+durante caídas.
+:::
+
+## Timeouts
+
+El dispatcher usa un timeout de solicitud de **10 segundos** por intento. Si tu
+manejador tarda más que eso, la solicitud fallará y 1Platform reintentará según
+el calendario anterior.
+
+## Concurrencia
+
+El dispatcher limita los webhooks salientes en vuelo a **20 envíos concurrentes
+por proceso**. Los webhooks que exceden este límite esperan hasta 5 s por un
+espacio antes de ser descartados — los eventos descartados aparecen como
+`payment_webhook.semaphore_timeout` en los logs y **no** se reintentan.
+
+Este límite protege a 1Platform del agotamiento de memoria cuando un comercio
+downstream responde con lentitud. Si necesitas mayor throughput, contacta a tu
+gerente de cuenta.
+
+## Encabezados en cada reintento
+
+| Encabezado | Notas |
+|---|---|
+| `X-Webhook-Signature` | Se recalcula en cada intento (el timestamp cambia entre reintentos) |
+| `X-Webhook-Timestamp` | También se recalcula — verifica la ventana de replay contra este valor |
+| `Content-Type: application/json` | Siempre |
+| Encabezados personalizados del campo `headers` de `body_template` | Se reenvían si están listados en el allowlist (`authorization`, `content-type`, `x-idempotency-key`, `x-request-id`, `x-webhook-signature`, `x-webhook-timestamp`) |
+
+## URLs internas vs externas
+
+Si la URL configurada apunta a un dominio 1platform.pro (p. ej. el endpoint
+interno de crédito de billing), el dispatcher **no reintenta** y usa un token
+bearer de vida corta en lugar de HMAC. Las URLs externas siempre usan HMAC + el
+calendario de reintentos anterior.

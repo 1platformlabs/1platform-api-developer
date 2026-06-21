@@ -1,0 +1,255 @@
+---
+title: "Retenciones y capturas de facturación"
+description: "Primitiva de facturación Autorizar+Capturar para operaciones asíncronas — reserva el saldo del usuario, ejecuta el trabajo y captura o reembolsa automáticamente. Cubre el ciclo de vida de BalanceHold, los headers, la idempotencia y el gate X-Plugin-Version."
+sidebar_position: 8
+---
+
+# Flujo: Retenciones y capturas de facturación (Autorizar + Capturar)
+
+## Vista general
+
+Las operaciones que tardan tiempo real en completarse (generación de contenido, trabajos por lotes, agentes de IA) necesitan un patrón de facturación que sea **seguro ante fallos**: si el trabajo falla después de debitar el saldo, el usuario debe ser reembolsado automáticamente — sin intervención manual.
+
+1Platform implementa el patrón **Autorizar + Capturar**, el mismo enfoque estándar de la industria para operaciones acotadas en el tiempo:
+
+```
+┌────────────────┐    ┌────────────────┐    ┌────────────────┐
+│   AUTHORIZE    │───▶│    EXECUTE     │───▶│    CAPTURE     │
+│ reserve funds  │    │ run async work │    │  debit funds   │
+└────────────────┘    └────────────────┘    └────────────────┘
+                              │
+                              │ on failure
+                              ▼
+                      ┌────────────────┐
+                      │    RELEASE     │
+                      │ refund balance │
+                      └────────────────┘
+```
+
+**Efecto sobre el saldo del usuario:**
+
+- `balance` — el libro contable absoluto. Solo se debita en la **CAPTURA**.
+- `reserved_balance` — fondos actualmente retenidos por registros `BalanceHold` ACTIVE. Aumentado por **AUTHORIZE**, disminuido por **CAPTURE** y **RELEASE**.
+- `available_balance = balance - reserved_balance` — la cantidad disponible para gastar en nuevas operaciones.
+
+---
+
+## ¿Cuándo se usa la ruta de retención?
+
+La ruta de retención se activa cuando se cumplen **las tres** condiciones:
+
+1. El endpoint soporta el patrón de retención (actualmente: `POST /api/v1/posts/content/`).
+2. El flag global `BILLING_USE_HOLD_CAPTURE_FOR_POSTS` es `true` (activado por defecto).
+3. El cliente envía `X-Plugin-Version: 2.36.0` o más reciente.
+
+Si falta cualquier condición, el endpoint recurre al comportamiento legado de cobrar primero. Esto mantiene a los clientes desplegados funcionando sin cambios mientras los plugins más nuevos obtienen el comportamiento más seguro automáticamente.
+
+| Versión del plugin | Ruta de facturación | Reembolso ante fallo en segundo plano |
+|---|---|---|
+| `< 2.36.0` (legado) | cobrar primero | ❌ sin reembolso automático (los fallos en segundo plano son poco frecuentes, solo remediación manual) |
+| `>= 2.36.0` | autorizar + capturar | ✅ automático — `BalanceHold` libera los fondos reservados |
+
+---
+
+## Ciclo de vida de BalanceHold
+
+Una retención es un documento pequeño que rastrea una reserva. Transiciona a través de cuatro estados:
+
+| Estado | Establecido por | Efecto secundario |
+|---|---|---|
+| `ACTIVE` | `authorize()` | `reserved_balance += amount` |
+| `CAPTURED` | `capture()` (éxito) | `balance -= amount`, `reserved_balance -= amount`, escribe `ConsumptionLog` |
+| `RELEASED` | `release()` (fallo / cancelación) | `reserved_balance -= amount` (el balance no se toca) |
+| `EXPIRED` | Worker de TTL (tick de 60s) | Mismos efectos que `RELEASED`, indica que el proceso se cayó o nunca se completó |
+
+Los **estados terminales** (CAPTURED, RELEASED, EXPIRED) son inmutables. Las llamadas posteriores a `capture` o `release` sobre una retención terminal no tienen efecto (idempotentes).
+
+**TTL:** cada retención se crea con `expires_at = now + 15 minutes` por defecto. Si el trabajo no se ha completado para entonces, el worker de TTL libera la reserva automáticamente. Esto evita que retenciones obsoletas bloqueen fondos indefinidamente si el proceso de la API se cae a mitad de un trabajo.
+
+---
+
+## Flujo de la solicitud — ejemplo de generación de contenido
+
+### 1. Enviar el trabajo
+
+```http
+POST /api/v1/posts/content/
+Authorization: Bearer ak-...
+x-user-token: sk-...
+X-Plugin-Version: 2.36.0
+X-Idempotency-Key: client-supplied-uuid-v4   # opcional pero recomendado
+Content-Type: application/json
+
+{
+  "keyword": "best running shoes 2026",
+  "lang": "en",
+  "country": "us",
+  "image_provider": "default"
+}
+```
+
+### 2. Respuesta (202 Accepted)
+
+El servidor crea la retención, la persiste en el trabajo, despacha el pipeline en segundo plano y devuelve de inmediato:
+
+```http
+HTTP/1.1 202 Accepted
+X-Hold-Id: 507f1f77bcf86cd799439099
+X-Operation-Cost: 0.05
+X-Available-Balance: 99.95
+Content-Type: application/json
+
+{
+  "success": true,
+  "data": {
+    "job_id": "65a1b2c3d4e5f6789abcdef4",
+    "type": "content",
+    "status": "pending",
+    "input": { "keyword": "best running shoes 2026", "hold_id": "507f1f77bcf86cd799439099", ... },
+    "created_at": "2026-05-19T10:30:00Z"
+  },
+  "msg": "Content generation job created for keyword: best running shoes 2026"
+}
+```
+
+**Observa:**
+- El `balance` del usuario sigue siendo **100.00** (aún no debitado).
+- `reserved_balance` es **0.05**.
+- `available_balance = 100.00 - 0.05 = 99.95` (devuelto en `X-Available-Balance`).
+
+### 3. El trabajo en segundo plano se ejecuta
+
+El pipeline de contenido se ejecuta en segundo plano. El proceso de la API ejecuta el flujo de generación de 10 capas. Dos resultados terminales:
+
+#### Éxito — CAPTURE
+
+```
+balance:           100.00 → 99.95   ✅ debited
+reserved_balance:    0.05 →  0.00   ✅ reservation released
+hold.status:       CAPTURED
+ConsumptionLog:    written with status=CHARGED, linked to hold_id
+```
+
+#### Fallo (error del proveedor, violación de invariante, etc.) — RELEASE
+
+```
+balance:           100.00 → 100.00  ✅ untouched
+reserved_balance:    0.05 →   0.00  ✅ fully released
+hold.status:       RELEASED
+hold.release_reason: "ProviderError" | "no_keywords" | etc.
+```
+
+### 4. Consultar el trabajo
+
+```http
+GET /api/v1/posts/content/{job_id}
+Authorization: Bearer ak-...
+x-user-token: sk-...
+```
+
+La respuesta incluye el estado actual del trabajo. Los clientes pueden inspeccionar la retención vinculada mediante el endpoint `holds`.
+
+---
+
+## Idempotencia
+
+La `idempotency_key` vincula una solicitud de autorización a una operación lógica para que los reintentos no cobren dos veces. Si una segunda `POST /api/v1/posts/content/` llega con la misma `X-Idempotency-Key` mientras la primera sigue en curso (o ya completada), el servidor devuelve la **misma retención** — nunca crea dos reservas.
+
+**Recomendado:** los clientes generan un UUIDv4 por solicitud lógica y lo pasan como `X-Idempotency-Key`. Si se omite, el servidor genera uno del lado del servidor y lo incluye en `X-Hold-Id`.
+
+---
+
+## Endpoints de transparencia
+
+### `GET /api/v1/holds`
+
+Lista las retenciones de saldo del usuario autenticado, las más recientes primero. Útil para renderizar una insignia "Reservado / Cobrado / Reembolsado" por trabajo en la interfaz del cliente.
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Por defecto | Notas |
+|---|---|---|---|
+| `status` | `active \| captured \| released \| expired` | — | Filtrar por estado del ciclo de vida |
+| `limit` | int (1-100) | 50 | Tamaño de página |
+| `skip` | int (>=0) | 0 | Desplazamiento de paginación |
+
+**Respuesta:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 3,
+    "items": [
+      {
+        "id": "507f1f77bcf86cd799439099",
+        "idempotency_key": "post_content_abc123",
+        "operation": "content_generation",
+        "owner": "posts.content",
+        "amount": "0.05",
+        "currency": "USD",
+        "status": "captured",
+        "created_at": "2026-05-19T10:30:00Z",
+        "expires_at": "2026-05-19T10:45:00Z",
+        "captured_at": "2026-05-19T10:33:00Z",
+        "released_at": null,
+        "release_reason": null
+      }
+    ]
+  },
+  "msg": "Balance holds retrieved"
+}
+```
+
+### `GET /api/v1/holds/{hold_id}`
+
+Obtiene una sola retención por su id. Devuelve `404` si la retención no existe o pertenece a otro usuario.
+
+---
+
+## Referencia de headers
+
+| Header | Dirección | Notas |
+|---|---|---|
+| `X-Plugin-Version` | Solicitud | **Requerido para la ruta de retención.** Formato `MAJOR.MINOR.PATCH`. Envía `2.36.0` o superior para optar por Autorizar+Capturar |
+| `X-Idempotency-Key` | Solicitud | Clave UUID/correlación opcional. Si se omite, el servidor genera una |
+| `X-Hold-Id` | Respuesta | ObjectId del `BalanceHold` creado |
+| `X-Operation-Cost` | Respuesta | Cadena decimal del monto reservado (preserva la precisión) |
+| `X-Available-Balance` | Respuesta | Cadena decimal — `balance - reserved_balance` después de autorizar |
+
+---
+
+## Códigos de error
+
+| HTTP | `error_code` (en el cuerpo) | Disparado por | Qué debe hacer el cliente |
+|---|---|---|---|
+| 402 | `insufficient_balance` | `available_balance < amount` al momento de autorizar | Solicitar al usuario que recargue |
+| 404 | `billing_not_found` | El usuario no tiene registro `Billing` | Aprovisionar la facturación para el usuario |
+| 422 | `no_keywords` | La investigación de keywords devolvió 0 títulos utilizables (la corrección de invariante para #117) | Sugerir una keyword diferente. La retención se libera — sin cobro |
+| 422 | `content_invariant_violation` | El pipeline de contenido produjo una salida por debajo del umbral mínimo de calidad | Reintentar el trabajo. La retención se libera |
+| 429 | `daily_limit_exceeded` | Usuario de plan gratuito que superó su cuota diaria | Mejorar el plan o esperar hasta la medianoche UTC |
+
+---
+
+## Precisión monetaria
+
+Todos los campos monetarios en el cable son **cadenas decimales** (p. ej., `"49.95"`, no `49.95`). Esto preserva la precisión sobre JSON, que no tiene un tipo decimal exacto nativo. Los clientes deben parsearlos con una librería decimal (Python `Decimal`, librería de dinero respaldada por `BigInt` en JS, PHP `BCMath`, etc.) — nunca como `float`.
+
+```javascript
+// Ejemplo en JS
+import Big from 'big.js';
+const amount = new Big(response.data.amount); // "0.05" → Big(0.05)
+```
+
+```php
+// Ejemplo en PHP
+$amount = bcadd("0.00", $response["data"]["amount"], 8); // aritmética de cadenas
+```
+
+---
+
+## Lo que NO está en el alcance (todavía)
+
+- **Capturas parciales.** Hoy el `amount` completo se captura o se libera por entero. Las capturas parciales por paso se rastrean como un seguimiento posterior (permitirá cobrar "keywords sí, imágenes no" de forma granular).
+- **Reembolso después de la captura.** Una vez que una retención está `CAPTURED`, llamar a `release` no tiene efecto (con una advertencia registrada). Revertir una captura requiere la ruta existente `consumption_service.refund`.
+- **Retenciones en flujos distintos al Post Generator.** La primitiva es reutilizable — futuros agentes asíncronos y operaciones por lotes la usarán — pero hoy solo `POST /api/v1/posts/content/` está cableado.

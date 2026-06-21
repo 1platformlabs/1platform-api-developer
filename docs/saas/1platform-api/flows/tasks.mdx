@@ -1,0 +1,474 @@
+---
+title: "Tareas"
+description: "Flujo paso a paso para listar, crear, actualizar y eliminar tareas de usuario (todo / in_progress / done) mediante la 1Platform API."
+sidebar_position: 20
+---
+
+# Flujo: Tareas
+
+## Vista general
+
+Este flujo documenta cómo un dashboard o un widget de productividad se integra con el subsistema de tareas de usuario: listar tareas filtradas por estado, crear nuevas tareas con fechas de vencimiento opcionales, actualizar el estado a medida que avanza el trabajo y eliminar tareas cuando ya no son relevantes.
+
+**Caso de uso:** Incrustar una lista personal de pendientes dentro de un dashboard whitelabel para que los usuarios puedan dar seguimiento a los recordatorios generados por otras funciones (escribir una página legal faltante, revisar un post generado por IA, renovar un dominio).
+
+**Resultado final:** El usuario dispone de una interfaz CRUD funcional sobre sus tareas, y otras partes del dashboard pueden programar seguimientos de forma programática creando tareas con fechas de vencimiento.
+
+---
+
+## Requisitos previos
+
+| Requisito | Detalles |
+|---|---|
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+
+### Headers requeridos en todas las solicitudes
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+---
+
+## Variables usadas en los ejemplos
+
+```bash
+BASE_URL="https://api.1platform.pro/api/v1"
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
+TASK_ID=""      # Obtenido en el Paso 3
+```
+
+---
+
+## Modelo de datos
+
+### Objeto Task
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `id` | string | Sí | ObjectId de MongoDB de la tarea |
+| `title` | string | Sí | Título corto mostrado en la lista |
+| `description` | string | Sí | Descripción libre (se permite Markdown) |
+| `status` | string | Sí | Uno de `todo`, `in_progress`, `done` |
+| `due_at` | string \| null | Sí | Fecha de vencimiento opcional en ISO-8601 |
+| `completed_at` | string \| null | Sí | Marca de tiempo ISO-8601 establecida cuando el estado pasa a `done` |
+| `created_at` | string | Sí | Marca de tiempo ISO-8601 de creación |
+| `updated_at` | string | Sí | Marca de tiempo ISO-8601 de la última actualización |
+
+### Payload de creación
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `title` | string | Sí | Título de la tarea |
+| `description` | string | No | Descripción opcional |
+| `due_at` | string \| null | No | Fecha de vencimiento opcional en ISO-8601 (p. ej., `"2026-04-30T18:00:00Z"`) |
+
+### Payload de actualización
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `title` | string \| null | No | Reemplaza el título (omite o envía `null` para conservar el actual) |
+| `description` | string \| null | No | Reemplaza la descripción |
+| `status` | string \| null | No | Nuevo estado (`todo`, `in_progress`, `done`) |
+| `due_at` | string \| null | No | Reemplaza la fecha de vencimiento |
+
+---
+
+## Flujo paso a paso
+
+### Paso 0 — Obtener el token de aplicación
+
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la aplicación.
+
+**Endpoint:** `POST /api/v1/auth/token`
+
+**Auth:** Ninguna (este es el punto de entrada)
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "App token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` faltante o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+
+---
+
+### Paso 1 — Obtener el token de usuario
+
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
+
+**Endpoint:** `POST /api/v1/users/token`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 1800
+  },
+  "msg": "User token generated successfully"
+}
+```
+
+:::note
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` faltante | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+:::tip
+Si todavía no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
+:::
+
+---
+
+### Paso 2 — Listar tareas
+
+**Objetivo:** Paginar las tareas del usuario, opcionalmente filtrando por estado.
+
+**Endpoint:** `GET /api/v1/tasks`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+**Parámetros de consulta:**
+
+| Parámetro | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `status` | string \| null | No | Filtra por `todo`, `in_progress` o `done` |
+| `skip` | integer | No | Desplazamiento para la paginación (por defecto `0`) |
+| `limit` | integer | No | Tamaño de página (por defecto `20`) |
+
+```bash
+curl -X GET "$BASE_URL/tasks?status=todo&limit=20" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "title": "Revisar artículo \"Guía SEO 2026\"",
+      "description": "Aprobar o pedir cambios antes del viernes.",
+      "status": "todo",
+      "due_at": "2026-05-02T18:00:00Z",
+      "completed_at": null,
+      "created_at": "2026-04-25T10:00:00Z",
+      "updated_at": "2026-04-25T10:00:00Z"
+    }
+  ],
+  "msg": "Tasks fetched successfully"
+}
+```
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | Valor de `status` inválido o parámetros de paginación no enteros | Usa `todo`/`in_progress`/`done` y desplazamientos enteros |
+
+---
+
+### Paso 3 — Crear una tarea
+
+**Objetivo:** Agregar una nueva tarea a la lista, opcionalmente con una fecha de vencimiento.
+
+**Endpoint:** `POST /api/v1/tasks`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X POST "$BASE_URL/tasks" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Renovar dominio example.org",
+    "description": "El dominio expira el 30/04. Renovar al menos 7 días antes.",
+    "due_at": "2026-04-23T00:00:00Z"
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439020",
+    "title": "Renovar dominio example.org",
+    "description": "El dominio expira el 30/04. Renovar al menos 7 días antes.",
+    "status": "todo",
+    "due_at": "2026-04-23T00:00:00Z",
+    "completed_at": null,
+    "created_at": "2026-04-27T15:30:00Z",
+    "updated_at": "2026-04-27T15:30:00Z"
+  },
+  "msg": "Task created successfully"
+}
+```
+
+:::note
+Guarda `data.id` como `$TASK_ID`. Las tareas nuevas siempre comienzan con estado `todo` y `completed_at: null`.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | `title` faltante o formato de `due_at` inválido | Envía un título válido y una marca de tiempo ISO-8601 |
+
+---
+
+### Paso 4 — Actualizar una tarea
+
+**Objetivo:** Cambiar el estado, el título, la descripción o la fecha de vencimiento de una tarea.
+
+**Endpoint:** `PATCH /api/v1/tasks/{task_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X PATCH "$BASE_URL/tasks/$TASK_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "done"
+  }'
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "507f1f77bcf86cd799439020",
+    "title": "Renovar dominio example.org",
+    "description": "El dominio expira el 30/04. Renovar al menos 7 días antes.",
+    "status": "done",
+    "due_at": "2026-04-23T00:00:00Z",
+    "completed_at": "2026-04-27T16:00:00Z",
+    "created_at": "2026-04-27T15:30:00Z",
+    "updated_at": "2026-04-27T16:00:00Z"
+  },
+  "msg": "Task updated successfully"
+}
+```
+
+:::note
+Establecer `status` en `done` completa automáticamente `completed_at` del lado del servidor. Revertir a `todo` o `in_progress` lo limpia.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 404 | La tarea no existe o pertenece a otro usuario | Verifica `$TASK_ID` |
+| 422 | Valor de `status` inválido o `due_at` malformado | Usa un valor de enum válido y una marca de tiempo ISO-8601 |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+
+---
+
+### Paso 5 — Eliminar una tarea
+
+**Objetivo:** Eliminar una tarea de forma permanente.
+
+**Endpoint:** `DELETE /api/v1/tasks/{task_id}`
+
+**Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
+
+```bash
+curl -X DELETE "$BASE_URL/tasks/$TASK_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true,
+    "id": "507f1f77bcf86cd799439020"
+  },
+  "msg": "Task deleted successfully"
+}
+```
+
+:::warning
+Esta acción es irreversible. La tarea y su historial se eliminan.
+:::
+
+**Errores comunes:**
+
+| Código | Causa | Solución |
+|---|---|---|
+| 422 | Parámetro de ruta `task_id` malformado | Usa un ObjectId válido |
+
+---
+
+## Ejemplo completo de extremo a extremo
+
+Flujo completo con valores ficticios consistentes.
+
+```bash
+# === VARIABLES ===
+BASE_URL="https://api.1platform.pro/api/v1"
+
+# === PASO 0: Obtener el token de aplicación ===
+APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "ak-prod-app-key-2026"}' \
+  | jq -r '.data.access_token')
+
+# === PASO 1: Obtener el token de usuario ===
+USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "sk-user-maria-2026"}' \
+  | jq -r '.data.access_token')
+
+# === PASO 2: Listar tareas todo ===
+curl -s -X GET "$BASE_URL/tasks?status=todo&limit=10" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+
+# === PASO 3: Crear una tarea ===
+TASK_ID=$(curl -s -X POST "$BASE_URL/tasks" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Demo task",
+    "description": "Sent from the Integration Flows guide",
+    "due_at": "2026-05-15T00:00:00Z"
+  }' | jq -r '.data.id')
+
+echo "TASK_ID: $TASK_ID"
+
+# === PASO 4: Marcar como in_progress, luego done ===
+curl -s -X PATCH "$BASE_URL/tasks/$TASK_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "in_progress"}' | jq
+
+curl -s -X PATCH "$BASE_URL/tasks/$TASK_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "done"}' | jq
+
+# === PASO 5: Eliminar ===
+curl -s -X DELETE "$BASE_URL/tasks/$TASK_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" | jq
+```
+
+---
+
+## Idempotencia y buenas prácticas
+
+### Idempotencia
+- `POST /tasks` **no** es idempotente: cada llamada crea una nueva tarea.
+- `PATCH /tasks/{id}` es idempotente: enviar el mismo payload dos veces produce el mismo estado final.
+- `DELETE /tasks/{id}` es idempotente: eliminar una tarea ya eliminada devuelve el mismo resultado (o 404; maneja ambos casos).
+
+### Reintentos
+- Para errores **5xx** en `POST /tasks`, reintenta con cuidado o usa una clave de deduplicación del lado del cliente.
+- Para **PATCH** y **DELETE**, reintenta con seguridad: ambos son idempotentes.
+- Para **429**, aplica backoff y reintenta.
+- Para **401**, regenera los tokens.
+
+### Timeouts
+- Todos los endpoints son CRUD simples: establece un timeout de cliente de 5 segundos.
+
+### Tokens
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa una renovación automática antes de la expiración.
+
+### Validaciones importantes
+- `status` debe ser uno de `todo`, `in_progress`, `done`.
+- `due_at` debe ser una marca de tiempo ISO-8601 válida; `null` limpia la fecha de vencimiento.
+- La API establece y limpia automáticamente `completed_at` según `status`.
+
+---
+
+## Referencia rápida de endpoints
+
+| Paso | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `GET` | `/api/v1/tasks` | Listar tareas (paginadas, filtrables) |
+| 3 | `POST` | `/api/v1/tasks` | Crear una tarea |
+| 4 | `PATCH` | `/api/v1/tasks/{task_id}` | Actualizar una tarea |
+| 5 | `DELETE` | `/api/v1/tasks/{task_id}` | Eliminar una tarea |
+
+---
+
+## Checklist rápido
+
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Listé tareas filtradas por estado
+- [ ] Creé una tarea y guardé su `id`
+- [ ] Actualicé el estado de la tarea a lo largo de su ciclo de vida (todo → in_progress → done)
+- [ ] Confirmé que la eliminación funciona mediante `DELETE /tasks/{task_id}`

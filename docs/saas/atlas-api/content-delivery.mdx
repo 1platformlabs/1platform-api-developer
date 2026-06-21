@@ -1,18 +1,18 @@
 ---
-title: Content delivery
-description: Mint short-lived, entitlement-checked playback tickets on the Atlas API — signed-URL downloads and HLS streaming envelopes, resolved per tenant archetype.
-sidebar_position: 8
+title: Entrega de contenido
+description: Genera tickets de reproducción de corta duración y verificados por entitlement en la Atlas API — descargas con URL firmada y envoltorios de streaming HLS, resueltos por arquetipo de tenant.
+sidebar_position: 9
 ---
 
-# Content delivery
+# Entrega de contenido
 
-Atlas never hands out a permanent link to the underlying file. Instead, an authenticated member
-requests a **playback ticket** — a short-lived, entitlement-checked credential that points at the
-asset. Depending on the tenant's [archetype](/docs/saas/atlas-api/tenant-resolution), the ticket is
-either a **signed URL** (downloadable files: ebooks, audio) or an **HLS streaming envelope** (video,
-live, TV) carrying a DRM token.
+Atlas nunca entrega un enlace permanente al archivo subyacente. En su lugar, un miembro autenticado
+solicita un **ticket de reproducción** — una credencial de corta duración, verificada por entitlement, que apunta al
+asset. Dependiendo del [arquetipo](/docs/saas/atlas-api/tenant-resolution) del tenant, el ticket es
+una **URL firmada** (archivos descargables: ebooks, audio) o un **envoltorio de streaming HLS** (video,
+live, TV) que porta un token de DRM.
 
-## Mint a playback ticket
+## Generar un ticket de reproducción
 
 ```bash
 curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=epub" \
@@ -32,73 +32,73 @@ curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=epub" \
 }
 ```
 
-### Response fields
+### Campos de la respuesta
 
-| Field | Description |
+| Campo | Descripción |
 |---|---|
-| `content_id` | The item this ticket is for. |
-| `delivery_kind` | `signed_url` (file download) or `hls` (streaming). |
-| `url` | The asset URL — a signed download link, or an HLS manifest URL. |
-| `expires_in_seconds` | Ticket lifetime (currently ~600s / 10 minutes). Re-request after expiry. |
-| `drm_token` | Present for HLS envelopes; bound to (content, member, expiry). `null` for signed-URL downloads. |
-| `renderable` | `false` only when a format has no renderable representation yet — the client should degrade to download/open-externally instead of opening an in-app reader. |
-| `render_format` | The engine format the client should render with (e.g. `epub`). |
+| `content_id` | El ítem para el que es este ticket. |
+| `delivery_kind` | `signed_url` (descarga de archivo) o `hls` (streaming). |
+| `url` | La URL del asset — un enlace de descarga firmado, o una URL de manifiesto HLS. |
+| `expires_in_seconds` | Vida útil del ticket (actualmente ~600s / 10 minutos). Vuelve a solicitarlo tras la expiración. |
+| `drm_token` | Presente en envoltorios HLS; ligado a (content, member, expiry). `null` para descargas con URL firmada. |
+| `renderable` | `false` solo cuando un formato aún no tiene una representación renderizable — el cliente debe degradar a descargar/abrir externamente en lugar de abrir un lector in-app. |
+| `render_format` | El formato del motor con el que el cliente debe renderizar (p. ej., `epub`). |
 
-### The `format` hint
+### La pista `format`
 
-The optional `?format=` query selects which uploaded asset to deliver — `pdf`, `epub`, `mobi`,
-`mp3`, `m4a`, etc. When omitted, the strategy picks the first uploaded format from the item's
-metadata, or its strategy default.
+La consulta opcional `?format=` selecciona qué asset subido entregar — `pdf`, `epub`, `mobi`,
+`mp3`, `m4a`, etc. Cuando se omite, la estrategia elige el primer formato subido de los
+metadatos del ítem, o el formato por defecto de su estrategia.
 
 ```bash
-# Audio download
+# Descarga de audio
 curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=mp3" \
   -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
 ```
 
-A format that is not in the tenant's allow-list returns `403 { "code": "ASSET_FORMAT_NOT_ALLOWED" }`.
+Un formato que no esté en la lista de permitidos del tenant devuelve `403 { "code": "ASSET_FORMAT_NOT_ALLOWED" }`.
 
-## Delivery strategy by archetype
+## Estrategia de entrega por arquetipo
 
-The delivery strategy is resolved from the tenant's archetype — you don't choose it per request:
+La estrategia de entrega se resuelve a partir del arquetipo del tenant — no la eliges por solicitud:
 
-| Archetypes | `delivery_kind` | Shape |
+| Arquetipos | `delivery_kind` | Forma |
 |---|---|---|
-| `library`, `podcast`, `education` | `signed_url` | A signed, expiring URL to the file. The client downloads or opens it. |
-| `streaming`, `live`, `tv`, `events` | `hls` | An HLS manifest URL plus a `drm_token` bound to the member and expiry. |
+| `library`, `podcast`, `education` | `signed_url` | Una URL firmada y con expiración al archivo. El cliente lo descarga o lo abre. |
+| `streaming`, `live`, `tv`, `events` | `hls` | Una URL de manifiesto HLS más un `drm_token` ligado al miembro y a la expiración. |
 
-## Access control
+## Control de acceso
 
-Before minting a ticket, Atlas enforces access:
+Antes de generar un ticket, Atlas hace cumplir el acceso:
 
-1. **Operators bypass.** A caller with an `admin` or `operator` role skips the entitlement check and
-   format/quota guards (they own the catalog they uploaded). Each bypass is written to the audit log.
-2. **Active entitlement.** A regular member must hold an active entitlement covering the item.
-3. **Lazy auto-grant.** On free-tier tenants, if the member has no entitlement yet, Atlas attempts an
-   inline grant and re-checks — covering the case where the grant at sign-in didn't land.
-4. **Denied.** Otherwise the request fails with the subscription wall:
+1. **Los operadores se saltan la verificación.** Un llamador con rol `admin` u `operator` se salta la verificación de entitlement
+   y las guardas de formato/cuota (son dueños del catálogo que subieron). Cada salto se escribe en el log de auditoría.
+2. **Entitlement activo.** Un miembro regular debe tener un entitlement activo que cubra el ítem.
+3. **Auto-grant perezoso.** En tenants de nivel gratuito, si el miembro aún no tiene entitlement, Atlas intenta un
+   grant en línea y vuelve a verificar — cubriendo el caso en que el grant al iniciar sesión no se concretó.
+4. **Denegado.** De lo contrario, la solicitud falla con el muro de suscripción:
 
 ```json
 { "code": "ENTITLEMENT_DENIED" }
 ```
 
-(HTTP `403`.) See [Entitlements](/docs/saas/atlas-api/entitlements) for how access is granted.
+(HTTP `403`.) Consulta [Entitlements](/docs/saas/atlas-api/entitlements) para saber cómo se concede el acceso.
 
-## Client flow
+## Flujo del cliente
 
 ```text
-GET /public/items/{slug}                         → discover the item (anonymous)
-GET /delivery/items/{content_id}/playback        → mint a ticket (JWT required)
-   ├─ delivery_kind = signed_url  → GET url       → download / open the file
-   └─ delivery_kind = hls         → play url       → HLS player uses drm_token
-(ticket expires)                                  → re-request the ticket
+GET /public/items/{slug}                         → descubre el ítem (anónimo)
+GET /delivery/items/{content_id}/playback        → genera un ticket (JWT requerido)
+   ├─ delivery_kind = signed_url  → GET url       → descarga / abre el archivo
+   └─ delivery_kind = hls         → play url       → el reproductor HLS usa drm_token
+(el ticket expira)                                → vuelve a solicitar el ticket
 ```
 
-Tickets are intentionally short-lived. Treat the `url` as ephemeral: fetch it just before playback,
-don't cache or share it, and re-mint when `expires_in_seconds` elapses.
+Los tickets son intencionalmente de corta duración. Trata la `url` como efímera: obtenla justo antes de la reproducción,
+no la caches ni la compartas, y vuelve a generarla cuando transcurra `expires_in_seconds`.
 
-## See also
+## Consulta también
 
-- [Entitlements](/docs/saas/atlas-api/entitlements) — granting and checking access.
-- [Catalog browsing](/docs/saas/atlas-api/catalog-browsing) — find the `content_id` / slug to deliver.
-- [Errors](/docs/saas/atlas-api/errors) — `ENTITLEMENT_DENIED`, `ASSET_FORMAT_NOT_ALLOWED`.
+- [Entitlements](/docs/saas/atlas-api/entitlements) — conceder y verificar el acceso.
+- [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing) — encuentra el `content_id` / slug a entregar.
+- [Errores](/docs/saas/atlas-api/errors) — `ENTITLEMENT_DENIED`, `ASSET_FORMAT_NOT_ALLOWED`.

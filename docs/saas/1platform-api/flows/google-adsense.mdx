@@ -1,31 +1,31 @@
 ---
 title: "Google AdSense"
-description: "Step-by-step flow to connect Google AdSense, view earnings, manage sites, handle alerts and policy issues via the 1Platform API."
+description: "Flujo paso a paso para conectar Google AdSense, ver ingresos, gestionar sitios y manejar alertas y problemas de políticas mediante la 1Platform API."
 sidebar_position: 11
 ---
 
-# Flow: Google AdSense
+# Flujo: Google AdSense
 
-## Overview
+## Vista general
 
-This flow documents how to integrate Google AdSense with your websites through the 1Platform API. It covers OAuth authorization, connecting AdSense accounts, viewing earnings (overview, by page, custom reports), managing sites, monitoring alerts and policy issues, and disconnecting or repairing connections.
+Este flujo documenta cómo integrar Google AdSense con tus sitios web a través de la 1Platform API. Cubre la autorización OAuth, la conexión de cuentas de AdSense, la consulta de ingresos (vista general, por página, reportes personalizados), la gestión de sitios, el monitoreo de alertas y problemas de políticas, y la desconexión o reparación de conexiones.
 
-**Use case:** Connect your users' websites to Google AdSense, monitor ad earnings and performance, track policy issues and alerts, and manage the full AdSense lifecycle — all through a unified API.
+**Caso de uso:** Conectar los sitios web de tus usuarios a Google AdSense, monitorear los ingresos y el rendimiento de los anuncios, hacer seguimiento de problemas de políticas y alertas, y gestionar todo el ciclo de vida de AdSense, todo a través de una API unificada.
 
-**End result:** A fully connected Google AdSense account with access to earnings data, site management, alerts monitoring, and policy issue tracking.
+**Resultado final:** Una cuenta de Google AdSense completamente conectada con acceso a datos de ingresos, gestión de sitios, monitoreo de alertas y seguimiento de problemas de políticas.
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| User API Key | User key (`sk-...`) obtained when creating the user |
-| Website registered | A website must be registered via the Manage Websites flow |
-| Google AdSense account | An active Google AdSense account is required |
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Sitio web registrado | Debe registrarse un sitio web mediante el flujo de Gestión de Sitios Web |
+| Cuenta de Google AdSense | Se requiere una cuenta activa de Google AdSense |
 
-### Required headers for all requests
+### Headers requeridos para todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -35,28 +35,28 @@ Content-Type: application/json
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
 USER_API_KEY="sk-user-abc123"
-APP_TOKEN=""      # Obtained in Step 0
-USER_TOKEN=""     # Obtained in Step 1
-WEBSITE_ID=""     # Website ID to connect AdSense to
+APP_TOKEN=""      # Obtenido en el Paso 0
+USER_TOKEN=""     # Obtenido en el Paso 1
+WEBSITE_ID=""     # ID del sitio web al que conectar AdSense
 ```
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -64,7 +64,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -79,26 +79,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcto y que la app esté activa |
+| 422 | Campo `apiKey` ausente o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Get User Token
+### Paso 1 — Obtener el token de usuario
 
-**Goal:** Authenticate the user and obtain the user JWT token.
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
 
 **Endpoint:** `POST /api/v1/users/token`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users/token" \
@@ -107,7 +107,7 @@ curl -X POST "$BASE_URL/users/token" \
   -d '{"apiKey": "'$USER_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -122,26 +122,26 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 :::note
-Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
-| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 :::tip
-If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
 :::
 
 ---
 
-### Step 2 — Start OAuth Authorization
+### Paso 2 — Iniciar la autorización OAuth
 
-**Goal:** Initiate the Google OAuth flow for AdSense. The API returns an authorization URL that the user must visit in their browser to grant access.
+**Objetivo:** Iniciar el flujo OAuth de Google para AdSense. La API devuelve una URL de autorización que el usuario debe visitar en su navegador para conceder el acceso.
 
 **Endpoint:** `GET /api/v1/adsense/oauth/authorize`
 
@@ -153,13 +153,13 @@ curl -X GET "$BASE_URL/adsense/oauth/authorize?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID to authorize AdSense for |
+| `website_id` | string | Sí | ID del sitio web para el que se autoriza AdSense |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -173,22 +173,22 @@ curl -X GET "$BASE_URL/adsense/oauth/authorize?website_id=$WEBSITE_ID" \
 ```
 
 :::warning
-The user must open the `authorization_url` in their browser, sign in with their Google account, and grant AdSense permissions. The OAuth callback is handled automatically by 1Platform. After authorization, use Step 3 to verify the OAuth status before connecting.
+El usuario debe abrir la `authorization_url` en su navegador, iniciar sesión con su cuenta de Google y conceder los permisos de AdSense. El callback OAuth lo gestiona automáticamente 1Platform. Tras la autorización, usa el Paso 3 para verificar el estado de OAuth antes de conectar.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Missing or invalid authentication token | Regenerate tokens (Steps 0 and 1) |
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | Token de autenticación ausente o inválido | Regenera los tokens (Pasos 0 y 1) |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 ---
 
-### Step 3 — Check OAuth Status
+### Paso 3 — Verificar el estado de OAuth
 
-**Goal:** Verify whether the user has completed the Google OAuth authorization for AdSense.
+**Objetivo:** Verificar si el usuario ha completado la autorización OAuth de Google para AdSense.
 
 **Endpoint:** `GET /api/v1/adsense/oauth/status`
 
@@ -200,13 +200,13 @@ curl -X GET "$BASE_URL/adsense/oauth/status?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID to check OAuth status for |
+| `website_id` | string | Sí | ID del sitio web para el que se verifica el estado de OAuth |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -221,20 +221,20 @@ curl -X GET "$BASE_URL/adsense/oauth/status?website_id=$WEBSITE_ID" \
 ```
 
 :::tip
-Poll this endpoint after the user visits the authorization URL (Step 2). Once `oauth_connected` is `true`, proceed to Step 4 to connect AdSense.
+Sondea este endpoint después de que el usuario visite la URL de autorización (Paso 2). Una vez que `oauth_connected` sea `true`, continúa con el Paso 4 para conectar AdSense.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 4 — Connect AdSense
+### Paso 4 — Conectar AdSense
 
-**Goal:** Activate the AdSense connection for the website after OAuth has been authorized.
+**Objetivo:** Activar la conexión de AdSense para el sitio web una vez que OAuth ha sido autorizado.
 
 **Endpoint:** `POST /api/v1/adsense/connect`
 
@@ -246,13 +246,13 @@ curl -X POST "$BASE_URL/adsense/connect?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID to connect AdSense for |
+| `website_id` | string | Sí | ID del sitio web para el que se conecta AdSense |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -276,26 +276,26 @@ curl -X POST "$BASE_URL/adsense/connect?website_id=$WEBSITE_ID" \
 ```
 
 :::note
-The response is an `AdSenseStatusResponse` object. Key fields:
-- `status` — Connection status (`"active"`, `"disconnected"`, `"error"`)
-- `publisher_id` — Your AdSense publisher ID (format: `pub-NNNN`)
-- `site_state` — Google's approval state for this site (e.g., `"READY"`, `"REQUIRES_REVIEW"`)
-- `site_auto_ads_enabled` — Whether auto ads are enabled for this site
+La respuesta es un objeto `AdSenseStatusResponse`. Campos clave:
+- `status` — Estado de la conexión (`"active"`, `"disconnected"`, `"error"`)
+- `publisher_id` — Tu ID de editor de AdSense (formato: `pub-NNNN`)
+- `site_state` — Estado de aprobación de Google para este sitio (p. ej., `"READY"`, `"REQUIRES_REVIEW"`)
+- `site_auto_ads_enabled` — Si los anuncios automáticos están habilitados para este sitio
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | OAuth not authorized | Complete the OAuth flow first (Steps 2 and 3) |
-| 409 | Already active or invalid state transition | Check current status with `GET /adsense/status`. The connection may already be active |
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 400 | OAuth no autorizado | Completa primero el flujo OAuth (Pasos 2 y 3) |
+| 409 | Ya está activo o transición de estado inválida | Verifica el estado actual con `GET /adsense/status`. La conexión puede que ya esté activa |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 5 — Get AdSense Status
+### Paso 5 — Obtener el estado de AdSense
 
-**Goal:** Retrieve the current AdSense connection status for a website.
+**Objetivo:** Recuperar el estado actual de la conexión de AdSense para un sitio web.
 
 **Endpoint:** `GET /api/v1/adsense/status`
 
@@ -307,13 +307,13 @@ curl -X GET "$BASE_URL/adsense/status?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID to check status for |
+| `website_id` | string | Sí | ID del sitio web para el que se verifica el estado |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -336,17 +336,17 @@ curl -X GET "$BASE_URL/adsense/status?website_id=$WEBSITE_ID" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 6 — List AdSense Accounts
+### Paso 6 — Listar cuentas de AdSense
 
-**Goal:** Retrieve the list of AdSense accounts available for the authorized Google account.
+**Objetivo:** Recuperar la lista de cuentas de AdSense disponibles para la cuenta de Google autorizada.
 
 **Endpoint:** `GET /api/v1/adsense/accounts`
 
@@ -358,15 +358,15 @@ curl -X GET "$BASE_URL/adsense/accounts?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID with an active AdSense connection |
-| `page` | integer | No | Page number (default: 1) |
-| `page_size` | integer | No | Items per page (1-100, default: 50) |
+| `website_id` | string | Sí | ID del sitio web con una conexión de AdSense activa |
+| `page` | integer | No | Número de página (por defecto: 1) |
+| `page_size` | integer | No | Elementos por página (1-100, por defecto: 50) |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -386,17 +386,17 @@ curl -X GET "$BASE_URL/adsense/accounts?website_id=$WEBSITE_ID" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 7 — List AdSense Sites
+### Paso 7 — Listar sitios de AdSense
 
-**Goal:** Retrieve the list of sites registered in the AdSense account.
+**Objetivo:** Recuperar la lista de sitios registrados en la cuenta de AdSense.
 
 **Endpoint:** `GET /api/v1/adsense/sites`
 
@@ -408,15 +408,15 @@ curl -X GET "$BASE_URL/adsense/sites?website_id=$WEBSITE_ID&page=1&page_size=20"
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID with an active AdSense connection |
-| `page` | integer | No | Page number for pagination |
-| `page_size` | integer | No | Number of results per page |
+| `website_id` | string | Sí | ID del sitio web con una conexión de AdSense activa |
+| `page` | integer | No | Número de página para la paginación |
+| `page_size` | integer | No | Número de resultados por página |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -444,17 +444,17 @@ curl -X GET "$BASE_URL/adsense/sites?website_id=$WEBSITE_ID&page=1&page_size=20"
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` query parameter |
+| 422 | Error de validación — parámetros ausentes o inválidos | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 8 — Sync Site State
+### Paso 8 — Sincronizar el estado del sitio
 
-**Goal:** Force a sync of the site state from Google AdSense to update the local status (approval state, auto ads, etc.).
+**Objetivo:** Forzar una sincronización del estado del sitio desde Google AdSense para actualizar el estado local (estado de aprobación, anuncios automáticos, etc.).
 
 **Endpoint:** `POST /api/v1/adsense/sites/sync`
 
@@ -466,13 +466,13 @@ curl -X POST "$BASE_URL/adsense/sites/sync?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID to sync site state for |
+| `website_id` | string | Sí | ID del sitio web cuyo estado se va a sincronizar |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -487,20 +487,20 @@ curl -X POST "$BASE_URL/adsense/sites/sync?website_id=$WEBSITE_ID" \
 ```
 
 :::tip
-Use this endpoint after making changes in the Google AdSense dashboard (e.g., enabling auto ads or submitting a site for review) to ensure the local state reflects the latest configuration.
+Usa este endpoint después de hacer cambios en el panel de Google AdSense (p. ej., habilitar anuncios automáticos o enviar un sitio a revisión) para asegurar que el estado local refleje la configuración más reciente.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 9 — Earnings Overview
+### Paso 9 — Vista general de ingresos
 
-**Goal:** Retrieve an overview of AdSense earnings for the website, with optional comparison to a previous period.
+**Objetivo:** Recuperar una vista general de los ingresos de AdSense del sitio web, con comparación opcional con un período anterior.
 
 **Endpoint:** `GET /api/v1/adsense/earnings/overview`
 
@@ -512,15 +512,15 @@ curl -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=3
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID with an active AdSense connection |
-| `period` | string | No | Report period (e.g., `"7d"`, `"30d"`, `"90d"`) |
-| `compare` | boolean | No | Compare with the previous period of the same length |
+| `website_id` | string | Sí | ID del sitio web con una conexión de AdSense activa |
+| `period` | string | No | Período del reporte (p. ej., `"7d"`, `"30d"`, `"90d"`) |
+| `compare` | boolean | No | Comparar con el período anterior de la misma duración |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -575,20 +575,20 @@ curl -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=3
 ```
 
 :::note
-When `compare` is `true`, each metric is a `MetricComparison` object with `current`, `previous`, `change_percent`, and `trend`. When `false` or omitted, metrics return as simple numbers.
+Cuando `compare` es `true`, cada métrica es un objeto `MetricComparison` con `current`, `previous`, `change_percent` y `trend`. Cuando es `false` o se omite, las métricas se devuelven como números simples.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` and optional `period` value |
+| 422 | Error de validación — parámetros ausentes o inválidos | Proporciona un `website_id` válido y un valor opcional de `period` |
 
 ---
 
-### Step 10 — Earnings by Page
+### Paso 10 — Ingresos por página
 
-**Goal:** Retrieve earnings broken down by individual page URL.
+**Objetivo:** Recuperar los ingresos desglosados por URL de página individual.
 
 **Endpoint:** `GET /api/v1/adsense/earnings/by-page`
 
@@ -600,14 +600,14 @@ curl -X GET "$BASE_URL/adsense/earnings/by-page?website_id=$WEBSITE_ID&period=30
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID with an active AdSense connection |
-| `period` | string | No | Report period (e.g., `"7d"`, `"30d"`, `"90d"`) |
+| `website_id` | string | Sí | ID del sitio web con una conexión de AdSense activa |
+| `period` | string | No | Período del reporte (p. ej., `"7d"`, `"30d"`, `"90d"`) |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -644,17 +644,17 @@ curl -X GET "$BASE_URL/adsense/earnings/by-page?website_id=$WEBSITE_ID&period=30
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` and optional `period` value |
+| 422 | Error de validación — parámetros ausentes o inválidos | Proporciona un `website_id` válido y un valor opcional de `period` |
 
 ---
 
-### Step 11 — Custom Earnings Report
+### Paso 11 — Reporte de ingresos personalizado
 
-**Goal:** Generate a custom earnings report with specific date ranges and dimensions.
+**Objetivo:** Generar un reporte de ingresos personalizado con rangos de fechas y dimensiones específicas.
 
 **Endpoint:** `POST /api/v1/adsense/earnings/report`
 
@@ -672,22 +672,22 @@ curl -X POST "$BASE_URL/adsense/earnings/report?website_id=$WEBSITE_ID" \
   }'
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID with an active AdSense connection |
+| `website_id` | string | Sí | ID del sitio web con una conexión de AdSense activa |
 
-**Request body:**
+**Cuerpo de la solicitud:**
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `start_date` | string | Yes | Start date in `YYYY-MM-DD` format |
-| `end_date` | string | Yes | End date in `YYYY-MM-DD` format |
-| `dimensions` | array | No | Array of dimension strings (e.g., `"DATE"`, `"COUNTRY"`, `"AD_UNIT"`). Default: `["DATE"]` |
-| `metrics` | array | No | Array of metric strings (e.g., `"ESTIMATED_EARNINGS"`, `"CLICKS"`, `"IMPRESSIONS"`). Default: `["ESTIMATED_EARNINGS", "CLICKS", "IMPRESSIONS"]` |
+| `start_date` | string | Sí | Fecha de inicio en formato `YYYY-MM-DD` |
+| `end_date` | string | Sí | Fecha de fin en formato `YYYY-MM-DD` |
+| `dimensions` | array | No | Arreglo de cadenas de dimensión (p. ej., `"DATE"`, `"COUNTRY"`, `"AD_UNIT"`). Por defecto: `["DATE"]` |
+| `metrics` | array | No | Arreglo de cadenas de métrica (p. ej., `"ESTIMATED_EARNINGS"`, `"CLICKS"`, `"IMPRESSIONS"`). Por defecto: `["ESTIMATED_EARNINGS", "CLICKS", "IMPRESSIONS"]` |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -712,20 +712,20 @@ curl -X POST "$BASE_URL/adsense/earnings/report?website_id=$WEBSITE_ID" \
 ```
 
 :::note
-The `headers` array describes each column in the `rows`. Each row is an array of string values corresponding to the headers in order. Currency values are returned as string representations of decimal numbers.
+El arreglo `headers` describe cada columna en `rows`. Cada fila es un arreglo de valores de cadena que corresponden a los headers en orden. Los valores de moneda se devuelven como representaciones de cadena de números decimales.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing fields or invalid date range | Ensure `start_date`, `end_date`, and `dimensions` are present and valid |
+| 422 | Error de validación — faltan campos o rango de fechas inválido | Asegúrate de que `start_date`, `end_date` y `dimensions` estén presentes y sean válidos |
 
 ---
 
-### Step 12 — List Alerts
+### Paso 12 — Listar alertas
 
-**Goal:** Retrieve AdSense alerts for the connected account (e.g., payment issues, policy warnings).
+**Objetivo:** Recuperar las alertas de AdSense de la cuenta conectada (p. ej., problemas de pago, advertencias de políticas).
 
 **Endpoint:** `GET /api/v1/adsense/alerts`
 
@@ -737,15 +737,15 @@ curl -X GET "$BASE_URL/adsense/alerts?website_id=$WEBSITE_ID&page=1&page_size=20
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID with an active AdSense connection |
-| `page` | integer | No | Page number for pagination |
-| `page_size` | integer | No | Number of results per page |
+| `website_id` | string | Sí | ID del sitio web con una conexión de AdSense activa |
+| `page` | integer | No | Número de página para la paginación |
+| `page_size` | integer | No | Número de resultados por página |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -774,20 +774,20 @@ curl -X GET "$BASE_URL/adsense/alerts?website_id=$WEBSITE_ID&page=1&page_size=20
 ```
 
 :::warning
-Alerts with `severity: "SEVERE"` require immediate attention and may indicate revenue-impacting issues. Monitor alerts regularly to avoid disruptions.
+Las alertas con `severity: "SEVERE"` requieren atención inmediata y pueden indicar problemas que afectan los ingresos. Monitorea las alertas con regularidad para evitar interrupciones.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` query parameter |
+| 422 | Error de validación — parámetros ausentes o inválidos | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 13 — List Policy Issues
+### Paso 13 — Listar problemas de políticas
 
-**Goal:** Retrieve policy issues reported by Google AdSense for the connected site.
+**Objetivo:** Recuperar los problemas de políticas reportados por Google AdSense para el sitio conectado.
 
 **Endpoint:** `GET /api/v1/adsense/policy-issues`
 
@@ -799,15 +799,15 @@ curl -X GET "$BASE_URL/adsense/policy-issues?website_id=$WEBSITE_ID&page=1&page_
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID with an active AdSense connection |
-| `page` | integer | No | Page number for pagination |
-| `page_size` | integer | No | Number of results per page |
+| `website_id` | string | Sí | ID del sitio web con una conexión de AdSense activa |
+| `page` | integer | No | Número de página para la paginación |
+| `page_size` | integer | No | Número de resultados por página |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -832,20 +832,20 @@ curl -X GET "$BASE_URL/adsense/policy-issues?website_id=$WEBSITE_ID&page=1&page_
 ```
 
 :::warning
-Policy issues can lead to ad serving restrictions or account suspension. Address reported issues promptly by reviewing and fixing the flagged content, then use Step 8 (Sync Site State) to refresh the status.
+Los problemas de políticas pueden llevar a restricciones en la entrega de anuncios o a la suspensión de la cuenta. Atiende los problemas reportados con prontitud revisando y corrigiendo el contenido marcado, y luego usa el Paso 8 (Sincronizar el estado del sitio) para actualizar el estado.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Validation Error — missing or invalid parameters | Provide a valid `website_id` query parameter |
+| 422 | Error de validación — parámetros ausentes o inválidos | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 14 — Disconnect AdSense
+### Paso 14 — Desconectar AdSense
 
-**Goal:** Disconnect the AdSense integration for a website. The OAuth credentials are preserved so you can reconnect later without re-authorizing.
+**Objetivo:** Desconectar la integración de AdSense para un sitio web. Las credenciales OAuth se conservan para que puedas reconectar más adelante sin volver a autorizar.
 
 **Endpoint:** `DELETE /api/v1/adsense/disconnect`
 
@@ -857,13 +857,13 @@ curl -X DELETE "$BASE_URL/adsense/disconnect?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID to disconnect AdSense from |
+| `website_id` | string | Sí | ID del sitio web del que se desconecta AdSense |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -887,21 +887,21 @@ curl -X DELETE "$BASE_URL/adsense/disconnect?website_id=$WEBSITE_ID" \
 ```
 
 :::tip
-After disconnecting, `oauth_connected` remains `true`. You can reconnect using Step 4 (Connect AdSense) without repeating the OAuth flow. To fully remove OAuth credentials, use Step 15 (Revoke OAuth).
+Tras desconectar, `oauth_connected` permanece en `true`. Puedes reconectar usando el Paso 4 (Conectar AdSense) sin repetir el flujo OAuth. Para eliminar por completo las credenciales OAuth, usa el Paso 15 (Revocar OAuth).
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | AdSense is not active for this website | Check current status with `GET /adsense/status` |
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 400 | AdSense no está activo para este sitio web | Verifica el estado actual con `GET /adsense/status` |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 15 — Revoke OAuth
+### Paso 15 — Revocar OAuth
 
-**Goal:** Revoke the Google OAuth credentials for AdSense. This fully removes the authorization and requires the user to re-authorize via the OAuth flow to reconnect.
+**Objetivo:** Revocar las credenciales OAuth de Google para AdSense. Esto elimina por completo la autorización y requiere que el usuario vuelva a autorizar mediante el flujo OAuth para reconectar.
 
 **Endpoint:** `POST /api/v1/adsense/oauth/revoke`
 
@@ -913,13 +913,13 @@ curl -X POST "$BASE_URL/adsense/oauth/revoke?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID to revoke OAuth for |
+| `website_id` | string | Sí | ID del sitio web para el que se revoca OAuth |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -934,21 +934,21 @@ curl -X POST "$BASE_URL/adsense/oauth/revoke?website_id=$WEBSITE_ID" \
 ```
 
 :::warning
-This action is irreversible. After revoking, the user must repeat the full OAuth flow (Step 2) to reconnect AdSense. Disconnect AdSense first (Step 14) if the connection is still active.
+Esta acción es irreversible. Tras revocar, el usuario debe repetir el flujo OAuth completo (Paso 2) para reconectar AdSense. Desconecta AdSense primero (Paso 14) si la conexión sigue activa.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 404 | OAuth not configured for this website | No OAuth credentials exist for this website |
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 404 | OAuth no configurado para este sitio web | No existen credenciales OAuth para este sitio web |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-### Step 16 — Repair Stuck Connection (admin)
+### Paso 16 — Reparar conexión atascada (admin)
 
-**Goal:** Repair a stuck or errored AdSense connection. This is an admin-only endpoint for resolving connection issues that cannot be fixed through normal disconnect/reconnect.
+**Objetivo:** Reparar una conexión de AdSense atascada o con error. Este es un endpoint solo para administradores que sirve para resolver problemas de conexión que no pueden corregirse mediante la desconexión/reconexión normal.
 
 **Endpoint:** `POST /api/v1/adsense/repair`
 
@@ -960,13 +960,13 @@ curl -X POST "$BASE_URL/adsense/repair?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `website_id` | string | Yes | Website ID with a stuck AdSense connection |
+| `website_id` | string | Sí | ID del sitio web con una conexión de AdSense atascada |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -990,31 +990,31 @@ curl -X POST "$BASE_URL/adsense/repair?website_id=$WEBSITE_ID" \
 ```
 
 :::warning
-This endpoint requires **admin-level access**. It is intended for support engineers to resolve edge cases where the connection is stuck in an error state and cannot be fixed via normal disconnect/reconnect operations.
+Este endpoint requiere **acceso de nivel administrador**. Está destinado a que los ingenieros de soporte resuelvan casos límite donde la conexión está atascada en un estado de error y no puede corregirse mediante operaciones normales de desconexión/reconexión.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 403 | Admin access required | This endpoint is restricted to admin users |
-| 422 | Validation Error — missing or invalid `website_id` | Provide a valid `website_id` query parameter |
+| 403 | Se requiere acceso de administrador | Este endpoint está restringido a usuarios administradores |
+| 422 | Error de validación — `website_id` ausente o inválido | Proporciona un parámetro de consulta `website_id` válido |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values, from authentication to earnings retrieval.
+Flujo completo con valores ficticios consistentes, desde la autenticación hasta la obtención de ingresos.
 
 ```bash
 #!/bin/bash
-# === Google AdSense — End-to-End Flow ===
+# === Google AdSense — Flujo de extremo a extremo ===
 
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 WEBSITE_ID="507f1f77bcf86cd799439011"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
@@ -1022,7 +1022,7 @@ APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
 
 echo "APP_TOKEN: $APP_TOKEN"
 
-# === STEP 1: Get User Token ===
+# === PASO 1: Obtener el token de usuario ===
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -1031,17 +1031,17 @@ USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
 
 echo "USER_TOKEN: $USER_TOKEN"
 
-# === STEP 2: Start OAuth Authorization ===
+# === PASO 2: Iniciar la autorización OAuth ===
 AUTH_URL=$(curl -s -X GET "$BASE_URL/adsense/oauth/authorize?website_id=$WEBSITE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq -r '.data.authorization_url')
 
-echo "Open this URL in your browser: $AUTH_URL"
-echo "Press Enter after authorizing..."
+echo "Abre esta URL en tu navegador: $AUTH_URL"
+echo "Presiona Enter después de autorizar..."
 read -r
 
-# === STEP 3: Check OAuth Status ===
+# === PASO 3: Verificar el estado de OAuth ===
 OAUTH_STATUS=$(curl -s -X GET "$BASE_URL/adsense/oauth/status?website_id=$WEBSITE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -1049,51 +1049,51 @@ OAUTH_STATUS=$(curl -s -X GET "$BASE_URL/adsense/oauth/status?website_id=$WEBSIT
 
 echo "OAuth connected: $OAUTH_STATUS"
 
-# === STEP 4: Connect AdSense ===
+# === PASO 4: Conectar AdSense ===
 curl -s -X POST "$BASE_URL/adsense/connect?website_id=$WEBSITE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 5: Verify Status ===
+# === PASO 5: Verificar el estado ===
 curl -s -X GET "$BASE_URL/adsense/status?website_id=$WEBSITE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 6: List Accounts ===
+# === PASO 6: Listar cuentas ===
 curl -s -X GET "$BASE_URL/adsense/accounts?website_id=$WEBSITE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 7: List Sites ===
+# === PASO 7: Listar sitios ===
 curl -s -X GET "$BASE_URL/adsense/sites?website_id=$WEBSITE_ID&page=1&page_size=20" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 8: Sync Site State ===
+# === PASO 8: Sincronizar el estado del sitio ===
 curl -s -X POST "$BASE_URL/adsense/sites/sync?website_id=$WEBSITE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 9: Earnings Overview (last 30 days with comparison) ===
-# Returns MetricComparison objects with current, previous, change_percent, and trend for each metric.
-# Fields: estimated_earnings, page_views, clicks, impressions, clicks_ctr, page_views_rpm, cost_per_click
+# === PASO 9: Vista general de ingresos (últimos 30 días con comparación) ===
+# Devuelve objetos MetricComparison con current, previous, change_percent y trend por cada métrica.
+# Campos: estimated_earnings, page_views, clicks, impressions, clicks_ctr, page_views_rpm, cost_per_click
 curl -s -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=30d&compare=true" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 10: Earnings by Page ===
+# === PASO 10: Ingresos por página ===
 curl -s -X GET "$BASE_URL/adsense/earnings/by-page?website_id=$WEBSITE_ID&period=30d" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 11: Custom Earnings Report ===
+# === PASO 11: Reporte de ingresos personalizado ===
 curl -s -X POST "$BASE_URL/adsense/earnings/report?website_id=$WEBSITE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -1105,91 +1105,91 @@ curl -s -X POST "$BASE_URL/adsense/earnings/report?website_id=$WEBSITE_ID" \
   }' \
   | jq .
 
-# === STEP 12: List Alerts ===
+# === PASO 12: Listar alertas ===
 curl -s -X GET "$BASE_URL/adsense/alerts?website_id=$WEBSITE_ID&page=1&page_size=20" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 13: List Policy Issues ===
+# === PASO 13: Listar problemas de políticas ===
 curl -s -X GET "$BASE_URL/adsense/policy-issues?website_id=$WEBSITE_ID&page=1&page_size=20" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-echo "AdSense flow completed successfully!"
+echo "Flujo de AdSense completado con éxito!"
 ```
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
+### Idempotencia
 
 :::note
-All `GET` endpoints in this flow are naturally idempotent — they can be called repeatedly without side effects. The `POST /adsense/connect` endpoint is guarded by state transitions: calling it when already active returns a `409` conflict, preventing duplicate connections.
+Todos los endpoints `GET` de este flujo son naturalmente idempotentes — pueden llamarse repetidamente sin efectos secundarios. El endpoint `POST /adsense/connect` está protegido por transiciones de estado: llamarlo cuando ya está activo devuelve un conflicto `409`, evitando conexiones duplicadas.
 :::
 
-### Retries
+### Reintentos
 
-- If you receive **429** (rate limit), wait the indicated time and retry.
-- If you receive **500** or a **timeout**, check the current status with `GET /adsense/status` before retrying a connection or disconnect operation.
-- For **401** (expired token), regenerate the token and retry the original request.
+- Si recibes un **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes un **500** o un **timeout**, verifica el estado actual con `GET /adsense/status` antes de reintentar una operación de conexión o desconexión.
+- Para un **401** (token expirado), regenera el token y reintenta la solicitud original.
 
 ### Timeouts
 
 :::warning
-OAuth authorization and connection operations involve external calls to Google APIs. Configure your HTTP client with at least **30 seconds** timeout for `POST /adsense/connect` and `POST /adsense/sites/sync`. Earnings report endpoints may take longer for large date ranges — use **60 seconds** timeout for `POST /adsense/earnings/report`.
+Las operaciones de autorización OAuth y de conexión implican llamadas externas a las APIs de Google. Configura tu cliente HTTP con un timeout de al menos **30 segundos** para `POST /adsense/connect` y `POST /adsense/sites/sync`. Los endpoints de reportes de ingresos pueden tardar más en rangos de fechas amplios — usa un timeout de **60 segundos** para `POST /adsense/earnings/report`.
 :::
 
 ### Tokens
 
-- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
-- Both tokens are required on all AdSense endpoints.
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de AdSense.
 
-### Important validations
+### Validaciones importantes
 
-- The website must be registered via the Manage Websites flow before connecting AdSense.
-- OAuth must be completed (Steps 2-3) before connecting (Step 4).
-- The `website_id` query parameter is required on every AdSense endpoint.
-- Disconnect (Step 14) before revoking OAuth (Step 15) if the connection is active.
-- The repair endpoint (Step 16) is admin-only and should not be called from regular user flows.
+- El sitio web debe estar registrado mediante el flujo de Gestión de Sitios Web antes de conectar AdSense.
+- OAuth debe completarse (Pasos 2-3) antes de conectar (Paso 4).
+- El parámetro de consulta `website_id` es requerido en cada endpoint de AdSense.
+- Desconecta (Paso 14) antes de revocar OAuth (Paso 15) si la conexión está activa.
+- El endpoint de reparación (Paso 16) es solo para administradores y no debe llamarse desde flujos de usuarios regulares.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/users/token` | Get user token |
-| 2 | `GET` | `/api/v1/adsense/oauth/authorize` | Start OAuth authorization |
-| 3 | `GET` | `/api/v1/adsense/oauth/status` | Check OAuth status |
-| 4 | `POST` | `/api/v1/adsense/connect` | Connect AdSense |
-| 5 | `GET` | `/api/v1/adsense/status` | Get AdSense status |
-| 6 | `GET` | `/api/v1/adsense/accounts` | List AdSense accounts |
-| 7 | `GET` | `/api/v1/adsense/sites` | List AdSense sites |
-| 8 | `POST` | `/api/v1/adsense/sites/sync` | Sync site state |
-| 9 | `GET` | `/api/v1/adsense/earnings/overview` | Earnings overview |
-| 10 | `GET` | `/api/v1/adsense/earnings/by-page` | Earnings by page |
-| 11 | `POST` | `/api/v1/adsense/earnings/report` | Custom earnings report |
-| 12 | `GET` | `/api/v1/adsense/alerts` | List alerts |
-| 13 | `GET` | `/api/v1/adsense/policy-issues` | List policy issues |
-| 14 | `DELETE` | `/api/v1/adsense/disconnect` | Disconnect AdSense |
-| 15 | `POST` | `/api/v1/adsense/oauth/revoke` | Revoke OAuth |
-| 16 | `POST` | `/api/v1/adsense/repair` | Repair stuck connection (admin) |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `GET` | `/api/v1/adsense/oauth/authorize` | Iniciar la autorización OAuth |
+| 3 | `GET` | `/api/v1/adsense/oauth/status` | Verificar el estado de OAuth |
+| 4 | `POST` | `/api/v1/adsense/connect` | Conectar AdSense |
+| 5 | `GET` | `/api/v1/adsense/status` | Obtener el estado de AdSense |
+| 6 | `GET` | `/api/v1/adsense/accounts` | Listar cuentas de AdSense |
+| 7 | `GET` | `/api/v1/adsense/sites` | Listar sitios de AdSense |
+| 8 | `POST` | `/api/v1/adsense/sites/sync` | Sincronizar el estado del sitio |
+| 9 | `GET` | `/api/v1/adsense/earnings/overview` | Vista general de ingresos |
+| 10 | `GET` | `/api/v1/adsense/earnings/by-page` | Ingresos por página |
+| 11 | `POST` | `/api/v1/adsense/earnings/report` | Reporte de ingresos personalizado |
+| 12 | `GET` | `/api/v1/adsense/alerts` | Listar alertas |
+| 13 | `GET` | `/api/v1/adsense/policy-issues` | Listar problemas de políticas |
+| 14 | `DELETE` | `/api/v1/adsense/disconnect` | Desconectar AdSense |
+| 15 | `POST` | `/api/v1/adsense/oauth/revoke` | Revocar OAuth |
+| 16 | `POST` | `/api/v1/adsense/repair` | Reparar conexión atascada (admin) |
 
 ---
 
-## Quick checklist
+## Lista de verificación rápida
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I have the User API Key (`sk-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I have a registered website with its ID
-- [ ] I completed the OAuth authorization flow (Steps 2-3)
-- [ ] I connected AdSense to the website (`POST /adsense/connect`)
-- [ ] I verified the connection status is `"active"` (`GET /adsense/status`)
-- [ ] I can retrieve earnings data (`GET /adsense/earnings/overview`)
-- [ ] I am monitoring alerts and policy issues regularly
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Tengo un sitio web registrado con su ID
+- [ ] Completé el flujo de autorización OAuth (Pasos 2-3)
+- [ ] Conecté AdSense al sitio web (`POST /adsense/connect`)
+- [ ] Verifiqué que el estado de la conexión sea `"active"` (`GET /adsense/status`)
+- [ ] Puedo recuperar datos de ingresos (`GET /adsense/earnings/overview`)
+- [ ] Estoy monitoreando alertas y problemas de políticas con regularidad

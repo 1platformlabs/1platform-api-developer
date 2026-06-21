@@ -1,19 +1,19 @@
 ---
-title: Receiving Notifications
-description: Canonical outbound webhook payload, status enum, and merchant-side FSM mapping.
+title: Recibir notificaciones
+description: Payload canónico del webhook saliente, enum de status y mapeo de la FSM del lado del comercio.
 sidebar_position: 3
 ---
 
-# Receiving Notifications
+# Recibir notificaciones
 
-When a transaction transitions to a terminal state, 1Platform fires a webhook
-to the URL you configured for that event (see
-[Configuring URLs](./configuring-urls)).
+Cuando una transacción transiciona a un estado terminal, 1Platform dispara un
+webhook a la URL que configuraste para ese evento (consulta
+[Configurar URLs](./configuring-urls)).
 
-## Canonical payload
+## Payload canónico {#canonical-payload}
 
-If you configured the event handler **without** a `body_template`, the payload
-follows this canonical shape:
+Si configuraste el manejador de eventos **sin** un `body_template`, el payload
+sigue esta forma canónica:
 
 ```json
 {
@@ -32,74 +32,75 @@ follows this canonical shape:
 }
 ```
 
-If you configured a `body_template`, the dispatcher emits whatever you defined
-— the canonical body is the **default** when you opt out of templating.
+Si configuraste un `body_template`, el dispatcher emite lo que tú definiste —
+el cuerpo canónico es el **valor por defecto** cuando renuncias al uso de plantillas.
 
-## Field reference
+## Referencia de campos
 
-| Field | Origin | Use it for |
+| Campo | Origen | Úsalo para |
 |---|---|---|
-| `event` | 1Platform | Routing inside your handler when one URL serves all five events |
-| `transaction_id` | 1Platform | Correlating with the `data.id` you stored at create time |
-| `external_transaction_id` | upstream provider | Operator support tickets — the value the provider's dashboard shows |
-| `status` | 1Platform | Final state of the transaction. See enum below |
-| `amount` | provider currency | Informational only — the amount the upstream provider charged |
-| `currency` | provider currency | The provider currency code (e.g. `GTQ`) |
-| `merchant_amount` | **your** currency | **Use this for ledgering**. The amount you originally quoted |
-| `merchant_currency` | your currency | E.g. `USD` |
-| `metadata` | echoed | The free-form object you sent at create time |
-| `merchant_reference` | echoed | The free-form ID you sent at create time. Use it as the deterministic key for idempotency |
-| `reference` | upstream provider | Provider-internal reference (e.g. card auth ID) |
-| `timestamp` | 1Platform | Last update time on the transaction (ISO 8601 with offset) |
+| `event` | 1Platform | Enrutamiento dentro de tu manejador cuando una URL atiende los cinco eventos |
+| `transaction_id` | 1Platform | Correlacionar con el `data.id` que almacenaste al momento de crear |
+| `external_transaction_id` | proveedor upstream | Tickets de soporte del operador — el valor que muestra el panel del proveedor |
+| `status` | 1Platform | Estado final de la transacción. Ver el enum más abajo |
+| `amount` | moneda del proveedor | Solo informativo — el monto que cobró el proveedor upstream |
+| `currency` | moneda del proveedor | El código de moneda del proveedor (p. ej. `GTQ`) |
+| `merchant_amount` | **tu** moneda | **Úsalo para el ledger**. El monto que cotizaste originalmente |
+| `merchant_currency` | tu moneda | P. ej. `USD` |
+| `metadata` | reflejado | El objeto de forma libre que enviaste al momento de crear |
+| `merchant_reference` | reflejado | El ID de forma libre que enviaste al crear. Úsalo como clave determinista para idempotencia |
+| `reference` | proveedor upstream | Referencia interna del proveedor (p. ej. ID de autorización de la tarjeta) |
+| `timestamp` | 1Platform | Hora de la última actualización de la transacción (ISO 8601 con offset) |
 
-:::warning amount vs merchant_amount
-The `amount` field is in the **provider's** currency (often GTQ) because the
-upstream payment processor converts USD to GTQ at charge time. **Never credit a
-seller using `amount`** — use `merchant_amount` + `merchant_currency`. The
-`amount` is informational; the exchange rate is opaque to the merchant.
+:::warning[amount vs merchant_amount]
+El campo `amount` está en la moneda del **proveedor** (a menudo GTQ) porque el
+procesador de pagos upstream convierte USD a GTQ al momento del cobro. **Nunca
+acredites a un vendedor usando `amount`** — usa `merchant_amount` +
+`merchant_currency`. El `amount` es informativo; el tipo de cambio es opaco para
+el comercio.
 :::
 
-## Status enum
+## Enum de status
 
-| Inbound `status` | Final? | Meaning |
+| `status` entrante | ¿Final? | Significado |
 |---|---|---|
-| `created` | No | Transaction created, buyer has not paid yet (no webhook fires for this state) |
-| `approved` | Yes | Buyer paid; funds settled |
-| `denied` | Yes | Card declined |
-| `cancelled` | Yes | Buyer cancelled before paying |
-| `expired` | Yes | Payment URL expired |
-| `dismiss` | Yes | Buyer closed the payment window |
+| `created` | No | Transacción creada, el comprador aún no ha pagado (no se dispara webhook para este estado) |
+| `approved` | Sí | El comprador pagó; los fondos se liquidaron |
+| `denied` | Sí | Tarjeta rechazada |
+| `cancelled` | Sí | El comprador canceló antes de pagar |
+| `expired` | Sí | La URL de pago expiró |
+| `dismiss` | Sí | El comprador cerró la ventana de pago |
 
-## Merchant-side FSM mapping
+## Mapeo de la FSM del lado del comercio
 
-Most marketplaces only need three states (`pending`, `paid`, `failed`). Map
-the five terminal `status` values like this:
+La mayoría de los marketplaces solo necesitan tres estados (`pending`, `paid`,
+`failed`). Mapea los cinco valores terminales de `status` así:
 
-| Provider `status` | Merchant FSM state |
+| `status` del proveedor | Estado de la FSM del comercio |
 |---|---|
-| `approved` | `paid` (and proceed to fulfilment) |
+| `approved` | `paid` (y procede al cumplimiento) |
 | `denied` | `failed` |
 | `cancelled` | `failed` |
 | `expired` | `failed` |
 | `dismiss` | `failed` |
 
-If you implement refunds out-of-band (via the operator dashboard), surface them
-as an additional `refunded` state; there is no automatic webhook for refunds
-yet. See [the dedicated note in payments-and-subscriptions](../flows/payments-and-subscriptions#refunds).
+Si implementas reembolsos fuera de banda (vía el panel del operador), exponlos
+como un estado adicional `refunded`; aún no hay un webhook automático para
+reembolsos. Consulta [la nota dedicada en payments-and-subscriptions](../flows/payments-and-subscriptions#refunds).
 
-## Response wrapper differs from the rest of the API
+## El envoltorio de respuesta difiere del resto de la API
 
-Outbound webhook payloads are **not** wrapped in `{ success, data, msg }`. They
-are flat objects (canonical or templated). This mirrors what most integrators
-expect from a webhook receiver and stays compatible with HMAC signing over the
-raw body. See [response format](../reference/response-format) for the full
-rule.
+Los payloads de webhooks salientes **no** se envuelven en `{ success, data, msg }`.
+Son objetos planos (canónicos o con plantilla). Esto refleja lo que la mayoría de
+los integradores esperan de un receptor de webhooks y se mantiene compatible con
+la firma HMAC sobre el cuerpo crudo. Consulta [formato de respuesta](../reference/response-format)
+para la regla completa.
 
-## Idempotency on the merchant side
+## Idempotencia del lado del comercio {#idempotency-on-the-merchant-side}
 
-1Platform delivers webhooks at-least-once with retries — see
-[Retry & delivery](./retry-and-delivery). Your handler **must** deduplicate.
+1Platform entrega los webhooks at-least-once con reintentos — consulta
+[Reintentos y entrega](./retry-and-delivery). Tu manejador **debe** deduplicar.
 
-The recommended deduplication key is `(transaction_id, event)`. If you set
-`merchant_reference` at create time, you can also dedupe by
-`(merchant_reference, event)` to align with your own order IDs.
+La clave de deduplicación recomendada es `(transaction_id, event)`. Si fijas
+`merchant_reference` al momento de crear, también puedes deduplicar por
+`(merchant_reference, event)` para alinearte con tus propios IDs de pedido.

@@ -1,39 +1,39 @@
 ---
-title: Testing
-description: Sandbox tenants, test card numbers, and replaying webhooks against localhost.
+title: Pruebas
+description: Tenants en sandbox, números de tarjeta de prueba y reproducción de webhooks contra localhost.
 sidebar_position: 6
 ---
 
-# Testing
+# Pruebas
 
-Practical recipes for integrating without touching real money or real users.
+Recetas prácticas para integrar sin tocar dinero real ni usuarios reales.
 
-## Sandbox tenant
+## Tenant en sandbox
 
-QA base URL: `https://api-qa.1platform.pro/api/v1`. Request credentials via
-your account manager — you'll receive an `ak-` (app) and `sk-` (user) key
-scoped to QA only. See [Environments](./environments) for the differences.
+URL base de QA: `https://api-qa.1platform.pro/api/v1`. Solicita credenciales a través de
+tu gestor de cuenta — recibirás una clave `ak-` (aplicación) y `sk-` (usuario)
+limitada solo a QA. Consulta [Entornos](./environments) para las diferencias.
 
-## Test card numbers
+## Números de tarjeta de prueba
 
-The integrated payment provider's sandbox accepts the standard Visa test
-numbers:
+El sandbox del proveedor de pagos integrado acepta los números de prueba Visa
+estándar:
 
-| Number | Outcome |
+| Número | Resultado |
 |---|---|
-| `4111 1111 1111 1111` | Approved (`status: "approved"`) |
-| `4000 0000 0000 0002` | Declined (`status: "denied"`) |
-| `4000 0000 0000 0119` | Expired (`status: "expired"`) |
+| `4111 1111 1111 1111` | Aprobada (`status: "approved"`) |
+| `4000 0000 0000 0002` | Rechazada (`status: "denied"`) |
+| `4000 0000 0000 0119` | Expirada (`status: "expired"`) |
 
-Use any future expiry date and any 3-digit CVV.
+Usa cualquier fecha de expiración futura y cualquier CVV de 3 dígitos.
 
-## Replaying webhooks against localhost
+## Reproducir webhooks contra localhost
 
-Three steps:
+Tres pasos:
 
-1. **Tunnel localhost.** Run `ngrok http 3000` (or `smee`, `cloudflared`, etc.)
-   to expose your local handler at a public URL.
-2. **Register the public URL.**
+1. **Crea un túnel a localhost.** Ejecuta `ngrok http 3000` (o `smee`, `cloudflared`, etc.)
+   para exponer tu manejador local en una URL pública.
+2. **Registra la URL pública.**
    ```bash
    curl -X POST "$BASE_URL/webhooks/config/domains" \
      -H "Authorization: Bearer $APP_TOKEN" \
@@ -47,13 +47,13 @@ Three steps:
        "on_approved": { "url": "https://abc123.ngrok-free.app/webhooks/payments", "method": "POST" }
      }'
    ```
-3. **Trigger a transaction** in QA with `4111 1111 1111 1111` and observe the
-   webhook hit your local handler.
+3. **Dispara una transacción** en QA con `4111 1111 1111 1111` y observa cómo el
+   webhook llega a tu manejador local.
 
-## Replaying captured payloads offline
+## Reproducir cargas útiles capturadas sin conexión
 
-Once you've captured one real payload (headers + body), you can replay it
-against your handler without going through the API:
+Una vez que hayas capturado una carga útil real (headers + cuerpo), puedes reproducirla
+contra tu manejador sin pasar por la API:
 
 ```bash
 curl -X POST http://localhost:3000/webhooks/payments \
@@ -63,28 +63,28 @@ curl -X POST http://localhost:3000/webhooks/payments \
   --data-binary @captured.json
 ```
 
-:::caution Replays expire after 5 minutes
-Captured payloads pass signature verification only inside the replay window.
-If you need to replay the same payload over and over (e.g. while debugging
-your handler), temporarily widen the window in your **test** verifier — never
-in prod.
+:::caution[Las reproducciones expiran después de 5 minutos]
+Las cargas útiles capturadas pasan la verificación de firma solo dentro de la ventana de reproducción.
+Si necesitas reproducir la misma carga útil una y otra vez (p. ej. mientras depuras
+tu manejador), amplía temporalmente la ventana en tu verificador de **pruebas** — nunca
+en prod.
 :::
 
-## Smoke tests
+## Pruebas de humo
 
-Minimum smoke test for a new integration:
+Prueba de humo mínima para una nueva integración:
 
-1. Mint app + user tokens (`POST /auth/token`, `POST /users/token`).
-2. `GET /users/billing` and confirm `data.billing.payment_gateway_id` is
-   non-null. If it's null, see [troubleshooting](./troubleshooting).
-3. `POST /users/transactions` with `merchant_reference` set to a unique
-   string.
-4. Open the returned `payment_url` in a browser; pay with the approved test
-   card.
-5. Verify your webhook handler receives `event: on_approved` with the same
+1. Genera tokens de aplicación + usuario (`POST /auth/token`, `POST /users/token`).
+2. `GET /users/billing` y confirma que `data.billing.payment_gateway_id` no sea
+   null. Si es null, consulta [solución de problemas](./troubleshooting).
+3. `POST /users/transactions` con `merchant_reference` establecido a una cadena
+   única.
+4. Abre la `payment_url` devuelta en un navegador; paga con la tarjeta de prueba
+   aprobada.
+5. Verifica que tu manejador de webhooks reciba `event: on_approved` con el mismo
    `merchant_reference`.
-6. Confirm signature verification passes and your handler dedupes correctly
-   on a forced replay.
+6. Confirma que la verificación de firma pasa y que tu manejador deduplica correctamente
+   en una reproducción forzada.
 
-If any step fails, the corresponding [troubleshooting](./troubleshooting)
-entry should explain what to check.
+Si algún paso falla, la entrada correspondiente de [solución de problemas](./troubleshooting)
+debería explicar qué revisar.

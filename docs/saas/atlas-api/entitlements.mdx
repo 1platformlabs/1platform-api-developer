@@ -1,36 +1,36 @@
 ---
 title: Entitlements
-description: Grant, revoke, check, and refresh content access on the Atlas API. Entitlement scopes (item, series, plan, live), checkout links, and the local cache fed by webhooks.
-sidebar_position: 9
+description: Concede, revoca, verifica y refresca el acceso a contenido en la Atlas API. Scopes de entitlement (item, series, plan, live), enlaces de checkout y la caché local alimentada por webhooks.
+sidebar_position: 10
 ---
 
 # Entitlements
 
-An **entitlement** is a row that says "this member may access this content." Atlas keeps a local,
-authoritative `entitlements` table — the cache that the [content delivery](/docs/saas/atlas-api/content-delivery)
-hot path reads on every playback request. Entitlements are written three ways: directly by an operator,
-by an inbound provider [webhook](/docs/saas/atlas-api/webhooks) after a purchase, or by a refresh
-call that reconciles with the external entitlement provider.
+Un **entitlement** es un registro que dice "este miembro puede acceder a este contenido." Atlas mantiene una tabla
+`entitlements` local y autoritativa — la caché que el hot path de [entrega de contenido](/docs/saas/atlas-api/content-delivery)
+lee en cada solicitud de reproducción. Los entitlements se escriben de tres maneras: directamente por un operador,
+por un [webhook](/docs/saas/atlas-api/webhooks) entrante de un proveedor tras una compra, o por una llamada de refresco
+que reconcilia con el proveedor de entitlements externo.
 
-All endpoints below are tenant-scoped via `Host` / `X-Tenant-Slug`
-(see [Tenant resolution](/docs/saas/atlas-api/tenant-resolution)).
+Todos los endpoints a continuación están acotados al tenant mediante `Host` / `X-Tenant-Slug`
+(consulta [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)).
 
 ## Scopes
 
-Every entitlement has a **scope** and a **scope reference**:
+Cada entitlement tiene un **scope** y una **referencia de scope**:
 
-| Scope | `scope_ref` is… | Grants access to… |
+| Scope | `scope_ref` es… | Concede acceso a… |
 |---|---|---|
-| `item` | a content id | a single catalog item |
-| `series` | a series id | all items in a series |
-| `plan` | a plan id (or `*`) | everything covered by the plan |
-| `live` | a live channel/event id | a live stream |
+| `item` | un content id | un único ítem del catálogo |
+| `series` | un series id | todos los ítems de una serie |
+| `plan` | un plan id (o `*`) | todo lo cubierto por el plan |
+| `live` | un id de canal/evento en vivo | un stream en vivo |
 
-A wildcard `scope_ref` of `*` (common on free-tier `plan` grants) covers the whole catalog.
+Un `scope_ref` comodín de `*` (común en los grants de `plan` de nivel gratuito) cubre todo el catálogo.
 
-## Grant (operator)
+## Conceder (operador)
 
-Operators grant access directly. Requires an `admin`/`operator` JWT.
+Los operadores conceden acceso directamente. Requiere un JWT de `admin`/`operator`.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/entitlements" \
@@ -58,11 +58,11 @@ curl -s -X POST "$ATLAS_BASE/entitlements" \
 }
 ```
 
-(HTTP `201`.) Set `expires_at` for time-bound rentals; omit or `null` for permanent access.
+(HTTP `201`.) Establece `expires_at` para alquileres con tiempo limitado; omítelo o `null` para acceso permanente.
 
-## Check access
+## Verificar acceso
 
-The authoritative read used for gating decisions. Reads the **local** entitlements table by default:
+La lectura autoritativa usada para las decisiones de control de acceso. Lee la tabla de entitlements **local** por defecto:
 
 ```bash
 curl -s "$ATLAS_BASE/entitlements/check?member_id=1f2e…&content_id=a3b4…" \
@@ -78,20 +78,20 @@ curl -s "$ATLAS_BASE/entitlements/check?member_id=1f2e…&content_id=a3b4…" \
 }
 ```
 
-When `has_access` is `false`, `reason` is `no_active_entitlement`. Add `?source=provider` to force a
-live call to the external entitlement provider (debug only — not the hot path). A provider outage on
-that path returns `503 { "code": "PROVIDER_UNAVAILABLE" }`.
+Cuando `has_access` es `false`, `reason` es `no_active_entitlement`. Agrega `?source=provider` para forzar una
+llamada en vivo al proveedor de entitlements externo (solo para depuración — no es el hot path). Una caída del proveedor en
+esa ruta devuelve `503 { "code": "PROVIDER_UNAVAILABLE" }`.
 
-## List a member's entitlements
+## Listar los entitlements de un miembro
 
 ```bash
 curl -s "$ATLAS_BASE/entitlements/by-member/1f2e…" \
   -H "X-Tenant-Slug: $TENANT_SLUG"
 ```
 
-Returns an array of the entitlement shape shown above.
+Devuelve un arreglo con la forma de entitlement mostrada arriba.
 
-## Revoke
+## Revocar
 
 ```bash
 curl -s -X DELETE "$ATLAS_BASE/entitlements/<ENTITLEMENT_ID>" \
@@ -99,13 +99,13 @@ curl -s -X DELETE "$ATLAS_BASE/entitlements/<ENTITLEMENT_ID>" \
   -H "Authorization: Bearer $ATLAS_ADMIN_JWT"
 ```
 
-Returns `204` on success, or `404 { "code": "ENTITLEMENT_NOT_FOUND" }` if the id doesn't exist for
-this tenant. Requires an `admin`/`operator` JWT.
+Devuelve `204` en caso de éxito, o `404 { "code": "ENTITLEMENT_NOT_FOUND" }` si el id no existe para
+este tenant. Requiere un JWT de `admin`/`operator`.
 
-## Checkout (paid access)
+## Checkout (acceso pagado)
 
-To sell access, create a checkout link via the configured entitlement provider. Atlas forwards your
-`scope`/`scope_ref` so they echo back on the provider's confirmation webhook:
+Para vender acceso, crea un enlace de checkout mediante el proveedor de entitlements configurado. Atlas reenvía tus
+`scope`/`scope_ref` para que rebote de vuelta en el webhook de confirmación del proveedor:
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/entitlements/checkout" \
@@ -124,14 +124,14 @@ curl -s -X POST "$ATLAS_BASE/entitlements/checkout" \
 { "url": "https://checkout.example/session/…" }
 ```
 
-Redirect the member to `url`. After payment, the provider sends a signed
-[webhook](/docs/saas/atlas-api/webhooks) (`access.granted`) that writes the entitlement row.
+Redirige al miembro a `url`. Tras el pago, el proveedor envía un
+[webhook](/docs/saas/atlas-api/webhooks) firmado (`access.granted`) que escribe el registro del entitlement.
 
-## Refresh after checkout
+## Refrescar tras el checkout
 
-The member may return from checkout **before** the webhook lands. Call refresh to reconcile
-immediately — it queries the provider once and persists the row locally so the next access check
-returns `true`:
+El miembro puede regresar del checkout **antes** de que el webhook llegue. Llama a refresh para reconciliar
+de inmediato — consulta al proveedor una vez y persiste el registro localmente para que la siguiente verificación de acceso
+devuelva `true`:
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/entitlements/refresh" \
@@ -145,22 +145,22 @@ curl -s -X POST "$ATLAS_BASE/entitlements/refresh" \
 { "has_access": true, "refreshed": true }
 ```
 
-`refreshed` is `true` only when this call wrote a new local row. The call is idempotent — repeating
-it is cheap and safe.
+`refreshed` es `true` solo cuando esta llamada escribió un nuevo registro local. La llamada es idempotente — repetirla
+es barato y seguro.
 
-## How entitlements drive delivery
+## Cómo los entitlements impulsan la entrega
 
 ```text
-checkout → provider payment → webhook (access.granted) → entitlements table row
+checkout → pago del proveedor → webhook (access.granted) → registro en la tabla entitlements
                                                               │
-GET /delivery/items/{id}/playback  ── reads has_active ───────┘ → ticket or 403
+GET /delivery/items/{id}/playback  ── lee has_active ─────────┘ → ticket o 403
 ```
 
-The same local table backs both `entitlements/check` and the delivery gate, so once a row exists the
-member can play immediately.
+La misma tabla local respalda tanto `entitlements/check` como la guarda de entrega, así que una vez que existe un registro el
+miembro puede reproducir de inmediato.
 
-## See also
+## Consulta también
 
-- [Webhooks](/docs/saas/atlas-api/webhooks) — the inbound events that grant/revoke access.
-- [Content delivery](/docs/saas/atlas-api/content-delivery) — entitlement-gated playback tickets.
-- [Errors](/docs/saas/atlas-api/errors) — `ENTITLEMENT_DENIED`, `ENTITLEMENT_NOT_FOUND`, `PROVIDER_UNAVAILABLE`.
+- [Webhooks](/docs/saas/atlas-api/webhooks) — los eventos entrantes que conceden/revocan acceso.
+- [Entrega de contenido](/docs/saas/atlas-api/content-delivery) — tickets de reproducción controlados por entitlement.
+- [Errores](/docs/saas/atlas-api/errors) — `ENTITLEMENT_DENIED`, `ENTITLEMENT_NOT_FOUND`, `PROVIDER_UNAVAILABLE`.

@@ -40,8 +40,8 @@ const scalarPlugin = (id: string, label: string, route: string, specPath: string
 ];
 
 const config: Config = {
-  title: '1Platform Developer Docs',
-  tagline: 'Configurable products and SaaS APIs on the 1Platform infrastructure',
+  title: 'Documentación para desarrolladores de 1Platform',
+  tagline: 'Productos configurables y APIs SaaS sobre la infraestructura de 1Platform',
   favicon: 'img/favicon.ico',
 
   future: {
@@ -53,12 +53,13 @@ const config: Config = {
 
   onBrokenLinks: 'throw',
 
-  // English by default, fully available in Spanish.
+  // Spanish-only for now: the source content is the canonical Spanish version
+  // (audited and improved here). English will be re-introduced later as a
+  // translated, non-default locale. Single locale ⇒ no locale switcher.
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en', 'es'],
+    defaultLocale: 'es',
+    locales: ['es'],
     localeConfigs: {
-      en: {label: 'English', htmlLang: 'en'},
       es: {label: 'Español', htmlLang: 'es'},
     },
   },
@@ -81,12 +82,12 @@ const config: Config = {
 
   // ─── Themes ─────────────────────────────────────────────────────────────────
   themes: [
-    // Offline local search (zero infra, bilingual). Resolves the search box in the navbar.
+    // Offline local search (zero infra). Resolves the search box in the navbar.
     [
       '@easyops-cn/docusaurus-search-local',
       {
         hashed: true,
-        language: ['en', 'es'],
+        language: ['es'],
         indexBlog: false,
         docsRouteBasePath: '/docs',
         highlightSearchTermsOnTargetPage: true,
@@ -148,35 +149,34 @@ const config: Config = {
       items: [
         {
           type: 'dropdown',
-          label: 'Solutions',
+          label: 'Soluciones',
           position: 'left',
           href: 'https://1platform.pro/solutions/',
           items: [
-            {href: 'https://1platform.pro/solutions/online-store/', label: 'Online Store', target: '_self'},
-            {href: 'https://1platform.pro/solutions/website/', label: 'Website Builder', target: '_self'},
-            {href: 'https://1platform.pro/solutions/content/', label: 'AI Content', target: '_self'},
-            {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Whitelabel Dashboard', target: '_self'},
-            {href: 'https://1platform.pro/payments-invoicing/', label: 'Payments & Invoicing', target: '_self'},
-            {href: 'https://1platform.pro/solutions/', label: 'View all solutions', target: '_self'},
+            {href: 'https://1platform.pro/solutions/online-store/', label: 'Tienda online', target: '_self'},
+            {href: 'https://1platform.pro/solutions/website/', label: 'Creador de sitios web', target: '_self'},
+            {href: 'https://1platform.pro/solutions/content/', label: 'Contenido con IA', target: '_self'},
+            {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Panel white-label', target: '_self'},
+            {href: 'https://1platform.pro/payments-invoicing/', label: 'Pagos y facturación', target: '_self'},
+            {href: 'https://1platform.pro/solutions/', label: 'Ver todas las soluciones', target: '_self'},
           ],
         },
-        {href: 'https://1platform.pro/features/', label: 'Features', position: 'left', target: '_self'},
-        {href: 'https://1platform.pro/pricing/', label: 'Pricing', position: 'left', target: '_self'},
+        {href: 'https://1platform.pro/features/', label: 'Funciones', position: 'left', target: '_self'},
+        {href: 'https://1platform.pro/pricing/', label: 'Precios', position: 'left', target: '_self'},
         {
           to: '/',
-          label: 'Docs',
+          label: 'Documentación',
           position: 'left',
           activeBaseRegex: '^/(docs|api-reference)?/?$|^/(docs|api-reference)/.*',
         },
         {href: 'https://1platform.pro/blog/', label: 'Blog', position: 'left', target: '_self'},
-        {type: 'localeDropdown', position: 'right'},
-        {href: 'https://app.1platform.pro', label: 'Get Started Free', position: 'right', className: 'navbar__cta'},
+        {href: 'https://app.1platform.pro', label: 'Comenzar gratis', position: 'right', className: 'navbar__cta'},
       ],
     },
     // Footer content is rendered by the custom swizzle at src/theme/Footer/index.tsx.
     footer: {
       style: 'light',
-      copyright: `© ${new Date().getFullYear()} 1Platform Labs. All rights reserved.`,
+      copyright: `© ${new Date().getFullYear()} 1Platform Labs. Todos los derechos reservados.`,
     },
     prism: {
       theme: prismThemes.github,

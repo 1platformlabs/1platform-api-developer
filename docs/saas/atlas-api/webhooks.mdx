@@ -1,18 +1,18 @@
 ---
 title: Webhooks
-description: How the Atlas API receives entitlement events from an external provider — HMAC-signed, idempotent by event id, and translated into grant/revoke writes.
-sidebar_position: 10
+description: Cómo la Atlas API recibe eventos de entitlement de un proveedor externo — firmados con HMAC, idempotentes por id de evento y traducidos a escrituras de grant/revoke.
+sidebar_position: 11
 ---
 
 # Webhooks
 
-Atlas receives **inbound** entitlement events from an external entitlement provider (your
-storefront / checkout / billing side). A webhook tells Atlas that a member gained or lost access —
-Atlas verifies the signature, deduplicates the delivery, and writes the corresponding row to its
-local [entitlements](/docs/saas/atlas-api/entitlements) table.
+Atlas recibe eventos de entitlement **entrantes** de un proveedor de entitlements externo (tu lado de
+storefront / checkout / facturación). Un webhook le dice a Atlas que un miembro ganó o perdió acceso —
+Atlas verifica la firma, deduplica la entrega y escribe el registro correspondiente en su tabla
+local de [entitlements](/docs/saas/atlas-api/entitlements).
 
-> This page describes events your provider **sends to Atlas**. Atlas exposes one inbound endpoint;
-> your provider is responsible for signing and retrying deliveries.
+> Esta página describe eventos que tu proveedor **envía a Atlas**. Atlas expone un endpoint entrante;
+> tu proveedor es responsable de firmar y reintentar las entregas.
 
 ## Endpoint
 
@@ -29,10 +29,10 @@ curl -s -X POST "$ATLAS_BASE/webhooks/entitlement" \
   -d '<RAW_JSON_BODY>'
 ```
 
-The exact header names for the signature, timestamp, and event id are configured per deployment.
-The defaults are illustrated above; confirm yours with the operator.
+Los nombres exactos de los headers para la firma, el timestamp y el id de evento se configuran por despliegue.
+Los valores por defecto se ilustran arriba; confirma los tuyos con el operador.
 
-## Event payload
+## Payload del evento
 
 ```json
 {
@@ -49,44 +49,44 @@ The defaults are illustrated above; confirm yours with the operator.
 }
 ```
 
-| Field | Description |
+| Campo | Descripción |
 |---|---|
-| `id` | Provider-side event id. Used for idempotency. |
-| `type` | One of the supported event types below. |
-| `occurred_at` | When the event happened (ISO 8601). |
-| `data.tenant_id` | The Atlas tenant the event applies to. **Required** for a write. |
-| `data.member_id` | The Atlas member. **Required** for a write. |
-| `data.scope` / `data.scope_ref` | The entitlement scope (see [Entitlements](/docs/saas/atlas-api/entitlements)). |
-| `data.expires_at` | Optional expiry for time-bound access. |
+| `id` | Id de evento del lado del proveedor. Usado para idempotencia. |
+| `type` | Uno de los tipos de evento soportados a continuación. |
+| `occurred_at` | Cuándo ocurrió el evento (ISO 8601). |
+| `data.tenant_id` | El tenant de Atlas al que aplica el evento. **Requerido** para una escritura. |
+| `data.member_id` | El miembro de Atlas. **Requerido** para una escritura. |
+| `data.scope` / `data.scope_ref` | El scope del entitlement (consulta [Entitlements](/docs/saas/atlas-api/entitlements)). |
+| `data.expires_at` | Expiración opcional para acceso con tiempo limitado. |
 
-## Supported event types
+## Tipos de evento soportados
 
-| `type` | Effect in Atlas |
+| `type` | Efecto en Atlas |
 |---|---|
-| `access.granted` | Grants an entitlement (`scope` + `scope_ref` required). |
-| `access.revoked` | Revokes the matching entitlement. |
-| `subscription.cancelled` | Revokes access. |
-| `rental.expired` | Revokes access. |
-| `subscription.renewed` | Accepted/acknowledged (used for transactional email; no entitlement write on its own). |
-| `subscription.payment_failed` | Accepted/acknowledged (drives a payment-failed email). |
-| `rental.started` | Accepted/acknowledged. |
+| `access.granted` | Concede un entitlement (`scope` + `scope_ref` requeridos). |
+| `access.revoked` | Revoca el entitlement coincidente. |
+| `subscription.cancelled` | Revoca el acceso. |
+| `rental.expired` | Revoca el acceso. |
+| `subscription.renewed` | Aceptado/reconocido (usado para email transaccional; sin escritura de entitlement por sí mismo). |
+| `subscription.payment_failed` | Aceptado/reconocido (impulsa un email de pago fallido). |
+| `rental.started` | Aceptado/reconocido. |
 
-An accepted-but-unhandled type is recorded and acknowledged as a no-op — it never errors.
+Un tipo aceptado pero no manejado se registra y se reconoce como un no-op — nunca da error.
 
-## Signature verification (HMAC)
+## Verificación de firma (HMAC)
 
-Atlas computes an HMAC-SHA256 over `"{timestamp}." + raw_body` using the shared webhook secret, and
-compares it (constant-time) against the signature header (the `sha256=` prefix is optional):
+Atlas calcula un HMAC-SHA256 sobre `"{timestamp}." + raw_body` usando el secreto de webhook compartido, y
+lo compara (en tiempo constante) contra el header de firma (el prefijo `sha256=` es opcional):
 
 ```text
-signed   = f"{timestamp}." + raw_request_body          # bytes
+signed   = f"{timestamp}." + raw_request_body          # bytes crudos
 expected = hex( HMAC_SHA256(secret, signed) )
 provided = header["X-Signature"].removeprefix("sha256=")
 valid    = constant_time_equals(expected, provided)
 ```
 
-Sign the **exact raw bytes** of the body — re-serializing the JSON will change the bytes and break
-verification. A missing or wrong signature/timestamp returns:
+Firma los **bytes crudos exactos** del cuerpo — re-serializar el JSON cambiará los bytes y romperá la
+verificación. Una firma/timestamp faltante o incorrecta devuelve:
 
 ```json
 { "code": "WEBHOOK_SIGNATURE_INVALID" }
@@ -94,34 +94,34 @@ verification. A missing or wrong signature/timestamp returns:
 
 (HTTP `401`.)
 
-## Idempotency
+## Idempotencia
 
-Atlas dedupes on `(provider, event_id)`. The event id comes from the `X-Event-Id` header when
-present, otherwise from the payload `id`. The first delivery is processed and acknowledged:
+Atlas deduplica por `(provider, event_id)`. El id de evento proviene del header `X-Event-Id` cuando está
+presente, de lo contrario del `id` del payload. La primera entrega se procesa y se reconoce:
 
 ```json
 { "received": true, "event_id": "evt_01H…", "deduplicated": false }
 ```
 
-A **replay** of the same event id is acknowledged without re-running the grant/revoke:
+Un **replay** del mismo id de evento se reconoce sin volver a ejecutar el grant/revoke:
 
 ```json
 { "received": true, "event_id": "evt_01H…", "deduplicated": true }
 ```
 
-Send a **stable** event id per logical event so retries are safe to replay.
+Envía un id de evento **estable** por evento lógico para que los reintentos sean seguros de reproducir.
 
-## Delivery & retry semantics
+## Semántica de entrega y reintento
 
-- Atlas processes the entitlement write inside a transaction, commits, then fires any transactional
-  email **best-effort** afterward — an email failure never turns a processed webhook into a `5xx`.
-- A successful processing (or a dedup) returns `2xx`. Retry only on `5xx` or a network failure.
-- Partial payloads (missing `tenant_id`/`member_id`, or a grant missing `scope`/`scope_ref`) are
-  recorded for dedup and acknowledged as a no-op — they will **not** be re-driven, so fix the
-  payload upstream rather than relying on retries.
+- Atlas procesa la escritura del entitlement dentro de una transacción, hace commit, y luego dispara cualquier email
+  transaccional **best-effort** después — un fallo de email nunca convierte un webhook procesado en un `5xx`.
+- Un procesamiento exitoso (o una deduplicación) devuelve `2xx`. Reintenta solo ante `5xx` o un fallo de red.
+- Los payloads parciales (sin `tenant_id`/`member_id`, o un grant sin `scope`/`scope_ref`) se
+  registran para deduplicación y se reconocen como no-op — **no** se volverán a procesar, así que corrige el
+  payload aguas arriba en lugar de apoyarte en los reintentos.
 
-## See also
+## Consulta también
 
-- [Entitlements](/docs/saas/atlas-api/entitlements) — what the events write, and the checkout flow.
-- [Integration keys](/docs/saas/atlas-api/integration-keys) — the outbound side (provisioning members).
-- [Errors](/docs/saas/atlas-api/errors) — `WEBHOOK_SIGNATURE_INVALID` and the global contract.
+- [Entitlements](/docs/saas/atlas-api/entitlements) — lo que escriben los eventos, y el flujo de checkout.
+- [Claves de integración](/docs/saas/atlas-api/integration-keys) — el lado saliente (aprovisionamiento de miembros).
+- [Errores](/docs/saas/atlas-api/errors) — `WEBHOOK_SIGNATURE_INVALID` y el contrato global.

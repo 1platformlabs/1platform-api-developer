@@ -1,39 +1,39 @@
 ---
-title: Integration keys
-description: Service-to-service authentication on the Atlas API using long-lived, capability-scoped integration keys (ak-int-…), separate from member JWTs.
+title: Claves de integración
+description: Autenticación de servicio a servicio en la Atlas API usando claves de integración de larga duración y acotadas por capacidad (ak-int-…), separadas de los JWT de miembro.
 sidebar_position: 4
 ---
 
-# Integration keys
+# Claves de integración
 
-Use **integration keys** for **service-to-service** access — backends that provision members, issue
-sign-in URLs, or react to commerce events on behalf of a tenant. They are completely separate from
-the member [JWT flow](/docs/saas/atlas-api/authentication): a key is long-lived, single-tenant, and
-**capability-scoped**.
+Usa **claves de integración** para acceso de **servicio a servicio** — backends que aprovisionan miembros, emiten
+URLs de inicio de sesión o reaccionan a eventos de comercio en nombre de un tenant. Están completamente separadas del
+[flujo JWT](/docs/saas/atlas-api/authentication) de miembro: una clave es de larga duración, de un solo tenant y
+**acotada por capacidad**.
 
-## Key format
+## Formato de la clave
 
-Integration keys use the `ak-int-` scheme prefix:
+Las claves de integración usan el prefijo de esquema `ak-int-`:
 
 ```
 ak-int-<prefix><secret>
 ```
 
-- `ak-int-` — fixed scheme prefix.
-- `<prefix>` — the first 8 characters of the secret, indexed for fast lookup.
-- `<secret>` — hashed at issuance and never stored in plaintext.
+- `ak-int-` — prefijo de esquema fijo.
+- `<prefix>` — los primeros 8 caracteres del secreto, indexados para búsqueda rápida.
+- `<secret>` — hasheado en la emisión y nunca almacenado en texto plano.
 
-Each key is bound to exactly **one tenant**, carries a `vendor` tag, and holds a list of
-**capabilities** that gate which endpoints it may call. Keys are issued out of band by a tenant
-operator; the issuing step decides the capability list — endpoints never widen it.
+Cada clave está ligada a exactamente **un tenant**, lleva una etiqueta `vendor` y contiene una lista de
+**capacidades** que controlan qué endpoints puede llamar. Las claves se emiten fuera de banda por un operador
+del tenant; el paso de emisión decide la lista de capacidades — los endpoints nunca la amplían.
 
-> Store the key as a secret. Anyone holding it can act for that tenant within its capabilities. If a
-> key is compromised, rotate it (revoke + reissue) — the secret itself can never be recovered from
+> Guarda la clave como un secreto. Cualquiera que la posea puede actuar por ese tenant dentro de sus capacidades. Si una
+> clave se ve comprometida, rótala (revoca + reemite) — el secreto en sí nunca puede recuperarse de
 > Atlas.
 
-## Authenticating
+## Autenticación
 
-Send the key as a bearer token. Atlas distinguishes a key from a member JWT by the `ak-int-` prefix:
+Envía la clave como un token bearer. Atlas distingue una clave de un JWT de miembro por el prefijo `ak-int-`:
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
@@ -42,44 +42,44 @@ curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
   -d '{ "email": "buyer@example.com", "display_name": "Buyer", "preferred_locale": "en" }'
 ```
 
-Because the key already encodes its tenant, integration endpoints resolve the tenant **from the
-key**, not from a `Host` / `X-Tenant-Slug` header.
+Como la clave ya codifica su tenant, los endpoints de integración resuelven el tenant **a partir de la
+clave**, no de un header `Host` / `X-Tenant-Slug`.
 
-## Capabilities
+## Capacidades
 
-A capability is a fine-grained permission string checked per endpoint. Current capabilities on the
-member-provisioning surface:
+Una capacidad es una cadena de permiso de grano fino verificada por endpoint. Capacidades actuales en la
+superficie de aprovisionamiento de miembros:
 
-| Capability | Grants |
+| Capacidad | Concede |
 |---|---|
-| `members.upsert` | Create or update a member by email and return a fresh sign-in URL. |
-| `members.issue_magic_link` | Issue a fresh single-use sign-in URL for an existing member. |
+| `members.upsert` | Crear o actualizar un miembro por email y devolver una URL de inicio de sesión nueva. |
+| `members.issue_magic_link` | Emitir una URL de inicio de sesión nueva de un solo uso para un miembro existente. |
 
-If a key calls an endpoint whose required capability it lacks, Atlas returns:
+Si una clave llama a un endpoint cuya capacidad requerida no tiene, Atlas devuelve:
 
 ```json
 { "code": "INTEGRATION_CAPABILITY_MISSING", "required": "members.upsert" }
 ```
 
-## Error codes
+## Códigos de error
 
-| HTTP | Code | Meaning |
+| HTTP | Code | Significado |
 |---|---|---|
-| 401 | `INTEGRATION_KEY_REQUIRED` | No `ak-int-…` bearer token present. |
-| 401 | `INTEGRATION_KEY_INVALID` | Key not found, inactive, or secret mismatch. |
-| 403 | `INTEGRATION_CAPABILITY_MISSING` | Key is valid but lacks the capability the endpoint needs. |
-| 404 | `TENANT_NOT_FOUND` / `MEMBER_NOT_FOUND` | The tenant or member tied to the key no longer exists. |
+| 401 | `INTEGRATION_KEY_REQUIRED` | No hay token bearer `ak-int-…` presente. |
+| 401 | `INTEGRATION_KEY_INVALID` | Clave no encontrada, inactiva o secreto que no coincide. |
+| 403 | `INTEGRATION_CAPABILITY_MISSING` | La clave es válida pero carece de la capacidad que el endpoint necesita. |
+| 404 | `TENANT_NOT_FOUND` / `MEMBER_NOT_FOUND` | El tenant o miembro ligado a la clave ya no existe. |
 
-> Cross-tenant member lookups return `404` (not `403`) on purpose — a leaked key cannot enumerate
-> which member ids exist in other tenants.
+> Las búsquedas de miembros entre tenants devuelven `404` (no `403`) a propósito — una clave filtrada no puede enumerar
+> qué ids de miembro existen en otros tenants.
 
-## Example: provision a buyer and hand them a sign-in URL
+## Ejemplo: aprovisionar un comprador y entregarle una URL de inicio de sesión
 
-A common pattern is a storefront/checkout backend provisioning a member after a successful purchase,
-then showing the buyer a one-click access link:
+Un patrón común es un backend de storefront/checkout aprovisionando un miembro tras una compra exitosa,
+y luego mostrando al comprador un enlace de acceso de un clic:
 
 ```bash
-# 1. Upsert the member (idempotent on tenant + email)
+# 1. Hacer upsert del miembro (idempotente en tenant + email)
 curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
   -H "Authorization: Bearer ak-int-<PREFIX><SECRET>" \
   -H "Content-Type: application/json" \
@@ -97,7 +97,7 @@ curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
 ```
 
 ```bash
-# 2. Later, render the access page with a *fresh* link (never persist the URL)
+# 2. Más tarde, renderiza la página de acceso con un enlace *nuevo* (nunca persistas la URL)
 curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/7c8d…/issue-magic-link" \
   -H "Authorization: Bearer ak-int-<PREFIX><SECRET>"
 ```
@@ -106,12 +106,12 @@ curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/7c8d…/issue-magic-l
 { "sign_in_url": "https://library.example.com/auth/verify?token=…", "expires_at": "2026-06-18T12:30:00Z" }
 ```
 
-The `created` flag is informational — treat upsert as idempotent. Each `sign_in_url` is single-use
-and short-lived (typically ~15 minutes); request a new one per access-page render rather than storing
-it, so a leaked storage row can't be replayed.
+La flag `created` es informativa — trata el upsert como idempotente. Cada `sign_in_url` es de un solo uso
+y de corta duración (típicamente ~15 minutos); solicita una nueva por cada renderizado de la página de acceso en lugar de almacenarla,
+para que un registro de almacenamiento filtrado no pueda reutilizarse.
 
-## See also
+## Consulta también
 
-- [Authentication](/docs/saas/atlas-api/authentication) — the member JWT flow these URLs feed into.
-- [Webhooks](/docs/saas/atlas-api/webhooks) — the inbound side of an external entitlement provider.
-- [Errors](/docs/saas/atlas-api/errors) — the global error contract.
+- [Autenticación](/docs/saas/atlas-api/authentication) — el flujo JWT de miembro al que alimentan estas URLs.
+- [Webhooks](/docs/saas/atlas-api/webhooks) — el lado entrante de un proveedor de entitlements externo.
+- [Errores](/docs/saas/atlas-api/errors) — el contrato de errores global.

@@ -1,34 +1,34 @@
 ---
-title: Rate limits
-description: Per-endpoint rate limits, the rate-key strategy, and how to handle 429 responses.
+title: Límites de uso
+description: Límites de uso por endpoint, la estrategia de clave de límite y cómo manejar respuestas 429.
 sidebar_position: 4
 ---
 
-# Rate limits
+# Límites de uso
 
-Rate limits are enforced via [slowapi](https://slowapi.readthedocs.io/) on
-every protected endpoint. Going over the limit returns `429 Too Many Requests`.
+Los límites de uso se aplican mediante [slowapi](https://slowapi.readthedocs.io/) en
+cada endpoint protegido. Superar el límite devuelve `429 Too Many Requests`.
 
-## Rate-limit key
+## Clave de límite de uso
 
-The rate-limit key is the SHA-256 of `(Authorization header + x-user-token header)`.
-When both headers are absent, the API falls back to the client IP address.
+La clave de límite de uso es el SHA-256 de `(header Authorization + header x-user-token)`.
+Cuando ambos headers están ausentes, la API recurre a la dirección IP del cliente.
 
-## Per-endpoint limits
+## Límites por endpoint
 
-| Constant | Value | Endpoints |
+| Constante | Valor | Endpoints |
 |---|---|---|
 | `HEALTH_LIMIT` | 100 / min | `/health` |
 | `AUTH_LIMIT` | 10 / min | `POST /auth/token`, `POST /users/token` |
-| `READ_LIMIT` | 50 / min | All `GET` endpoints |
-| `WRITE_LIMIT` | 20 / min | All `POST`/`PUT`/`PATCH`/`DELETE` (except specials below) |
+| `READ_LIMIT` | 50 / min | Todos los endpoints `GET` |
+| `WRITE_LIMIT` | 20 / min | Todos los `POST`/`PUT`/`PATCH`/`DELETE` (excepto los especiales de abajo) |
 | `KEYWORD_LIMIT` | 10 / min | `/posts/keywords/*` |
 | `CONTENT_LIMIT` | 5 / min | `/posts/content/*` |
 | `INDEXING_LIMIT` | 20 / min | `/posts/indexing/*` |
 
-Limits are identical across QA and production.
+Los límites son idénticos en QA y producción.
 
-## Handling 429
+## Cómo manejar 429
 
 ```python
 import time
@@ -44,9 +44,9 @@ def call_with_backoff(client: httpx.Client, *args, **kwargs) -> httpx.Response:
     return r  # exhausted retries
 ```
 
-:::tip Cache tokens to stay under AUTH_LIMIT
-The 10 / min limit on `auth/token` and `users/token` is the most common reason
-to hit a 429 during development. Cache tokens for `expires_in - 60s` and only
-mint a fresh one when the cached value is about to expire. See the
-[token caching tip](../flows/payments-and-subscriptions#token-caching-pattern).
+:::tip[Guarda los tokens en caché para no superar AUTH_LIMIT]
+El límite de 10 / min en `auth/token` y `users/token` es la razón más común
+para alcanzar un 429 durante el desarrollo. Guarda los tokens en caché por `expires_in - 60s` y solo
+genera uno nuevo cuando el valor en caché esté por expirar. Consulta el
+[patrón de caché de tokens](../flows/payments-and-subscriptions#token-caching-pattern).
 :::

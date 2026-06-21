@@ -1,85 +1,85 @@
 ---
-title: Troubleshooting
-description: Common non-obvious failure modes — symptom-first.
+title: Solución de problemas
+description: Modos de fallo comunes y no evidentes — organizados por síntoma.
 sidebar_position: 5
 ---
 
-# Troubleshooting
+# Solución de problemas
 
-This page is organised by **symptom**, so you can grep for the error you're
-seeing rather than guessing at root cause.
+Esta página está organizada por **síntoma**, para que puedas buscar el error que estás
+viendo en lugar de adivinar la causa raíz.
 
-## "I get 502 Bad Gateway with HTML when creating a transaction"
+## "Obtengo 502 Bad Gateway con HTML al crear una transacción"
 
-**Most likely:** your tenant has no payment gateway configured. Since
-2026-04-29 the API returns **`422`** with `data.code: PAYMENT_GATEWAY_NOT_CONFIGURED`
-JSON instead of `502 HTML`.
+**Lo más probable:** tu tenant no tiene una pasarela de pago configurada. Desde el
+2026-04-29 la API devuelve **`422`** con JSON `data.code: PAYMENT_GATEWAY_NOT_CONFIGURED`
+en lugar de `502 HTML`.
 
-If you still see HTML 502:
-1. Hit `GET /health` and confirm the deployment includes the fix
+Si aún ves HTML 502:
+1. Llama a `GET /health` y confirma que el despliegue incluye la corrección
    (`version >= 0.x.x`).
-2. Inspect `GET /users/billing` — `data.billing.payment_gateway_id` should be
-   non-null.
-3. If null, configure a gateway via the operator dashboard and re-create the
-   transaction.
+2. Inspecciona `GET /users/billing` — `data.billing.payment_gateway_id` debería ser
+   no null.
+3. Si es null, configura una pasarela a través del dashboard del operador y vuelve a crear la
+   transacción.
 
-## "401 on every call even though my key is valid"
+## "401 en cada llamada aunque mi clave es válida"
 
-Two common causes:
+Dos causas comunes:
 
-1. **Environment mismatch.** QA keys do not authenticate against prod and
-   vice versa. See [Environments](./environments) — inspect the `Host:`
-   header your client sends.
-2. **Truncated key.** Newly issued keys carry `ak-` / `sk-` prefixes. Copy
-   the full string including the prefix; legacy keys without a prefix still
-   work via exact-match lookup.
+1. **Discordancia de entorno.** Las claves de QA no se autentican contra prod ni
+   viceversa. Consulta [Entornos](./environments) — inspecciona el header `Host:`
+   que tu cliente envía.
+2. **Clave truncada.** Las claves recién emitidas llevan prefijos `ak-` / `sk-`. Copia
+   la cadena completa incluyendo el prefijo; las claves heredadas sin prefijo aún
+   funcionan mediante búsqueda por coincidencia exacta.
 
-## "My webhook signature verification keeps failing"
+## "La verificación de firma de mi webhook sigue fallando"
 
-Three pitfalls:
+Tres trampas:
 
-1. **Re-stringifying the body.** 1Platform signs the canonical re-serialisation
-   of the body, but you must verify against the **raw bytes** that arrived on
-   the wire. Use `request.body` / `php://input` / Express `express.raw()` —
-   never `JSON.stringify(JSON.parse(body))`.
-2. **Clock skew.** The signed material includes the `X-Webhook-Timestamp`
-   header. Reject anything older than 5 minutes. NTP-syncing your servers
-   prevents most replay-window false positives.
-3. **Comparing the prefix.** Strip the `sha256=` prefix from `X-Webhook-Signature`
-   **before** comparing. Don't include it in the computed value.
+1. **Re-serializar el cuerpo.** 1Platform firma la re-serialización canónica
+   del cuerpo, pero debes verificar contra los **bytes crudos** que llegaron por
+   la red. Usa `request.body` / `php://input` / `express.raw()` de Express —
+   nunca `JSON.stringify(JSON.parse(body))`.
+2. **Desfase de reloj.** El material firmado incluye el header `X-Webhook-Timestamp`.
+   Rechaza cualquier cosa más antigua de 5 minutos. Sincronizar tus servidores con NTP
+   previene la mayoría de los falsos positivos de la ventana de reproducción.
+3. **Comparar el prefijo.** Elimina el prefijo `sha256=` de `X-Webhook-Signature`
+   **antes** de comparar. No lo incluyas en el valor calculado.
 
-See [webhook security](../webhooks/security) for verifier code in three languages.
+Consulta [seguridad de webhooks](../webhooks/security) para código de verificación en tres lenguajes.
 
-## "I'm hitting 429 in development"
+## "Estoy alcanzando 429 en desarrollo"
 
-You're probably minting a fresh token on every request. The auth endpoints
-are limited to 10 / min. Cache tokens for `expires_in - 60s` and reuse them
-across calls — see the
-[token caching tip](../flows/payments-and-subscriptions#token-caching-pattern).
+Probablemente estás generando un token nuevo en cada solicitud. Los endpoints de auth
+están limitados a 10 / min. Guarda los tokens en caché por `expires_in - 60s` y reutilízalos
+en todas las llamadas — consulta el
+[patrón de caché de tokens](../flows/payments-and-subscriptions#token-caching-pattern).
 
-## "The webhook arrived but my handler ran twice"
+## "El webhook llegó pero mi manejador se ejecutó dos veces"
 
-Webhooks are delivered **at-least-once**. Your handler must be idempotent.
-Dedupe on `(transaction_id, event)` — see
-[receiving notifications → idempotency](../webhooks/receiving-notifications#idempotency-on-the-merchant-side).
+Los webhooks se entregan **al menos una vez**. Tu manejador debe ser idempotente.
+Deduplica con `(transaction_id, event)` — consulta
+[recibir notificaciones → idempotencia](../webhooks/receiving-notifications#idempotency-on-the-merchant-side).
 
-## "I rotated the webhook secret and now legitimate webhooks fail verification"
+## "Roté el secreto del webhook y ahora los webhooks legítimos fallan la verificación"
 
-The old secret is invalidated immediately when you call
-`POST /webhooks/config/rotate-secret`. In-flight webhooks signed with the old
-secret will fail verification at your end.
+El secreto antiguo se invalida de inmediato cuando llamas a
+`POST /webhooks/config/rotate-secret`. Los webhooks en vuelo firmados con el secreto
+antiguo fallarán la verificación de tu lado.
 
-Mitigation: keep the previous secret in your verifier for **24 hours** (accept
-either) before removing it. See
-[webhook security → secret rotation](../webhooks/security#secret-rotation).
+Mitigación: conserva el secreto anterior en tu verificador durante **24 horas** (acepta
+cualquiera de los dos) antes de eliminarlo. Consulta
+[seguridad de webhooks → rotación de secretos](../webhooks/security#secret-rotation).
 
-## "The transaction's `amount` looks 7-8x larger than what I sent"
+## "El `amount` de la transacción se ve 7-8 veces más grande que lo que envié"
 
-You are reading the **provider currency** (often GTQ) instead of the merchant
-currency (USD). The webhook payload includes both:
+Estás leyendo la **moneda del proveedor** (a menudo GTQ) en lugar de la moneda del
+comercio (USD). La carga útil del webhook incluye ambas:
 
-- `amount` + `currency` — the upstream provider currency
-- `merchant_amount` + `merchant_currency` — what you originally sent
+- `amount` + `currency` — la moneda del proveedor upstream
+- `merchant_amount` + `merchant_currency` — lo que originalmente enviaste
 
-**Always credit your seller using `merchant_amount`.** The `amount` field is
-informational only — the exchange rate is opaque and applied at charge time.
+**Acredita siempre a tu vendedor usando `merchant_amount`.** El campo `amount` es
+solo informativo — la tasa de cambio es opaca y se aplica al momento del cargo.

@@ -1,28 +1,28 @@
 ---
-title: "User Onboarding"
-description: "Step-by-step flow to register a new user, authenticate, and retrieve their profile via the 1Platform API."
+title: "Onboarding de usuarios"
+description: "Flujo paso a paso para registrar un nuevo usuario, autenticarlo y recuperar su perfil mediante la 1Platform API."
 sidebar_position: 2
 ---
 
-# Flow: User Onboarding
+# Flujo: Onboarding de usuarios
 
-## Overview
+## Vista general
 
-This flow documents the step-by-step process to onboard a new user on the 1Platform API. It covers creating a user account, obtaining authentication tokens, and retrieving the user's profile.
+Este flujo documenta el proceso paso a paso para hacer el onboarding de un nuevo usuario en la 1Platform API. Cubre la creación de una cuenta de usuario, la obtención de tokens de autenticación y la recuperación del perfil del usuario.
 
-**Use case:** Register new users from your application, set up their billing and subscription, and authenticate them for subsequent API calls.
+**Caso de uso:** Registra nuevos usuarios desde tu aplicación, configura su facturación y suscripción, y autentícalos para las llamadas posteriores a la API.
 
-**End result:** A fully registered user with an API key, authenticated tokens, and a retrievable profile.
+**Resultado final:** Un usuario completamente registrado con una API key, tokens autenticados y un perfil recuperable.
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
 
-### Required headers for all requests
+### Headers requeridos en todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -32,38 +32,38 @@ Content-Type: application/json
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
-APP_TOKEN=""       # Obtained in Step 0
-USER_API_KEY=""    # Obtained in Step 1 (from user creation response)
-USER_TOKEN=""      # Obtained in Step 2
+APP_TOKEN=""       # Obtenido en el Paso 0
+USER_API_KEY=""    # Obtenido en el Paso 1 (de la respuesta de creación de usuario)
+USER_TOKEN=""      # Obtenido en el Paso 2
 ```
 
 ---
 
-## Data required to create a user
+## Datos requeridos para crear un usuario
 
-### User
+### Usuario
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `email` | string | Yes | User email address (unique, min 5 chars) |
-| `currency` | string | No | Billing currency code (default: `"USD"`) |
+| `email` | string | Sí | Dirección de correo del usuario (única, mínimo 5 caracteres) |
+| `currency` | string | No | Código de moneda de facturación (por defecto: `"USD"`) |
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -71,7 +71,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -86,26 +86,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` faltante o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Create User
+### Paso 1 — Crear usuario
 
-**Goal:** Register a new user with automatic billing and subscription setup.
+**Objetivo:** Registrar un nuevo usuario con configuración automática de facturación y suscripción.
 
 **Endpoint:** `POST /api/v1/users`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users" \
@@ -117,7 +117,7 @@ curl -X POST "$BASE_URL/users" \
   }'
 ```
 
-**Response (201):**
+**Respuesta (201):**
 
 ```json
 {
@@ -136,29 +136,29 @@ curl -X POST "$BASE_URL/users" \
 ```
 
 :::note
-Save `data.api_key` as `$USER_API_KEY`. This is the user's permanent API key used to generate user tokens.
+Guarda `data.api_key` como `$USER_API_KEY`. Esta es la API key permanente del usuario que se usa para generar tokens de usuario.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Invalid email format or validation error | Verify the email address format |
-| 401 | Authentication required (app token) | Verify the app token is valid |
-| 409 | Email already registered | Use the existing user; obtain their token with `POST /users/token` |
-| 422 | Missing `email` field | Send `{"email": "..."}` in the body |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
-| 500 | Internal server error | Contact support |
+| 400 | Formato de email inválido o error de validación | Verifica el formato de la dirección de correo |
+| 401 | Se requiere autenticación (token de aplicación) | Verifica que el token de aplicación sea válido |
+| 409 | Email ya registrado | Usa el usuario existente; obtén su token con `POST /users/token` |
+| 422 | Campo `email` faltante | Envía `{"email": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
 
 ---
 
-### Step 2 — Get User Token
+### Paso 2 — Obtener el token de usuario
 
-**Goal:** Authenticate the user and obtain the user JWT token.
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
 
 **Endpoint:** `POST /api/v1/users/token`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users/token" \
@@ -167,7 +167,7 @@ curl -X POST "$BASE_URL/users/token" \
   -d '{"apiKey": "'$USER_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -182,26 +182,26 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 :::note
-Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
-| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` faltante | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 :::tip
-If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
 :::
 
 ---
 
-### Step 3 — Get User Profile
+### Paso 3 — Obtener el perfil del usuario
 
-**Goal:** Retrieve the authenticated user's profile information to verify the onboarding was successful.
+**Objetivo:** Recuperar la información de perfil del usuario autenticado para verificar que el onboarding fue exitoso.
 
 **Endpoint:** `GET /api/v1/users/profile`
 
@@ -213,7 +213,7 @@ curl -X GET "$BASE_URL/users/profile" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -229,19 +229,19 @@ curl -X GET "$BASE_URL/users/profile" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required — invalid or missing token | Regenerate tokens (Steps 0 and 2) |
-| 422 | Validation error | Check request format |
-| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+| 401 | Se requiere autenticación — token inválido o faltante | Regenera los tokens (Pasos 0 y 2) |
+| 422 | Error de validación | Revisa el formato de la solicitud |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
 
 ---
 
-### Step 4 — Revoke All User Tokens
+### Paso 4 — Revocar todos los tokens del usuario
 
-**Goal:** Invalidate all existing JWT tokens for the user. After this call, the user must obtain a new token via `POST /users/token`.
+**Objetivo:** Invalidar todos los tokens JWT existentes del usuario. Después de esta llamada, el usuario debe obtener un nuevo token mediante `POST /users/token`.
 
 **Endpoint:** `POST /api/v1/users/revoke-tokens`
 
@@ -253,7 +253,7 @@ curl -X POST "$BASE_URL/users/revoke-tokens" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -267,28 +267,28 @@ curl -X POST "$BASE_URL/users/revoke-tokens" \
 ```
 
 :::warning
-After revoking tokens, the current `$USER_TOKEN` is no longer valid. You must call `POST /users/token` again to obtain a new token.
+Tras revocar los tokens, el `$USER_TOKEN` actual deja de ser válido. Debes llamar nuevamente a `POST /users/token` para obtener un nuevo token.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid or already revoked token | Obtain a new token via `POST /users/token` |
-| 422 | Validation error | Check request format |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | Token inválido o ya revocado | Obtén un nuevo token mediante `POST /users/token` |
+| 422 | Error de validación | Revisa el formato de la solicitud |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values, from authentication to profile verification.
+Flujo completo con valores ficticios consistentes, desde la autenticación hasta la verificación del perfil.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
@@ -296,7 +296,7 @@ APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
 
 echo "APP_TOKEN: $APP_TOKEN"
 
-# === STEP 1: Create User ===
+# === PASO 1: Crear usuario ===
 USER_RESPONSE=$(curl -s -X POST "$BASE_URL/users" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -310,7 +310,7 @@ echo "USER_RESPONSE: $USER_RESPONSE"
 USER_API_KEY=$(echo $USER_RESPONSE | jq -r '.data.api_key')
 echo "USER_API_KEY: $USER_API_KEY"
 
-# === STEP 2: Get User Token ===
+# === PASO 2: Obtener el token de usuario ===
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -319,19 +319,19 @@ USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
 
 echo "USER_TOKEN: $USER_TOKEN"
 
-# === STEP 3: Get User Profile ===
+# === PASO 3: Obtener el perfil del usuario ===
 curl -s -X GET "$BASE_URL/users/profile" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 4: Revoke All Tokens (optional — for security rotation) ===
+# === PASO 4: Revocar todos los tokens (opcional — para rotación de seguridad) ===
 curl -s -X POST "$BASE_URL/users/revoke-tokens" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# After revoking, get a new user token
+# Tras revocar, obtén un nuevo token de usuario
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -343,52 +343,52 @@ echo "NEW USER_TOKEN: $USER_TOKEN"
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
+### Idempotencia
 
-:::warning[No idempotency mechanism]
-The API does not support an `Idempotency-Key` header. If a user creation request fails due to timeout, check with `POST /users/token` using the expected API key before retrying to avoid duplicate accounts. Duplicate emails will return a **409** error.
+:::warning[Sin mecanismo de idempotencia]
+La API no admite una cabecera `Idempotency-Key`. Si una solicitud de creación de usuario falla por timeout, verifica con `POST /users/token` usando la API key esperada antes de reintentar, para evitar cuentas duplicadas. Los emails duplicados devolverán un error **409**.
 :::
 
-### Retries
-- If you receive **429** (rate limit), wait the indicated time and retry.
-- If you receive **500** or a **timeout**, verify the user state before retrying.
-- For **401** (expired token), regenerate the token and retry the original request.
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, verifica el estado del usuario antes de reintentar.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
 
 ### Timeouts
-- User creation is synchronous and typically completes within **2-3 seconds** (creates User, Billing, and Subscription records).
-- Configure your HTTP client with at least **10 seconds** timeout for the create endpoint.
+- La creación de usuario es síncrona y normalmente se completa en **2-3 segundos** (crea registros de User, Billing y Subscription).
+- Configura tu cliente HTTP con al menos **10 segundos** de timeout para el endpoint de creación.
 
 ### Tokens
-- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
-- Both tokens are required on all protected endpoints (except user creation and token generation which only need the app token).
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints protegidos (excepto la creación de usuario y la generación de tokens, que solo necesitan el token de aplicación).
 
-### Important validations
-- The user email must be unique across the platform.
-- The email must be at least 5 characters long and in a valid format.
-- The `currency` field defaults to `"USD"` if not specified.
+### Validaciones importantes
+- El email del usuario debe ser único en toda la plataforma.
+- El email debe tener al menos 5 caracteres y un formato válido.
+- El campo `currency` toma el valor por defecto `"USD"` si no se especifica.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/users` | Create user |
-| 2 | `POST` | `/api/v1/users/token` | Get user token |
-| 3 | `GET` | `/api/v1/users/profile` | Get user profile |
-| 4 | `POST` | `/api/v1/users/revoke-tokens` | Revoke all user tokens |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users` | Crear usuario |
+| 2 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 3 | `GET` | `/api/v1/users/profile` | Obtener el perfil del usuario |
+| 4 | `POST` | `/api/v1/users/revoke-tokens` | Revocar todos los tokens del usuario |
 
 ---
 
-## Quick checklist
+## Checklist rápido
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I created the User (`POST /users`) and saved the `api_key`
-- [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I verified the user profile (`GET /users/profile`)
-- [ ] I stored the user's `api_key` securely for future token generation
-- [ ] I can revoke tokens when needed (`POST /users/revoke-tokens`)
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Creé el usuario (`POST /users`) y guardé la `api_key`
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Verifiqué el perfil del usuario (`GET /users/profile`)
+- [ ] Almacené la `api_key` del usuario de forma segura para generar tokens en el futuro
+- [ ] Puedo revocar tokens cuando sea necesario (`POST /users/revoke-tokens`)

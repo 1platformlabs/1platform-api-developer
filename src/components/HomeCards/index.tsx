@@ -25,7 +25,7 @@ const TENANT_PRODUCTS: Card[] = [
     desc: translate({
       id: 'home.product.dashboard.desc',
       message:
-        'The white-label control panel for billing, invoicing, domains, team, and every enabled module.',
+        'El panel de control white-label para cobros, facturación, dominios, equipo y cada módulo habilitado.',
     }),
     href: '/docs/products/dashboard/overview',
   },
@@ -36,7 +36,7 @@ const TENANT_PRODUCTS: Card[] = [
     desc: translate({
       id: 'home.product.atlasDashboard.desc',
       message:
-        'Run a branded content storefront — catalog, monetization, members, SEO, and the mobile app.',
+        'Opera una tienda de contenido con tu marca: catálogo, monetización, miembros, SEO y la app móvil.',
     }),
     href: '/docs/products/atlas-dashboard/overview',
   },
@@ -47,7 +47,7 @@ const TENANT_PRODUCTS: Card[] = [
     desc: translate({
       id: 'home.product.atlasApp.desc',
       message:
-        'A white-label mobile app (iOS, Android, TV) with an in-app reader, offline downloads, and more.',
+        'Una app móvil white-label (iOS, Android, TV) con lector integrado, descargas offline y más.',
     }),
     href: '/docs/products/atlas-app/overview',
   },
@@ -62,7 +62,7 @@ const SAAS_PRODUCTS: Card[] = [
     desc: translate({
       id: 'home.saas.onepApi.desc',
       message:
-        'The core REST API — AI content, payments, invoicing, domains, agents — with two-token auth.',
+        'La API REST principal: contenido con IA, pagos, facturación, dominios y agentes, con autenticación de dos tokens.',
     }),
     href: '/docs/saas/1platform-api/overview',
   },
@@ -73,7 +73,7 @@ const SAAS_PRODUCTS: Card[] = [
     desc: translate({
       id: 'home.saas.atlasApi.desc',
       message:
-        'The standalone, multitenant content-delivery API — catalog, entitlements, delivery, webhooks.',
+        'La API independiente y multitenant de entrega de contenido: catálogo, entitlements, entrega y webhooks.',
     }),
     href: '/docs/saas/atlas-api/overview',
   },
@@ -83,29 +83,29 @@ const QUICKLINKS: Card[] = [
   {
     icon: '🔌',
     iconClass: styles.iconBlue,
-    title: translate({id: 'home.quick.apiref.title', message: 'API Reference'}),
-    desc: translate({id: 'home.quick.apiref.desc', message: 'Browse and test every endpoint, live.'}),
+    title: translate({id: 'home.quick.apiref.title', message: 'Referencia de la API'}),
+    desc: translate({id: 'home.quick.apiref.desc', message: 'Explora y prueba cada endpoint en vivo.'}),
     href: '/docs/saas/api-reference-index',
   },
   {
     icon: '🚀',
     iconClass: styles.iconGreen,
-    title: translate({id: 'home.quick.start.title', message: 'Getting started'}),
-    desc: translate({id: 'home.quick.start.desc', message: 'Make your first authenticated call.'}),
+    title: translate({id: 'home.quick.start.title', message: 'Primeros pasos'}),
+    desc: translate({id: 'home.quick.start.desc', message: 'Haz tu primera llamada autenticada.'}),
     href: '/docs/saas/1platform-api/getting-started',
   },
   {
     icon: '🧩',
     iconClass: styles.iconPurple,
-    title: translate({id: 'home.quick.flows.title', message: 'Integration flows'}),
-    desc: translate({id: 'home.quick.flows.desc', message: 'End-to-end workflows, step by step.'}),
+    title: translate({id: 'home.quick.flows.title', message: 'Flujos de integración'}),
+    desc: translate({id: 'home.quick.flows.desc', message: 'Flujos de trabajo de punta a punta, paso a paso.'}),
     href: '/docs/saas/1platform-api/flows/generate-invoice',
   },
   {
     icon: '🔔',
     iconClass: styles.iconOrange,
     title: translate({id: 'home.quick.webhooks.title', message: 'Webhooks'}),
-    desc: translate({id: 'home.quick.webhooks.desc', message: 'React to events as they happen.'}),
+    desc: translate({id: 'home.quick.webhooks.desc', message: 'Reacciona a los eventos en el momento en que ocurren.'}),
     href: '/docs/saas/1platform-api/webhooks/overview',
   },
 ];
@@ -114,7 +114,7 @@ function CardGrid({cards, columns}: {cards: Card[]; columns: 2 | 3}): ReactNode 
   return (
     <div className={columns === 2 ? styles.grid2 : styles.grid3}>
       {cards.map((c) => (
-        <Link key={c.href} className={styles.card} to={c.href}>
+        <Link key={c.href} className={`${styles.card} homeCard`} to={c.href}>
           <div className={`${styles.cardIconBadge} ${c.iconClass}`} aria-hidden="true">
             {c.icon}
           </div>

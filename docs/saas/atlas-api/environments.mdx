@@ -1,65 +1,64 @@
 ---
-title: Environments
-description: Atlas API base URLs for production and QA, where to find the OpenAPI spec, and conventions for the API path prefix and versioning.
+title: Entornos
+description: URLs base de la Atlas API para producción y QA, dónde encontrar la especificación OpenAPI y convenciones para el prefijo de ruta de la API y el versionado.
 sidebar_position: 5
 ---
 
-# Environments
+# Entornos
 
-The **Atlas API** runs in two environments. Both expose the same versioned API under the `/api/v1`
-prefix.
+La **Atlas API** corre en dos entornos. Ambos exponen la misma API versionada bajo el prefijo `/api/v1`.
 
-| Environment | Base URL |
+| Entorno | URL base |
 |---|---|
-| **Production** | `https://atlas-api.1platform.pro/api/v1` |
+| **Producción** | `https://atlas-api.1platform.pro/api/v1` |
 | **QA / staging** | `https://atlas-api-qa.1platform.pro/api/v1` |
 
 ```bash
-# Production
+# Producción
 export ATLAS_BASE="https://atlas-api.1platform.pro/api/v1"
 
 # QA
 export ATLAS_BASE="https://atlas-api-qa.1platform.pro/api/v1"
 ```
 
-> Develop and test against **QA** first. QA is a separate deployment with its own data — tenants,
-> members, catalog items, and entitlements do **not** carry over to production.
+> Desarrolla y prueba primero contra **QA**. QA es un despliegue separado con sus propios datos — tenants,
+> miembros, ítems del catálogo y entitlements **no** se trasladan a producción.
 
-## API path prefix
+## Prefijo de ruta de la API
 
-Every endpoint documented in this section lives under `/api/v1`. For example, the catalog endpoint is:
+Cada endpoint documentado en esta sección vive bajo `/api/v1`. Por ejemplo, el endpoint del catálogo es:
 
 ```
 https://atlas-api.1platform.pro/api/v1/public/catalog
 ```
 
-A bare request to the host root (`/`) returns a small service descriptor and is not part of the API
-surface.
+Una solicitud directa a la raíz del host (`/`) devuelve un pequeño descriptor de servicio y no es parte de la superficie de
+la API.
 
-## OpenAPI specification
+## Especificación OpenAPI
 
-The machine-readable OpenAPI 3.1 document is served at the **host root** (not under `/api/v1`):
+El documento OpenAPI 3.1 legible por máquina se sirve en la **raíz del host** (no bajo `/api/v1`):
 
-| Environment | OpenAPI URL |
+| Entorno | URL de OpenAPI |
 |---|---|
-| Production | `https://atlas-api.1platform.pro/openapi.json` |
+| Producción | `https://atlas-api.1platform.pro/openapi.json` |
 | QA | `https://atlas-api-qa.1platform.pro/openapi.json` |
 
 ```bash
 curl -s https://atlas-api.1platform.pro/openapi.json | jq '.info'
 ```
 
-You can also browse and try every endpoint interactively in the
-**[Atlas API reference →](/api-reference/atlas-api)**.
+También puedes explorar y probar cada endpoint de forma interactiva en la
+**[referencia de la Atlas API →](/api-reference/atlas-api)**.
 
-## Per-request tenant scoping
+## Acotamiento por tenant por solicitud
 
-Both environments are multitenant. A base URL alone does not identify a tenant — you must scope each
-request via the `Host` header (production traffic through a tenant's own domain) or an explicit
-`X-Tenant-Slug` header. See [Tenant resolution](/docs/saas/atlas-api/tenant-resolution).
+Ambos entornos son multitenant. Una URL base por sí sola no identifica un tenant — debes acotar cada
+solicitud mediante el header `Host` (tráfico de producción a través del propio dominio de un tenant) o un header explícito
+`X-Tenant-Slug`. Consulta [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution).
 
-## See also
+## Consulta también
 
-- [Quickstart](/docs/saas/atlas-api/quickstart) — first calls against an environment.
-- [Tenant resolution](/docs/saas/atlas-api/tenant-resolution) — pick the right tenant per request.
-- [Rate limits](/docs/saas/atlas-api/rate-limits) — per-environment limits and backoff.
+- [Inicio rápido](/docs/saas/atlas-api/quickstart) — primeras llamadas contra un entorno.
+- [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution) — elige el tenant correcto por solicitud.
+- [Límites de uso](/docs/saas/atlas-api/rate-limits) — límites por entorno y backoff.

@@ -1,29 +1,29 @@
 ---
-title: Configuring URLs
-description: Domain registration, event handler declaration, and secret rotation. Pointer page that links to the full flow.
+title: Configurar URLs
+description: Registro de dominios, declaración de manejadores de eventos y rotación del secreto. Página guía que enlaza al flujo completo.
 sidebar_position: 4
 ---
 
-# Configuring URLs
+# Configurar URLs
 
-Webhook setup is a one-time bootstrap per environment. The full step-by-step
-guide lives in [the Webhook Configuration flow](../flows/webhook-configuration).
+La configuración de webhooks es un bootstrap único por entorno. La guía completa
+paso a paso está en [el flujo de Configuración de Webhooks](../flows/webhook-configuration).
 
-## At-a-glance
+## De un vistazo
 
-| Step | Endpoint | Purpose |
+| Paso | Endpoint | Propósito |
 |---|---|---|
-| 1 | `GET /webhooks/config/` | Read current state |
-| 2 | `POST /webhooks/config/domains` | Register a domain (returns the initial `webhook_secret` **once**) |
-| 3 | `PUT /webhooks/config/events` | Map each `on_*` event to one of your URLs |
-| 4 | `DELETE /webhooks/config/domains/{domain}` | Unregister a domain |
-| 5 | `POST /webhooks/config/rotate-secret` | Rotate the signing secret (returns new value **once**) |
+| 1 | `GET /webhooks/config/` | Leer el estado actual |
+| 2 | `POST /webhooks/config/domains` | Registrar un dominio (devuelve el `webhook_secret` inicial **una sola vez**) |
+| 3 | `PUT /webhooks/config/events` | Mapear cada evento `on_*` a una de tus URLs |
+| 4 | `DELETE /webhooks/config/domains/{domain}` | Dar de baja un dominio |
+| 5 | `POST /webhooks/config/rotate-secret` | Rotar el secreto de firma (devuelve el nuevo valor **una sola vez**) |
 
-## Where each URL points
+## A dónde apunta cada URL
 
-Bower's marketplace pattern: register one merchant domain (e.g.
-`api.bowerfans.com`), then map all five events to a single endpoint that uses
-the canonical payload's `event` field for internal routing.
+Patrón de marketplace de Bower: registra un dominio de comercio (p. ej.
+`api.bowerfans.com`) y luego mapea los cinco eventos a un único endpoint que use
+el campo `event` del payload canónico para el enrutamiento interno.
 
 ```bash
 curl -X PUT "$BASE_URL/webhooks/config/events" \
@@ -38,23 +38,23 @@ curl -X PUT "$BASE_URL/webhooks/config/events" \
   }'
 ```
 
-## body_template — opt out of the canonical body
+## body_template — renunciar al cuerpo canónico
 
-Each event handler accepts an optional `body_template` object. When present,
-the dispatcher emits **whatever you define** instead of the canonical body —
-you can interpolate the following variables with `{{var}}` syntax:
+Cada manejador de eventos acepta un objeto opcional `body_template`. Cuando está
+presente, el dispatcher emite **lo que tú definas** en lugar del cuerpo canónico
+— puedes interpolar las siguientes variables con la sintaxis `{{var}}`:
 
 `transaction_id`, `status`, `amount`, `usd_amount`, `currency`,
 `currency_provider`, `user_id`, `billing_id`, `provider`, `reference`,
 `external_transaction_id`.
 
-When `body_template` is **absent or empty**, the dispatcher falls back to the
-[canonical body](./receiving-notifications#canonical-payload). This is the
-recommended path for new integrations.
+Cuando `body_template` está **ausente o vacío**, el dispatcher recurre al
+[cuerpo canónico](./receiving-notifications#canonical-payload). Esta es la ruta
+recomendada para integraciones nuevas.
 
-## Cross-references
+## Referencias cruzadas
 
-- [Webhook security](./security) — HMAC headers and verification.
-- [Receiving notifications](./receiving-notifications) — canonical body shape.
-- [Retry & delivery](./retry-and-delivery) — what happens when your handler
-  returns non-2xx.
+- [Seguridad de webhooks](./security) — encabezados HMAC y verificación.
+- [Recibir notificaciones](./receiving-notifications) — forma del cuerpo canónico.
+- [Reintentos y entrega](./retry-and-delivery) — qué pasa cuando tu manejador
+  devuelve algo distinto de 2xx.

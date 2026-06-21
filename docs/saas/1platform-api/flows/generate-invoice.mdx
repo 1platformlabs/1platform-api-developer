@@ -1,31 +1,31 @@
 ---
-title: "Generate Invoice (FEL)"
-description: "Step-by-step flow to issue an electronic invoice (FEL) via 1Platform API, registered in the Guatemalan tax system through TribuTax."
+title: "Generar factura (FEL)"
+description: "Flujo paso a paso para emitir una factura electrónica (FEL) mediante la 1Platform API, registrada en el sistema tributario guatemalteco a través de TribuTax."
 sidebar_position: 1
 ---
 
-# Flow: Generate Invoice
+# Flujo: Generar factura
 
-## Overview
+## Vista general
 
-This flow documents the step-by-step process to issue an electronic invoice (FEL) through the 1Platform API. The invoice is registered in the Guatemalan tax system via TribuTax integration.
+Este flujo documenta el proceso paso a paso para emitir una factura electrónica (FEL) a través de la 1Platform API. La factura se registra en el sistema tributario guatemalteco mediante la integración con TribuTax.
 
-**Use case:** Issue electronic invoices from your application, associated with a previously configured Business.
+**Caso de uso:** Emitir facturas electrónicas desde tu aplicación, asociadas a un Business previamente configurado.
 
-**End result:** An invoice with `issued` status, registered in TribuTax with its FEL UUID, series, fiscal number, and full FEL report metadata (receiver, issuer, certification, taxes, etc.).
+**Resultado final:** Una factura con estado `issued`, registrada en TribuTax con su FEL UUID, serie, número fiscal y los metadatos completos del reporte FEL (receptor, emisor, certificación, impuestos, etc.).
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| User API Key | User key (`sk-...`) obtained when creating the user |
-| TribuTax configured | The App must have `keys.tributax` configured with `api_url`, `token`, and `login` (stored in the App document, not env vars) |
-| Business created | You need a business with a valid `documentNumber` (NIT) |
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| TribuTax configurado | La App debe tener `keys.tributax` configurado con `api_url`, `token` y `login` (almacenado en el documento de la App, no en variables de entorno) |
+| Business creado | Necesitas un business con un `documentNumber` (NIT) válido |
 
-### Required headers for all requests
+### Headers requeridos para todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -35,68 +35,68 @@ Content-Type: application/json
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
 USER_API_KEY="sk-user-abc123"
-APP_TOKEN=""    # Obtained in Step 0
-USER_TOKEN=""   # Obtained in Step 1
-BUSINESS_ID=""  # Obtained in Step 2
-BRANCH_ID=""    # Obtained in Step 2b (optional)
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
+BUSINESS_ID=""  # Obtenido en el Paso 2
+BRANCH_ID=""    # Obtenido en el Paso 2b (opcional)
 ```
 
 ---
 
-## Data required to create an invoice
+## Datos requeridos para crear una factura
 
-### Receptor (customer)
+### Receptor (cliente)
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `name` | string | Yes | Legal name of the receptor |
-| `documentType` | string | Yes | Document type (e.g., `"NIT"`, `"CUI"`, `"Pasaporte"`) |
-| `documentNumber` | string | Yes | Document number (NIT without hyphen) |
-| `email` | string | Yes | Receptor email (for invoice delivery) |
-| `address` | string | No | Receptor address (default: `"Ciudad"`) |
+| `name` | string | Sí | Nombre legal del receptor |
+| `documentType` | string | Sí | Tipo de documento (p. ej., `"NIT"`, `"CUI"`, `"Pasaporte"`) |
+| `documentNumber` | string | Sí | Número de documento (NIT sin guion) |
+| `email` | string | Sí | Correo del receptor (para el envío de la factura) |
+| `address` | string | No | Dirección del receptor (por defecto: `"Ciudad"`) |
 
-### Items (invoice line items)
+### Items (líneas de la factura)
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `description` | string | Yes | Description of the good or service |
-| `unit_price` | float | Yes | Unit price |
-| `quantity` | int | Yes | Quantity |
-| `discounts` | float | No | Applied discounts (default: `0`) |
-| `type` | string | No | `"S"` = Service, `"B"` = Good (default: `"S"`) |
+| `description` | string | Sí | Descripción del bien o servicio |
+| `unit_price` | float | Sí | Precio unitario |
+| `quantity` | int | Sí | Cantidad |
+| `discounts` | float | No | Descuentos aplicados (por defecto: `0`) |
+| `type` | string | No | `"S"` = Servicio, `"B"` = Bien (por defecto: `"S"`) |
 
-### Invoice options
+### Opciones de la factura
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `items` | array | Yes | List of items (minimum 1) |
-| `receptorInfo` | object | Yes | Receptor data |
-| `date` | string | No | Date in `YYYY-MM-DD` format (default: today) |
-| `emitOnCreate` | bool | No | Emit via TribuTax on creation (default: `true`) |
-| `currency` | string | No | Currency (default: `"GTQ"`) |
-| `description` | string | No | General invoice description |
+| `items` | array | Sí | Lista de items (mínimo 1) |
+| `receptorInfo` | object | Sí | Datos del receptor |
+| `date` | string | No | Fecha en formato `YYYY-MM-DD` (por defecto: hoy) |
+| `emitOnCreate` | bool | No | Emitir vía TribuTax al crear (por defecto: `true`) |
+| `currency` | string | No | Moneda (por defecto: `"GTQ"`) |
+| `description` | string | No | Descripción general de la factura |
 
 :::warning
-`branchId` is no longer accepted. If sent, the API returns a **422** error. Invoices are associated directly to the business via the `businessId` in the URL path.
+`branchId` ya no se acepta. Si se envía, la API devuelve un error **422**. Las facturas se asocian directamente al business mediante el `businessId` en la ruta de la URL.
 :::
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -104,7 +104,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -119,26 +119,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcto y que la app esté activa |
+| 422 | Campo `apiKey` ausente o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Get User Token
+### Paso 1 — Obtener el token de usuario
 
-**Goal:** Authenticate the user and obtain the user JWT token.
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
 
 **Endpoint:** `POST /api/v1/users/token`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users/token" \
@@ -147,7 +147,7 @@ curl -X POST "$BASE_URL/users/token" \
   -d '{"apiKey": "'$USER_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -162,26 +162,26 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 :::note
-Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
-| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 :::tip
-If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
 :::
 
 ---
 
-### Step 2 — Create Business
+### Paso 2 — Crear el Business
 
-**Goal:** Register the invoice-issuing business. You only need to do this once.
+**Objetivo:** Registrar el business emisor de facturas. Solo necesitas hacerlo una vez.
 
 **Endpoint:** `POST /api/v1/businesses`
 
@@ -200,7 +200,7 @@ curl -X POST "$BASE_URL/businesses" \
   }'
 ```
 
-**Response (201):**
+**Respuesta (201):**
 
 ```json
 {
@@ -220,15 +220,15 @@ curl -X POST "$BASE_URL/businesses" \
 ```
 
 :::note
-Save `data.id` as `$BUSINESS_ID`.
+Guarda `data.id` como `$BUSINESS_ID`.
 :::
 
-:::tip Create the business and its first branch in one call
-You can include an optional **`branch`** object in the request body. When present, the
-API creates the branch **and** links the calling user to it (as the branch owner) in the
-same call, so the business is immediately returned by `GET /api/v1/businesses`. Omitting
-`branch` creates a standalone business that is **not** linked to any user — add a branch
-later via [Step 2b](#step-2b--create-branch-optional) to make it appear in listings.
+:::tip[Crea el business y su primera sucursal en una sola llamada]
+Puedes incluir un objeto **`branch`** opcional en el cuerpo de la solicitud. Cuando está presente, la
+API crea la sucursal **y** vincula al usuario que llama (como propietario de la sucursal) en la
+misma llamada, de modo que el business es devuelto de inmediato por `GET /api/v1/businesses`. Omitir
+`branch` crea un business independiente que **no** está vinculado a ningún usuario; agrega una sucursal
+más adelante mediante [el Paso 2b](#step-2b--create-branch-optional) para que aparezca en los listados.
 
 ```bash
 curl -X POST "$BASE_URL/businesses" \
@@ -245,19 +245,18 @@ curl -X POST "$BASE_URL/businesses" \
 ```
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid or expired token | Regenerate tokens (Steps 0 and 1) |
-| 409 | A Business with that `documentNumber` already exists | Use the existing Business; retrieve it with `GET /api/v1/businesses/{businessId}` |
-| 422 | Missing required fields | Verify that `name`, `documentType`, `documentNumber`, and `address` are present |
+| 401 | Token inválido o expirado | Regenera los tokens (Pasos 0 y 1) |
+| 409 | Ya existe un Business con ese `documentNumber` | Usa el Business existente; recupéralo con `GET /api/v1/businesses/{businessId}` |
+| 422 | Faltan campos requeridos | Verifica que `name`, `documentType`, `documentNumber` y `address` estén presentes |
 
 ---
 
-### Step 2b — Create Branch (optional)
-
-**Goal:** Register a branch under the business. Branches hold a `commerceId` required by TribuTax for multi-establishment businesses. If your business operates from a single location, you can skip this step.
+### Paso 2b — Crear sucursal (opcional) {#step-2b--create-branch-optional}
+**Objetivo:** Registrar una sucursal bajo el business. Las sucursales tienen un `commerceId` requerido por TribuTax para business con múltiples establecimientos. Si tu business opera desde una sola ubicación, puedes omitir este paso.
 
 **Endpoint:** `POST /api/v1/businesses/{businessId}/branches`
 
@@ -274,7 +273,7 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/branches" \
   }'
 ```
 
-**Response (201):**
+**Respuesta (201):**
 
 ```json
 {
@@ -294,31 +293,31 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/branches" \
 ```
 
 :::note
-Save `data.id` as `$BRANCH_ID`. The `commerceId` is the TribuTax commerce identifier for this branch.
+Guarda `data.id` como `$BRANCH_ID`. El `commerceId` es el identificador de comercio de TribuTax para esta sucursal.
 :::
 
-**Branch data:**
+**Datos de la sucursal:**
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `name` | string | Yes | Branch display name (max 255 chars) |
-| `commerceId` | string | Yes | Commerce ID for TribuTax integration |
+| `name` | string | Sí | Nombre visible de la sucursal (máx. 255 caracteres) |
+| `commerceId` | string | Sí | ID de comercio para la integración con TribuTax |
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid or expired token | Regenerate tokens (Steps 0 and 1) |
-| 404 | Business not found | Verify the `businessId` in the URL |
-| 422 | Missing required fields | Verify that `name` and `commerceId` are present |
-| 429 | Rate limit exceeded | Wait and retry |
-| 500 | Internal server error | Contact support |
+| 401 | Token inválido o expirado | Regenera los tokens (Pasos 0 y 1) |
+| 404 | Business no encontrado | Verifica el `businessId` en la URL |
+| 422 | Faltan campos requeridos | Verifica que `name` y `commerceId` estén presentes |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
 
 ---
 
-### Step 2c — Get Branch Details
+### Paso 2c — Obtener detalles de la sucursal
 
-**Goal:** Retrieve the details of a specific branch.
+**Objetivo:** Recuperar los detalles de una sucursal específica.
 
 **Endpoint:** `GET /api/v1/businesses/{businessId}/branches/{branchId}`
 
@@ -330,7 +329,7 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/branches/$BRANCH_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -356,21 +355,21 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/branches/$BRANCH_ID" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Branch does not belong to this business | Verify the `branchId` belongs to the specified `businessId` |
-| 401 | Invalid or expired token | Regenerate tokens |
-| 404 | Business or branch not found | Verify both IDs |
-| 422 | Invalid path parameters | Verify `businessId` and `branchId` are valid identifiers |
-| 429 | Rate limit exceeded | Wait and retry |
+| 400 | La sucursal no pertenece a este business | Verifica que el `branchId` pertenezca al `businessId` especificado |
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business o sucursal no encontrados | Verifica ambos IDs |
+| 422 | Parámetros de ruta inválidos | Verifica que `businessId` y `branchId` sean identificadores válidos |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 ---
 
-### Step 2d — Look Up Person by Document (Optional)
+### Paso 2d — Buscar persona por documento (opcional)
 
-**Goal:** Retrieve personal data for a person using their CUI/DPI number. Useful for pre-filling the invoice receptor fields (`name`, `documentNumber`) without asking the customer to type them manually.
+**Objetivo:** Recuperar los datos personales de una persona usando su número de CUI/DPI. Útil para pre-rellenar los campos del receptor de la factura (`name`, `documentNumber`) sin pedirle al cliente que los escriba manualmente.
 
 **Endpoint:** `POST /api/v1/identify`
 
@@ -386,13 +385,13 @@ curl -X POST "$BASE_URL/identify" \
   }'
 ```
 
-**Request body:**
+**Cuerpo de la solicitud:**
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `document_number` | string | Yes | CUI/DPI number — exactly 13 digits |
+| `document_number` | string | Sí | Número de CUI/DPI — exactamente 13 dígitos |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -422,32 +421,32 @@ curl -X POST "$BASE_URL/identify" \
 ```
 
 :::note
-Combine `first_name`, `second_name`, `first_surname`, and `second_surname` to build the receptor `name` field. The `document_number` from the response is the CUI, which can be passed as `documentNumber` in the invoice receptor with `documentType: "CUI"`.
+Combina `first_name`, `second_name`, `first_surname` y `second_surname` para construir el campo `name` del receptor. El `document_number` de la respuesta es el CUI, que puede pasarse como `documentNumber` en el receptor de la factura con `documentType: "CUI"`.
 
-For invoices issued to companies, use the NIT lookup path instead (the receptor's `documentType` should be `"NIT"`).
+Para facturas emitidas a empresas, usa en su lugar la ruta de búsqueda por NIT (el `documentType` del receptor debe ser `"NIT"`).
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid or expired token | Regenerate tokens (Steps 0 and 1) |
-| 404 | No records found for the document number | Verify the CUI/DPI is correct (13 digits) |
-| 422 | Integration not configured or lookup error | Ensure the App has the person lookup integration enabled |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
-| 500 | Internal server error | Contact support |
+| 401 | Token inválido o expirado | Regenera los tokens (Pasos 0 y 1) |
+| 404 | No se encontraron registros para el número de documento | Verifica que el CUI/DPI sea correcto (13 dígitos) |
+| 422 | Integración no configurada o error en la búsqueda | Asegúrate de que la App tenga habilitada la integración de búsqueda de personas |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
+| 500 | Error interno del servidor | Contacta a soporte |
 
 ---
 
-### Step 3 — Create Invoice
+### Paso 3 — Crear la factura
 
-**Goal:** Issue an electronic invoice (FEL) associated with a business. The business NIT is used as the emitter on TribuTax.
+**Objetivo:** Emitir una factura electrónica (FEL) asociada a un business. El NIT del business se usa como emisor en TribuTax.
 
 **Endpoint:** `POST /api/v1/businesses/{businessId}/invoices`
 
 **Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
 
-#### Minimal cURL
+#### cURL mínimo
 
 ```bash
 curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
@@ -471,7 +470,7 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
   }'
 ```
 
-#### Full cURL (all fields)
+#### cURL completo (todos los campos)
 
 ```bash
 curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
@@ -509,7 +508,7 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
   }'
 ```
 
-**Response (201):**
+**Respuesta (201):**
 
 ```json
 {
@@ -633,32 +632,32 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
 ```
 
 :::note
-Save `data.id` as `$INVOICE_ID` for subsequent queries.
+Guarda `data.id` como `$INVOICE_ID` para consultas posteriores.
 
-**Key fiscal fields:**
-- `uid` — FEL invoice UUID
-- `invoiceUrl` — Direct link to view the invoice on FEEL
-- `serieFEL` — FEL invoice series
-- `numeroFEL` — FEL invoice number
-- `externalId` — TribuTax ID (required for cancellation)
+**Campos fiscales clave:**
+- `uid` — UUID de la factura FEL
+- `invoiceUrl` — Enlace directo para ver la factura en FEEL
+- `serieFEL` — Serie de la factura FEL
+- `numeroFEL` — Número de la factura FEL
+- `externalId` — ID de TribuTax (requerido para la anulación)
 
-**FEL report metadata** is automatically fetched from FEEL and included in the response. If the fetch fails, the invoice is still created successfully with `fel_synced: false` and the FEL fields as `null`.
+**Los metadatos del reporte FEL** se obtienen automáticamente de FEEL y se incluyen en la respuesta. Si la obtención falla, la factura se crea igualmente con éxito con `fel_synced: false` y los campos FEL como `null`.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid or expired token | Regenerate tokens |
-| 404 | Business not found | Verify the `businessId` in the URL |
-| 422 | TribuTax validation error, invalid fields, or deprecated `branchId` sent | Check receptor data (valid NIT), items (at least 1). Do **not** send `branchId` in the body |
-| 500 | Internal error | Contact support. The invoice may have been saved with `failed` status |
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business no encontrado | Verifica el `businessId` en la URL |
+| 422 | Error de validación de TribuTax, campos inválidos o `branchId` obsoleto enviado | Revisa los datos del receptor (NIT válido), los items (al menos 1). **No** envíes `branchId` en el cuerpo |
+| 500 | Error interno | Contacta a soporte. La factura puede haberse guardado con estado `failed` |
 
 ---
 
-### Step 4 — Get Invoice Details
+### Paso 4 — Obtener detalles de la factura
 
-**Goal:** Retrieve the full details of an issued invoice. The response is read directly from the database — FEL metadata was already fetched during creation (or cancellation).
+**Objetivo:** Recuperar los detalles completos de una factura emitida. La respuesta se lee directamente de la base de datos — los metadatos FEL ya se obtuvieron durante la creación (o la anulación).
 
 **Endpoint:** `GET /api/v1/businesses/{businessId}/invoices/{invoiceId}`
 
@@ -670,9 +669,9 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
-The response has the same structure as the create response (Step 3), including all FEL report fields (`fel_synced`, `fel_receiver`, `fel_issuer`, `fel_items`, `fel_certification`, `fel_phrases`, `fel_general_taxes`, `fel_addendum`, `fel_cancellation`, `document_type`, `total_in_words_es`, `total_in_words_en`).
+La respuesta tiene la misma estructura que la respuesta de creación (Paso 3), incluyendo todos los campos del reporte FEL (`fel_synced`, `fel_receiver`, `fel_issuer`, `fel_items`, `fel_certification`, `fel_phrases`, `fel_general_taxes`, `fel_addendum`, `fel_cancellation`, `document_type`, `total_in_words_es`, `total_in_words_en`).
 
 ```json
 {
@@ -715,51 +714,51 @@ The response has the same structure as the create response (Step 3), including a
 ```
 
 :::note
-If `fel_synced` is `false`, it means the FEL report fetch failed during creation. The fiscal fields (`uid`, `serieFEL`, `numeroFEL`) are still available but the FEL metadata fields will be `null`.
+Si `fel_synced` es `false`, significa que la obtención del reporte FEL falló durante la creación. Los campos fiscales (`uid`, `serieFEL`, `numeroFEL`) siguen disponibles, pero los campos de metadatos FEL serán `null`.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid or expired token | Regenerate tokens |
-| 404 | Business or Invoice not found | Verify the IDs |
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business o factura no encontrados | Verifica los IDs |
 
 ---
 
-### Step 5 — List Invoices
+### Paso 5 — Listar facturas
 
-**Goal:** Retrieve a paginated list of invoices for the business.
+**Objetivo:** Recuperar una lista paginada de facturas del business.
 
 **Endpoint:** `GET /api/v1/businesses/{businessId}/invoices`
 
 **Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
 
 ```bash
-# List all invoices (page 1, 20 per page)
+# Listar todas las facturas (página 1, 20 por página)
 curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN"
 
-# With filters
+# Con filtros
 curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices?status=issued&date_from=2026-02-01&date_to=2026-02-28&page=1&limit=50&sort_by=created_at&sort_order=desc" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Parameter | Type | Default | Description |
+| Parámetro | Tipo | Por defecto | Descripción |
 |---|---|---|---|
-| `page` | int | `1` | Page number (minimum 1) |
-| `limit` | int | `20` | Results per page (maximum 100) |
-| `status` | string | — | Filter by status: `issued`, `cancelled`, `failed` |
-| `date_from` | string | — | Start date (ISO format) |
-| `date_to` | string | — | End date (ISO format) |
-| `sort_by` | string | `created_at` | Field to sort by |
-| `sort_order` | string | `desc` | Order: `asc` or `desc` |
+| `page` | int | `1` | Número de página (mínimo 1) |
+| `limit` | int | `20` | Resultados por página (máximo 100) |
+| `status` | string | — | Filtrar por estado: `issued`, `cancelled`, `failed` |
+| `date_from` | string | — | Fecha de inicio (formato ISO) |
+| `date_to` | string | — | Fecha de fin (formato ISO) |
+| `sort_by` | string | `created_at` | Campo por el cual ordenar |
+| `sort_order` | string | `desc` | Orden: `asc` o `desc` |
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -792,18 +791,18 @@ curl -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices?status=issued&date_from=
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid or expired token | Regenerate tokens |
-| 404 | Business not found | Verify the `businessId` |
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business no encontrado | Verifica el `businessId` |
 
 ---
 
-### Step 6 — Cancel Invoice
+### Paso 6 — Anular factura
 
-**Goal:** Cancel an issued invoice. If it was registered in TribuTax, it will also be voided there. After cancellation, the FEL report is re-fetched to capture updated cancellation data from FEL (`fel_cancellation`).
+**Objetivo:** Anular una factura emitida. Si fue registrada en TribuTax, también se anulará allí. Tras la anulación, el reporte FEL se vuelve a obtener para capturar los datos de anulación actualizados de FEL (`fel_cancellation`).
 
 **Endpoint:** `DELETE /api/v1/businesses/{businessId}/invoices/{invoiceId}`
 
@@ -819,7 +818,7 @@ curl -X DELETE "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
   }'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -835,26 +834,26 @@ curl -X DELETE "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Invoice is already cancelled | Cannot cancel twice |
-| 401 | Invalid or expired token | Regenerate tokens |
-| 404 | Business or Invoice not found | Verify the IDs |
-| 422 | TribuTax error during cancellation | Verify the invoice has a valid `externalId`. Contact support if it persists |
+| 400 | La factura ya está anulada | No se puede anular dos veces |
+| 401 | Token inválido o expirado | Regenera los tokens |
+| 404 | Business o factura no encontrados | Verifica los IDs |
+| 422 | Error de TribuTax durante la anulación | Verifica que la factura tenga un `externalId` válido. Contacta a soporte si persiste |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values, from authentication to invoice issuance.
+Flujo completo con valores ficticios consistentes, desde la autenticación hasta la emisión de la factura.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
@@ -862,7 +861,7 @@ APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
 
 echo "APP_TOKEN: $APP_TOKEN"
 
-# === STEP 1: Get User Token ===
+# === PASO 1: Obtener el token de usuario ===
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -871,7 +870,7 @@ USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
 
 echo "USER_TOKEN: $USER_TOKEN"
 
-# === STEP 2: Create Business ===
+# === PASO 2: Crear el Business ===
 BUSINESS_ID=$(curl -s -X POST "$BASE_URL/businesses" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -886,7 +885,7 @@ BUSINESS_ID=$(curl -s -X POST "$BASE_URL/businesses" \
 
 echo "BUSINESS_ID: $BUSINESS_ID"
 
-# === STEP 3: Create Invoice ===
+# === PASO 3: Crear la factura ===
 INVOICE_RESPONSE=$(curl -s -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -925,7 +924,7 @@ echo "INVOICE_RESPONSE: $INVOICE_RESPONSE"
 INVOICE_ID=$(echo $INVOICE_RESPONSE | jq -r '.data.id')
 echo "INVOICE_ID: $INVOICE_ID"
 
-# === STEP 4: Verify Invoice ===
+# === PASO 4: Verificar la factura ===
 curl -s -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -934,84 +933,84 @@ curl -s -X GET "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
 
 ---
 
-## Unimplemented endpoints (detected gaps)
+## Endpoints no implementados (brechas detectadas)
 
-| Feature | Status | Notes |
+| Funcionalidad | Estado | Notas |
 |---|---|---|
-| Download invoice PDF | Not implemented | No endpoint exists to retrieve the PDF. Should be implemented in `app/api/v1/endpoints/invoicing.py` or consumed directly from TribuTax |
-| Send invoice by email | Not implemented | The receptor's `email` field is sent to TribuTax, but there is no explicit endpoint to resend |
-| Re-emit failed invoice | Not implemented | If an invoice was saved with `status: "failed"`, there is no endpoint to retry emission. A new invoice must be created |
-| Assign/unassign users to Branch | Not implemented | Only the creator is automatically assigned. No endpoint exists to manage additional assignments |
-| Update Business | Not implemented | No PUT/PATCH endpoint exists to modify a business after creation |
-| Update Branch | Not implemented | No PUT/PATCH endpoint exists to modify a branch after creation |
-| List Branches | Not implemented | No endpoint to list all branches for a business |
-| List user's Businesses | Not implemented | No endpoint to list all businesses. The user must know the `businessId` |
+| Descargar PDF de la factura | No implementado | No existe un endpoint para recuperar el PDF. Debería implementarse en `app/api/v1/endpoints/invoicing.py` o consumirse directamente desde TribuTax |
+| Enviar factura por correo | No implementado | El campo `email` del receptor se envía a TribuTax, pero no hay un endpoint explícito para reenviar |
+| Reemitir factura fallida | No implementado | Si una factura se guardó con `status: "failed"`, no hay un endpoint para reintentar la emisión. Debe crearse una nueva factura |
+| Asignar/desasignar usuarios a una sucursal | No implementado | Solo el creador se asigna automáticamente. No existe un endpoint para gestionar asignaciones adicionales |
+| Actualizar Business | No implementado | No existe un endpoint PUT/PATCH para modificar un business tras su creación |
+| Actualizar sucursal | No implementado | No existe un endpoint PUT/PATCH para modificar una sucursal tras su creación |
+| Listar sucursales | No implementado | No hay un endpoint para listar todas las sucursales de un business |
+| Listar los Business del usuario | No implementado | No hay un endpoint para listar todos los business. El usuario debe conocer el `businessId` |
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
+### Idempotencia
 
-:::warning[No idempotency mechanism]
-The API does not support an `Idempotency-Key` header. If a request fails due to timeout, check with `GET /invoices` before retrying to avoid duplicate invoices.
+:::warning[Sin mecanismo de idempotencia]
+La API no admite un header `Idempotency-Key`. Si una solicitud falla por timeout, verifica con `GET /invoices` antes de reintentar para evitar facturas duplicadas.
 :::
 
-### Retries
+### Reintentos
 
-- If you receive **429** (rate limit), wait the indicated time and retry.
-- If you receive **500** or a **timeout**, **do not retry creation immediately**. First query `GET /invoices?status=issued` to verify whether the invoice was created. Invoices that failed in TribuTax are saved with `status: "failed"`.
-- For **401** (expired token), regenerate the token and retry the original request.
+- Si recibes un **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes un **500** o un **timeout**, **no reintentes la creación de inmediato**. Primero consulta `GET /invoices?status=issued` para verificar si la factura se creó. Las facturas que fallaron en TribuTax se guardan con `status: "failed"`.
+- Para un **401** (token expirado), regenera el token y reintenta la solicitud original.
 
 ### Timeouts
 
 :::warning
-Invoice emission involves an external call to TribuTax with a configurable timeout (default: **30 seconds**, set in `App.keys.tributax.timeout`). Additionally, the FEL report is fetched from FEEL after emission. Configure your HTTP client with at least **60 seconds** timeout for the create endpoint.
+La emisión de facturas implica una llamada externa a TribuTax con un timeout configurable (por defecto: **30 segundos**, definido en `App.keys.tributax.timeout`). Además, el reporte FEL se obtiene de FEEL después de la emisión. Configura tu cliente HTTP con un timeout de al menos **60 segundos** para el endpoint de creación.
 :::
 
 ### Tokens
 
-- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
-- Both tokens are required on all invoicing endpoints.
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de facturación.
 
-### Important validations
+### Validaciones importantes
 
-- The Business `documentNumber` must match the NIT registered in TribuTax.
-- The receptor's `documentNumber` must be a valid NIT for Guatemalan electronic invoicing.
-- At least **1 item** is required in the invoice.
-- Do **not** send `branchId` in the request body — it will be rejected with a 422 error.
+- El `documentNumber` del Business debe coincidir con el NIT registrado en TribuTax.
+- El `documentNumber` del receptor debe ser un NIT válido para la facturación electrónica guatemalteca.
+- Se requiere al menos **1 item** en la factura.
+- **No** envíes `branchId` en el cuerpo de la solicitud — será rechazado con un error 422.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/users/token` | Get user token |
-| 2 | `POST` | `/api/v1/businesses` | Create business |
-| 2b | `POST` | `/api/v1/businesses/{businessId}/branches` | Create branch (optional) |
-| 2c | `GET` | `/api/v1/businesses/{businessId}/branches/{branchId}` | Get branch details |
-| 2d | `POST` | `/api/v1/identify` | Look up person by CUI/DPI (optional) |
-| 2e | `GET` | `/api/v1/businesses/{businessId}` | Get business |
-| 3 | `POST` | `/api/v1/businesses/{businessId}/invoices` | Create invoice |
-| 4 | `GET` | `/api/v1/businesses/{businessId}/invoices/{invoiceId}` | Get invoice details |
-| 5 | `GET` | `/api/v1/businesses/{businessId}/invoices` | List invoices |
-| 6 | `DELETE` | `/api/v1/businesses/{businessId}/invoices/{invoiceId}` | Cancel invoice |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `POST` | `/api/v1/businesses` | Crear business |
+| 2b | `POST` | `/api/v1/businesses/{businessId}/branches` | Crear sucursal (opcional) |
+| 2c | `GET` | `/api/v1/businesses/{businessId}/branches/{branchId}` | Obtener detalles de la sucursal |
+| 2d | `POST` | `/api/v1/identify` | Buscar persona por CUI/DPI (opcional) |
+| — | `GET` | `/api/v1/businesses/{businessId}` | Obtener business (recuperación de un 409) |
+| 3 | `POST` | `/api/v1/businesses/{businessId}/invoices` | Crear factura |
+| 4 | `GET` | `/api/v1/businesses/{businessId}/invoices/{invoiceId}` | Obtener detalles de la factura |
+| 5 | `GET` | `/api/v1/businesses/{businessId}/invoices` | Listar facturas |
+| 6 | `DELETE` | `/api/v1/businesses/{businessId}/invoices/{invoiceId}` | Anular factura |
 
 ---
 
-## Quick checklist
+## Lista de verificación rápida
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I have the User API Key (`sk-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I created the Business or have its ID (`POST /businesses`)
-- [ ] I created a Branch if needed (`POST /businesses/{id}/branches`) (optional)
-- [ ] I looked up the receptor's personal data via CUI/DPI if needed (`POST /identify`) (optional)
-- [ ] I have the receptor data (name, document number, email)
-- [ ] I have at least 1 item with description, unit price, and quantity
-- [ ] I issued the invoice (`POST /businesses/{id}/invoices`)
-- [ ] I verified the invoice status (`status: "issued"`) and FEL sync (`fel_synced: true`)
-- [ ] I saved the `uid`, `serieFEL`, `numeroFEL`, and `invoiceUrl` as fiscal reference
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Creé el Business o tengo su ID (`POST /businesses`)
+- [ ] Creé una sucursal si fue necesario (`POST /businesses/{id}/branches`) (opcional)
+- [ ] Busqué los datos personales del receptor vía CUI/DPI si fue necesario (`POST /identify`) (opcional)
+- [ ] Tengo los datos del receptor (nombre, número de documento, correo)
+- [ ] Tengo al menos 1 item con descripción, precio unitario y cantidad
+- [ ] Emití la factura (`POST /businesses/{id}/invoices`)
+- [ ] Verifiqué el estado de la factura (`status: "issued"`) y la sincronización FEL (`fel_synced: true`)
+- [ ] Guardé el `uid`, `serieFEL`, `numeroFEL` e `invoiceUrl` como referencia fiscal

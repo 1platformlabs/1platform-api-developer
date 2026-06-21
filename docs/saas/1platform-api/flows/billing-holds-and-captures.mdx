@@ -1,16 +1,16 @@
 ---
-title: "Billing Holds & Captures"
-description: "Authorize+Capture billing primitive for async operations — reserve user balance, do work, capture or refund automatically. Covers BalanceHold lifecycle, headers, idempotency, and the X-Plugin-Version gate."
+title: "Retenciones y capturas de facturación"
+description: "Primitiva de facturación Autorizar+Capturar para operaciones asíncronas — reserva el saldo del usuario, ejecuta el trabajo y captura o reembolsa automáticamente. Cubre el ciclo de vida de BalanceHold, los headers, la idempotencia y el gate X-Plugin-Version."
 sidebar_position: 8
 ---
 
-# Flow: Billing Holds & Captures (Authorize + Capture)
+# Flujo: Retenciones y capturas de facturación (Autorizar + Capturar)
 
-## Overview
+## Vista general
 
-Operations that take real time to complete (content generation, batch jobs, AI agents) need a billing pattern that is **safe under failure**: if the work fails after the balance is debited, the user must be reimbursed automatically — without manual intervention.
+Las operaciones que tardan tiempo real en completarse (generación de contenido, trabajos por lotes, agentes de IA) necesitan un patrón de facturación que sea **seguro ante fallos**: si el trabajo falla después de debitar el saldo, el usuario debe ser reembolsado automáticamente — sin intervención manual.
 
-1Platform implements the **Authorize + Capture** pattern, the same approach Stripe, AWS, and PayPal use for time-bounded operations:
+1Platform implementa el patrón **Autorizar + Capturar**, el mismo enfoque estándar de la industria para operaciones acotadas en el tiempo:
 
 ```
 ┌────────────────┐    ┌────────────────┐    ┌────────────────┐
@@ -26,58 +26,58 @@ Operations that take real time to complete (content generation, batch jobs, AI a
                       └────────────────┘
 ```
 
-**Effect on the user balance:**
+**Efecto sobre el saldo del usuario:**
 
-- `balance` — the absolute ledger. Only debited at **CAPTURE**.
-- `reserved_balance` — funds currently held by ACTIVE `BalanceHold` records. Increased by **AUTHORIZE**, decreased by **CAPTURE** and **RELEASE**.
-- `available_balance = balance - reserved_balance` — the amount spendable for new operations.
+- `balance` — el libro contable absoluto. Solo se debita en la **CAPTURA**.
+- `reserved_balance` — fondos actualmente retenidos por registros `BalanceHold` ACTIVE. Aumentado por **AUTHORIZE**, disminuido por **CAPTURE** y **RELEASE**.
+- `available_balance = balance - reserved_balance` — la cantidad disponible para gastar en nuevas operaciones.
 
 ---
 
-## When is the hold path used?
+## ¿Cuándo se usa la ruta de retención?
 
-The hold path activates when **all three** conditions are met:
+La ruta de retención se activa cuando se cumplen **las tres** condiciones:
 
-1. The endpoint supports the hold pattern (currently: `POST /api/v1/posts/content/`).
-2. The global flag `BILLING_USE_HOLD_CAPTURE_FOR_POSTS` is `true` (default ON).
-3. The client sends `X-Plugin-Version: 2.36.0` or newer.
+1. El endpoint soporta el patrón de retención (actualmente: `POST /api/v1/posts/content/`).
+2. El flag global `BILLING_USE_HOLD_CAPTURE_FOR_POSTS` es `true` (activado por defecto).
+3. El cliente envía `X-Plugin-Version: 2.36.0` o más reciente.
 
-If any condition is missing, the endpoint falls back to the legacy charge-first behavior. This keeps deployed clients running unchanged while newer plugins get the safer behavior automatically.
+Si falta cualquier condición, el endpoint recurre al comportamiento legado de cobrar primero. Esto mantiene a los clientes desplegados funcionando sin cambios mientras los plugins más nuevos obtienen el comportamiento más seguro automáticamente.
 
-| Plugin Version | Billing path | Refund on background failure |
+| Versión del plugin | Ruta de facturación | Reembolso ante fallo en segundo plano |
 |---|---|---|
-| `< 2.36.0` (legacy) | charge-first | ❌ no automatic refund (background failures rare, manual remediation only) |
-| `>= 2.36.0` | authorize + capture | ✅ automatic — `BalanceHold` releases reserved funds |
+| `< 2.36.0` (legado) | cobrar primero | ❌ sin reembolso automático (los fallos en segundo plano son poco frecuentes, solo remediación manual) |
+| `>= 2.36.0` | autorizar + capturar | ✅ automático — `BalanceHold` libera los fondos reservados |
 
 ---
 
-## BalanceHold lifecycle
+## Ciclo de vida de BalanceHold
 
-A hold is a small document tracking a reservation. It transitions through four states:
+Una retención es un documento pequeño que rastrea una reserva. Transiciona a través de cuatro estados:
 
-| Status | Set by | Side-effect |
+| Estado | Establecido por | Efecto secundario |
 |---|---|---|
 | `ACTIVE` | `authorize()` | `reserved_balance += amount` |
-| `CAPTURED` | `capture()` (success) | `balance -= amount`, `reserved_balance -= amount`, writes `ConsumptionLog` |
-| `RELEASED` | `release()` (failure / cancel) | `reserved_balance -= amount` (balance untouched) |
-| `EXPIRED` | TTL worker (60s tick) | Same effects as `RELEASED`, indicates the process crashed or never completed |
+| `CAPTURED` | `capture()` (éxito) | `balance -= amount`, `reserved_balance -= amount`, escribe `ConsumptionLog` |
+| `RELEASED` | `release()` (fallo / cancelación) | `reserved_balance -= amount` (el balance no se toca) |
+| `EXPIRED` | Worker de TTL (tick de 60s) | Mismos efectos que `RELEASED`, indica que el proceso se cayó o nunca se completó |
 
-**Terminal states** (CAPTURED, RELEASED, EXPIRED) are immutable. Subsequent calls to `capture` or `release` on a terminal hold are no-ops (idempotent).
+Los **estados terminales** (CAPTURED, RELEASED, EXPIRED) son inmutables. Las llamadas posteriores a `capture` o `release` sobre una retención terminal no tienen efecto (idempotentes).
 
-**TTL:** every hold is created with `expires_at = now + 15 minutes` by default. If the work hasn't completed by then, the TTL worker releases the reservation automatically. This prevents stale holds from locking funds indefinitely if the API process crashes mid-job.
+**TTL:** cada retención se crea con `expires_at = now + 15 minutes` por defecto. Si el trabajo no se ha completado para entonces, el worker de TTL libera la reserva automáticamente. Esto evita que retenciones obsoletas bloqueen fondos indefinidamente si el proceso de la API se cae a mitad de un trabajo.
 
 ---
 
-## Request flow — Content Generation example
+## Flujo de la solicitud — ejemplo de generación de contenido
 
-### 1. Submit the job
+### 1. Enviar el trabajo
 
 ```http
 POST /api/v1/posts/content/
 Authorization: Bearer ak-...
 x-user-token: sk-...
 X-Plugin-Version: 2.36.0
-X-Idempotency-Key: client-supplied-uuid-v4   # optional but recommended
+X-Idempotency-Key: client-supplied-uuid-v4   # opcional pero recomendado
 Content-Type: application/json
 
 {
@@ -88,9 +88,9 @@ Content-Type: application/json
 }
 ```
 
-### 2. Response (202 Accepted)
+### 2. Respuesta (202 Accepted)
 
-The server creates the hold, persists it on the job, dispatches the background pipeline, and returns immediately:
+El servidor crea la retención, la persiste en el trabajo, despacha el pipeline en segundo plano y devuelve de inmediato:
 
 ```http
 HTTP/1.1 202 Accepted
@@ -112,16 +112,16 @@ Content-Type: application/json
 }
 ```
 
-**Notice:**
-- The user's `balance` is still **100.00** (not yet debited).
-- `reserved_balance` is **0.05**.
-- `available_balance = 100.00 - 0.05 = 99.95` (returned in `X-Available-Balance`).
+**Observa:**
+- El `balance` del usuario sigue siendo **100.00** (aún no debitado).
+- `reserved_balance` es **0.05**.
+- `available_balance = 100.00 - 0.05 = 99.95` (devuelto en `X-Available-Balance`).
 
-### 3. Background work runs
+### 3. El trabajo en segundo plano se ejecuta
 
-The content pipeline runs in the background. The API process executes the 10-layer generation flow. Two terminal outcomes:
+El pipeline de contenido se ejecuta en segundo plano. El proceso de la API ejecuta el flujo de generación de 10 capas. Dos resultados terminales:
 
-#### Success — CAPTURE
+#### Éxito — CAPTURE
 
 ```
 balance:           100.00 → 99.95   ✅ debited
@@ -130,7 +130,7 @@ hold.status:       CAPTURED
 ConsumptionLog:    written with status=CHARGED, linked to hold_id
 ```
 
-#### Failure (provider error, invariant violation, etc.) — RELEASE
+#### Fallo (error del proveedor, violación de invariante, etc.) — RELEASE
 
 ```
 balance:           100.00 → 100.00  ✅ untouched
@@ -139,7 +139,7 @@ hold.status:       RELEASED
 hold.release_reason: "ProviderError" | "no_keywords" | etc.
 ```
 
-### 4. Poll the job
+### 4. Consultar el trabajo
 
 ```http
 GET /api/v1/posts/content/{job_id}
@@ -147,33 +147,33 @@ Authorization: Bearer ak-...
 x-user-token: sk-...
 ```
 
-The response includes the current job status. Clients can inspect the linked hold via the `holds` endpoint.
+La respuesta incluye el estado actual del trabajo. Los clientes pueden inspeccionar la retención vinculada mediante el endpoint `holds`.
 
 ---
 
-## Idempotency
+## Idempotencia
 
-The `idempotency_key` ties an authorize request to a logical operation so that retries don't double-charge. If a second `POST /api/v1/posts/content/` arrives with the same `X-Idempotency-Key` while the first is still in flight (or completed), the server returns the **same hold** — never creating two reservations.
+La `idempotency_key` vincula una solicitud de autorización a una operación lógica para que los reintentos no cobren dos veces. Si una segunda `POST /api/v1/posts/content/` llega con la misma `X-Idempotency-Key` mientras la primera sigue en curso (o ya completada), el servidor devuelve la **misma retención** — nunca crea dos reservas.
 
-**Recommended:** clients generate a UUIDv4 per logical request and pass it as `X-Idempotency-Key`. If omitted, the server generates one server-side and includes it in `X-Hold-Id`.
+**Recomendado:** los clientes generan un UUIDv4 por solicitud lógica y lo pasan como `X-Idempotency-Key`. Si se omite, el servidor genera uno del lado del servidor y lo incluye en `X-Hold-Id`.
 
 ---
 
-## Transparency endpoints
+## Endpoints de transparencia
 
 ### `GET /api/v1/holds`
 
-List the authenticated user's balance holds, most recent first. Useful for rendering a "Reserved / Charged / Refunded" badge per job in the client UI.
+Lista las retenciones de saldo del usuario autenticado, las más recientes primero. Útil para renderizar una insignia "Reservado / Cobrado / Reembolsado" por trabajo en la interfaz del cliente.
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Param | Type | Default | Notes |
+| Parámetro | Tipo | Por defecto | Notas |
 |---|---|---|---|
-| `status` | `active \| captured \| released \| expired` | — | Filter by lifecycle state |
-| `limit` | int (1-100) | 50 | Page size |
-| `skip` | int (>=0) | 0 | Pagination offset |
+| `status` | `active \| captured \| released \| expired` | — | Filtrar por estado del ciclo de vida |
+| `limit` | int (1-100) | 50 | Tamaño de página |
+| `skip` | int (>=0) | 0 | Desplazamiento de paginación |
 
-**Response:**
+**Respuesta:**
 
 ```json
 {
@@ -203,53 +203,53 @@ List the authenticated user's balance holds, most recent first. Useful for rende
 
 ### `GET /api/v1/holds/{hold_id}`
 
-Fetch a single hold by its id. Returns `404` if the hold doesn't exist or belongs to another user.
+Obtiene una sola retención por su id. Devuelve `404` si la retención no existe o pertenece a otro usuario.
 
 ---
 
-## Headers reference
+## Referencia de headers
 
-| Header | Direction | Notes |
+| Header | Dirección | Notas |
 |---|---|---|
-| `X-Plugin-Version` | Request | **Required for hold path.** Format `MAJOR.MINOR.PATCH`. Send `2.36.0` or higher to opt into Authorize+Capture |
-| `X-Idempotency-Key` | Request | Optional UUID/correlation key. If omitted, server generates one |
-| `X-Hold-Id` | Response | ObjectId of the created `BalanceHold` |
-| `X-Operation-Cost` | Response | Decimal string of the reserved amount (preserves precision) |
-| `X-Available-Balance` | Response | Decimal string — `balance - reserved_balance` after authorize |
+| `X-Plugin-Version` | Solicitud | **Requerido para la ruta de retención.** Formato `MAJOR.MINOR.PATCH`. Envía `2.36.0` o superior para optar por Autorizar+Capturar |
+| `X-Idempotency-Key` | Solicitud | Clave UUID/correlación opcional. Si se omite, el servidor genera una |
+| `X-Hold-Id` | Respuesta | ObjectId del `BalanceHold` creado |
+| `X-Operation-Cost` | Respuesta | Cadena decimal del monto reservado (preserva la precisión) |
+| `X-Available-Balance` | Respuesta | Cadena decimal — `balance - reserved_balance` después de autorizar |
 
 ---
 
-## Error codes
+## Códigos de error
 
-| HTTP | `error_code` (in body) | Triggered by | What the client should do |
+| HTTP | `error_code` (en el cuerpo) | Disparado por | Qué debe hacer el cliente |
 |---|---|---|---|
-| 402 | `insufficient_balance` | `available_balance < amount` at authorize time | Prompt the user to top up |
-| 404 | `billing_not_found` | User has no `Billing` record | Provision billing for the user |
-| 422 | `no_keywords` | Keyword research returned 0 usable titles (the invariant fix for #117) | Suggest a different keyword. The hold is released — no charge |
-| 422 | `content_invariant_violation` | Content pipeline produced output below minimum quality threshold | Retry the job. The hold is released |
-| 429 | `daily_limit_exceeded` | Free-plan user past their daily quota | Upgrade or wait until midnight UTC |
+| 402 | `insufficient_balance` | `available_balance < amount` al momento de autorizar | Solicitar al usuario que recargue |
+| 404 | `billing_not_found` | El usuario no tiene registro `Billing` | Aprovisionar la facturación para el usuario |
+| 422 | `no_keywords` | La investigación de keywords devolvió 0 títulos utilizables (la corrección de invariante para #117) | Sugerir una keyword diferente. La retención se libera — sin cobro |
+| 422 | `content_invariant_violation` | El pipeline de contenido produjo una salida por debajo del umbral mínimo de calidad | Reintentar el trabajo. La retención se libera |
+| 429 | `daily_limit_exceeded` | Usuario de plan gratuito que superó su cuota diaria | Mejorar el plan o esperar hasta la medianoche UTC |
 
 ---
 
-## Monetary precision
+## Precisión monetaria
 
-All monetary fields on the wire are **decimal strings** (e.g., `"49.95"`, not `49.95`). This preserves precision over JSON, which does not have a native exact-decimal type. Clients should parse them with a decimal library (Python `Decimal`, JS `BigInt`-backed money library, PHP `BCMath`, etc.) — never as `float`.
+Todos los campos monetarios en el cable son **cadenas decimales** (p. ej., `"49.95"`, no `49.95`). Esto preserva la precisión sobre JSON, que no tiene un tipo decimal exacto nativo. Los clientes deben parsearlos con una librería decimal (Python `Decimal`, librería de dinero respaldada por `BigInt` en JS, PHP `BCMath`, etc.) — nunca como `float`.
 
 ```javascript
-// JS example
+// Ejemplo en JS
 import Big from 'big.js';
 const amount = new Big(response.data.amount); // "0.05" → Big(0.05)
 ```
 
 ```php
-// PHP example
-$amount = bcadd("0.00", $response["data"]["amount"], 8); // string arithmetic
+// Ejemplo en PHP
+$amount = bcadd("0.00", $response["data"]["amount"], 8); // aritmética de cadenas
 ```
 
 ---
 
-## What's NOT in scope (yet)
+## Lo que NO está en el alcance (todavía)
 
-- **Partial captures.** Today the whole `amount` is either captured or released. Per-step partial captures are tracked as a follow-up (will allow charging "keywords yes, images no" granularly).
-- **Refund-after-capture.** Once a hold is `CAPTURED`, calling `release` is a no-op (with a logged warning). Reversing a capture requires the existing `consumption_service.refund` path.
-- **Holds on flows other than Post Generator.** The primitive is reusable — future async agents and batch operations will use it — but only `POST /api/v1/posts/content/` is wired today.
+- **Capturas parciales.** Hoy el `amount` completo se captura o se libera por entero. Las capturas parciales por paso se rastrean como un seguimiento posterior (permitirá cobrar "keywords sí, imágenes no" de forma granular).
+- **Reembolso después de la captura.** Una vez que una retención está `CAPTURED`, llamar a `release` no tiene efecto (con una advertencia registrada). Revertir una captura requiere la ruta existente `consumption_service.refund`.
+- **Retenciones en flujos distintos al Post Generator.** La primitiva es reutilizable — futuros agentes asíncronos y operaciones por lotes la usarán — pero hoy solo `POST /api/v1/posts/content/` está cableado.

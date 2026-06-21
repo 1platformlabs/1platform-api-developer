@@ -1,30 +1,30 @@
 ---
-title: "Notifications"
-description: "Step-by-step flow to list, create, mark as read, and count unread notifications via the 1Platform API."
+title: "Notificaciones"
+description: "Flujo paso a paso para listar, crear, marcar como leídas y contar notificaciones no leídas a través de la 1Platform API."
 sidebar_position: 17
 ---
 
-# Flow: Notifications
+# Flujo: Notificaciones
 
-## Overview
+## Vista general
 
-This flow documents how a dashboard or admin tool integrates with the notifications subsystem — listing the user's notification feed, broadcasting messages from an admin context, marking individual entries as read, and reading the unread count for a navbar bell icon.
+Este flujo documenta cómo un dashboard o una herramienta de administración se integra con el subsistema de notificaciones: listar el feed de notificaciones del usuario, difundir mensajes desde un contexto de administración, marcar entradas individuales como leídas y leer el conteo de no leídas para el icono de campana de la barra de navegación.
 
-**Use case:** Show an in-app notifications inbox with unread badges, and let admins push announcements to all users or a specific user.
+**Caso de uso:** Mostrar una bandeja de notificaciones in-app con badges de no leídas, y permitir que los administradores envíen anuncios a todos los usuarios o a un usuario específico.
 
-**End result:** The dashboard renders an up-to-date notifications feed with read/unread state, and the unread badge stays in sync with `/notifications/unread-count`.
+**Resultado final:** El dashboard renderiza un feed de notificaciones actualizado con el estado leído/no leído, y el badge de no leídas se mantiene sincronizado con `/notifications/unread-count`.
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| User API Key | User key (`sk-...`) obtained when creating the user |
-| Admin role | Creating notifications requires admin privileges on the app |
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Rol de administrador | Crear notificaciones requiere privilegios de administrador en la app |
 
-### Required headers for all requests
+### Headers requeridos en todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -34,55 +34,55 @@ Content-Type: application/json
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
 USER_API_KEY="sk-user-abc123"
-APP_TOKEN=""           # Obtained in Step 0
-USER_TOKEN=""          # Obtained in Step 1
-NOTIFICATION_ID=""     # Obtained in Step 2 or Step 3
+APP_TOKEN=""           # Obtenido en el Paso 0
+USER_TOKEN=""          # Obtenido en el Paso 1
+NOTIFICATION_ID=""     # Obtenido en el Paso 2 o el Paso 3
 ```
 
 ---
 
-## Data model
+## Modelo de datos
 
-### Notification object
+### Objeto Notification
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `id` | string | Yes | MongoDB ObjectId of the notification |
-| `title` | string | Yes | Short headline shown in the feed |
-| `body` | string | Yes | Full notification body (Markdown is allowed) |
-| `severity` | string | Yes | One of `info`, `success`, `warning` |
-| `link_url` | string \| null | Yes | Optional URL the notification links to |
-| `read_at` | string \| null | Yes | ISO-8601 timestamp when marked as read, `null` if unread |
-| `created_at` | string | Yes | ISO-8601 timestamp when created |
+| `id` | string | Sí | MongoDB ObjectId de la notificación |
+| `title` | string | Sí | Titular corto que se muestra en el feed |
+| `body` | string | Sí | Cuerpo completo de la notificación (se permite Markdown) |
+| `severity` | string | Sí | Uno de `info`, `success`, `warning` |
+| `link_url` | string \| null | Sí | URL opcional a la que enlaza la notificación |
+| `read_at` | string \| null | Sí | Timestamp ISO-8601 de cuándo se marcó como leída, `null` si está sin leer |
+| `created_at` | string | Sí | Timestamp ISO-8601 de cuándo se creó |
 
-### Create payload
+### Payload de creación
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `title` | string | Yes | Short headline (max ~120 chars recommended) |
-| `body` | string | No | Full body text |
-| `severity` | string | No | `info` (default), `success`, or `warning` |
-| `link_url` | string \| null | No | Optional URL for click-through |
-| `user_id` | string \| null | No | Target a specific user. Mutually exclusive with `is_global` |
-| `is_global` | boolean | No | If `true`, broadcast to every user in the app |
+| `title` | string | Sí | Titular corto (se recomienda máx. ~120 caracteres) |
+| `body` | string | No | Texto completo del cuerpo |
+| `severity` | string | No | `info` (por defecto), `success` o `warning` |
+| `link_url` | string \| null | No | URL opcional para click-through |
+| `user_id` | string \| null | No | Apunta a un usuario específico. Mutuamente excluyente con `is_global` |
+| `is_global` | boolean | No | Si es `true`, difunde a todos los usuarios de la app |
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -90,7 +90,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -105,26 +105,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` ausente o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Get User Token
+### Paso 1 — Obtener el token de usuario
 
-**Goal:** Authenticate the user and obtain the user JWT token.
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
 
 **Endpoint:** `POST /api/v1/users/token`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo el token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users/token" \
@@ -133,7 +133,7 @@ curl -X POST "$BASE_URL/users/token" \
   -d '{"apiKey": "'$USER_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -148,38 +148,38 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 :::note
-Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
-| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 :::tip
-If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
 :::
 
 ---
 
-### Step 2 — List notifications
+### Paso 2 — Listar notificaciones
 
-**Goal:** Page through the authenticated user's notification feed.
+**Objetivo:** Paginar el feed de notificaciones del usuario autenticado.
 
 **Endpoint:** `GET /api/v1/notifications`
 
 **Auth:** `Authorization: Bearer $APP_TOKEN` + `x-user-token: $USER_TOKEN`
 
-**Query parameters:**
+**Parámetros de consulta:**
 
-| Param | Type | Required | Description |
+| Parámetro | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `unread_only` | boolean | No | When `true`, return only unread notifications |
-| `skip` | integer | No | Offset for pagination (default `0`) |
-| `limit` | integer | No | Page size (default `20`) |
+| `unread_only` | boolean | No | Cuando es `true`, devuelve solo las notificaciones no leídas |
+| `skip` | integer | No | Offset para la paginación (por defecto `0`) |
+| `limit` | integer | No | Tamaño de página (por defecto `20`) |
 
 ```bash
 curl -X GET "$BASE_URL/notifications?unread_only=false&skip=0&limit=20" \
@@ -187,7 +187,7 @@ curl -X GET "$BASE_URL/notifications?unread_only=false&skip=0&limit=20" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -216,18 +216,18 @@ curl -X GET "$BASE_URL/notifications?unread_only=false&skip=0&limit=20" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Invalid query parameter type | Pass `unread_only` as boolean and `skip`/`limit` as integers |
-| 429 | Rate limit exceeded | Wait and retry |
+| 422 | Tipo de parámetro de consulta inválido | Pasa `unread_only` como boolean y `skip`/`limit` como integers |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 ---
 
-### Step 3 — Create a notification (admin)
+### Paso 3 — Crear una notificación (admin)
 
-**Goal:** Push a notification to a specific user or broadcast to all users in the app.
+**Objetivo:** Enviar una notificación a un usuario específico o difundirla a todos los usuarios de la app.
 
 **Endpoint:** `POST /api/v1/notifications`
 
@@ -247,7 +247,7 @@ curl -X POST "$BASE_URL/notifications" \
   }'
 ```
 
-**Response (201):**
+**Respuesta (201):**
 
 ```json
 {
@@ -266,21 +266,21 @@ curl -X POST "$BASE_URL/notifications" \
 ```
 
 :::warning
-`user_id` and `is_global: true` are mutually exclusive — set one or the other. Sending both returns **422**.
+`user_id` e `is_global: true` son mutuamente excluyentes: define uno u otro. Enviar ambos devuelve **422**.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Missing `title`, invalid `severity`, or conflicting `user_id` + `is_global` | Set exactly one targeting field and a valid `severity` |
-| 429 | Rate limit exceeded | Wait and retry |
+| 422 | Falta `title`, `severity` inválido, o conflicto entre `user_id` + `is_global` | Define exactamente un campo de destino y un `severity` válido |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 ---
 
-### Step 4 — Mark a notification as read
+### Paso 4 — Marcar una notificación como leída
 
-**Goal:** Update the `read_at` timestamp on a single notification.
+**Objetivo:** Actualizar el timestamp `read_at` en una sola notificación.
 
 **Endpoint:** `PATCH /api/v1/notifications/{notification_id}/read`
 
@@ -292,7 +292,7 @@ curl -X PATCH "$BASE_URL/notifications/$NOTIFICATION_ID/read" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -310,19 +310,19 @@ curl -X PATCH "$BASE_URL/notifications/$NOTIFICATION_ID/read" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 404 | Notification does not exist or belongs to another user | Verify the `notification_id` |
-| 422 | Malformed `notification_id` path parameter | Use a valid ObjectId |
-| 429 | Rate limit exceeded | Wait and retry |
+| 404 | La notificación no existe o pertenece a otro usuario | Verifica el `notification_id` |
+| 422 | Parámetro de ruta `notification_id` malformado | Usa un ObjectId válido |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 ---
 
-### Step 5 — Read the unread count
+### Paso 5 — Leer el conteo de no leídas
 
-**Goal:** Show the unread badge on the bell icon — fast, lightweight check.
+**Objetivo:** Mostrar el badge de no leídas en el icono de campana: una verificación rápida y ligera.
 
 **Endpoint:** `GET /api/v1/notifications/unread-count`
 
@@ -334,7 +334,7 @@ curl -X GET "$BASE_URL/notifications/unread-count" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -347,45 +347,45 @@ curl -X GET "$BASE_URL/notifications/unread-count" \
 ```
 
 :::tip
-Poll this endpoint every 30–60 seconds, or hook it into a webhook. It is far cheaper than calling `/notifications?unread_only=true` because the server returns only the count, not the documents.
+Consulta este endpoint cada 30–60 segundos, o engánchalo a un webhook. Es mucho más económico que llamar a `/notifications?unread_only=true`, porque el servidor devuelve solo el conteo y no los documentos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Missing or malformed user token header | Send `x-user-token: $USER_TOKEN` |
-| 429 | Rate limit exceeded | Reduce poll frequency or back off |
+| 422 | Header de token de usuario ausente o malformado | Envía `x-user-token: $USER_TOKEN` |
+| 429 | Límite de tasa excedido | Reduce la frecuencia de polling o aplica back off |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values.
+Flujo completo con valores ficticios consistentes.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
   | jq -r '.data.access_token')
 
-# === STEP 1: Get User Token ===
+# === PASO 1: Obtener el token de usuario ===
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "sk-user-maria-2026"}' \
   | jq -r '.data.access_token')
 
-# === STEP 2: List notifications ===
+# === PASO 2: Listar notificaciones ===
 curl -s -X GET "$BASE_URL/notifications?unread_only=true&limit=10" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" | jq
 
-# === STEP 3: Create a global notification ===
+# === PASO 3: Crear una notificación global ===
 NOTIFICATION_ID=$(curl -s -X POST "$BASE_URL/notifications" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -397,14 +397,14 @@ NOTIFICATION_ID=$(curl -s -X POST "$BASE_URL/notifications" \
     "is_global": true
   }' | jq -r '.data.id')
 
-echo "Created notification: $NOTIFICATION_ID"
+echo "Notificación creada: $NOTIFICATION_ID"
 
-# === STEP 4: Mark as read ===
+# === PASO 4: Marcar como leída ===
 curl -s -X PATCH "$BASE_URL/notifications/$NOTIFICATION_ID/read" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" | jq
 
-# === STEP 5: Read unread count ===
+# === PASO 5: Leer el conteo de no leídas ===
 curl -s -X GET "$BASE_URL/notifications/unread-count" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" | jq
@@ -412,51 +412,51 @@ curl -s -X GET "$BASE_URL/notifications/unread-count" \
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
-- `PATCH /notifications/{id}/read` is idempotent — marking an already-read notification returns the same final state.
-- `POST /notifications` is **not** idempotent — every call creates a new notification. Send a deduplication identifier in your application layer if you need exactly-once semantics.
-- `GET` endpoints are read-only and naturally idempotent.
+### Idempotencia
+- `PATCH /notifications/{id}/read` es idempotente: marcar una notificación ya leída devuelve el mismo estado final.
+- `POST /notifications` **no** es idempotente: cada llamada crea una nueva notificación. Envía un identificador de deduplicación en tu capa de aplicación si necesitas semántica de exactamente-una-vez.
+- Los endpoints `GET` son de solo lectura y naturalmente idempotentes.
 
-### Retries
-- If you receive **429** (rate limit), back off and retry. The unread-count endpoint is safe to call every 30–60 seconds.
-- For **5xx** errors, retry with exponential backoff.
-- For **401**, regenerate tokens and retry.
+### Reintentos
+- Si recibes **429** (límite de tasa), aplica back off y reintenta. El endpoint de unread-count es seguro de llamar cada 30–60 segundos.
+- Para errores **5xx**, reintenta con backoff exponencial.
+- Para **401**, regenera los tokens y reintenta.
 
 ### Timeouts
-- All endpoints are simple CRUD operations — set a 5-second client timeout.
+- Todos los endpoints son operaciones CRUD simples: configura un timeout de cliente de 5 segundos.
 
 ### Tokens
-- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa una renovación automática antes de la expiración.
 
-### Important validations
-- `severity` must be one of `info`, `success`, `warning` — the API rejects any other value.
-- `user_id` and `is_global: true` are mutually exclusive.
-- `link_url` should be HTTPS — http URLs may be flagged as unsafe by browsers.
+### Validaciones importantes
+- `severity` debe ser uno de `info`, `success`, `warning`: la API rechaza cualquier otro valor.
+- `user_id` e `is_global: true` son mutuamente excluyentes.
+- `link_url` debería ser HTTPS: los navegadores pueden marcar las URLs http como inseguras.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/users/token` | Get user token |
-| 2 | `GET` | `/api/v1/notifications` | List notifications (paginated) |
-| 3 | `POST` | `/api/v1/notifications` | Create a notification (admin) |
-| 4 | `PATCH` | `/api/v1/notifications/{notification_id}/read` | Mark as read |
-| 5 | `GET` | `/api/v1/notifications/unread-count` | Read unread count |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `GET` | `/api/v1/notifications` | Listar notificaciones (paginado) |
+| 3 | `POST` | `/api/v1/notifications` | Crear una notificación (admin) |
+| 4 | `PATCH` | `/api/v1/notifications/{notification_id}/read` | Marcar como leída |
+| 5 | `GET` | `/api/v1/notifications/unread-count` | Leer el conteo de no leídas |
 
 ---
 
-## Quick checklist
+## Checklist rápido
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I have the User API Key (`sk-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I listed notifications and rendered them in the UI
-- [ ] I created a notification via `POST /notifications`
-- [ ] I marked at least one notification as read
-- [ ] I wired the unread-count endpoint to the navbar badge
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Listé las notificaciones y las rendericé en la UI
+- [ ] Creé una notificación vía `POST /notifications`
+- [ ] Marqué al menos una notificación como leída
+- [ ] Conecté el endpoint de unread-count al badge de la barra de navegación

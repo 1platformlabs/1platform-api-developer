@@ -1,16 +1,16 @@
 ---
-title: Code Samples
-description: Production-ready receiver implementations in Python (FastAPI), TypeScript (Express), and PHP (Laravel-style).
+title: Ejemplos de código
+description: Implementaciones de receptores listas para producción en Python (FastAPI), TypeScript (Express) y PHP (estilo Laravel).
 sidebar_position: 6
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Code Samples
+# Ejemplos de código
 
-End-to-end webhook receivers that verify the signature, dedupe by
-`(transaction_id, event)`, and enqueue fulfilment for async processing.
+Receptores de webhooks de extremo a extremo que verifican la firma, deduplican por
+`(transaction_id, event)` y encolan el cumplimiento para procesamiento asíncrono.
 
 <Tabs groupId="lang" queryString>
 <TabItem value="python" label="Python (FastAPI)">
@@ -25,9 +25,9 @@ from fastapi import FastAPI, Header, HTTPException, Request, status
 
 app = FastAPI()
 WEBHOOK_SECRET = os.environ["WEBHOOK_SECRET"]
-REPLAY_WINDOW = 300  # seconds
+REPLAY_WINDOW = 300  # segundos
 
-# Replace with Redis SET in production
+# Reemplaza con un SET de Redis en producción
 SEEN: set[tuple[str, str]] = set()
 
 
@@ -62,7 +62,7 @@ async def receive_webhook(
         return {"status": "duplicate"}
     SEEN.add(key)
 
-    # Fast ack — defer fulfilment to a background queue
+    # Ack rápido — difiere el cumplimiento a una cola en segundo plano
     # await queue.enqueue(payload)
     return {"status": "ok"}
 ```
@@ -76,11 +76,11 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 const app = express();
 const SECRET = process.env.WEBHOOK_SECRET!;
-const REPLAY_WINDOW = 300; // seconds
+const REPLAY_WINDOW = 300; // segundos
 
 const seen = new Set<string>();
 
-// IMPORTANT: capture the raw body before JSON parsing
+// IMPORTANTE: captura el cuerpo crudo antes del parseo JSON
 app.use(
   "/webhooks/payments",
   express.raw({ type: "application/json", limit: "1mb" }),
@@ -120,9 +120,9 @@ app.post("/webhooks/payments", (req, res) => {
 app.listen(3000);
 ```
 
-:::tip Capture the raw body
-Express parses JSON eagerly by default, which loses byte-exact equality.
-Mount `express.raw` for the webhook route only.
+:::tip[Captura el cuerpo crudo]
+Express parsea JSON de forma anticipada por defecto, lo que pierde la igualdad
+byte a byte. Monta `express.raw` solo para la ruta del webhook.
 :::
 
 </TabItem>
@@ -130,7 +130,7 @@ Mount `express.raw` for the webhook route only.
 
 ```php
 <?php
-// /webhooks/payments — assumes a router that hands you the raw request body.
+// /webhooks/payments — asume un router que te entrega el cuerpo crudo de la solicitud.
 const REPLAY_WINDOW = 300;
 
 function verify(string $body, string $sig, string $ts, string $secret): bool {
@@ -155,7 +155,7 @@ if (!verify($rawBody, $sig, $ts, $secret)) {
 }
 
 $payload = json_decode($rawBody, true);
-// Replace with a real cache (Redis, Memcached, or DB unique index)
+// Reemplaza con una caché real (Redis, Memcached o un índice único en la BD)
 $cacheKey = "webhook:{$payload['transaction_id']}:{$payload['event']}";
 if (apcu_exists($cacheKey)) {
     echo json_encode(['status' => 'duplicate']);
@@ -170,10 +170,10 @@ echo json_encode(['status' => 'ok']);
 </TabItem>
 </Tabs>
 
-## What every receiver must do
+## Qué debe hacer todo receptor
 
-1. **Verify HMAC against raw bytes** — never reparse the JSON before verifying.
-2. **Reject on replay-window skew** — reject anything outside ±5 minutes.
-3. **Constant-time comparison** — never `==`.
-4. **Dedupe by `(transaction_id, event)`** — webhooks are at-least-once.
-5. **Acknowledge with 2xx fast** — defer heavy work to a background queue.
+1. **Verificar el HMAC contra los bytes crudos** — nunca re-parsees el JSON antes de verificar.
+2. **Rechazar por skew de la ventana de replay** — rechaza cualquier cosa fuera de ±5 minutos.
+3. **Comparación de tiempo constante** — nunca uses `==`.
+4. **Deduplicar por `(transaction_id, event)`** — los webhooks son at-least-once.
+5. **Acusar recibo con 2xx rápidamente** — difiere el trabajo pesado a una cola en segundo plano.

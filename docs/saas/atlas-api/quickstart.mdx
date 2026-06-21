@@ -1,37 +1,37 @@
 ---
-title: Quickstart
-description: Resolve a tenant, sign in with a magic link, browse the catalog, and mint your first playback ticket on the Atlas API in minutes.
+title: Inicio rápido
+description: Resuelve un tenant, inicia sesión con un magic link, explora el catálogo y genera tu primer ticket de reproducción en la Atlas API en minutos.
 sidebar_position: 2
 ---
 
-# Quickstart
+# Inicio rápido
 
-This walkthrough takes you from zero to a working **Atlas API** integration: pick an environment,
-resolve a tenant, sign a member in with a magic link, browse the public catalog, and mint a playback
-ticket for an entitled item.
+Este recorrido te lleva de cero a una integración funcional con la **Atlas API**: elige un entorno,
+resuelve un tenant, inicia la sesión de un miembro con un magic link, explora el catálogo público y genera un ticket de
+reproducción para un ítem con entitlement.
 
-> Atlas is multitenant. **Every** request is scoped to a tenant resolved server-side from the
-> `Host` header (or an explicit `X-Tenant-Slug` override) — see
-> [Tenant resolution](/docs/saas/atlas-api/tenant-resolution). You never put a tenant id in the body.
+> Atlas es multitenant. **Cada** solicitud está acotada a un tenant resuelto del lado del servidor a partir del
+> header `Host` (o un override explícito `X-Tenant-Slug`) — consulta
+> [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution). Nunca pones un id de tenant en el cuerpo.
 
-## 1. Set your base URL
+## 1. Establece tu URL base
 
 ```bash
-# Production
+# Producción
 export ATLAS_BASE="https://atlas-api.1platform.pro/api/v1"
 
 # QA / staging
 # export ATLAS_BASE="https://atlas-api-qa.1platform.pro/api/v1"
 
-# The tenant you are integrating against, by slug or by its primary domain:
+# El tenant contra el que estás integrando, por slug o por su dominio primario:
 export TENANT_SLUG="your-tenant"
 ```
 
-See [Environments](/docs/saas/atlas-api/environments) for the full list.
+Consulta [Entornos](/docs/saas/atlas-api/environments) para la lista completa.
 
-## 2. Resolve the tenant (optional sanity check)
+## 2. Resuelve el tenant (verificación opcional)
 
-The public branding endpoint confirms your tenant resolves and returns its archetype and config:
+El endpoint de branding público confirma que tu tenant se resuelve y devuelve su arquetipo y configuración:
 
 ```bash
 curl -s "$ATLAS_BASE/tenants/by-host?host=library.example.com"
@@ -49,19 +49,19 @@ curl -s "$ATLAS_BASE/tenants/by-host?host=library.example.com"
 }
 ```
 
-## 3. Sign a member in (magic link → JWT)
+## 3. Inicia la sesión de un miembro (magic link → JWT)
 
-Atlas authenticates members with a **passwordless magic link**. Request the link, the member clicks
-it (delivering a single-use token), then exchange that token for a JWT session.
+Atlas autentica a los miembros con un **magic link sin contraseña**. Solicita el enlace, el miembro hace clic
+en él (entregando un token de un solo uso), y luego intercambia ese token por una sesión JWT.
 
 ```bash
-# (a) Issue the magic link — the member receives an email
+# (a) Emite el magic link — el miembro recibe un email
 curl -s -X POST "$ATLAS_BASE/auth/magic-link" \
   -H "X-Tenant-Slug: $TENANT_SLUG" \
   -H "Content-Type: application/json" \
   -d '{ "email": "reader@example.com", "return_url": "/me/library" }'
 
-# (b) Exchange the single-use token (from the email link) for a session
+# (b) Intercambia el token de un solo uso (del enlace del email) por una sesión
 curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" \
   -H "X-Tenant-Slug: $TENANT_SLUG" \
   -H "Content-Type: application/json" \
@@ -79,17 +79,17 @@ curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" \
 }
 ```
 
-Save the access token and send it on subsequent calls:
+Guarda el token de acceso y envíalo en las llamadas posteriores:
 
 ```bash
 export ATLAS_JWT="<JWT_ACCESS_TOKEN>"
 ```
 
-Full details (refresh, sessions, admin sign-in) in [Authentication](/docs/saas/atlas-api/authentication).
+Todos los detalles (refresco, sesiones, inicio de sesión de administrador) en [Autenticación](/docs/saas/atlas-api/authentication).
 
-## 4. Browse the catalog
+## 4. Explora el catálogo
 
-The catalog is public (anonymous) and tenant-scoped:
+El catálogo es público (anónimo) y está acotado al tenant:
 
 ```bash
 curl -s "$ATLAS_BASE/public/catalog?page=1&page_size=20" \
@@ -116,12 +116,12 @@ curl -s "$ATLAS_BASE/public/catalog?page=1&page_size=20" \
 }
 ```
 
-More query patterns in [Catalog browsing](/docs/saas/atlas-api/catalog-browsing).
+Más patrones de consulta en [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing).
 
-## 5. Mint a playback ticket
+## 5. Genera un ticket de reproducción
 
-With a JWT, request a short-lived **playback ticket** for an item. Atlas checks the member's
-entitlement first, then returns a signed URL (or an HLS envelope, depending on the tenant archetype):
+Con un JWT, solicita un **ticket de reproducción** de corta duración para un ítem. Atlas verifica el
+entitlement del miembro primero, y luego devuelve una URL firmada (o un envoltorio HLS, dependiendo del arquetipo del tenant):
 
 ```bash
 curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=epub" \
@@ -141,13 +141,13 @@ curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=epub" \
 }
 ```
 
-A member without access gets `403 { "code": "ENTITLEMENT_DENIED" }`. See
-[Entitlements](/docs/saas/atlas-api/entitlements) and [Content delivery](/docs/saas/atlas-api/content-delivery).
+Un miembro sin acceso obtiene `403 { "code": "ENTITLEMENT_DENIED" }`. Consulta
+[Entitlements](/docs/saas/atlas-api/entitlements) y [Entrega de contenido](/docs/saas/atlas-api/content-delivery).
 
-## Next steps
+## Próximos pasos
 
-- [Authentication](/docs/saas/atlas-api/authentication) — magic-link lifecycle, refresh, roles.
-- [Integration keys](/docs/saas/atlas-api/integration-keys) — service-to-service access.
-- [Webhooks](/docs/saas/atlas-api/webhooks) — receive entitlement events.
-- [Errors](/docs/saas/atlas-api/errors) — the `{ code, message }` contract.
-- **[Interactive API reference →](/api-reference/atlas-api)** — browse and test every endpoint.
+- [Autenticación](/docs/saas/atlas-api/authentication) — ciclo de vida del magic link, refresco, roles.
+- [Claves de integración](/docs/saas/atlas-api/integration-keys) — acceso de servicio a servicio.
+- [Webhooks](/docs/saas/atlas-api/webhooks) — recibe eventos de entitlement.
+- [Errores](/docs/saas/atlas-api/errors) — el contrato `{ code, message }`.
+- **[Referencia interactiva de la API →](/api-reference/atlas-api)** — explora y prueba cada endpoint.

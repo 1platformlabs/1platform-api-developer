@@ -1,29 +1,29 @@
 ---
-title: "Referrals"
-description: "Step-by-step flow to resolve a referral code to its destination payload (referrer, signup URL) via the 1Platform API."
+title: "Referidos"
+description: "Flujo paso a paso para resolver un código de referido a su payload de destino (referente, URL de registro) a través de la 1Platform API."
 sidebar_position: 18
 ---
 
-# Flow: Referrals
+# Flujo: Referidos
 
-## Overview
+## Vista general
 
-This flow documents how a public-facing landing page or signup widget resolves a referral code to its destination — typically the referrer's username and a pre-filled signup URL — so the page can show "Invited by María García" and reward both parties when the new user signs up.
+Este flujo documenta cómo una landing page pública o un widget de registro resuelve un código de referido a su destino — normalmente el nombre de usuario del referente y una URL de registro pre-rellenada — para que la página pueda mostrar "Invitado por María García" y recompensar a ambas partes cuando el nuevo usuario se registra.
 
-**Use case:** Render a personalized signup page when a visitor arrives via a referral link like `https://example.com/r/MARIA2026`.
+**Caso de uso:** Renderizar una página de registro personalizada cuando un visitante llega a través de un enlace de referido como `https://example.com/r/MARIA2026`.
 
-**End result:** Your client knows whether the referral code is valid and, if so, who referred the visitor and where to send them next.
+**Resultado final:** Tu cliente sabe si el código de referido es válido y, de ser así, quién refirió al visitante y a dónde enviarlo a continuación.
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| Referral code | The code captured from the URL or shared link |
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| Código de referido | El código capturado de la URL o del enlace compartido |
 
-### Required headers for all requests
+### Headers requeridos en todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -31,44 +31,44 @@ Content-Type: application/json
 ```
 
 :::note
-This is a public lookup — no user token is required. The endpoint is safe to call from a public landing page (server-side) using the app token.
+Esta es una consulta pública — no se requiere token de usuario. El endpoint es seguro de llamar desde una landing page pública (del lado del servidor) usando el token de aplicación.
 :::
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
-APP_TOKEN=""             # Obtained in Step 0
-REFERRAL_CODE="MARIA2026"  # Captured from the URL path or query string
+APP_TOKEN=""             # Obtenido en el Paso 0
+REFERRAL_CODE="MARIA2026"  # Capturado de la ruta de la URL o de la cadena de consulta
 ```
 
 ---
 
-## Data model
+## Modelo de datos
 
-### Referral resolution object
+### Objeto de resolución de referido
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `code` | string | Yes | The original referral code |
-| `valid` | boolean | Yes | `true` if the code resolves, `false` otherwise |
-| `referrer_username` | string \| null | No | Public username of the referrer (when `valid` is `true`) |
-| `signup_url` | string \| null | No | Optional pre-filled signup URL (e.g., with `?ref=...`) |
+| `code` | string | Sí | El código de referido original |
+| `valid` | boolean | Sí | `true` si el código se resuelve, `false` en caso contrario |
+| `referrer_username` | string \| null | No | Nombre de usuario público del referente (cuando `valid` es `true`) |
+| `signup_url` | string \| null | No | URL de registro pre-rellenada opcional (p. ej., con `?ref=...`) |
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -76,7 +76,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -91,22 +91,22 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcto y que la app esté activa |
+| 422 | Campo `apiKey` faltante o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Resolve the referral code
+### Paso 1 — Resolver el código de referido
 
-**Goal:** Look up the referrer info and signup destination for a given code.
+**Objetivo:** Consultar la información del referente y el destino de registro para un código dado.
 
 **Endpoint:** `GET /api/v1/referrals/{code}`
 
@@ -117,7 +117,7 @@ curl -X GET "$BASE_URL/referrals/$REFERRAL_CODE" \
   -H "Authorization: Bearer $APP_TOKEN"
 ```
 
-**Response (200) — valid code:**
+**Respuesta (200) — código válido:**
 
 ```json
 {
@@ -132,7 +132,7 @@ curl -X GET "$BASE_URL/referrals/$REFERRAL_CODE" \
 }
 ```
 
-**Response (200) — invalid code:**
+**Respuesta (200) — código inválido:**
 
 ```json
 {
@@ -148,27 +148,27 @@ curl -X GET "$BASE_URL/referrals/$REFERRAL_CODE" \
 ```
 
 :::note
-The endpoint always returns **200** with `valid: false` for unknown codes — this avoids leaking whether a code exists via HTTP status codes. Inspect `data.valid` in your client to decide how to render the page.
+El endpoint siempre devuelve **200** con `valid: false` para códigos desconocidos — esto evita filtrar si un código existe a través de los códigos de estado HTTP. Inspecciona `data.valid` en tu cliente para decidir cómo renderizar la página.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Malformed `code` path parameter (empty or invalid characters) | Use a non-empty alphanumeric code |
+| 422 | Parámetro de ruta `code` malformado (vacío o con caracteres inválidos) | Usa un código alfanumérico no vacío |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values.
+Flujo completo con valores ficticios consistentes.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 REFERRAL_CODE="MARIA2026"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
@@ -176,7 +176,7 @@ APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
 
 echo "APP_TOKEN: $APP_TOKEN"
 
-# === STEP 1: Resolve referral code ===
+# === PASO 1: Resolver el código de referido ===
 RESPONSE=$(curl -s -X GET "$BASE_URL/referrals/$REFERRAL_CODE" \
   -H "Authorization: Bearer $APP_TOKEN")
 
@@ -185,53 +185,53 @@ REFERRER=$(echo "$RESPONSE" | jq -r '.data.referrer_username')
 SIGNUP_URL=$(echo "$RESPONSE" | jq -r '.data.signup_url')
 
 if [ "$VALID" = "true" ]; then
-  echo "Invited by: $REFERRER"
-  echo "Signup URL: $SIGNUP_URL"
+  echo "Invitado por: $REFERRER"
+  echo "URL de registro: $SIGNUP_URL"
 else
-  echo "Referral code is invalid — fall back to default signup."
+  echo "El código de referido es inválido — usa el registro predeterminado."
 fi
 ```
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
-The endpoint is read-only and idempotent — repeated calls return the same data.
+### Idempotencia
+El endpoint es de solo lectura e idempotente — las llamadas repetidas devuelven los mismos datos.
 
-### Retries
-- If you receive **429** (rate limit), wait and retry.
-- For **5xx** errors, retry with exponential backoff.
-- For **401**, regenerate the app token and retry.
+### Reintentos
+- Si recibes **429** (límite de tasa), espera y reintenta.
+- Para errores **5xx**, reintenta con backoff exponencial.
+- Para **401**, regenera el token de aplicación y reintenta.
 
 ### Timeouts
-Set a 5-second client timeout.
+Establece un timeout de cliente de 5 segundos.
 
-### Caching
-Resolved codes can be cached for **5 minutes** server-side without losing freshness — referrer usernames rarely change. If you cache client-side, store only `(code, referrer_username, signup_url)` pairs and refresh on cache miss.
+### Caché
+Los códigos resueltos pueden cachearse durante **5 minutos** del lado del servidor sin perder frescura — los nombres de usuario de los referentes rara vez cambian. Si cacheas del lado del cliente, almacena solo pares `(code, referrer_username, signup_url)` y refresca al fallar la caché.
 
 ### Tokens
-The app token expires in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+El token de aplicación expira en **30 minutos** (1800 segundos). Implementa una renovación automática antes de la expiración.
 
-### Important validations
-- Validate the `code` parameter on the client before calling the API — strip whitespace, reject obvious garbage to avoid wasting requests.
-- Always check `data.valid` before showing personalized content. Unknown codes return **200** with `valid: false`, not 404.
+### Validaciones importantes
+- Valida el parámetro `code` en el cliente antes de llamar a la API — elimina los espacios en blanco, rechaza basura evidente para evitar desperdiciar solicitudes.
+- Siempre comprueba `data.valid` antes de mostrar contenido personalizado. Los códigos desconocidos devuelven **200** con `valid: false`, no 404.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `GET` | `/api/v1/referrals/{code}` | Resolve referral code |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `GET` | `/api/v1/referrals/{code}` | Resolver el código de referido |
 
 ---
 
-## Quick checklist
+## Checklist rápido
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I extracted the referral code from the URL
-- [ ] I called `/referrals/{code}` and inspected `data.valid`
-- [ ] I rendered the personalized signup page when valid, fallback otherwise
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Extraje el código de referido de la URL
+- [ ] Llamé a `/referrals/{code}` e inspeccioné `data.valid`
+- [ ] Rendericé la página de registro personalizada cuando es válido, y el fallback en caso contrario

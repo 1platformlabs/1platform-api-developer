@@ -1,32 +1,32 @@
 ---
-title: "AI Generations"
-description: "Step-by-step flow to generate fictional comments, AI images, and profile cards via the 1Platform API."
+title: "Generaciones con IA"
+description: "Flujo paso a paso para generar comentarios ficticios, imágenes con IA y fichas de perfil a través de la 1Platform API."
 sidebar_position: 3
 ---
 
-# Flow: AI Generations
+# Flujo: Generaciones con IA
 
-## Overview
+## Vista general
 
-This flow documents how to use the 1Platform AI generation endpoints to create fictional comments, generate images, and build complete profile cards.
+Este flujo documenta cómo usar los endpoints de generación con IA de 1Platform para crear comentarios ficticios, generar imágenes y construir fichas de perfil completas.
 
-**Use case:** Seed your website with realistic fictional comments, generate AI-powered images for content, and create complete profile cards with bio, social media links, and photos.
+**Caso de uso:** Sembrar tu sitio web con comentarios ficticios realistas, generar imágenes con IA para tu contenido y crear fichas de perfil completas con biografía, enlaces de redes sociales y fotos.
 
-**End result:** Generated comments, images, and profile cards ready to integrate into your application.
+**Resultado final:** Comentarios, imágenes y fichas de perfil generados, listos para integrarse en tu aplicación.
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| User API Key | User key (`sk-...`) obtained when creating the user |
-| AI provider configured | The App must have AI provider keys configured |
-| Image provider configured | Required for AI image generation |
-| Search provider configured | Required for profile card social media discovery |
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Proveedor de IA configurado | La App debe tener configuradas las claves del proveedor de IA |
+| Proveedor de imágenes configurado | Requerido para la generación de imágenes con IA |
+| Proveedor de búsqueda configurado | Requerido para el descubrimiento de redes sociales en la ficha de perfil |
 
-### Required headers for all requests
+### Headers requeridos para todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -36,54 +36,54 @@ Content-Type: application/json
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
 USER_API_KEY="sk-user-abc123"
-APP_TOKEN=""    # Obtained in Step 0
-USER_TOKEN=""   # Obtained in Step 1
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
 ```
 
 ---
 
-## Data required for generations
+## Datos requeridos para las generaciones
 
-### Comments
+### Comentarios
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `count` | integer | Yes | Number of comments to generate (1-50) |
-| `lang` | string | Yes | Language: `"es"` or `"en"` |
-| `context` | string | Yes | Context to orient comment content (min 5 chars) |
+| `count` | integer | Sí | Número de comentarios a generar (1-50) |
+| `lang` | string | Sí | Idioma: `"es"` o `"en"` |
+| `context` | string | Sí | Contexto para orientar el contenido del comentario (mín. 5 caracteres) |
 
-### Images
+### Imágenes
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `count` | integer | Yes | Number of images to generate (1-10) |
-| `context` | string | Yes | Context to orient image generation (min 3 chars) |
+| `count` | integer | Sí | Número de imágenes a generar (1-10) |
+| `context` | string | Sí | Contexto para orientar la generación de imágenes (mín. 3 caracteres) |
 
-### Profile
+### Perfil
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `owner` | string | Yes | Person's full name (min 1 char) |
-| `lang` | string | Yes | Language: `"es"` or `"en"` |
-| `context` | string | No | Additional context to influence bio generation (default: `""`) |
+| `owner` | string | Sí | Nombre completo de la persona (mín. 1 carácter) |
+| `lang` | string | Sí | Idioma: `"es"` o `"en"` |
+| `context` | string | No | Contexto adicional para influir en la generación de la biografía (por defecto: `""`) |
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguno (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -91,7 +91,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -106,26 +106,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` faltante o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Get User Token
+### Paso 1 — Obtener el token de usuario
 
-**Goal:** Authenticate the user and obtain the user JWT token.
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
 
 **Endpoint:** `POST /api/v1/users/token`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users/token" \
@@ -134,7 +134,7 @@ curl -X POST "$BASE_URL/users/token" \
   -d '{"apiKey": "'$USER_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -149,26 +149,26 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 :::note
-Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
-| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` faltante | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 :::tip
-If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+Si todavía no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
 :::
 
 ---
 
-### Step 2 — Generate Comments
+### Paso 2 — Generar comentarios
 
-**Goal:** Generate realistic fictional comments for website content seeding.
+**Objetivo:** Generar comentarios ficticios realistas para sembrar el contenido del sitio web.
 
 **Endpoint:** `POST /api/v1/users/generations/comments`
 
@@ -186,7 +186,7 @@ curl -X POST "$BASE_URL/users/generations/comments" \
   }'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -222,21 +222,21 @@ curl -X POST "$BASE_URL/users/generations/comments" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Invalid input or AI generation failed | Verify `count`, `lang`, and `context` values |
-| 401 | Authentication required | Regenerate tokens |
-| 402 | Insufficient balance — not enough credits | Top up your account balance |
-| 422 | Validation error — missing or invalid fields | `count` must be 1-50, `lang` must be `"es"` or `"en"`, `context` min 5 chars |
-| 429 | Rate limit exceeded (5 req/min) | Wait and retry — this is an AI-intensive endpoint |
+| 400 | Entrada inválida o falló la generación con IA | Verifica los valores de `count`, `lang` y `context` |
+| 401 | Autenticación requerida | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 422 | Error de validación — campos faltantes o inválidos | `count` debe ser 1-50, `lang` debe ser `"es"` o `"en"`, `context` mín. 5 caracteres |
+| 429 | Límite de tasa excedido (5 req/min) | Espera y reintenta — este es un endpoint intensivo en IA |
 
 ---
 
-### Step 3 — Generate Images
+### Paso 3 — Generar imágenes
 
-**Goal:** Generate AI-powered images based on a context description.
+**Objetivo:** Generar imágenes con IA a partir de una descripción de contexto.
 
 **Endpoint:** `POST /api/v1/users/generations/images`
 
@@ -253,7 +253,7 @@ curl -X POST "$BASE_URL/users/generations/images" \
   }'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -281,24 +281,24 @@ curl -X POST "$BASE_URL/users/generations/images" \
 ```
 
 :::note
-Each image includes the `url` where it can be accessed and the `prompt` that was used to generate it. Partial results may be returned if some generation attempts fail.
+Cada imagen incluye la `url` donde se puede acceder y el `prompt` que se usó para generarla. Se pueden devolver resultados parciales si algunos intentos de generación fallan.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required | Regenerate tokens |
-| 402 | Insufficient balance — not enough credits | Top up your account balance |
-| 422 | Validation error — `count` must be 1-10, `context` min 3 chars | Check field values |
-| 429 | Rate limit exceeded (5 req/min) | Wait and retry — this is an AI-intensive endpoint |
-| 500 | All image generation attempts failed | Verify AI provider configuration |
+| 401 | Autenticación requerida | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 422 | Error de validación — `count` debe ser 1-10, `context` mín. 3 caracteres | Revisa los valores de los campos |
+| 429 | Límite de tasa excedido (5 req/min) | Espera y reintenta — este es un endpoint intensivo en IA |
+| 500 | Todos los intentos de generación de imágenes fallaron | Verifica la configuración del proveedor de IA |
 
 ---
 
-### Step 4 — Generate Profile Card
+### Paso 4 — Generar ficha de perfil
 
-**Goal:** Generate a complete profile card including gender detection, AI bio, social media links, and a profile image.
+**Objetivo:** Generar una ficha de perfil completa que incluye detección de género, biografía con IA, enlaces de redes sociales y una imagen de perfil.
 
 **Endpoint:** `POST /api/v1/users/generations/profile`
 
@@ -316,7 +316,7 @@ curl -X POST "$BASE_URL/users/generations/profile" \
   }'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -332,28 +332,28 @@ curl -X POST "$BASE_URL/users/generations/profile" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Missing or invalid owner name | Provide a valid person name (min 1 char) |
-| 401 | Authentication required | Regenerate tokens |
-| 402 | Insufficient balance — not enough credits | Top up your account balance |
-| 422 | Validation error — `owner` and `lang` are required | Check required fields |
-| 429 | Rate limit exceeded (5 req/min) | Wait and retry |
-| 500 | AI generation failed | Verify AI, search, and image provider configuration |
+| 400 | Nombre de owner faltante o inválido | Proporciona un nombre de persona válido (mín. 1 carácter) |
+| 401 | Autenticación requerida | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 422 | Error de validación — `owner` y `lang` son requeridos | Revisa los campos requeridos |
+| 429 | Límite de tasa excedido (5 req/min) | Espera y reintenta |
+| 500 | Falló la generación con IA | Verifica la configuración de los proveedores de IA, búsqueda e imágenes |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values.
+Flujo completo con valores ficticios consistentes.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
@@ -361,7 +361,7 @@ APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
 
 echo "APP_TOKEN: $APP_TOKEN"
 
-# === STEP 1: Get User Token ===
+# === PASO 1: Obtener el token de usuario ===
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -370,7 +370,7 @@ USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
 
 echo "USER_TOKEN: $USER_TOKEN"
 
-# === STEP 2: Generate Comments ===
+# === PASO 2: Generar comentarios ===
 curl -s -X POST "$BASE_URL/users/generations/comments" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -382,7 +382,7 @@ curl -s -X POST "$BASE_URL/users/generations/comments" \
   }' \
   | jq .
 
-# === STEP 3: Generate Images ===
+# === PASO 3: Generar imágenes ===
 curl -s -X POST "$BASE_URL/users/generations/images" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -393,7 +393,7 @@ curl -s -X POST "$BASE_URL/users/generations/images" \
   }' \
   | jq .
 
-# === STEP 4: Generate Profile Card ===
+# === PASO 4: Generar ficha de perfil ===
 curl -s -X POST "$BASE_URL/users/generations/profile" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -408,58 +408,58 @@ curl -s -X POST "$BASE_URL/users/generations/profile" \
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
+### Idempotencia
 
-:::warning[No idempotency mechanism]
-Generation endpoints create new content on each call. There is no deduplication. Store generated results in your application to avoid unnecessary regeneration.
+:::warning[Sin mecanismo de idempotencia]
+Los endpoints de generación crean contenido nuevo en cada llamada. No hay deduplicación. Almacena los resultados generados en tu aplicación para evitar regeneraciones innecesarias.
 :::
 
-### Retries
-- If you receive **429** (rate limit), wait the indicated time and retry.
-- If you receive **500** or a **timeout**, do not retry immediately — partial results may have been generated.
-- For **401** (expired token), regenerate the token and retry the original request.
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, no reintentes de inmediato — pueden haberse generado resultados parciales.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
 
 ### Timeouts
-- Comment generation typically takes **5-10 seconds** depending on count.
-- Image generation may take **10-30 seconds** per image.
-- Profile generation involves multiple AI calls and may take **15-30 seconds**.
-- Configure your HTTP client with at least **60 seconds** timeout for generation endpoints.
+- La generación de comentarios suele tardar **5-10 segundos** según la cantidad.
+- La generación de imágenes puede tardar **10-30 segundos** por imagen.
+- La generación de perfiles implica múltiples llamadas a la IA y puede tardar **15-30 segundos**.
+- Configura tu cliente HTTP con al menos **60 segundos** de timeout para los endpoints de generación.
 
 ### Tokens
-- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
-- Both tokens are required on all generation endpoints.
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de generación.
 
-### Important validations
-- Comment `count` must be between 1 and 50.
-- Image `count` must be between 1 and 10.
-- Comment `context` must be at least 5 characters.
-- Image `context` must be at least 3 characters.
-- Profile `lang` must be `"es"` or `"en"`.
-- All generation endpoints are AI-intensive with a rate limit of **5 req/min**.
+### Validaciones importantes
+- El `count` de comentarios debe estar entre 1 y 50.
+- El `count` de imágenes debe estar entre 1 y 10.
+- El `context` de comentarios debe tener al menos 5 caracteres.
+- El `context` de imágenes debe tener al menos 3 caracteres.
+- El `lang` de perfil debe ser `"es"` o `"en"`.
+- Todos los endpoints de generación son intensivos en IA con un límite de tasa de **5 req/min**.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/users/token` | Get user token |
-| 2 | `POST` | `/api/v1/users/generations/comments` | Generate comments |
-| 3 | `POST` | `/api/v1/users/generations/images` | Generate images |
-| 4 | `POST` | `/api/v1/users/generations/profile` | Generate profile card |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener token de usuario |
+| 2 | `POST` | `/api/v1/users/generations/comments` | Generar comentarios |
+| 3 | `POST` | `/api/v1/users/generations/images` | Generar imágenes |
+| 4 | `POST` | `/api/v1/users/generations/profile` | Generar ficha de perfil |
 
 ---
 
-## Quick checklist
+## Lista de verificación rápida
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I have the User API Key (`sk-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I generated comments (`POST /users/generations/comments`)
-- [ ] I generated images (`POST /users/generations/images`)
-- [ ] I generated a profile card (`POST /users/generations/profile`)
-- [ ] I stored the generated content in my application
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Generé comentarios (`POST /users/generations/comments`)
+- [ ] Generé imágenes (`POST /users/generations/images`)
+- [ ] Generé una ficha de perfil (`POST /users/generations/profile`)
+- [ ] Almacené el contenido generado en mi aplicación

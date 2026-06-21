@@ -1,30 +1,30 @@
 ---
-title: "Paid Onboarding"
-description: "Step-by-step flow to register new user accounts via payment — create a checkout session, poll for completion, and retrieve the API key via the 1Platform API."
+title: "Onboarding con pago"
+description: "Flujo paso a paso para registrar nuevas cuentas de usuario mediante pago — crea una sesión de checkout, consulta su finalización y obtén la API key mediante la 1Platform API."
 sidebar_position: 13
 ---
 
-# Flow: Paid Onboarding
+# Flujo: Onboarding con pago
 
-## Overview
+## Vista general
 
-This flow documents the step-by-step process to register a new user account through a payment-gated onboarding flow via the 1Platform API. The user does not exist yet at the start of this flow — authentication is performed exclusively with the App token.
+Este flujo documenta el proceso paso a paso para registrar una nueva cuenta de usuario a través de un flujo de onboarding condicionado a un pago mediante la 1Platform API. El usuario aún no existe al inicio de este flujo — la autenticación se realiza exclusivamente con el token de aplicación.
 
-**Use case:** Allow end users to self-register on your platform by completing a payment. Once the payment is confirmed, a new user account is automatically provisioned and its API key is returned.
+**Caso de uso:** Permite que los usuarios finales se autoregistren en tu plataforma completando un pago. Una vez confirmado el pago, se aprovisiona automáticamente una nueva cuenta de usuario y se devuelve su API key.
 
-**End result:** A fully registered user account with a `completed` onboarding status and a unique API key (`sk-...`) ready to be exchanged for a user JWT token via `POST /users/token`.
+**Resultado final:** Una cuenta de usuario completamente registrada con un estado de onboarding `completed` y una API key única (`sk-...`) lista para intercambiarse por un token JWT de usuario mediante `POST /users/token`.
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| Registration enabled | The App must have registration enabled (contact support if you receive a 503 error) |
-| Valid email | The email address must not be already registered in the system |
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+| Registro habilitado | La App debe tener el registro habilitado (contacta a soporte si recibes un error 503) |
+| Email válido | La dirección de email no debe estar ya registrada en el sistema |
 
-### Required headers for all requests
+### Headers requeridos en todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -32,32 +32,32 @@ Content-Type: application/json
 ```
 
 :::note
-No `x-user-token` header is needed in this flow. The user does not exist yet at Steps 1 and 3. Only the App token is required throughout.
+No se necesita el header `x-user-token` en este flujo. El usuario aún no existe en los Pasos 1 y 3. Solo se requiere el token de aplicación a lo largo de todo el flujo.
 :::
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
-APP_TOKEN=""     # Obtained in Step 0
-SESSION_ID=""    # Obtained in Step 1
-API_KEY=""       # Obtained in Step 3 (user's sk-... key)
+APP_TOKEN=""     # Obtenido en el Paso 0
+SESSION_ID=""    # Obtenido en el Paso 1
+API_KEY=""       # Obtenido en el Paso 3 (clave sk-... del usuario)
 ```
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -65,7 +65,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -80,26 +80,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcto y que la app esté activa |
+| 422 | Campo `apiKey` faltante o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Create Registration Session
+### Paso 1 — Crear la sesión de registro
 
-**Goal:** Initiate the paid onboarding flow for a new user. The API creates a checkout session and returns a payment URL to redirect the user to.
+**Objetivo:** Iniciar el flujo de onboarding con pago para un nuevo usuario. La API crea una sesión de checkout y devuelve una URL de pago a la que redirigir al usuario.
 
 **Endpoint:** `POST /api/v1/onboarding/`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only — no user token, the user does not exist yet)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación — sin token de usuario, el usuario aún no existe)
 
 ```bash
 curl -X POST "$BASE_URL/onboarding/" \
@@ -112,15 +112,15 @@ curl -X POST "$BASE_URL/onboarding/" \
   }'
 ```
 
-**Request body:**
+**Cuerpo de la solicitud:**
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `email` | string | Yes | New user's email address (max 254 chars, must be a valid email) |
-| `amount` | number | Yes | Amount to charge in the merchant's currency (must be > 0 and ≤ 10000) |
-| `currency` | string | No | ISO 4217 currency code (default: `"USD"`, pattern: `^[A-Z]{3}$`) |
+| `email` | string | Sí | Dirección de email del nuevo usuario (máx. 254 caracteres, debe ser un email válido) |
+| `amount` | number | Sí | Monto a cobrar en la moneda del comercio (debe ser > 0 y ≤ 10000) |
+| `currency` | string | No | Código de moneda ISO 4217 (por defecto: `"USD"`, patrón: `^[A-Z]{3}$`) |
 
-**Response (201):**
+**Respuesta (201):**
 
 ```json
 {
@@ -130,63 +130,63 @@ curl -X POST "$BASE_URL/onboarding/" \
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |---|---|---|
-| `session_id` | string | Unique registration session identifier — used to poll status in Step 3 |
-| `payment_url` | string | URL to redirect the user to in order to complete payment |
-| `expires_in` | integer | Session TTL in seconds (default: 86400 = 24 hours) |
+| `session_id` | string | Identificador único de la sesión de registro — se usa para consultar el estado en el Paso 3 |
+| `payment_url` | string | URL a la que redirigir al usuario para completar el pago |
+| `expires_in` | integer | TTL de la sesión en segundos (por defecto: 86400 = 24 horas) |
 
 :::note
-Save `session_id` as `$SESSION_ID`. Redirect the user to `payment_url` immediately after receiving this response.
+Guarda `session_id` como `$SESSION_ID`. Redirige al usuario a `payment_url` inmediatamente después de recibir esta respuesta.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Amount below the configured minimum | Increase the `amount` value |
-| 401 | Invalid or expired app token | Regenerate the app token (Step 0) |
-| 409 | Email is already registered | Use the existing account; do not create a duplicate |
-| 422 | Invalid email format or missing required fields | Verify `email` is a valid address and `amount` is provided |
-| 429 | Rate limit exceeded | Wait and retry |
-| 503 | Registration temporarily disabled | Contact support |
+| 400 | El monto está por debajo del mínimo configurado | Aumenta el valor de `amount` |
+| 401 | Token de aplicación inválido o expirado | Regenera el token de aplicación (Paso 0) |
+| 409 | El email ya está registrado | Usa la cuenta existente; no crees un duplicado |
+| 422 | Formato de email inválido o campos requeridos faltantes | Verifica que `email` sea una dirección válida y que se incluya `amount` |
+| 429 | Límite de tasa excedido | Espera y reintenta |
+| 503 | Registro deshabilitado temporalmente | Contacta a soporte |
 
 ---
 
-### Step 2 — User Completes Payment
+### Paso 2 — El usuario completa el pago
 
-**Goal:** Redirect the user to the payment URL and wait for them to complete the checkout process.
+**Objetivo:** Redirigir al usuario a la URL de pago y esperar a que complete el proceso de checkout.
 
-This step is handled outside the API — your application must:
+Este paso se gestiona fuera de la API — tu aplicación debe:
 
-1. Redirect or open the `payment_url` from Step 1 in the user's browser.
-2. Wait for the user to complete the payment form.
-3. Optionally, receive a webhook notification from the payment provider, or proceed directly to polling in Step 3.
+1. Redirigir o abrir la `payment_url` del Paso 1 en el navegador del usuario.
+2. Esperar a que el usuario complete el formulario de pago.
+3. Opcionalmente, recibir una notificación por webhook del proveedor de pagos, o pasar directamente al polling del Paso 3.
 
 :::tip
-The session is valid for `expires_in` seconds (default 24 hours). You do not need to wait for a callback — you can begin polling immediately and the status will transition to `"completed"` once the payment is confirmed.
+La sesión es válida durante `expires_in` segundos (por defecto 24 horas). No necesitas esperar un callback — puedes comenzar el polling de inmediato y el estado pasará a `"completed"` una vez que se confirme el pago.
 :::
 
 :::warning
-Do not re-create the session if the user navigates away or the browser is closed. The same `session_id` remains valid until it expires. Re-initiating for the same email while a session is pending will return a 409 (Email already registered) if the payment was already completed, or you may poll the existing session.
+No vuelvas a crear la sesión si el usuario se va o el navegador se cierra. El mismo `session_id` sigue siendo válido hasta que expire. Reiniciar para el mismo email mientras una sesión está pendiente devolverá un 409 (El email ya está registrado) si el pago ya se completó, o puedes consultar la sesión existente.
 :::
 
 ---
 
-### Step 3 — Poll Registration Status
+### Paso 3 — Consultar el estado del registro
 
-**Goal:** Check whether the user has completed payment and the account has been provisioned. Repeat this request until `status` is `"completed"`, `"failed"`, or `"expired"`.
+**Objetivo:** Comprobar si el usuario completó el pago y la cuenta fue aprovisionada. Repite esta solicitud hasta que `status` sea `"completed"`, `"failed"` o `"expired"`.
 
 **Endpoint:** `GET /api/v1/onboarding/status/{session_id}`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación)
 
 ```bash
 curl -X GET "$BASE_URL/onboarding/status/$SESSION_ID" \
   -H "Authorization: Bearer $APP_TOKEN"
 ```
 
-**Response (200) — pending:**
+**Respuesta (200) — pendiente:**
 
 ```json
 {
@@ -195,7 +195,7 @@ curl -X GET "$BASE_URL/onboarding/status/$SESSION_ID" \
 }
 ```
 
-**Response (200) — completed:**
+**Respuesta (200) — completada:**
 
 ```json
 {
@@ -204,49 +204,49 @@ curl -X GET "$BASE_URL/onboarding/status/$SESSION_ID" \
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |---|---|---|
-| `status` | string | Registration status: `"pending"`, `"completed"`, `"failed"`, or `"expired"` |
-| `api_key` | string \| null | The new user's API key (`sk-...`). Only present when `status` is `"completed"`. **Single-read guard** — this value is returned only once. Store it securely immediately. |
+| `status` | string | Estado del registro: `"pending"`, `"completed"`, `"failed"` o `"expired"` |
+| `api_key` | string \| null | La API key del nuevo usuario (`sk-...`). Solo está presente cuando `status` es `"completed"`. **Protección de lectura única** — este valor se devuelve una sola vez. Guárdalo de forma segura de inmediato. |
 
-:::warning[Single-read guard — store the API key immediately]
-The `api_key` field is protected by a single-read guard. It is returned **only once** in the first `"completed"` response. Subsequent calls to this endpoint after the key has been read will return a **410 Gone** error. Save `api_key` to persistent storage before returning from this request.
+:::warning[Protección de lectura única — guarda la API key de inmediato]
+El campo `api_key` está protegido por una garantía de lectura única. Se devuelve **una sola vez** en la primera respuesta `"completed"`. Las llamadas posteriores a este endpoint, una vez leída la clave, devolverán un error **410 Gone**. Guarda `api_key` en almacenamiento persistente antes de finalizar esta solicitud.
 :::
 
 :::note
-The recommended polling interval is **5 seconds**. Stop polling when `status` is `"completed"`, `"failed"`, or `"expired"`. Once you have the `api_key`, exchange it for a user JWT token via `POST /users/token` to authenticate subsequent requests on behalf of the new user.
+El intervalo de polling recomendado es de **5 segundos**. Detén el polling cuando `status` sea `"completed"`, `"failed"` o `"expired"`. Una vez que tengas la `api_key`, intercámbiala por un token JWT de usuario mediante `POST /users/token` para autenticar las solicitudes posteriores en nombre del nuevo usuario.
 :::
 
-**Status lifecycle:**
+**Ciclo de vida del estado:**
 
-| Status | Meaning | Next action |
+| Estado | Significado | Siguiente acción |
 |---|---|---|
-| `pending` | Payment not yet confirmed | Continue polling |
-| `completed` | Payment confirmed, account created | Stop polling, save `api_key` |
-| `failed` | Payment failed or was declined | Notify user, optionally restart flow |
-| `expired` | Session TTL elapsed before payment | Create a new session (Step 1) |
+| `pending` | Pago aún no confirmado | Continúa el polling |
+| `completed` | Pago confirmado, cuenta creada | Detén el polling, guarda `api_key` |
+| `failed` | Pago fallido o rechazado | Notifica al usuario, opcionalmente reinicia el flujo |
+| `expired` | TTL de la sesión transcurrido antes del pago | Crea una nueva sesión (Paso 1) |
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid or expired app token | Regenerate the app token (Step 0) |
-| 404 | Session not found or already expired | Verify the `session_id`; if expired, create a new session |
-| 410 | API key already retrieved (single-read guard triggered) | The key was already returned — check your persistent storage |
-| 422 | Validation error on path parameter | Verify the `session_id` format |
-| 429 | Rate limit exceeded | Wait and retry with exponential backoff |
+| 401 | Token de aplicación inválido o expirado | Regenera el token de aplicación (Paso 0) |
+| 404 | Sesión no encontrada o ya expirada | Verifica el `session_id`; si expiró, crea una nueva sesión |
+| 410 | API key ya recuperada (se activó la protección de lectura única) | La clave ya se devolvió — revisa tu almacenamiento persistente |
+| 422 | Error de validación en el parámetro de ruta | Verifica el formato del `session_id` |
+| 429 | Límite de tasa excedido | Espera y reintenta con backoff exponencial |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values, from authentication to retrieving the new user's API key.
+Flujo completo con valores ficticios consistentes, desde la autenticación hasta la obtención de la API key del nuevo usuario.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
@@ -254,7 +254,7 @@ APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
 
 echo "APP_TOKEN: $APP_TOKEN"
 
-# === STEP 1: Create Registration Session ===
+# === PASO 1: Crear la sesión de registro ===
 ONBOARDING_RESPONSE=$(curl -s -X POST "$BASE_URL/onboarding/" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -268,14 +268,14 @@ SESSION_ID=$(echo $ONBOARDING_RESPONSE | jq -r '.session_id')
 PAYMENT_URL=$(echo $ONBOARDING_RESPONSE | jq -r '.payment_url')
 
 echo "SESSION_ID: $SESSION_ID"
-echo "Redirect user to: $PAYMENT_URL"
+echo "Redirige al usuario a: $PAYMENT_URL"
 
-# === STEP 2: User Completes Payment (external — redirect user to $PAYMENT_URL) ===
-# Your application redirects the browser to $PAYMENT_URL here.
-# The user fills in their payment details and submits.
+# === PASO 2: El usuario completa el pago (externo — redirige al usuario a $PAYMENT_URL) ===
+# Aquí tu aplicación redirige el navegador a $PAYMENT_URL.
+# El usuario completa sus datos de pago y los envía.
 
-# === STEP 3: Poll Registration Status ===
-# Poll every 5 seconds until status is "completed", "failed", or "expired"
+# === PASO 3: Consultar el estado del registro ===
+# Consulta cada 5 segundos hasta que status sea "completed", "failed" o "expired"
 while true; do
   STATUS_RESPONSE=$(curl -s -X GET "$BASE_URL/onboarding/status/$SESSION_ID" \
     -H "Authorization: Bearer $APP_TOKEN")
@@ -285,20 +285,20 @@ while true; do
 
   if [ "$STATUS" = "completed" ]; then
     API_KEY=$(echo $STATUS_RESPONSE | jq -r '.api_key')
-    echo "New user API key: $API_KEY"
-    # IMPORTANT: Save $API_KEY to persistent storage immediately.
-    # This value is returned only once (single-read guard).
+    echo "API key del nuevo usuario: $API_KEY"
+    # IMPORTANTE: Guarda $API_KEY en almacenamiento persistente de inmediato.
+    # Este valor se devuelve una sola vez (protección de lectura única).
     break
   elif [ "$STATUS" = "failed" ] || [ "$STATUS" = "expired" ]; then
-    echo "Onboarding did not complete: $STATUS"
+    echo "El onboarding no se completó: $STATUS"
     break
   fi
 
   sleep 5
 done
 
-# === OPTIONAL: Exchange API Key for User Token ===
-# Once you have the API key, obtain a user JWT for subsequent requests:
+# === OPCIONAL: Intercambiar la API key por un token de usuario ===
+# Una vez que tengas la API key, obtén un JWT de usuario para las solicitudes posteriores:
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -310,62 +310,62 @@ echo "USER_TOKEN: $USER_TOKEN"
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
+### Idempotencia
 
-:::warning[No idempotency mechanism]
-The API does not support an `Idempotency-Key` header on the onboarding endpoint. If a session creation request times out, **do not re-submit the same email immediately** — first check whether the session was created and poll its status. Submitting the same email a second time after a successful creation will return a 409 error.
+:::warning[Sin mecanismo de idempotencia]
+La API no admite un encabezado `Idempotency-Key` en el endpoint de onboarding. Si una solicitud de creación de sesión expira por timeout, **no reenvíes el mismo email de inmediato** — primero comprueba si la sesión fue creada y consulta su estado. Enviar el mismo email por segunda vez tras una creación exitosa devolverá un error 409.
 :::
 
-### Retries
+### Reintentos
 
-- If you receive **429** (rate limit), wait and retry with exponential backoff.
-- If you receive **503** (registration disabled), surface this to the end user; do not retry automatically.
-- If you receive **5xx** or a timeout on the status poll, retry after a brief delay — the session state is not affected by a failed status check.
-- For **401** (expired token), regenerate the app token (Step 0) and resume polling.
+- Si recibes **429** (límite de tasa), espera y reintenta con backoff exponencial.
+- Si recibes **503** (registro deshabilitado), muéstraselo al usuario final; no reintentes automáticamente.
+- Si recibes **5xx** o un timeout en la consulta de estado, reintenta tras una breve pausa — el estado de la sesión no se ve afectado por una consulta de estado fallida.
+- Para **401** (token expirado), regenera el token de aplicación (Paso 0) y reanuda el polling.
 
 ### Polling
 
-- Poll `GET /onboarding/status/{session_id}` at intervals of **5 seconds** or more. Polling too aggressively may trigger rate limiting.
-- Set a hard stop on polling after `expires_in` seconds (default 24 hours) to avoid indefinite loops.
-- Implement a maximum retry count (e.g., 500 attempts at 5-second intervals) as a safety net.
+- Consulta `GET /onboarding/status/{session_id}` en intervalos de **5 segundos** o más. Hacer polling de forma demasiado agresiva puede activar el límite de tasa.
+- Establece un tope absoluto al polling tras `expires_in` segundos (por defecto 24 horas) para evitar bucles indefinidos.
+- Implementa un número máximo de reintentos (por ejemplo, 500 intentos a intervalos de 5 segundos) como medida de seguridad.
 
-### API key security
+### Seguridad de la API key
 
 :::warning
-The `api_key` returned in the `"completed"` status is a **permanent credential** for the new user account. Treat it with the same security as a password:
-- Store it in an encrypted datastore, never in plain text or logs.
-- Do not transmit it over unencrypted channels.
-- This value is returned only once — there is no endpoint to retrieve it again after the single-read guard has triggered.
+La `api_key` devuelta en el estado `"completed"` es una **credencial permanente** de la nueva cuenta de usuario. Trátala con la misma seguridad que una contraseña:
+- Almacénala en un datastore cifrado, nunca en texto plano ni en logs.
+- No la transmitas por canales sin cifrar.
+- Este valor se devuelve una sola vez — no hay ningún endpoint para recuperarla de nuevo una vez que se activó la protección de lectura única.
 :::
 
 ### Tokens
 
-- The app token expires in **30 minutes** (1800 seconds). Implement automatic renewal before expiration, especially during long polling loops.
-- The `api_key` obtained at the end of this flow can be exchanged for a user JWT token at any time via `POST /users/token`.
+- El token de aplicación expira en **30 minutos** (1800 segundos). Implementa una renovación automática antes de la expiración, especialmente durante bucles de polling largos.
+- La `api_key` obtenida al final de este flujo puede intercambiarse por un token JWT de usuario en cualquier momento mediante `POST /users/token`.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/onboarding/` | Create registration session |
-| 2 | — | _(user action)_ | Redirect user to payment URL |
-| 3 | `GET` | `/api/v1/onboarding/status/{session_id}` | Poll registration status |
-| — | `POST` | `/api/v1/users/token` | Exchange API key for user JWT (after completion) |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/onboarding/` | Crear la sesión de registro |
+| 2 | — | _(acción del usuario)_ | Redirigir al usuario a la URL de pago |
+| 3 | `GET` | `/api/v1/onboarding/status/{session_id}` | Consultar el estado del registro |
+| — | `POST` | `/api/v1/users/token` | Intercambiar la API key por un JWT de usuario (tras completarse) |
 
 ---
 
-## Quick checklist
+## Checklist rápido
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I created the registration session (`POST /onboarding/`) and have the `session_id`
-- [ ] I redirected the user to the `payment_url`
-- [ ] I am polling `GET /onboarding/status/{session_id}` at a sensible interval (5s recommended)
-- [ ] I stopped polling when `status` is `"completed"`, `"failed"`, or `"expired"`
-- [ ] I saved the `api_key` to persistent storage **immediately** upon receiving it (single-read guard)
-- [ ] I exchanged the `api_key` for a user JWT token (`POST /users/token`) for subsequent requests
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Creé la sesión de registro (`POST /onboarding/`) y tengo el `session_id`
+- [ ] Redirigí al usuario a la `payment_url`
+- [ ] Estoy consultando `GET /onboarding/status/{session_id}` en un intervalo razonable (5s recomendado)
+- [ ] Detuve el polling cuando `status` fue `"completed"`, `"failed"` o `"expired"`
+- [ ] Guardé la `api_key` en almacenamiento persistente **de inmediato** al recibirla (protección de lectura única)
+- [ ] Intercambié la `api_key` por un token JWT de usuario (`POST /users/token`) para las solicitudes posteriores

@@ -1,42 +1,42 @@
 ---
-title: Webhook Integration Overview
-description: How outbound webhooks work — events, lifecycle, and the full buyer-to-merchant sequence.
+title: Vista general de la integración de webhooks
+description: Cómo funcionan los webhooks salientes — eventos, ciclo de vida y la secuencia completa de comprador a comercio.
 sidebar_position: 1
 ---
 
-# Webhook Integration Overview
+# Vista general de la integración de webhooks
 
-1Platform sends signed HTTP callbacks to your backend whenever a payment changes
-state. This avoids polling and lets you fulfil orders, send receipts, or update
-your CRM in near real time.
+1Platform envía callbacks HTTP firmados a tu backend cada vez que un pago cambia
+de estado. Esto evita el polling y te permite cumplir pedidos, enviar recibos o
+actualizar tu CRM casi en tiempo real.
 
-## Inbound vs outbound
+## Entrantes vs salientes
 
-| Direction | Endpoint | Who calls | Auth |
+| Dirección | Endpoint | Quién llama | Auth |
 |---|---|---|---|
-| **Inbound** (provider → 1Platform) | `POST /api/v1/webhooks/transactions` | Upstream payment provider | HMAC verified inside the API |
-| **Outbound** (1Platform → merchant) | Whatever URL you register via `PUT /api/v1/webhooks/config/events` | 1Platform | HMAC signed; you verify before trusting |
+| **Entrante** (proveedor → 1Platform) | `POST /api/v1/webhooks/transactions` | Proveedor de pagos upstream | Verificado con HMAC dentro de la API |
+| **Saliente** (1Platform → comercio) | Cualquier URL que registres vía `PUT /api/v1/webhooks/config/events` | 1Platform | Firmado con HMAC; lo verificas antes de confiar |
 
-This section is exclusively about the **outbound** path. The inbound path is an
-implementation detail — you only see its consequences.
+Esta sección trata exclusivamente sobre la ruta **saliente**. La ruta entrante es
+un detalle de implementación — solo ves sus consecuencias.
 
-## Lifecycle events
+## Eventos del ciclo de vida
 
-Each transaction can fire one of five terminal events:
+Cada transacción puede disparar uno de cinco eventos terminales:
 
-| Event | Meaning |
+| Evento | Significado |
 |---|---|
-| `on_approved` | Buyer paid; funds settled |
-| `on_denied` | Card declined |
-| `on_cancelled` | Buyer abandoned the checkout window |
-| `on_expired` | The `payment_url` timed out before payment |
-| `on_dismiss` | Buyer closed the payment overlay |
+| `on_approved` | El comprador pagó; los fondos se liquidaron |
+| `on_denied` | Tarjeta rechazada |
+| `on_cancelled` | El comprador abandonó la ventana de checkout |
+| `on_expired` | El `payment_url` expiró antes del pago |
+| `on_dismiss` | El comprador cerró el overlay de pago |
 
-You configure a separate URL per event via `PUT /webhooks/config/events`. All
-five may point to the same endpoint — the canonical body's `event` field tells
-you which one fired.
+Configuras una URL distinta por evento vía `PUT /webhooks/config/events`. Las
+cinco pueden apuntar al mismo endpoint — el campo `event` del cuerpo canónico te
+indica cuál se disparó.
 
-## End-to-end sequence
+## Secuencia de extremo a extremo
 
 ```mermaid
 sequenceDiagram
@@ -45,24 +45,24 @@ sequenceDiagram
   participant P as 1Platform API
   participant U as Upstream provider
 
-  B->>M: Click "Pay"
+  B->>M: Clic en "Pagar"
   M->>P: POST /users/transactions { amount, metadata, merchant_reference }
-  P->>U: Create transaction
+  P->>U: Crear transacción
   U-->>P: { id, payment_url }
   P-->>M: 201 { id, payment_url, status: "created" }
-  M-->>B: Redirect to payment_url
-  B->>U: Complete payment
-  U-->>P: Inbound webhook /webhooks/transactions { externalId, status: "approved" }
-  P->>P: Update Transaction.status = approved
-  P->>M: Outbound webhook on_approved { transaction_id, status, ... }
+  M-->>B: Redirige a payment_url
+  B->>U: Completar pago
+  U-->>P: Webhook entrante /webhooks/transactions { externalId, status: "approved" }
+  P->>P: Actualiza Transaction.status = approved
+  P->>M: Webhook saliente on_approved { transaction_id, status, ... }
   M-->>P: 200 OK
-  P->>P: Credit ledger / fulfil order
+  P->>P: Acredita ledger / cumple pedido
 ```
 
-## What to read next
+## Qué leer a continuación
 
-1. [Webhook security](./security) — HMAC scheme, headers, replay protection.
-2. [Receiving notifications](./receiving-notifications) — canonical payload shape, status enum, FSM.
-3. [Configuring URLs](./configuring-urls) — domain registration, event handlers, secret rotation.
-4. [Retry & delivery](./retry-and-delivery) — at-least-once semantics, backoff, dead-letter.
-5. [Code samples](./code-samples) — Python, TypeScript, PHP verifiers.
+1. [Seguridad de webhooks](./security) — esquema HMAC, encabezados, protección contra replay.
+2. [Recibir notificaciones](./receiving-notifications) — forma del payload canónico, enum de status, FSM.
+3. [Configurar URLs](./configuring-urls) — registro de dominios, manejadores de eventos, rotación del secreto.
+4. [Reintentos y entrega](./retry-and-delivery) — semántica at-least-once, backoff, dead-letter.
+5. [Ejemplos de código](./code-samples) — verificadores en Python, TypeScript, PHP.

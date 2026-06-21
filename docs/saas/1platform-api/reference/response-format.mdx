@@ -1,17 +1,17 @@
 ---
-title: Response format
-description: The standard response wrapper, the webhook namespace exception, and how to read errors consistently.
+title: Formato de respuesta
+description: El envoltorio de respuesta estándar, la excepción del namespace de webhooks y cómo leer errores de forma consistente.
 sidebar_position: 7
 ---
 
-# Response format
+# Formato de respuesta
 
-The 1Platform API uses **two** response shapes, depending on the namespace.
+La 1Platform API usa **dos** formas de respuesta, según el namespace.
 
-## Wrapper 1 — client-facing endpoints (`{ success, data, msg }`)
+## Envoltorio 1 — endpoints orientados al cliente (`{ success, data, msg }`)
 
-Every endpoint under `/auth/*`, `/users/*`, `/posts/*`, `/agents/*`, etc.
-wraps the response in:
+Cada endpoint bajo `/auth/*`, `/users/*`, `/posts/*`, `/agents/*`, etc.
+envuelve la respuesta en:
 
 ```json
 {
@@ -21,7 +21,7 @@ wraps the response in:
 }
 ```
 
-On error:
+En caso de error:
 
 ```json
 {
@@ -31,32 +31,32 @@ On error:
 }
 ```
 
-When `data.code` is present, branch on it for client logic. When it's absent,
-treat the HTTP status code as the source of truth and surface `msg` to the
-operator.
+Cuando `data.code` está presente, ramifica según él para la lógica del cliente. Cuando está ausente,
+trata el código de estado HTTP como la fuente de verdad y muestra `msg` al
+operador.
 
-## Wrapper 2 — inbound webhook namespace (`{ status, message }`)
+## Envoltorio 2 — namespace de webhook entrante (`{ status, message }`)
 
-`POST /webhooks/transactions` (the **inbound** receiver from the upstream
-provider) uses a flat shape because the provider expects it:
+`POST /webhooks/transactions` (el receptor **entrante** desde el proveedor
+upstream) usa una forma plana porque el proveedor la espera así:
 
 ```json
 { "status": "ok", "message": "Webhook accepted" }
 ```
 
-You don't normally interact with this endpoint directly — the upstream
-provider does.
+Normalmente no interactúas directamente con este endpoint — lo hace el proveedor
+upstream.
 
-## Outbound webhooks — neither wrapper
+## Webhooks salientes — ningún envoltorio
 
-Outbound webhooks (1Platform → merchant) use a domain-specific payload, not
-either of the wrappers above. See
-[receiving notifications → canonical payload](../webhooks/receiving-notifications#canonical-payload).
+Los webhooks salientes (1Platform → comercio) usan una carga útil específica del dominio, no
+ninguno de los envoltorios anteriores. Consulta
+[recibir notificaciones → carga útil canónica](../webhooks/receiving-notifications#canonical-payload).
 
-## Pydantic 422 errors
+## Errores 422 de Pydantic
 
-FastAPI's automatic schema validation returns **its own** shape, not the
-wrapper:
+La validación automática de esquema de FastAPI devuelve **su propia** forma, no el
+envoltorio:
 
 ```json
 {
@@ -67,17 +67,17 @@ wrapper:
 }
 ```
 
-These are client bugs (missing field, wrong type) — fix the request, never
-retry blindly.
+Estos son errores del cliente (campo faltante, tipo incorrecto) — corrige la solicitud, nunca
+reintentes a ciegas.
 
-## Choosing what to read
+## Qué leer
 
-| You want to know... | Read |
+| Quieres saber... | Lee |
 |---|---|
-| Did the request succeed? | HTTP status code (`2xx` = yes) |
-| Is the response a wrapper? | `success` field — present means yes |
-| What kind of business failure? | `data.code` if present |
-| What to show the operator? | `msg` |
-| What field of my request is wrong? | `detail[].loc` (Pydantic 422 only) |
+| ¿La solicitud tuvo éxito? | Código de estado HTTP (`2xx` = sí) |
+| ¿La respuesta es un envoltorio? | Campo `success` — presente significa sí |
+| ¿Qué tipo de fallo de negocio? | `data.code` si está presente |
+| ¿Qué mostrar al operador? | `msg` |
+| ¿Qué campo de mi solicitud está mal? | `detail[].loc` (solo Pydantic 422) |
 
-See also: [error code reference](./error-codes).
+Consulta también: [referencia de códigos de error](./error-codes).

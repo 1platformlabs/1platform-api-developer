@@ -1,30 +1,30 @@
 ---
-title: "Dashboard Settings"
-description: "Step-by-step flow to list, read, upsert, and delete dashboard settings (key/value pairs) for a 1Platform app."
+title: "Ajustes del dashboard"
+description: "Flujo paso a paso para listar, leer, hacer upsert y eliminar ajustes del dashboard (pares clave/valor) de una app de 1Platform."
 sidebar_position: 15
 ---
 
-# Flow: Dashboard Settings
+# Flujo: Ajustes del dashboard
 
-## Overview
+## Vista general
 
-This flow documents how to manage app-level dashboard settings — arbitrary key/value pairs that the dashboard reads to drive UI behavior, feature toggles, banners, scheduled maintenance windows, and other runtime configuration. Settings are scoped per app and persist across user sessions.
+Este flujo documenta cómo gestionar los ajustes del dashboard a nivel de app — pares clave/valor arbitrarios que el dashboard lee para controlar el comportamiento de la UI, los conmutadores de funciones, los banners, las ventanas de mantenimiento programado y otra configuración en tiempo de ejecución. Los ajustes tienen alcance por app y persisten entre sesiones de usuario.
 
-**Use case:** Drive whitelabel UI configuration (announcement banners, feature flags, links, default values) without redeploying the dashboard.
+**Caso de uso:** Controlar la configuración de la UI whitelabel (banners de anuncios, feature flags, enlaces, valores predeterminados) sin tener que redesplegar el dashboard.
 
-**End result:** Your app has a fully managed key/value settings store accessible from the dashboard.
+**Resultado final:** Tu app cuenta con un almacén de ajustes clave/valor completamente gestionado y accesible desde el dashboard.
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| User API Key | User key (`sk-...`) obtained when creating the user |
-| Admin role | Upserting and deleting settings requires admin privileges on the app |
+| App API Key | Clave de aplicación (`ak-...`) proporcionada al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Rol de administrador | Hacer upsert y eliminar ajustes requiere privilegios de administrador en la app |
 
-### Required headers for all requests
+### Headers requeridos para todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -34,48 +34,48 @@ Content-Type: application/json
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
 USER_API_KEY="sk-user-abc123"
-APP_TOKEN=""    # Obtained in Step 0
-USER_TOKEN=""   # Obtained in Step 1
-SETTING_KEY="announcement_banner"  # Used in Steps 3-5
+APP_TOKEN=""    # Obtenido en el Paso 0
+USER_TOKEN=""   # Obtenido en el Paso 1
+SETTING_KEY="announcement_banner"  # Usado en los Pasos 3-5
 ```
 
 ---
 
-## Data model
+## Modelo de datos
 
-### Setting object
+### Objeto setting
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `id` | string | Yes | MongoDB ObjectId of the setting record |
-| `key` | string | Yes | Unique key identifier (slug-style) |
-| `value` | object | Yes | Arbitrary JSON value (object, array, primitive) |
-| `updated_at` | string | Yes | ISO-8601 timestamp of the last write |
+| `id` | string | Sí | ObjectId de MongoDB del registro del ajuste |
+| `key` | string | Sí | Identificador de clave único (estilo slug) |
+| `value` | object | Sí | Valor JSON arbitrario (objeto, array, primitivo) |
+| `updated_at` | string | Sí | Timestamp ISO-8601 de la última escritura |
 
-### Upsert payload
+### Payload de upsert
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `key` | string | Yes | Unique key identifier |
-| `value` | object | No | JSON value to store. Defaults to `{}` if omitted |
+| `key` | string | Sí | Identificador de clave único |
+| `value` | object | No | Valor JSON a almacenar. Por defecto `{}` si se omite |
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -83,7 +83,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -98,26 +98,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` ausente o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Get User Token
+### Paso 1 — Obtener el token de usuario
 
-**Goal:** Authenticate the user and obtain the user JWT token.
+**Objetivo:** Autenticar al usuario y obtener el token JWT del usuario.
 
 **Endpoint:** `POST /api/v1/users/token`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users/token" \
@@ -126,7 +126,7 @@ curl -X POST "$BASE_URL/users/token" \
   -d '{"apiKey": "'$USER_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -141,26 +141,26 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 :::note
-Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
-| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 :::tip
-If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
 :::
 
 ---
 
-### Step 2 — List all settings
+### Paso 2 — Listar todos los ajustes
 
-**Goal:** Retrieve every setting configured for the current app.
+**Objetivo:** Recuperar todos los ajustes configurados para la app actual.
 
 **Endpoint:** `GET /api/v1/settings`
 
@@ -172,7 +172,7 @@ curl -X GET "$BASE_URL/settings" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -199,17 +199,17 @@ curl -X GET "$BASE_URL/settings" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Missing or malformed user token header | Send `x-user-token: $USER_TOKEN` |
+| 422 | Header de token de usuario ausente o malformado | Envía `x-user-token: $USER_TOKEN` |
 
 ---
 
-### Step 3 — Upsert a setting
+### Paso 3 — Hacer upsert de un ajuste
 
-**Goal:** Create a new setting or update the value of an existing key.
+**Objetivo:** Crear un ajuste nuevo o actualizar el valor de una clave existente.
 
 **Endpoint:** `PUT /api/v1/settings`
 
@@ -230,7 +230,7 @@ curl -X PUT "$BASE_URL/settings" \
   }'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -250,20 +250,20 @@ curl -X PUT "$BASE_URL/settings" \
 ```
 
 :::note
-`PUT` is idempotent — sending the same payload twice produces the same final state. Use it to safely retry on network errors.
+`PUT` es idempotente — enviar el mismo payload dos veces produce el mismo estado final. Úsalo para reintentar de forma segura ante errores de red.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Missing `key` or invalid `value` shape | Provide `{"key": "...", "value": {...}}` |
+| 422 | `key` ausente o forma de `value` inválida | Proporciona `{"key": "...", "value": {...}}` |
 
 ---
 
-### Step 4 — Read a single setting by key
+### Paso 4 — Leer un único ajuste por clave
 
-**Goal:** Look up a setting by its key.
+**Objetivo:** Consultar un ajuste por su clave.
 
 **Endpoint:** `GET /api/v1/settings/{key}`
 
@@ -275,7 +275,7 @@ curl -X GET "$BASE_URL/settings/$SETTING_KEY" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -294,19 +294,19 @@ curl -X GET "$BASE_URL/settings/$SETTING_KEY" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 404 | No setting with that key | Verify the key spelling — keys are case-sensitive |
-| 422 | Malformed `key` path parameter | Use a non-empty alphanumeric key |
-| 429 | Rate limit exceeded | Wait and retry |
+| 404 | No existe ningún ajuste con esa clave | Verifica la ortografía de la clave — las claves distinguen mayúsculas y minúsculas |
+| 422 | Parámetro de ruta `key` malformado | Usa una clave alfanumérica no vacía |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 ---
 
-### Step 5 — Delete a setting
+### Paso 5 — Eliminar un ajuste
 
-**Goal:** Remove a setting permanently.
+**Objetivo:** Eliminar un ajuste de forma permanente.
 
 **Endpoint:** `DELETE /api/v1/settings/{key}`
 
@@ -318,7 +318,7 @@ curl -X DELETE "$BASE_URL/settings/$SETTING_KEY" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -332,45 +332,45 @@ curl -X DELETE "$BASE_URL/settings/$SETTING_KEY" \
 ```
 
 :::warning
-This action is irreversible. The next call to `/settings/{key}` will return **404**.
+Esta acción es irreversible. La siguiente llamada a `/settings/{key}` devolverá **404**.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 422 | Malformed `key` path parameter | Use a non-empty alphanumeric key |
+| 422 | Parámetro de ruta `key` malformado | Usa una clave alfanumérica no vacía |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values.
+Flujo completo con valores ficticios consistentes.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 SETTING_KEY="announcement_banner"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
   | jq -r '.data.access_token')
 
-# === STEP 1: Get User Token ===
+# === PASO 1: Obtener el token de usuario ===
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "sk-user-maria-2026"}' \
   | jq -r '.data.access_token')
 
-# === STEP 2: List all settings ===
+# === PASO 2: Listar todos los ajustes ===
 curl -s -X GET "$BASE_URL/settings" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" | jq
 
-# === STEP 3: Upsert a setting ===
+# === PASO 3: Hacer upsert de un ajuste ===
 curl -s -X PUT "$BASE_URL/settings" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -384,12 +384,12 @@ curl -s -X PUT "$BASE_URL/settings" \
     }
   }' | jq
 
-# === STEP 4: Read the setting ===
+# === PASO 4: Leer el ajuste ===
 curl -s -X GET "$BASE_URL/settings/$SETTING_KEY" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" | jq
 
-# === STEP 5: Delete the setting ===
+# === PASO 5: Eliminar el ajuste ===
 curl -s -X DELETE "$BASE_URL/settings/$SETTING_KEY" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" | jq
@@ -397,51 +397,51 @@ curl -s -X DELETE "$BASE_URL/settings/$SETTING_KEY" \
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
-- `PUT /settings` is idempotent by design — the same payload always produces the same final state.
-- `DELETE /settings/{key}` is idempotent — deleting an already-deleted key returns the same outcome (or 404 — handle both).
-- `GET` endpoints are read-only and naturally idempotent.
+### Idempotencia
+- `PUT /settings` es idempotente por diseño — el mismo payload siempre produce el mismo estado final.
+- `DELETE /settings/{key}` es idempotente — eliminar una clave ya eliminada devuelve el mismo resultado (o 404 — maneja ambos casos).
+- Los endpoints `GET` son de solo lectura y naturalmente idempotentes.
 
-### Retries
-- If you receive **429** (rate limit), wait the indicated time and retry.
-- If you receive **500** or a **timeout** on `PUT`, retry — the operation is idempotent.
-- For **401** (expired token), regenerate the token and retry the original request.
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout** en `PUT`, reintenta — la operación es idempotente.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
 
 ### Timeouts
-- All endpoints in this flow are simple key/value reads and writes — set a 5-second client timeout.
+- Todos los endpoints de este flujo son lecturas y escrituras simples de clave/valor — define un timeout de cliente de 5 segundos.
 
 ### Tokens
-- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
 
-### Important validations
-- `key` must be unique per app and case-sensitive.
-- `value` may be any JSON-serializable object, array, string, number, or boolean.
-- Settings should NOT contain secrets — they are not encrypted at rest. Use the App's `keys` configuration for credentials.
+### Validaciones importantes
+- `key` debe ser única por app y distingue mayúsculas y minúsculas.
+- `value` puede ser cualquier objeto, array, string, número o booleano serializable en JSON.
+- Los ajustes NO deben contener secretos — no se cifran en reposo. Usa la configuración `keys` de la app para credenciales.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/users/token` | Get user token |
-| 2 | `GET` | `/api/v1/settings` | List all settings |
-| 3 | `PUT` | `/api/v1/settings` | Upsert a setting |
-| 4 | `GET` | `/api/v1/settings/{key}` | Read a single setting |
-| 5 | `DELETE` | `/api/v1/settings/{key}` | Delete a setting |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener token de usuario |
+| 2 | `GET` | `/api/v1/settings` | Listar todos los ajustes |
+| 3 | `PUT` | `/api/v1/settings` | Hacer upsert de un ajuste |
+| 4 | `GET` | `/api/v1/settings/{key}` | Leer un único ajuste |
+| 5 | `DELETE` | `/api/v1/settings/{key}` | Eliminar un ajuste |
 
 ---
 
-## Quick checklist
+## Lista de verificación rápida
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I have the User API Key (`sk-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I listed existing settings to see what's already configured
-- [ ] I upserted at least one setting via `PUT /settings`
-- [ ] I read it back via `GET /settings/{key}`
-- [ ] I confirmed deletion works via `DELETE /settings/{key}`
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Listé los ajustes existentes para ver qué ya está configurado
+- [ ] Hice upsert de al menos un ajuste mediante `PUT /settings`
+- [ ] Lo leí de vuelta mediante `GET /settings/{key}`
+- [ ] Confirmé que la eliminación funciona mediante `DELETE /settings/{key}`

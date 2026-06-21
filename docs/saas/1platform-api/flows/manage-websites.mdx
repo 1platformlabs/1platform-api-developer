@@ -1,30 +1,30 @@
 ---
-title: "Manage Websites"
-description: "Step-by-step flow to register, update, search, delete websites, and generate legal pages via the 1Platform API."
+title: "Gestionar sitios web"
+description: "Flujo paso a paso para registrar, actualizar, buscar y eliminar sitios web, y generar páginas legales a través de la 1Platform API."
 sidebar_position: 6
 ---
 
-# Flow: Manage Websites
+# Flujo: Gestionar sitios web
 
-## Overview
+## Vista general
 
-This flow documents how to manage websites through the 1Platform API. It covers listing categories, registering websites, searching by URL, updating website details, generating legal pages, and deleting websites.
+Este flujo documenta cómo gestionar sitios web a través de la 1Platform API. Cubre el listado de categorías, el registro de sitios web, la búsqueda por URL, la actualización de detalles del sitio, la generación de páginas legales y la eliminación de sitios web.
 
-**Use case:** Register and manage your users' websites for content generation, SEO analysis, legal page creation, and third-party integrations.
+**Caso de uso:** Registra y gestiona los sitios web de tus usuarios para generación de contenido, análisis SEO, creación de páginas legales e integraciones de terceros.
 
-**End result:** A fully registered website with category assignment, AI-generated description, and complete legal pages (privacy policy, cookie policy, legal notice, contact, and about-me).
+**Resultado final:** Un sitio web totalmente registrado con asignación de categoría, descripción generada con IA y páginas legales completas (política de privacidad, política de cookies, aviso legal, contacto y sobre mí).
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| User API Key | User key (`sk-...`) obtained when creating the user |
-| AI provider configured | Required for AI-generated descriptions and legal pages |
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Proveedor de IA configurado | Requerido para descripciones y páginas legales generadas con IA |
 
-### Required headers for all requests
+### Headers requeridos en todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -34,53 +34,53 @@ Content-Type: application/json
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
 USER_API_KEY="sk-user-abc123"
-APP_TOKEN=""       # Obtained in Step 0
-USER_TOKEN=""      # Obtained in Step 1
-CATEGORY_ID=""     # Obtained in Step 2
-WEBSITE_ID=""      # Obtained in Step 3
+APP_TOKEN=""       # Obtenido en el Paso 0
+USER_TOKEN=""      # Obtenido en el Paso 1
+CATEGORY_ID=""     # Obtenido en el Paso 2
+WEBSITE_ID=""      # Obtenido en el Paso 3
 ```
 
 ---
 
-## Data required to create a website
+## Datos requeridos para crear un sitio web
 
-### Website
+### Sitio web
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `url` | string | Yes | Website URL to register |
-| `site_name` | string | Yes | Website display name |
-| `category_id` | string | No | Category ID to assign |
-| `lang` | string | No | Website language: `"es"` or `"en"` (default: `"es"`) |
-| `site_description` | string | No | Website description (AI-generated if empty) |
+| `url` | string | Sí | URL del sitio web a registrar |
+| `site_name` | string | Sí | Nombre visible del sitio web |
+| `category_id` | string | No | ID de categoría a asignar |
+| `lang` | string | No | Idioma del sitio web: `"es"` o `"en"` (por defecto: `"es"`) |
+| `site_description` | string | No | Descripción del sitio web (generada con IA si está vacía) |
 
-### Legal pages
+### Páginas legales
 
-| Field | Type | Required | Description |
+| Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `legal_email` | string | Yes | Contact email address (min 5 chars) |
-| `legal_owner` | string | No | Legal owner name (default: `""`) |
-| `legal_address` | string | No | Fiscal/business address (default: `""`) |
-| `legal_activity` | string | No | Business activity description (default: `""`) |
-| `site_topic` | string | No | Website topic for AI-generated pages (default: `""`) |
+| `legal_email` | string | Sí | Dirección de correo de contacto (mín. 5 caracteres) |
+| `legal_owner` | string | No | Nombre del titular legal (por defecto: `""`) |
+| `legal_address` | string | No | Dirección fiscal/comercial (por defecto: `""`) |
+| `legal_activity` | string | No | Descripción de la actividad comercial (por defecto: `""`) |
+| `site_topic` | string | No | Tema del sitio web para las páginas generadas con IA (por defecto: `""`) |
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de aplicación.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -88,7 +88,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -103,26 +103,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` faltante o mal formado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Get User Token
+### Paso 1 — Obtener el token de usuario
 
-**Goal:** Authenticate the user and obtain the user JWT token.
+**Objetivo:** Autenticar al usuario y obtener el token JWT de usuario.
 
 **Endpoint:** `POST /api/v1/users/token`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users/token" \
@@ -131,7 +131,7 @@ curl -X POST "$BASE_URL/users/token" \
   -d '{"apiKey": "'$USER_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -146,26 +146,26 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 :::note
-Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
-| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | API key de usuario inválida o usuario inactivo | Verifica la `apiKey` del usuario |
+| 422 | Campo `apiKey` faltante | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 :::tip
-If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+Si aún no tienes un usuario, crea uno con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá la `api_key` del usuario.
 :::
 
 ---
 
-### Step 2 — List Categories
+### Paso 2 — Listar categorías
 
-**Goal:** Retrieve available website categories to assign to the new website.
+**Objetivo:** Obtener las categorías de sitio web disponibles para asignar al nuevo sitio web.
 
 **Endpoint:** `GET /api/v1/users/categories`
 
@@ -177,7 +177,7 @@ curl -X GET "$BASE_URL/users/categories?status_filter=active" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -209,22 +209,22 @@ curl -X GET "$BASE_URL/users/categories?status_filter=active" \
 ```
 
 :::note
-Save the desired `id` as `$CATEGORY_ID` to use when creating or updating a website.
+Guarda el `id` deseado como `$CATEGORY_ID` para usarlo al crear o actualizar un sitio web.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required | Regenerate tokens |
-| 422 | Validation error | Check query parameter format |
-| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 422 | Error de validación | Revisa el formato del parámetro de consulta |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
 
 ---
 
-### Step 3 — Add Website
+### Paso 3 — Agregar un sitio web
 
-**Goal:** Register a new website for the authenticated user.
+**Objetivo:** Registrar un nuevo sitio web para el usuario autenticado.
 
 **Endpoint:** `POST /api/v1/users/websites`
 
@@ -244,7 +244,7 @@ curl -X POST "$BASE_URL/users/websites" \
   }'
 ```
 
-**Response (201):**
+**Respuesta (201):**
 
 ```json
 {
@@ -275,24 +275,24 @@ curl -X POST "$BASE_URL/users/websites" \
 ```
 
 :::note
-Save `data.id` as `$WEBSITE_ID`.
+Guarda `data.id` como `$WEBSITE_ID`.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required | Regenerate tokens |
-| 404 | Category not found | Verify the `category_id` exists |
-| 409 | Website already exists for this user | Use a different URL or search for the existing website |
-| 422 | Validation error — missing required fields | Verify `url` and `site_name` are present |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Categoría no encontrada | Verifica que el `category_id` exista |
+| 409 | El sitio web ya existe para este usuario | Usa una URL diferente o busca el sitio web existente |
+| 422 | Error de validación — faltan campos requeridos | Verifica que `url` y `site_name` estén presentes |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
 
 ---
 
-### Step 4 — Search Website by URL
+### Paso 4 — Buscar un sitio web por URL
 
-**Goal:** Find a website by its URL among the authenticated user's websites.
+**Objetivo:** Encontrar un sitio web por su URL entre los sitios web del usuario autenticado.
 
 **Endpoint:** `GET /api/v1/users/websites`
 
@@ -304,7 +304,7 @@ curl -X GET "$BASE_URL/users/websites?url=https://mijardin.com" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -326,20 +326,20 @@ curl -X GET "$BASE_URL/users/websites?url=https://mijardin.com" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required | Regenerate tokens |
-| 404 | Website not found | Verify the URL matches exactly |
-| 422 | Validation error | Check query parameter format |
-| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Sitio web no encontrado | Verifica que la URL coincida exactamente |
+| 422 | Error de validación | Revisa el formato del parámetro de consulta |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
 
 ---
 
-### Step 5 — Get Website by ID
+### Paso 5 — Obtener un sitio web por ID
 
-**Goal:** Retrieve details of a specific website by its ID.
+**Objetivo:** Obtener los detalles de un sitio web específico por su ID.
 
 **Endpoint:** `GET /api/v1/users/websites/{website_id}`
 
@@ -351,24 +351,24 @@ curl -X GET "$BASE_URL/users/websites/$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
-The response has the same structure as the create response (Step 3).
+La respuesta tiene la misma estructura que la respuesta de creación (Paso 3).
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required | Regenerate tokens |
-| 404 | Website not found | Verify the `website_id` |
-| 422 | Validation error | Check path parameter format |
-| 429 | Rate limit exceeded (50 req/min) | Wait and retry |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Sitio web no encontrado | Verifica el `website_id` |
+| 422 | Error de validación | Revisa el formato del parámetro de ruta |
+| 429 | Límite de tasa excedido (50 req/min) | Espera y reintenta |
 
 ---
 
-### Step 6 — Update Website
+### Paso 6 — Actualizar un sitio web
 
-**Goal:** Update an existing website's details. All fields are optional (partial update).
+**Objetivo:** Actualizar los detalles de un sitio web existente. Todos los campos son opcionales (actualización parcial).
 
 **Endpoint:** `PATCH /api/v1/users/websites/{website_id}`
 
@@ -386,7 +386,7 @@ curl -X PATCH "$BASE_URL/users/websites/$WEBSITE_ID" \
   }'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -410,20 +410,20 @@ curl -X PATCH "$BASE_URL/users/websites/$WEBSITE_ID" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required | Regenerate tokens |
-| 404 | Website not found | Verify the `website_id` |
-| 422 | Validation error in request body | Check field formats |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Sitio web no encontrado | Verifica el `website_id` |
+| 422 | Error de validación en el cuerpo de la solicitud | Revisa los formatos de los campos |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
 
 ---
 
-### Step 7 — Generate Legal Pages
+### Paso 7 — Generar páginas legales
 
-**Goal:** Generate all legal pages for the website: privacy policy, cookie policy, legal notice, contact page, and about-me page.
+**Objetivo:** Generar todas las páginas legales del sitio web: política de privacidad, política de cookies, aviso legal, página de contacto y página sobre mí.
 
 **Endpoint:** `POST /api/v1/users/websites/{website_id}/legal`
 
@@ -443,7 +443,7 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/legal" \
   }'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -489,29 +489,29 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/legal" \
 ```
 
 :::note
-The `pages` object contains each legal page with its `title` and HTML `content`. The `meta.slug_map` provides URL-friendly slugs for each page type.
+El objeto `pages` contiene cada página legal con su `title` y su `content` en HTML. El `meta.slug_map` proporciona slugs amigables para URL para cada tipo de página.
 :::
 
 :::tip
-If you omit `legal_owner` or `legal_address`, the API will use AI to generate suitable values based on the website's context.
+Si omites `legal_owner` o `legal_address`, la API usará IA para generar valores adecuados basados en el contexto del sitio web.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required | Regenerate tokens |
-| 402 | Insufficient balance — not enough credits | Top up your account balance |
-| 404 | Website not found | Verify the `website_id` |
-| 422 | Validation error — `legal_email` missing or too short | Provide a valid email (min 5 chars) |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
-| 500 | AI generation failed | Verify AI provider configuration |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 402 | Saldo insuficiente — no hay créditos suficientes | Recarga el saldo de tu cuenta |
+| 404 | Sitio web no encontrado | Verifica el `website_id` |
+| 422 | Error de validación — `legal_email` faltante o demasiado corto | Proporciona un correo válido (mín. 5 caracteres) |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 500 | Falló la generación con IA | Verifica la configuración del proveedor de IA |
 
 ---
 
-### Step 8 — Delete Website
+### Paso 8 — Eliminar un sitio web
 
-**Goal:** Remove a website from the authenticated user's account. This action is irreversible.
+**Objetivo:** Eliminar un sitio web de la cuenta del usuario autenticado. Esta acción es irreversible.
 
 **Endpoint:** `DELETE /api/v1/users/websites/{website_id}`
 
@@ -523,7 +523,7 @@ curl -X DELETE "$BASE_URL/users/websites/$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -534,29 +534,29 @@ curl -X DELETE "$BASE_URL/users/websites/$WEBSITE_ID" \
 ```
 
 :::warning
-This action is irreversible. The website and all its associated data will be permanently removed.
+Esta acción es irreversible. El sitio web y todos sus datos asociados se eliminarán de forma permanente.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Authentication required | Regenerate tokens |
-| 404 | Website not found | Verify the `website_id` |
-| 422 | Validation error | Check path parameter format |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Sitio web no encontrado | Verifica el `website_id` |
+| 422 | Error de validación | Revisa el formato del parámetro de ruta |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values.
+Flujo completo con valores ficticios consistentes.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
@@ -564,7 +564,7 @@ APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
 
 echo "APP_TOKEN: $APP_TOKEN"
 
-# === STEP 1: Get User Token ===
+# === PASO 1: Obtener el token de usuario ===
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -573,7 +573,7 @@ USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
 
 echo "USER_TOKEN: $USER_TOKEN"
 
-# === STEP 2: List Categories ===
+# === PASO 2: Listar categorías ===
 CATEGORY_ID=$(curl -s -X GET "$BASE_URL/users/categories?status_filter=active" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -581,7 +581,7 @@ CATEGORY_ID=$(curl -s -X GET "$BASE_URL/users/categories?status_filter=active" \
 
 echo "CATEGORY_ID: $CATEGORY_ID"
 
-# === STEP 3: Add Website ===
+# === PASO 3: Agregar un sitio web ===
 WEBSITE_ID=$(curl -s -X POST "$BASE_URL/users/websites" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -596,13 +596,13 @@ WEBSITE_ID=$(curl -s -X POST "$BASE_URL/users/websites" \
 
 echo "WEBSITE_ID: $WEBSITE_ID"
 
-# === STEP 4: Search Website by URL ===
+# === PASO 4: Buscar un sitio web por URL ===
 curl -s -X GET "$BASE_URL/users/websites?url=https://mijardin.com" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   | jq .
 
-# === STEP 5: Update Website ===
+# === PASO 5: Actualizar un sitio web ===
 curl -s -X PATCH "$BASE_URL/users/websites/$WEBSITE_ID" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -610,7 +610,7 @@ curl -s -X PATCH "$BASE_URL/users/websites/$WEBSITE_ID" \
   -d '{"site_name": "Mi Jardin Digital - Edicion 2026"}' \
   | jq .
 
-# === STEP 6: Generate Legal Pages ===
+# === PASO 6: Generar páginas legales ===
 curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/legal" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -627,60 +627,60 @@ curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/legal" \
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
+### Idempotencia
 
-:::warning[No idempotency mechanism]
-The API does not support an `Idempotency-Key` header. If a website creation request fails due to timeout, search for the website by URL (`GET /users/websites?url=...`) before retrying. Duplicate URLs for the same user return a **409** error.
+:::warning[Sin mecanismo de idempotencia]
+La API no admite un header `Idempotency-Key`. Si una solicitud de creación de sitio web falla por timeout, busca el sitio web por URL (`GET /users/websites?url=...`) antes de reintentar. Las URLs duplicadas para el mismo usuario devuelven un error **409**.
 :::
 
-### Retries
-- If you receive **429** (rate limit), wait the indicated time and retry.
-- If you receive **500** or a **timeout**, verify the resource state before retrying.
-- For **401** (expired token), regenerate the token and retry the original request.
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **500** o un **timeout**, verifica el estado del recurso antes de reintentar.
+- Ante un **401** (token expirado), regenera el token y reintenta la solicitud original.
 
 ### Timeouts
-- Website creation typically completes within **2-5 seconds** (may take longer if AI description generation is triggered).
-- Legal page generation involves AI calls and may take **10-30 seconds**.
-- Configure your HTTP client with at least **45 seconds** timeout for the legal pages endpoint.
+- La creación de un sitio web suele completarse en **2-5 segundos** (puede tardar más si se dispara la generación de descripción con IA).
+- La generación de páginas legales implica llamadas a IA y puede tardar **10-30 segundos**.
+- Configura tu cliente HTTP con al menos **45 segundos** de timeout para el endpoint de páginas legales.
 
 ### Tokens
-- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
-- Both tokens are required on all website management endpoints.
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de gestión de sitios web.
 
-### Important validations
-- Website URLs must be unique per user.
-- The `category_id` must reference an existing active category.
-- The `lang` field must be `"es"` or `"en"`.
-- The `legal_email` field is required and must be at least 5 characters long.
-- Website deletion is irreversible — there is no restore endpoint.
+### Validaciones importantes
+- Las URLs de los sitios web deben ser únicas por usuario.
+- El `category_id` debe referenciar una categoría activa existente.
+- El campo `lang` debe ser `"es"` o `"en"`.
+- El campo `legal_email` es requerido y debe tener al menos 5 caracteres.
+- La eliminación de un sitio web es irreversible — no hay endpoint de restauración.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/users/token` | Get user token |
-| 2 | `GET` | `/api/v1/users/categories` | List categories |
-| 3 | `POST` | `/api/v1/users/websites` | Add website |
-| 4 | `GET` | `/api/v1/users/websites` | Search website by URL |
-| 5 | `GET` | `/api/v1/users/websites/{website_id}` | Get website by ID |
-| 6 | `PATCH` | `/api/v1/users/websites/{website_id}` | Update website |
-| 7 | `POST` | `/api/v1/users/websites/{website_id}/legal` | Generate legal pages |
-| 8 | `DELETE` | `/api/v1/users/websites/{website_id}` | Delete website |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener el token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener el token de usuario |
+| 2 | `GET` | `/api/v1/users/categories` | Listar categorías |
+| 3 | `POST` | `/api/v1/users/websites` | Agregar un sitio web |
+| 4 | `GET` | `/api/v1/users/websites` | Buscar un sitio web por URL |
+| 5 | `GET` | `/api/v1/users/websites/{website_id}` | Obtener un sitio web por ID |
+| 6 | `PATCH` | `/api/v1/users/websites/{website_id}` | Actualizar un sitio web |
+| 7 | `POST` | `/api/v1/users/websites/{website_id}/legal` | Generar páginas legales |
+| 8 | `DELETE` | `/api/v1/users/websites/{website_id}` | Eliminar un sitio web |
 
 ---
 
-## Quick checklist
+## Checklist rápido
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I have the User API Key (`sk-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I listed available categories (`GET /users/categories`)
-- [ ] I registered the website (`POST /users/websites`)
-- [ ] I verified the website details (`GET /users/websites/{id}`)
-- [ ] I generated legal pages (`POST /users/websites/{id}/legal`)
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Listé las categorías disponibles (`GET /users/categories`)
+- [ ] Registré el sitio web (`POST /users/websites`)
+- [ ] Verifiqué los detalles del sitio web (`GET /users/websites/{id}`)
+- [ ] Generé las páginas legales (`POST /users/websites/{id}/legal`)

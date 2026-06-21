@@ -1,32 +1,32 @@
 ---
-title: "External Integrations"
-description: "Step-by-step flow to connect websites with Google Search Console and the link-building marketplace via the 1Platform API."
+title: "Integraciones externas"
+description: "Flujo paso a paso para conectar sitios web con Google Search Console y el marketplace de link building a través de la 1Platform API."
 sidebar_position: 4
 ---
 
-# Flow: External Integrations
+# Flujo: Integraciones externas
 
-## Overview
+## Vista general
 
-This flow documents how to connect registered websites with external services through the 1Platform API: Google Search Console for SEO management and the link-building marketplace for backlink acquisition.
+Este flujo documenta cómo conectar sitios web registrados con servicios externos a través de la 1Platform API: Google Search Console para la gestión de SEO y el marketplace de link building para la adquisición de backlinks.
 
-**Use case:** After registering a website, connect it to Google Search Console for indexing management and sitemap submission, and to the link-building marketplace for backlink opportunities.
+**Caso de uso:** Después de registrar un sitio web, conéctalo a Google Search Console para la gestión de indexación y el envío de sitemaps, y al marketplace de link building para oportunidades de backlinks.
 
-**End result:** A website registered in Google Search Console with sitemaps configured, and listed in the link-building marketplace with ownership verified.
+**Resultado final:** Un sitio web registrado en Google Search Console con sitemaps configurados, y listado en el marketplace de link building con la propiedad verificada.
 
 ---
 
-## Prerequisites
+## Requisitos previos
 
-| Requirement | Details |
+| Requisito | Detalles |
 |---|---|
-| App API Key | Application key (`ak-...`) provided when registering your app |
-| User API Key | User key (`sk-...`) obtained when creating the user |
-| Website registered | A website must be registered via `POST /users/websites` first |
-| Google service account | A service account with Search Console access (for Search Console integration) |
-| Marketplace credentials | User must have marketplace credentials configured (for link-building integration) |
+| App API Key | Clave de aplicación (`ak-...`) provista al registrar tu app |
+| User API Key | Clave de usuario (`sk-...`) obtenida al crear el usuario |
+| Sitio web registrado | Un sitio web debe registrarse primero vía `POST /users/websites` |
+| Cuenta de servicio de Google | Una cuenta de servicio con acceso a Search Console (para la integración con Search Console) |
+| Credenciales del marketplace | El usuario debe tener credenciales del marketplace configuradas (para la integración de link building) |
 
-### Required headers for all requests
+### Headers requeridos para todas las solicitudes
 
 ```
 Authorization: Bearer $APP_TOKEN
@@ -36,28 +36,28 @@ Content-Type: application/json
 
 ---
 
-## Variables used in examples
+## Variables usadas en los ejemplos
 
 ```bash
 BASE_URL="https://api.1platform.pro/api/v1"
 APP_API_KEY="ak-your-app-api-key"
 USER_API_KEY="sk-user-abc123"
-APP_TOKEN=""       # Obtained in Step 0
-USER_TOKEN=""      # Obtained in Step 1
-WEBSITE_ID=""      # From an existing registered website
+APP_TOKEN=""       # Obtenido en el Paso 0
+USER_TOKEN=""      # Obtenido en el Paso 1
+WEBSITE_ID=""      # De un sitio web ya registrado
 ```
 
 ---
 
-## Step-by-step flow
+## Flujo paso a paso
 
-### Step 0 — Get App Token
+### Paso 0 — Obtener el token de aplicación
 
-**Goal:** Authenticate the application and obtain the app JWT token.
+**Objetivo:** Autenticar la aplicación y obtener el token JWT de la app.
 
 **Endpoint:** `POST /api/v1/auth/token`
 
-**Auth:** None (this is the entry point)
+**Auth:** Ninguna (este es el punto de entrada)
 
 ```bash
 curl -X POST "$BASE_URL/auth/token" \
@@ -65,7 +65,7 @@ curl -X POST "$BASE_URL/auth/token" \
   -d '{"apiKey": "'$APP_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -80,26 +80,26 @@ curl -X POST "$BASE_URL/auth/token" \
 ```
 
 :::note
-Save `data.access_token` as `$APP_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$APP_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid API key or inactive app | Verify that `apiKey` is correct and the app is active |
-| 422 | Missing or malformed `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded (10 req/min) | Wait and retry |
+| 401 | API key inválida o app inactiva | Verifica que `apiKey` sea correcta y que la app esté activa |
+| 422 | Campo `apiKey` ausente o malformado | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido (10 req/min) | Espera y reintenta |
 
 ---
 
-### Step 1 — Get User Token
+### Paso 1 — Obtener el token de usuario
 
-**Goal:** Authenticate the user and obtain the user JWT token.
+**Objetivo:** Autenticar al usuario y obtener el token JWT del usuario.
 
 **Endpoint:** `POST /api/v1/users/token`
 
-**Auth:** `Authorization: Bearer $APP_TOKEN` (app token only, no user token required)
+**Auth:** `Authorization: Bearer $APP_TOKEN` (solo token de aplicación, no se requiere token de usuario)
 
 ```bash
 curl -X POST "$BASE_URL/users/token" \
@@ -108,7 +108,7 @@ curl -X POST "$BASE_URL/users/token" \
   -d '{"apiKey": "'$USER_API_KEY'"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -123,26 +123,26 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 :::note
-Save `data.access_token` as `$USER_TOKEN`. Expires in 30 minutes.
+Guarda `data.access_token` como `$USER_TOKEN`. Expira en 30 minutos.
 :::
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 401 | Invalid user API key or inactive user | Verify the user's `apiKey` |
-| 422 | Missing `apiKey` field | Send `{"apiKey": "..."}` in the body |
-| 429 | Rate limit exceeded | Wait and retry |
+| 401 | API key de usuario inválida o usuario inactivo | Verifica el `apiKey` del usuario |
+| 422 | Campo `apiKey` ausente | Envía `{"apiKey": "..."}` en el cuerpo |
+| 429 | Límite de tasa excedido | Espera y reintenta |
 
 :::tip
-If you don't have a user yet, create one with `POST /api/v1/users` sending `{"email": "user@example.com"}`. The response will include the user's `api_key`.
+Si aún no tienes un usuario, créalo con `POST /api/v1/users` enviando `{"email": "user@example.com"}`. La respuesta incluirá el `api_key` del usuario.
 :::
 
 ---
 
-### Step 2 — Add Website to Search Console
+### Paso 2 — Agregar sitio web a Search Console
 
-**Goal:** Register the website in Google Search Console.
+**Objetivo:** Registrar el sitio web en Google Search Console.
 
 **Endpoint:** `POST /api/v1/users/websites/{website_id}/searchconsole`
 
@@ -156,7 +156,7 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   -d '{"action": "add"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -170,23 +170,23 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Invalid action or website not registered in Search Console | Verify action is `add`, `verify`, `delete`, or `sitemaps` |
-| 401 | Authentication required | Regenerate tokens |
-| 402 | Insufficient balance — not enough credits | Top up your account balance |
-| 404 | Website not found | Verify the `website_id` |
-| 422 | Validation error — missing or malformed fields | Check required fields |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
-| 502 | Google Search Console API error | Service temporarily unavailable — retry later |
+| 400 | Acción inválida o sitio web no registrado en Search Console | Verifica que la acción sea `add`, `verify`, `delete` o `sitemaps` |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 404 | Sitio web no encontrado | Verifica el `website_id` |
+| 422 | Error de validación — campos ausentes o malformados | Verifica los campos requeridos |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 502 | Error de la API de Google Search Console | Servicio temporalmente no disponible — reintenta más tarde |
 
 ---
 
-### Step 3 — Verify Website in Search Console
+### Paso 3 — Verificar sitio web en Search Console
 
-**Goal:** Confirm ownership of the website in Google Search Console.
+**Objetivo:** Confirmar la propiedad del sitio web en Google Search Console.
 
 **Endpoint:** `POST /api/v1/users/websites/{website_id}/searchconsole`
 
@@ -200,7 +200,7 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   -d '{"action": "verify"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -214,23 +214,23 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Website not registered in Search Console or verification failed | Add the website first (Step 2) |
-| 401 | Authentication required | Regenerate tokens |
-| 402 | Insufficient balance — not enough credits | Top up your account balance |
-| 404 | Website not found | Verify the `website_id` |
-| 422 | Validation error — missing or malformed fields | Check required fields |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
-| 502 | Google Search Console API error | Service temporarily unavailable — retry later |
+| 400 | Sitio web no registrado en Search Console o verificación fallida | Agrega primero el sitio web (Paso 2) |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 404 | Sitio web no encontrado | Verifica el `website_id` |
+| 422 | Error de validación — campos ausentes o malformados | Verifica los campos requeridos |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 502 | Error de la API de Google Search Console | Servicio temporalmente no disponible — reintenta más tarde |
 
 ---
 
-### Step 4 — Submit Sitemaps
+### Paso 4 — Enviar sitemaps
 
-**Goal:** Submit sitemap URLs for the website in Google Search Console.
+**Objetivo:** Enviar las URLs de sitemap del sitio web en Google Search Console.
 
 **Endpoint:** `POST /api/v1/users/websites/{website_id}/searchconsole`
 
@@ -252,7 +252,7 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   }'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -266,23 +266,23 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Invalid action or missing sitemaps payload | Include `payload.sitemaps` array for sitemaps action |
-| 401 | Authentication required | Regenerate tokens |
-| 402 | Insufficient balance — not enough credits | Top up your account balance |
-| 404 | Website not found | Verify the `website_id` |
-| 422 | Validation error — missing or malformed fields | Check required fields |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
-| 502 | Google Search Console API error | Service temporarily unavailable — retry later |
+| 400 | Acción inválida o payload de sitemaps ausente | Incluye el array `payload.sitemaps` para la acción sitemaps |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 402 | Saldo insuficiente — créditos insuficientes | Recarga el saldo de tu cuenta |
+| 404 | Sitio web no encontrado | Verifica el `website_id` |
+| 422 | Error de validación — campos ausentes o malformados | Verifica los campos requeridos |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 502 | Error de la API de Google Search Console | Servicio temporalmente no disponible — reintenta más tarde |
 
 ---
 
-### Step 5 — Add Website to Link-Building Marketplace
+### Paso 5 — Agregar sitio web al marketplace de link building
 
-**Goal:** Register the website in the link-building marketplace for backlink opportunities.
+**Objetivo:** Registrar el sitio web en el marketplace de link building para oportunidades de backlinks.
 
 **Endpoint:** `POST /api/v1/users/websites/{website_id}/publisuites`
 
@@ -296,7 +296,7 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
   -d '{"action": "add"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -310,26 +310,26 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Invalid action, missing credentials, or website already added | Verify the action value and marketplace credentials are configured |
-| 401 | Authentication required | Regenerate tokens |
-| 404 | Website not found in marketplace | Verify the `website_id` |
-| 422 | Validation error — missing or malformed fields | Check required fields |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
-| 502 | Link-building service unavailable | Service temporarily unavailable — retry later |
+| 400 | Acción inválida, credenciales ausentes o sitio web ya agregado | Verifica el valor de la acción y que las credenciales del marketplace estén configuradas |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Sitio web no encontrado en el marketplace | Verifica el `website_id` |
+| 422 | Error de validación — campos ausentes o malformados | Verifica los campos requeridos |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 502 | Servicio de link building no disponible | Servicio temporalmente no disponible — reintenta más tarde |
 
 :::tip
-The link-building marketplace endpoint supports additional actions beyond `add` and `verify`: `orders`, `view_order`, `sync`, `accept_order`, `reject_order`, `reopen_order`, and `send_url`. These actions support optional fields like `order_id`, `url`, `page`, `page_size`, and `status_filter` for order management workflows.
+El endpoint del marketplace de link building admite acciones adicionales además de `add` y `verify`: `orders`, `view_order`, `sync`, `accept_order`, `reject_order`, `reopen_order` y `send_url`. Estas acciones admiten campos opcionales como `order_id`, `url`, `page`, `page_size` y `status_filter` para los flujos de gestión de órdenes.
 :::
 
 ---
 
-### Step 6 — Verify Website in Marketplace
+### Paso 6 — Verificar sitio web en el marketplace
 
-**Goal:** Confirm ownership of the website in the link-building marketplace to activate the listing.
+**Objetivo:** Confirmar la propiedad del sitio web en el marketplace de link building para activar el listado.
 
 **Endpoint:** `POST /api/v1/users/websites/{website_id}/publisuites`
 
@@ -343,7 +343,7 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
   -d '{"action": "verify"}'
 ```
 
-**Response (200):**
+**Respuesta (200):**
 
 ```json
 {
@@ -357,29 +357,29 @@ curl -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
 }
 ```
 
-**Common errors:**
+**Errores comunes:**
 
-| Code | Cause | Solution |
+| Código | Causa | Solución |
 |---|---|---|
-| 400 | Verification failed or website not added yet | Add the website first (Step 5) |
-| 401 | Authentication required | Regenerate tokens |
-| 404 | Website not found in marketplace | Verify the website was added |
-| 422 | Validation error — missing or malformed fields | Check required fields |
-| 429 | Rate limit exceeded (20 req/min) | Wait and retry |
-| 502 | Link-building service unavailable | Service temporarily unavailable — retry later |
+| 400 | Verificación fallida o sitio web aún no agregado | Agrega primero el sitio web (Paso 5) |
+| 401 | Se requiere autenticación | Regenera los tokens |
+| 404 | Sitio web no encontrado en el marketplace | Verifica que el sitio web fue agregado |
+| 422 | Error de validación — campos ausentes o malformados | Verifica los campos requeridos |
+| 429 | Límite de tasa excedido (20 req/min) | Espera y reintenta |
+| 502 | Servicio de link building no disponible | Servicio temporalmente no disponible — reintenta más tarde |
 
 ---
 
-## Full end-to-end example
+## Ejemplo completo de extremo a extremo
 
-Complete flow with consistent fictitious values.
+Flujo completo con valores ficticios consistentes.
 
 ```bash
 # === VARIABLES ===
 BASE_URL="https://api.1platform.pro/api/v1"
-WEBSITE_ID="65b2c3d4e5f6a789bcdef012"  # From a previously registered website
+WEBSITE_ID="65b2c3d4e5f6a789bcdef012"  # De un sitio web registrado previamente
 
-# === STEP 0: Get App Token ===
+# === PASO 0: Obtener el token de aplicación ===
 APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
   -H "Content-Type: application/json" \
   -d '{"apiKey": "ak-prod-app-key-2026"}' \
@@ -387,7 +387,7 @@ APP_TOKEN=$(curl -s -X POST "$BASE_URL/auth/token" \
 
 echo "APP_TOKEN: $APP_TOKEN"
 
-# === STEP 1: Get User Token ===
+# === PASO 1: Obtener el token de usuario ===
 USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "Content-Type: application/json" \
@@ -396,7 +396,7 @@ USER_TOKEN=$(curl -s -X POST "$BASE_URL/users/token" \
 
 echo "USER_TOKEN: $USER_TOKEN"
 
-# === STEP 2: Add to Search Console ===
+# === PASO 2: Agregar a Search Console ===
 curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -404,7 +404,7 @@ curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   -d '{"action": "add"}' \
   | jq .
 
-# === STEP 3: Verify in Search Console ===
+# === PASO 3: Verificar en Search Console ===
 curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -412,7 +412,7 @@ curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   -d '{"action": "verify"}' \
   | jq .
 
-# === STEP 4: Submit Sitemaps ===
+# === PASO 4: Enviar sitemaps ===
 curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -425,7 +425,7 @@ curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/searchconsole" \
   }' \
   | jq .
 
-# === STEP 5: Add to Link-Building Marketplace ===
+# === PASO 5: Agregar al marketplace de link building ===
 curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -433,7 +433,7 @@ curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
   -d '{"action": "add"}' \
   | jq .
 
-# === STEP 6: Verify in Marketplace ===
+# === PASO 6: Verificar en el marketplace ===
 curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
@@ -444,55 +444,55 @@ curl -s -X POST "$BASE_URL/users/websites/$WEBSITE_ID/publisuites" \
 
 ---
 
-## Idempotency and best practices
+## Idempotencia y buenas prácticas
 
-### Idempotency
-- Search Console and marketplace actions are generally idempotent — re-adding an already-added website will return an appropriate error rather than creating duplicates.
+### Idempotencia
+- Las acciones de Search Console y del marketplace son generalmente idempotentes — volver a agregar un sitio web ya agregado devolverá un error apropiado en lugar de crear duplicados.
 
-### Retries
-- If you receive **429** (rate limit), wait the indicated time and retry.
-- If you receive **502** (service unavailable), the external service is temporarily down — retry after a short delay.
-- For **401** (expired token), regenerate the token and retry the original request.
+### Reintentos
+- Si recibes **429** (límite de tasa), espera el tiempo indicado y reintenta.
+- Si recibes **502** (servicio no disponible), el servicio externo está temporalmente caído — reintenta tras una breve demora.
+- Para **401** (token expirado), regenera el token y reintenta la solicitud original.
 
 ### Timeouts
-- External integration calls involve third-party APIs and may take **5-15 seconds**.
-- Configure your HTTP client with at least **30 seconds** timeout for these endpoints.
+- Las llamadas de integración externa involucran APIs de terceros y pueden tardar **5-15 segundos**.
+- Configura tu cliente HTTP con al menos **30 segundos** de timeout para estos endpoints.
 
 ### Tokens
-- Both tokens (app and user) expire in **30 minutes** (1800 seconds). Implement automatic renewal before expiration.
-- Both tokens are required on all integration endpoints.
+- Ambos tokens (de aplicación y de usuario) expiran en **30 minutos** (1800 segundos). Implementa la renovación automática antes de la expiración.
+- Ambos tokens son requeridos en todos los endpoints de integración.
 
-### Important validations
-- The website must be registered in the platform (`POST /users/websites`) before adding to external services.
-- For Search Console, a Google service account with appropriate permissions is required.
-- For the link-building marketplace, user marketplace credentials must be configured.
-- The `sitemaps` action requires a `payload.sitemaps` array with valid sitemap URLs.
+### Validaciones importantes
+- El sitio web debe estar registrado en la plataforma (`POST /users/websites`) antes de agregarlo a servicios externos.
+- Para Search Console, se requiere una cuenta de servicio de Google con los permisos apropiados.
+- Para el marketplace de link building, deben configurarse las credenciales del marketplace del usuario.
+- La acción `sitemaps` requiere un array `payload.sitemaps` con URLs de sitemap válidas.
 
 ---
 
-## Quick endpoint reference
+## Referencia rápida de endpoints
 
-| Step | Method | Endpoint | Description |
+| Paso | Método | Endpoint | Descripción |
 |---|---|---|---|
-| 0 | `POST` | `/api/v1/auth/token` | Get app token |
-| 1 | `POST` | `/api/v1/users/token` | Get user token |
-| 2 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Add to Search Console |
-| 3 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Verify in Search Console |
-| 4 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Submit sitemaps |
-| 5 | `POST` | `/api/v1/users/websites/{website_id}/publisuites` | Add to marketplace |
-| 6 | `POST` | `/api/v1/users/websites/{website_id}/publisuites` | Verify in marketplace |
+| 0 | `POST` | `/api/v1/auth/token` | Obtener token de aplicación |
+| 1 | `POST` | `/api/v1/users/token` | Obtener token de usuario |
+| 2 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Agregar a Search Console |
+| 3 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Verificar en Search Console |
+| 4 | `POST` | `/api/v1/users/websites/{website_id}/searchconsole` | Enviar sitemaps |
+| 5 | `POST` | `/api/v1/users/websites/{website_id}/publisuites` | Agregar al marketplace |
+| 6 | `POST` | `/api/v1/users/websites/{website_id}/publisuites` | Verificar en el marketplace |
 
 ---
 
-## Quick checklist
+## Lista de verificación rápida
 
-- [ ] I have the App API Key (`ak-...`)
-- [ ] I have the User API Key (`sk-...`)
-- [ ] I obtained the App Token (`POST /auth/token`)
-- [ ] I obtained the User Token (`POST /users/token`)
-- [ ] I have a registered website with its `website_id`
-- [ ] I added the website to Search Console (`action: "add"`)
-- [ ] I verified website ownership in Search Console (`action: "verify"`)
-- [ ] I submitted sitemaps (`action: "sitemaps"`)
-- [ ] I added the website to the link-building marketplace (`action: "add"`)
-- [ ] I verified ownership in the marketplace (`action: "verify"`)
+- [ ] Tengo la App API Key (`ak-...`)
+- [ ] Tengo la User API Key (`sk-...`)
+- [ ] Obtuve el token de aplicación (`POST /auth/token`)
+- [ ] Obtuve el token de usuario (`POST /users/token`)
+- [ ] Tengo un sitio web registrado con su `website_id`
+- [ ] Agregué el sitio web a Search Console (`action: "add"`)
+- [ ] Verifiqué la propiedad del sitio web en Search Console (`action: "verify"`)
+- [ ] Envié los sitemaps (`action: "sitemaps"`)
+- [ ] Agregué el sitio web al marketplace de link building (`action: "add"`)
+- [ ] Verifiqué la propiedad en el marketplace (`action: "verify"`)

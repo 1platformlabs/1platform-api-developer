@@ -1,84 +1,86 @@
 ---
-title: Retry & Delivery
-description: At-least-once delivery semantics, retry schedule, dead-letter behaviour, and the response codes 1Platform expects from your handler.
+title: Reintentos y entrega
+description: Semántica de entrega at-least-once, calendario de reintentos, comportamiento dead-letter y los códigos de respuesta que 1Platform espera de tu manejador.
 sidebar_position: 5
 ---
 
-# Retry & Delivery
+# Reintentos y entrega
 
-## Delivery guarantees
+## Garantías de entrega
 
-1Platform delivers outbound webhooks with **at-least-once** semantics. Your
-handler **must** be idempotent — see
-[Receiving notifications → idempotency](./receiving-notifications#idempotency-on-the-merchant-side).
+1Platform entrega los webhooks salientes con semántica **at-least-once**. Tu
+manejador **debe** ser idempotente — consulta
+[Recibir notificaciones → idempotencia](./receiving-notifications#idempotency-on-the-merchant-side).
 
-## Retry schedule
+## Calendario de reintentos
 
-When 1Platform receives any non-success response (or the request fails entirely),
-it retries with exponential backoff:
+Cuando 1Platform recibe cualquier respuesta no exitosa (o la solicitud falla por
+completo), reintenta con backoff exponencial:
 
-| Attempt | Delay before retry | Cumulative time |
+| Intento | Espera antes del reintento | Tiempo acumulado |
 |---|---|---|
 | 1 | — | 0 |
 | 2 | 5 s | 5 s |
 | 3 | 30 s | 35 s |
 | 4 | 120 s | 155 s |
 
-After the fourth attempt fails, the webhook is logged as
-`payment_webhook.exhausted_retries` and dropped. There is no automatic
-dead-letter queue today — operators must reconcile via
-`GET /users/transactions` and a manual replay.
+Después de que el cuarto intento falla, el webhook se registra como
+`payment_webhook.exhausted_retries` y se descarta. Hoy no hay una cola
+dead-letter automática — los operadores deben reconciliar vía
+`GET /users/transactions` y un replay manual.
 
-:::caution Plan for outages
-If your backend is down for more than ~3 minutes, expect to lose some webhook
-deliveries. Periodically reconcile with
-`GET /users/transactions?from=...&to=...` to backfill missed events.
+:::caution[Planifica para caídas]
+Si tu backend está caído por más de ~3 minutos, espera perder algunas entregas
+de webhooks. Reconcilia periódicamente con
+`GET /users/transactions?from=...&to=...` para reponer los eventos perdidos.
 :::
 
-## Response codes 1Platform expects
+## Códigos de respuesta que 1Platform espera
 
-| Status | Behaviour |
+| Status | Comportamiento |
 |---|---|
-| `2xx` | Success. No retry. |
-| `3xx` | **Treated as failure** — your handler must not redirect, even on duplicates. |
-| `4xx` | **Treated as failure and retried.** Even though the request is "your fault", 1Platform retries because a misconfigured `Authorization` header should not silently drop the event. |
-| `5xx` | Retried (this is the expected path for transient failures). |
-| Connection refused / DNS failure / timeout | Retried. |
+| `2xx` | Éxito. Sin reintento. |
+| `3xx` | **Se trata como falla** — tu manejador no debe redirigir, ni siquiera en duplicados. |
+| `4xx` | **Se trata como falla y se reintenta.** Aunque la solicitud sea "culpa tuya", 1Platform reintenta porque un encabezado `Authorization` mal configurado no debería descartar el evento silenciosamente. |
+| `5xx` | Se reintenta (esta es la ruta esperada para fallas transitorias). |
+| Conexión rechazada / falla de DNS / timeout | Se reintenta. |
 
-:::tip Always return 200 quickly
-Acknowledge receipt with `200 OK` (or `202 Accepted`) and a tiny body **before**
-running heavy work. Defer fulfilment to a background queue so a slow handler
-doesn't trigger spurious retries that amplify load during outages.
+:::tip[Devuelve siempre 200 rápidamente]
+Acusa recibo con `200 OK` (o `202 Accepted`) y un cuerpo mínimo **antes** de
+ejecutar trabajo pesado. Difiere el cumplimiento a una cola en segundo plano para
+que un manejador lento no dispare reintentos espurios que amplifiquen la carga
+durante caídas.
 :::
 
 ## Timeouts
 
-The dispatcher uses a **10-second** request timeout per attempt. If your
-handler takes longer than that, the request will fail and 1Platform will retry
-according to the schedule above.
+El dispatcher usa un timeout de solicitud de **10 segundos** por intento. Si tu
+manejador tarda más que eso, la solicitud fallará y 1Platform reintentará según
+el calendario anterior.
 
-## Concurrency
+## Concurrencia
 
-The dispatcher caps in-flight outbound webhooks at **20 concurrent dispatches
-per process**. Webhooks beyond this cap wait up to 5 s for a slot before being
-dropped — drop events show up as `payment_webhook.semaphore_timeout` in the
-logs and are **not** retried.
+El dispatcher limita los webhooks salientes en vuelo a **20 envíos concurrentes
+por proceso**. Los webhooks que exceden este límite esperan hasta 5 s por un
+espacio antes de ser descartados — los eventos descartados aparecen como
+`payment_webhook.semaphore_timeout` en los logs y **no** se reintentan.
 
-This cap protects 1Platform from memory exhaustion when a downstream merchant
-is slow to respond. If you need higher throughput, contact your account manager.
+Este límite protege a 1Platform del agotamiento de memoria cuando un comercio
+downstream responde con lentitud. Si necesitas mayor throughput, contacta a tu
+gerente de cuenta.
 
-## Headers on every retry
+## Encabezados en cada reintento
 
-| Header | Notes |
+| Encabezado | Notas |
 |---|---|
-| `X-Webhook-Signature` | Recomputed every attempt (timestamp changes between retries) |
-| `X-Webhook-Timestamp` | Also recomputed — verify the replay window against this value |
-| `Content-Type: application/json` | Always |
-| Custom headers from `body_template`'s `headers` field | Forwarded if listed in the allowlist (`authorization`, `content-type`, `x-idempotency-key`, `x-request-id`, `x-webhook-signature`, `x-webhook-timestamp`) |
+| `X-Webhook-Signature` | Se recalcula en cada intento (el timestamp cambia entre reintentos) |
+| `X-Webhook-Timestamp` | También se recalcula — verifica la ventana de replay contra este valor |
+| `Content-Type: application/json` | Siempre |
+| Encabezados personalizados del campo `headers` de `body_template` | Se reenvían si están listados en el allowlist (`authorization`, `content-type`, `x-idempotency-key`, `x-request-id`, `x-webhook-signature`, `x-webhook-timestamp`) |
 
-## Internal vs external URLs
+## URLs internas vs externas
 
-If the configured URL points to a 1platform.pro domain (e.g. the internal
-billing-credit endpoint), the dispatcher **does not retry** and uses a
-short-lived bearer token instead of HMAC. External URLs always use HMAC + the
-retry schedule above.
+Si la URL configurada apunta a un dominio 1platform.pro (p. ej. el endpoint
+interno de crédito de billing), el dispatcher **no reintenta** y usa un token
+bearer de vida corta en lugar de HMAC. Las URLs externas siempre usan HMAC + el
+calendario de reintentos anterior.

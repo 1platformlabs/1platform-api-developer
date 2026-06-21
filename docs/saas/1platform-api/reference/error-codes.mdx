@@ -1,41 +1,41 @@
 ---
-title: Error code reference
-description: Unified catalogue of every machine-readable `data.code` returned by the 1Platform API, with recommended client behaviour.
+title: Referencia de códigos de error
+description: Catálogo unificado de cada `data.code` legible por máquina que devuelve la 1Platform API, con el comportamiento recomendado del cliente.
 sidebar_position: 3
 ---
 
-# Error code reference
+# Referencia de códigos de error
 
-Most failure responses follow the standard wrapper `{ success: false, data: { code }, msg }`.
-This page lists every `data.code` value, what it means, and what the client
-should do.
+La mayoría de las respuestas de fallo siguen el envoltorio estándar `{ success: false, data: { code }, msg }`.
+Esta página lista cada valor de `data.code`, lo que significa y lo que el cliente
+debe hacer.
 
-| Endpoint(s) | HTTP | `data.code` | Meaning | Recommended client behaviour |
+| Endpoint(s) | HTTP | `data.code` | Significado | Comportamiento recomendado del cliente |
 |---|---|---|---|---|
-| `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | Tenant has no active gateway configured. | Surface a setup CTA to the operator. **Do not retry.** |
-| `POST /users/transactions` | 422 | `CURRENCY_NOT_SUPPORTED` | Gateway does not support the requested currency. | Reject the request client-side; show the gateway's supported list. **Do not retry.** |
-| `POST /users/transactions` | 502 | `PAYMENT_PROVIDER_TIMEOUT` | Upstream payment provider timed out. | Retry with exponential backoff (max 3, base 30s). |
-| `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | Refund API not yet implemented; use the operator dashboard. | **Do not retry.** Issue refunds out-of-band. |
-| `POST /webhooks/config/domains` | 409 | (no code; `msg` only) | Domain already in `allowed_domains`. | Treat as success or call DELETE first. |
-| `PUT /webhooks/config/events` | 400 | (no code; `msg` only) | URL host is not in `allowed_domains`. | Register the domain via the [webhook configuration flow](../flows/webhook-configuration). |
-| (any) | 401 | (no code; `msg` only) | Token expired or invalid. | Mint a fresh token and retry **once**. |
-| (any) | 422 | (no code; Pydantic `detail`) | Schema validation error. | Fix client-side — never retry. |
-| (any) | 429 | (no code; `msg` only) | Rate limit exceeded. | Honour `Retry-After` header (or default to 60s). |
-| `POST /users/transactions` | 502 | (no code; generic `msg`) | Upstream payment provider unreachable / timed out. | Retry with exponential backoff (max 3 attempts, base 30s). |
+| `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El tenant no tiene una pasarela activa configurada. | Muestra un CTA de configuración al operador. **No reintentes.** |
+| `POST /users/transactions` | 422 | `CURRENCY_NOT_SUPPORTED` | La pasarela no admite la moneda solicitada. | Rechaza la solicitud en el cliente; muestra la lista de monedas admitidas de la pasarela. **No reintentes.** |
+| `POST /users/transactions` | 502 | `PAYMENT_PROVIDER_TIMEOUT` | El proveedor de pagos upstream agotó el tiempo de espera. | Reintenta con retroceso exponencial (máx. 3, base 30s). |
+| `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | La API de reembolsos aún no está implementada; usa el dashboard del operador. | **No reintentes.** Emite los reembolsos fuera de banda. |
+| `POST /webhooks/config/domains` | 409 | (sin código; solo `msg`) | El dominio ya está en `allowed_domains`. | Trátalo como éxito o llama primero a DELETE. |
+| `PUT /webhooks/config/events` | 400 | (sin código; solo `msg`) | El host de la URL no está en `allowed_domains`. | Registra el dominio mediante el [flujo de configuración de webhooks](../flows/webhook-configuration). |
+| (cualquiera) | 401 | (sin código; solo `msg`) | Token expirado o inválido. | Genera un token nuevo y reintenta **una vez**. |
+| (cualquiera) | 422 | (sin código; `detail` de Pydantic) | Error de validación de esquema. | Corrige en el cliente — nunca reintentes. |
+| (cualquiera) | 429 | (sin código; solo `msg`) | Límite de uso superado. | Respeta el header `Retry-After` (o usa 60s por defecto). |
+| `POST /users/transactions` | 502 | (sin código; `msg` genérico) | Proveedor de pagos upstream inaccesible / agotó el tiempo de espera. | Reintenta con retroceso exponencial (máx. 3 intentos, base 30s). |
 
-## Conventions
+## Convenciones
 
-- **Endpoints that return `data.code`** — anything where a client needs to
-  branch on the *kind* of failure. Always check `data.code` before reading
-  `msg`, since `msg` is human-facing copy that may change.
-- **Endpoints that return `msg` only** — generic 4xx/5xx where the HTTP
-  status code carries enough information.
-- **Pydantic 422** — schema-level validation failures use FastAPI's default
-  shape `{ detail: [...], message: "Validation error" }` rather than the
-  ResponseWrapper. See [response format](./response-format).
+- **Endpoints que devuelven `data.code`** — cualquiera donde el cliente necesite
+  ramificar según el *tipo* de fallo. Revisa siempre `data.code` antes de leer
+  `msg`, ya que `msg` es texto orientado a humanos que puede cambiar.
+- **Endpoints que devuelven solo `msg`** — 4xx/5xx genéricos donde el código de
+  estado HTTP lleva suficiente información.
+- **Pydantic 422** — los fallos de validación a nivel de esquema usan la forma por
+  defecto de FastAPI `{ detail: [...], message: "Validation error" }` en lugar del
+  ResponseWrapper. Consulta [formato de respuesta](./response-format).
 
-## Adding new codes
+## Agregar nuevos códigos
 
-When the API adds a new `data.code`, this page is updated in the same change
-that ships the code. If you find a value here without a matching entry,
-that's a documentation bug — please report it.
+Cuando la API agrega un nuevo `data.code`, esta página se actualiza en el mismo cambio
+que despliega el código. Si encuentras un valor aquí sin una entrada correspondiente,
+es un error de documentación — por favor repórtalo.

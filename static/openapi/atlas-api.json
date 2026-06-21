@@ -2781,7 +2781,7 @@
           "entitlement"
         ],
         "summary": "Checkout",
-        "description": "Create a checkout link for the calling member.\n\nForwards the call to the configured entitlement provider, carrying\nAtlas's ``tenant_id`` / ``scope`` / ``scope_ref`` so the provider can\necho them back on the resulting webhook (those fields drive\n``EntitlementRepository.grant`` once the payment confirms).",
+        "description": "Create a checkout link for the calling member.\n\nTenant-aware (D-18): resolves the entitlement provider from the tenant's\n``config.payments`` (kind/base_url) + env-namespaced secret, and maps the\nrequested ``plan_ref`` (a ``config.plans`` slug) to the provider's product\nid via ``plan_product_map`` before delegating. Carries Atlas's\n``tenant_id`` / ``scope`` / ``scope_ref`` so the provider can echo them\nback on the resulting webhook (those fields drive\n``EntitlementRepository.grant`` once the payment confirms). A ``mock``\nprovider returns a fake URL (no real charge).",
         "operationId": "checkout_api_v1_entitlements_checkout_post",
         "parameters": [
           {
@@ -2904,6 +2904,120 @@
                   "detail": {
                     "code": "PROVIDER_UNAVAILABLE"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/entitlements/trial": {
+      "post": {
+        "tags": [
+          "entitlement"
+        ],
+        "summary": "Start Trial",
+        "description": "Activate the tenant's free trial for the calling member (D-14).\n\nGrants ``Entitlement(scope=\"plan\", scope_ref=trial.plan_ref,\nexpires_at=now+days, granted_by=\"trial\")`` which unlocks like VIP until it\npassively expires (no revoke job). Server-authoritative: the app never\ngrants the trial. Dedup (once-per-member) by ANY existing\n``granted_by=\"trial\"`` row for the (tenant, member, plan) — even an\nexpired one — so the trial cannot be re-consumed (R-6).\n\nReturns ``granted=false`` with a stable reason when the tenant has no\nenabled trial (``trial_unavailable``) or the member already used it\n(``trial_already_used``).",
+        "operationId": "start_trial_api_v1_entitlements_trial_post",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -3243,6 +3357,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PlaybackTicket"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Free member crossed a freemium gate without the required plan or exhausted the daily distinct-title quota — a subscription is required.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "FREEMIUM_GATE_BLOCKED"
+                  }
                 }
               }
             }
@@ -12680,6 +12806,120 @@
         }
       }
     },
+    "/api/v1/me/freemium": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Get Freemium",
+        "description": "Return the member's effective freemium policy (AFR-01).\n\nCrosses ``config.app.freemium`` × the member's entitlements × the daily\ndistinct-title counter to produce the meter (``used/remaining/reset_at``),\nthe reader preview cap (``preview_pages``), the trial CTA state, and the\nactive subscription. UX only — the binding gate is server-side delivery\n(D-3). ``enabled=false`` ⇒ everything allowed.",
+        "operationId": "me.freemium_get",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreemiumView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/achievements/recent": {
       "get": {
         "tags": [
@@ -19040,6 +19280,16 @@
                 "type": "null"
               }
             ]
+          },
+          "freemium": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppFreemium"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": true,
@@ -19070,6 +19320,198 @@
         ],
         "title": "AppDownloadView",
         "description": "``GET /me/app/download`` — a short-lived presigned URL (or store\nlink for iOS). Returned as JSON (not a cached 302) so it never lands in\nbrowser history (audit H-1)."
+      },
+      "AppFreeQuota": {
+        "properties": {
+          "books_per_day": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Books Per Day"
+          },
+          "preview_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Pages"
+          },
+          "window": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "title": "Window",
+            "default": "day"
+          },
+          "keeps_unlocked": {
+            "type": "boolean",
+            "title": "Keeps Unlocked",
+            "default": true
+          },
+          "rollover": {
+            "type": "boolean",
+            "title": "Rollover",
+            "default": false
+          },
+          "downloads_per_day": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Downloads Per Day"
+          },
+          "reads_per_month": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reads Per Month"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AppFreeQuota",
+        "description": "Free-tier quota knobs for the freemium policy (AFR-01, D-5b/D-15/D-19).\n\n``books_per_day`` is the hero of the model: the number of *distinct*\npremium titles a free member may open in full (read in the in-app\nreader **or** download) per window — counted by distinct ``content_id``,\nnot requests (so read+download of the same title = one slot). ``None``\n⇒ no book quota. ``preview_pages`` caps the EPUB in-app preview of a\nnot-yet-unlocked premium title (does NOT consume a slot, D-19).\n``downloads_per_day``/``reads_per_month`` are legacy/compat knobs.\n``keeps_unlocked`` (Audible \"it's yours\") makes a spent slot grant a\npermanent per-item entitlement (D-15). ``rollover`` is v2 (unused)."
+      },
+      "AppFreemium": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "free_quota": {
+            "$ref": "#/components/schemas/AppFreeQuota"
+          },
+          "trial": {
+            "$ref": "#/components/schemas/AppFreemiumTrial"
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/AppFreemiumGate"
+            },
+            "type": "array",
+            "title": "Gates"
+          },
+          "paywall": {
+            "$ref": "#/components/schemas/AppPaywall"
+          },
+          "plans_layout": {
+            "$ref": "#/components/schemas/AppPlansLayout"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AppFreemium",
+        "description": "Per-tenant freemium policy (AFR-01) — mirrors ``AppReleases``.\n\nAdditive sub-object of ``AppConfig`` (``extra=\"allow\"``) so it rides\n``/tenants/by-host`` with no migration; ``None`` (or ``enabled=false``)\nfor every pre-existing tenant ⇒ no gating (full access, no regression —\nR-1/R-5). ``extra=\"forbid\"`` because the dashboard admin is the only\nwriter and the app renders the fields verbatim. The policy carries NO\nsecrets and NO vendor names — only declarative gates/quotas/copy keys."
+      },
+      "AppFreemiumGate": {
+        "properties": {
+          "feature": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Feature"
+          },
+          "required_plan": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Plan"
+          },
+          "free_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Limit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "feature"
+        ],
+        "title": "AppFreemiumGate",
+        "description": "A single declarative freemium gate (AFR-01, D-6).\n\n``feature`` is the capability key the app/backend gate against (e.g.\n``premium_content``, ``offline_download``, ``early_access``).\n``required_plan`` references a ``config.plans`` slug — an active\n``scope=plan`` entitlement with that slug unlocks the gate (the\nenforcement NEVER hardcodes a slug, D-13). ``free_limit`` is an optional\nfree allowance before the gate engages (``None`` ⇒ hard gate)."
+      },
+      "AppFreemiumTrial": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "plan_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Ref"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "once_per_member": {
+            "type": "boolean",
+            "title": "Once Per Member",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AppFreemiumTrial",
+        "description": "Free trial of a paid plan (AFR-01, D-14 — Spotify/Audible lever).\n\nWhen ``enabled`` and ``plan_ref``/``days`` are set, the trial grant path\nissues a temporary ``Entitlement(scope=\"plan\", scope_ref=plan_ref,\nexpires_at=now+days, granted_by=\"trial\")`` that unlocks like VIP until it\npassively expires (no revoke job). ``once_per_member`` dedups by any\nexisting ``granted_by=\"trial\"`` row for the (tenant, member, plan)."
       },
       "AppFunnel": {
         "properties": {
@@ -19140,6 +19582,87 @@
         },
         "type": "object",
         "title": "AppKpis"
+      },
+      "AppPaywall": {
+        "properties": {
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "quota",
+              "plan"
+            ],
+            "title": "Trigger",
+            "default": "quota"
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "soft",
+              "hard"
+            ],
+            "title": "Style",
+            "default": "soft"
+          },
+          "show_meter": {
+            "type": "boolean",
+            "title": "Show Meter",
+            "default": true
+          },
+          "headline_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline Key"
+          },
+          "cta_plan_slug": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cta Plan Slug"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AppPaywall",
+        "description": "Paywall presentation policy (AFR-01, D-16). UX only — the binding\ngate is server-side (D-3). ``style=\"soft\"`` shows a meter + countdown\n(Medium/NYT); ``hard`` is a dry wall. ``headline_key`` is an i18n key\n(no embedded copy); ``cta_plan_slug`` is the promoted ``config.plans``\nslug."
+      },
+      "AppPlansLayout": {
+        "properties": {
+          "hero_plan_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hero Plan Ref"
+          },
+          "highlight_savings": {
+            "type": "boolean",
+            "title": "Highlight Savings",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AppPlansLayout",
+        "description": "Pricing-landing presentation (AFR-04, D-17 — anchoring). UX hints\nonly; all plans come from ``config.plans`` (no hardcode, D-13)."
       },
       "AppReaderConfig": {
         "properties": {
@@ -20072,6 +20595,48 @@
         },
         "type": "object",
         "title": "ComingSoonCopy"
+      },
+      "ConfigPayments": {
+        "properties": {
+          "provider_kind": {
+            "type": "string",
+            "enum": [
+              "mock",
+              "external"
+            ],
+            "title": "Provider Kind",
+            "default": "mock"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "checkout_return_path": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Checkout Return Path",
+            "default": "/plans"
+          },
+          "plan_product_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Plan Product Map"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ConfigPayments",
+        "description": "Per-tenant payment-provider config (AFR-05, D-18) — **NON-secret**.\n\nLives at ``tenants.config.payments`` (sibling of ``config.plans``, NOT\nunder ``config.app``) and is served verbatim by ``GET /tenants/by-host``\n— so it MUST never carry ``api_key``/``webhook_secret`` (R-8). Those are\nresolved server-side from env namespaced per tenant\n(``ENTITLEMENT_PROVIDER_WEBHOOK_SECRET__<tenant_slug>``, fallback global).\n\n``provider_kind`` discriminates the entitlement-provider factory:\n``mock`` (default ⇒ no charge, no regression) or ``external`` (the\nconfigured remote payment layer). ``base_url`` overrides the global\nendpoint per tenant. ``plan_product_map`` maps a ``config.plans`` slug to\nthe provider's product id (what gets sold). The discriminator/value are\nconfig/code — never a UI label (brand rule)."
       },
       "ContentAssetOut": {
         "properties": {
@@ -21844,6 +22409,245 @@
         ],
         "title": "FooterSocialLink",
         "description": "A social icon + link in the footer \"follow us\" row.\n\n``kind`` selects the inline-SVG icon the dashboard renders; the\noperator supplies the URL (no vendor handle hardcoded)."
+      },
+      "FreemiumGateView": {
+        "properties": {
+          "feature": {
+            "type": "string",
+            "title": "Feature"
+          },
+          "required_plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Plan"
+          },
+          "free_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Limit"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature",
+          "allowed"
+        ],
+        "title": "FreemiumGateView"
+      },
+      "FreemiumQuotaView": {
+        "properties": {
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "book"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used",
+            "default": 0
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining"
+          },
+          "reset_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reset At"
+          },
+          "preview_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Pages"
+          }
+        },
+        "type": "object",
+        "title": "FreemiumQuotaView"
+      },
+      "FreemiumSubscriptionView": {
+        "properties": {
+          "plan_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Slug"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "paid",
+                  "trial"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "title": "FreemiumSubscriptionView"
+      },
+      "FreemiumTrialView": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "default": false
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "plan_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Ref"
+          }
+        },
+        "type": "object",
+        "title": "FreemiumTrialView"
+      },
+      "FreemiumView": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/FreemiumGateView"
+            },
+            "type": "array",
+            "title": "Gates"
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreemiumQuotaView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreemiumTrialView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subscription": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreemiumSubscriptionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "FreemiumView"
       },
       "FunnelStep": {
         "properties": {
@@ -27266,6 +28070,16 @@
                 "type": "null"
               }
             ]
+          },
+          "payments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfigPayments"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": true,
@@ -27504,6 +28318,16 @@
                 "type": "null"
               }
             ]
+          },
+          "payments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfigPayments"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -27636,6 +28460,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/CustomCodeSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfigPayments"
               },
               {
                 "type": "null"
@@ -27830,6 +28664,49 @@
           "delta_clicks_wow"
         ],
         "title": "TopQueryOut"
+      },
+      "TrialResponse": {
+        "properties": {
+          "granted": {
+            "type": "boolean",
+            "title": "Granted"
+          },
+          "plan_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Slug"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "granted | trial_unavailable | trial_already_used",
+            "default": "granted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "granted"
+        ],
+        "title": "TrialResponse",
+        "description": "Outcome of a free-trial activation (AFR-01, D-14)."
       },
       "UpNextEpisode": {
         "properties": {

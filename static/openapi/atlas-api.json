@@ -773,7 +773,8 @@
         "tags": [
           "content"
         ],
-        "summary": "Create Item",
+        "summary": "Create a content item",
+        "description": "Create a new catalog item for the resolved tenant.\n\nThe item starts in the ``status`` given by the payload (default\n``draft``). ``slug`` must be unique within the tenant — a collision\nreturns ``409 CONTENT_SLUG_TAKEN``. Requires the admin/operator role.",
         "operationId": "create_item_api_v1_content_items_post",
         "parameters": [
           {
@@ -922,7 +923,8 @@
         "tags": [
           "content"
         ],
-        "summary": "List Items",
+        "summary": "List content items (operator)",
+        "description": "Paginated operator listing of the tenant's catalog across **all**\nstatuses (including ``draft`` and ``archived``). For the public,\npublished-only, filterable grid use ``GET /public/catalog`` instead.",
         "operationId": "list_items_api_v1_content_items_get",
         "parameters": [
           {
@@ -1010,7 +1012,8 @@
         "tags": [
           "content"
         ],
-        "summary": "Get Item By Slug",
+        "summary": "Get a content item by slug",
+        "description": "Fetch a single item by its human-readable slug, scoped to the\nresolved tenant. Returns ``404 CONTENT_NOT_FOUND`` when no item with\nthat slug exists for the tenant.",
         "operationId": "get_item_by_slug_api_v1_content_items_by_slug__slug__get",
         "parameters": [
           {
@@ -1096,7 +1099,8 @@
         "tags": [
           "content"
         ],
-        "summary": "Get Item",
+        "summary": "Get a content item by id",
+        "description": "Fetch a single item by its id, scoped to the resolved tenant.\nReturns ``404 CONTENT_NOT_FOUND`` when the id does not belong to the\ntenant.",
         "operationId": "get_item_api_v1_content_items__item_id__get",
         "parameters": [
           {
@@ -1229,7 +1233,7 @@
         "tags": [
           "content"
         ],
-        "summary": "Patch Item",
+        "summary": "Update a content item",
         "description": "Partial update. Cannot mutate ``id``, ``tenant_id`` or\n``created_at`` (they are absent from :class:`ContentItemUpdate`).\nSlug changes re-check the ``(tenant_id, slug)`` uniqueness constraint\nbefore flush so we surface a stable 409 instead of a 500.",
         "operationId": "patch_item_api_v1_content_items__item_id__patch",
         "parameters": [
@@ -1401,7 +1405,7 @@
         "tags": [
           "content"
         ],
-        "summary": "Soft Delete Item",
+        "summary": "Soft-delete a content item",
         "description": "Soft delete — transitions ``status`` to ``archived`` (the row is\npreserved). Idempotent: deleting an already-archived row is a no-op\nthat still returns 204 and writes an audit entry.",
         "operationId": "soft_delete_item_api_v1_content_items__item_id__delete",
         "parameters": [
@@ -1546,8 +1550,8 @@
         "tags": [
           "content"
         ],
-        "summary": "Publish Item",
-        "description": "Move ``draft|scheduled|archived`` → ``published``. Returns 409\n``CONTENT_ALREADY_PUBLISHED`` when the row is already in the\n``published`` state so callers can display a stable error.",
+        "summary": "Publish a content item",
+        "description": "Move ``draft|scheduled|archived`` → ``published``. Returns 409\n``CONTENT_ALREADY_PUBLISHED`` when the row is already in the\n``published`` state so callers can display a stable error.\n\nOn publish, fans out a \"new title\" inbox notification to content\nsubscribers (🔔 Notificar) and followers of any credited author — in\nthe SAME transaction (idempotent per member+content). Push/email\ndelivery is scheduled best-effort AFTER commit so it never blocks or\nrolls back the publish.",
         "operationId": "publish_item_api_v1_content_items__item_id__publish_post",
         "parameters": [
           {
@@ -1710,8 +1714,8 @@
         "tags": [
           "content"
         ],
-        "summary": "Upload Item Asset",
-        "description": "Upload a downloadable asset (PDF / EPUB / MOBI / MP3 / M4A) for a\ncontent item. The file lands at the canonical storage key\n``items/{item_id}/file.{format}`` so the DOWNLOAD delivery strategy\ncan return a signed URL to entitled members without further wiring.\n\nRe-uploading the same format overwrites the previous payload (the\nstorage key is deterministic) and bumps ``metadata.assets[format]``\non the content item.",
+        "summary": "Upload a downloadable asset",
+        "description": "Upload a downloadable asset (PDF / EPUB / MOBI / MP3 / M4A) for a\ncontent item. The file lands at the canonical storage key\n``items/{item_id}/file.{format}`` so the DOWNLOAD delivery strategy\ncan return a signed URL to entitled members without further wiring.\n\nRe-uploading the same format overwrites the previous payload (the\nstorage key is deterministic) and bumps ``metadata.assets[format]``\non the content item. With ``chapter=N`` (AUD-05) the audio lands at\n``items/{id}/audio_ch_{N}.{format}`` and bumps ``metadata.assets[\"audio_ch_{N}\"]``\nso delivery signs the chapter's own object (and charges the per-chapter gate).",
         "operationId": "upload_item_asset_api_v1_content_items__item_id__assets_post",
         "parameters": [
           {
@@ -1903,12 +1907,174 @@
         }
       }
     },
+    "/api/v1/content/items/{item_id}/audio": {
+      "put": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Set the audiobook narrator + chapter list (merge-preserve)",
+        "description": "Upsert the audiobook block (``narrator`` + ``audio_chapters``) on an\nitem's ``metadata_`` WITHOUT touching any other key (D-1 merge-preserve).\n\nA plain ``PATCH /{id}`` with ``metadata`` replaces the whole blob and\nwould drop ``assets``/``cover`` — a data-loss trap. This endpoint reads\nthe current metadata under a row lock, sets only the two audio keys and\nwrites it back in one transaction (R-5), so an interleaved asset upload\nof the same row cannot be lost.\n\nThe public detail derives ``audio{narrator,total,chapters}`` from these\nkeys (``_derive_item_audio``); delivery gates playback per chapter.",
+        "operationId": "put_item_audio_api_v1_content_items__item_id__audio_put",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "x-admin-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentItemOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Content item not found for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "CONTENT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Chapter orders are duplicated or not contiguous 1..N.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "AUDIO_CHAPTERS_INVALID"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/content/items/{item_id}/cover-image": {
       "post": {
         "tags": [
           "content"
         ],
-        "summary": "Upload Item Cover Image",
+        "summary": "Upload a cover image",
         "description": "Upload a public cover image for a content item.\n\nThe file lands at ``images/{tenant_id}/items/{item_id}/cover.{ext}``\non the public-read storage prefix; the resulting public URL is\npersisted on ``content_items.cover_image_url`` so catalog responses\ncan surface it without a per-request signed URL roundtrip.\nRe-uploading replaces the previous payload (the storage key is\ndeterministic on the file extension).\n\nAllowed Content-Types: ``image/jpeg``, ``image/png``, ``image/webp``.",
         "operationId": "upload_item_cover_image_api_v1_content_items__item_id__cover_image_post",
         "parameters": [
@@ -2104,7 +2270,7 @@
         "tags": [
           "content"
         ],
-        "summary": "Delete Item Cover Image",
+        "summary": "Remove a cover image",
         "description": "Remove the cover image — clears the column and deletes the\nstorage object. Idempotent: deleting an item that has no cover\nreturns 204 and still records an audit entry.",
         "operationId": "delete_item_cover_image_api_v1_content_items__item_id__cover_image_delete",
         "parameters": [
@@ -2256,12 +2422,434 @@
         }
       }
     },
+    "/api/v1/content/items/{item_id}/assets/{fmt}": {
+      "delete": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Remove a downloadable asset (PDF/EPUB/MOBI)",
+        "description": "Remove one downloadable format from a content item (#122).\n\nDeletes the storage object and drops ``metadata.assets[fmt]`` so the\npublic download page stops offering it. Idempotent: deleting a format\nthe item never had returns 204. Does NOT touch ``media_title_id`` —\nthe per-format assets share the item's single Media title, so a\nsingle-format delete leaves the others (and delivery's local fallback)\nintact.",
+        "operationId": "delete_item_asset_api_v1_content_items__item_id__assets__fmt__delete",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "fmt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Fmt"
+            }
+          },
+          {
+            "name": "x-admin-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Format or Content-Type is not supported for downloadable assets.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "ASSET_FORMAT_INVALID"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Content item not found for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "CONTENT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Object storage refused or failed the write — usually a credentials / policy misconfiguration on the bucket.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "ASSET_STORAGE_FAILED"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/content/items/{item_id}/reviews": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "List a content item's reviews (public)",
+        "description": "Public reviews for an item by id, in the dashboard's flat shape.\n\n``average``/``count`` come from the ``content_items`` denorm kept in\nsync by ``ReviewRepository._refresh_denorm``. ``author_name`` is the\nreviewer's display_name (neutral label when unset — never PII).",
+        "operationId": "list_item_reviews_api_v1_content_items__item_id__reviews_get",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewsListOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Content item not found for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "CONTENT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Publish a review (member)",
+        "description": "Member-scoped review upsert by item id (idempotent per member).\n\nMirrors ``POST /me/reviews`` (reuses ``ReviewRepository.upsert`` and\nits denorm refresh) but takes the content id from the path so the\ndashboard's item page posts without threading it through the body.\nThe review is written with the server-derived tenant + member ids —\nno client-supplied tenant/member, so no cross-tenant IDOR.",
+        "operationId": "create_item_review_api_v1_content_items__item_id__reviews_post",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSubmitIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewEntryOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The member token's tenant does not match the request tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_MISMATCH"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Content item not found for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "CONTENT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/content/items/{item_id}/archive": {
       "post": {
         "tags": [
           "content"
         ],
-        "summary": "Archive Item",
+        "summary": "Archive a content item",
         "description": "Move any state → ``archived``. Idempotent: re-archiving returns\n200 with the unchanged row and still records an audit entry.",
         "operationId": "archive_item_api_v1_content_items__item_id__archive_post",
         "parameters": [
@@ -2911,6 +3499,96 @@
         }
       }
     },
+    "/api/v1/entitlements/guest-checkout": {
+      "post": {
+        "tags": [
+          "entitlement"
+        ],
+        "summary": "Guest Checkout",
+        "description": "Anonymous checkout for a not-yet-signed-in buyer (web ``/vip``).\n\nThe buyer supplies only an email — the card is entered on the provider's\nhosted page, never here. Flow: create-or-reuse a tenant-scoped member by\nemail (idempotent), commit it so a racing webhook finds the row, then\ndelegate to the same provider ``create_checkout_link`` as the member\ncheckout with ``member.id`` as the external id. The provider echoes that\nid back on the paid webhook, so the grant attributes to the right member\n(server-authoritative — this endpoint NEVER writes an Entitlement; only\nthe confirmed-payment webhook grants). Rate-limited per browser and\nreturns an identical ``{url}`` whether the member was created or reused,\nso it can't be used to probe which emails exist. A ``mock`` provider\nreturns a fake URL (no real charge).",
+        "operationId": "guest_checkout_api_v1_entitlements_guest_checkout_post",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuestCheckoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid return_url (must be https or site-relative).",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INVALID_RETURN_URL"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Upstream entitlement provider is unavailable.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "PROVIDER_UNAVAILABLE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/entitlements/trial": {
       "post": {
         "tags": [
@@ -3238,7 +3916,7 @@
           "delivery"
         ],
         "summary": "Get Playback Ticket",
-        "description": "Mint a playback ticket for the requested item.\n\nDecision order:\n\n1. **Operator bypass** — admin/operator skip the entitlement check\n   and any strategy-level quota / format guard. Audit row written\n   so the action is traceable.\n2. **Has active entitlement** — non-operator caller proceeds to\n   strategy resolution.\n3. **Lazy auto-grant** — caller has none; if the tenant qualifies\n   under the free-tier predicate, attempt the grant inline and\n   re-check. Closes the gap when eager grant on sign-in failed.\n4. **403 ENTITLEMENT_DENIED** — fall through to subscription wall.",
+        "description": "Mint a playback ticket for the requested item.\n\nDecision order:\n\n1. **Operator bypass** — admin/operator skip the entitlement check\n   and any strategy-level quota / format guard. Audit row written\n   so the action is traceable.\n2. **Has active entitlement** — non-operator caller proceeds to\n   strategy resolution.\n3. **Lazy auto-grant** — caller has none; if the tenant qualifies\n   under the free-tier predicate, attempt the grant inline and\n   re-check. Closes the gap when eager grant on sign-in failed.\n4. **403 ENTITLEMENT_DENIED** — fall through to subscription wall.\n\nChapter gate selection (F3 — cross-quota bypass fix): a validated\n``?chapter=`` request is charged against the per-chapter quota\n(``audio_chapters_per_day``) ONLY when it resolves to a real\nper-chapter asset (``metadata.assets[\"audio_ch_{order}\"]``). When the\nchapter falls back to the FULL audio file (mocks-first, L-28), the\ndelivered artifact is the whole title, so the request is charged\nagainst the per-TITLE gate (``books_per_day``, including its\n``keeps_unlocked`` semantics) — the slot spent always matches what is\ndelivered. Otherwise a free member who exhausted ``books_per_day``\ncould keep extracting complete audiobooks via ``?chapter=1``, and a\ntenant with ``audio_chapters_per_day > books_per_day`` would hand out\nMORE full files per day than the title gate allows.",
         "operationId": "get_playback_ticket_api_v1_delivery_items__content_id__playback_get",
         "parameters": [
           {
@@ -3268,6 +3946,25 @@
               "title": "Format"
             },
             "description": "Optional download format hint (pdf|epub|mobi|mp3|m4a). When omitted, the strategy picks the first uploaded format from ``content_item.metadata.assets`` or the strategy default."
+          },
+          {
+            "name": "chapter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional audiobook chapter (1-based ``order`` from the item's ``metadata.audio_chapters``). 404 ``CHAPTER_NOT_FOUND`` when the order does not exist. The chapter asset is ``metadata.assets['audio_ch_{order}']`` when uploaded; otherwise the URL derives from the full audio asset (same file — mocks-first, L-28) and the app seeks using the chapter offsets.",
+              "title": "Chapter"
+            },
+            "description": "Optional audiobook chapter (1-based ``order`` from the item's ``metadata.audio_chapters``). 404 ``CHAPTER_NOT_FOUND`` when the order does not exist. The chapter asset is ``metadata.assets['audio_ch_{order}']`` when uploaded; otherwise the URL derives from the full audio asset (same file — mocks-first, L-28) and the app seeks using the chapter offsets."
           },
           {
             "name": "authorization",
@@ -3380,6 +4077,18 @@
                 "example": {
                   "detail": {
                     "code": "ASSET_FORMAT_NOT_ALLOWED"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Requested format is not available for this item (e.g. it was deleted), or the requested chapter order does not exist in the item's audio chapters.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "ASSET_NOT_AVAILABLE"
                   }
                 }
               }
@@ -3523,6 +4232,34 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/media": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Media Webhook",
+        "description": "Inbound ``title.*`` from 1Platform Media. Verifies HMAC against each\nlocal tenant's ``config.media_supply.webhook_secret`` (N:1 fan-out) and\nruns the per-storefront auto-publish (G-B1). A payload that no configured\nsecret verifies is silently ignored (no recipient) — never 500s.",
+        "operationId": "media_webhook_api_v1_webhooks_media_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed media webhook payload (WEBHOOK_PAYLOAD_INVALID)."
+          },
+          "401": {
+            "description": "No configured tenant secret verified the signature (WEBHOOK_SIGNATURE_INVALID)."
           }
         }
       }
@@ -4316,11 +5053,13 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "A secondary archetype duplicates the immutable primary archetype.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                "example": {
+                  "detail": {
+                    "code": "SECONDARY_INCLUDES_PRIMARY"
+                  }
                 }
               }
             }
@@ -6293,6 +7032,837 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/media/integration": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-media"
+        ],
+        "summary": "Get Media Integration",
+        "description": "Read the tenant's media-supply integration — flags only, never the\nsecret values (the sealed ``api_key``/``webhook_secret`` stay server-side).",
+        "operationId": "admin.media_integration_get",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaSupplyConfigOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "admin",
+          "admin-media"
+        ],
+        "summary": "Patch Media Integration",
+        "description": "Write the tenant's media-supply integration. Secrets are sealed with\nFernet at rest; an omitted secret preserves the stored ciphertext.",
+        "operationId": "admin.media_integration_patch",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaSupplyConfigPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaSupplyConfigOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tenant not found (TENANT_NOT_FOUND)."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/media/subscriptions": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-media"
+        ],
+        "summary": "List Media Subscriptions",
+        "operationId": "admin.media_subscriptions_list",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Admin.Media Subscriptions List"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin",
+          "admin-media"
+        ],
+        "summary": "Create Media Subscription",
+        "operationId": "admin.media_subscriptions_create",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaSubscriptionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Admin.Media Subscriptions Create"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/media/subscriptions/{subscription_id}": {
+      "patch": {
+        "tags": [
+          "admin",
+          "admin-media"
+        ],
+        "summary": "Patch Media Subscription",
+        "operationId": "admin.media_subscriptions_patch",
+        "parameters": [
+          {
+            "name": "subscription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Subscription Id"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaSubscriptionPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Admin.Media Subscriptions Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin",
+          "admin-media"
+        ],
+        "summary": "Delete Media Subscription",
+        "operationId": "admin.media_subscriptions_delete",
+        "parameters": [
+          {
+            "name": "subscription_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Subscription Id"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -8526,6 +10096,29 @@
         "operationId": "list_libraries_api_v1_admin_libraries_get",
         "parameters": [
           {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -8724,6 +10317,77 @@
             }
           },
           {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -8815,6 +10479,54 @@
               "type": "string",
               "format": "uuid",
               "title": "Tenant Id"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -8930,6 +10642,54 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -9042,6 +10802,54 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -9141,6 +10949,54 @@
               "type": "string",
               "format": "uuid",
               "title": "Subscription Id"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -10981,14 +12837,59 @@
         }
       }
     },
-    "/api/v1/notifications": {
+    "/api/v1/me/notifications": {
       "get": {
         "tags": [
-          "notifications"
+          "me"
         ],
         "summary": "List Inbox",
-        "operationId": "list_inbox_api_v1_notifications_get",
+        "description": "Newest-first inbox page for the authenticated member.\n\n``unread_count`` is computed over the WHOLE inbox (not just the\nreturned page) so the app badge stays truthful when older unread\nrows fall outside ``limit``.",
+        "operationId": "me.notifications_list",
         "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -11044,11 +12945,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Notification"
-                  },
-                  "title": "Response List Inbox Api V1 Notifications Get"
+                  "$ref": "#/components/schemas/NotificationListResponse"
                 }
               }
             }
@@ -11066,14 +12963,46 @@
         }
       }
     },
-    "/api/v1/notifications/mark-all-read": {
+    "/api/v1/me/notifications/mark-all-read": {
       "post": {
         "tags": [
-          "notifications"
+          "me"
         ],
         "summary": "Mark All Read",
-        "operationId": "mark_all_read_api_v1_notifications_mark_all_read_post",
+        "operationId": "me.notifications_mark_all_read",
         "parameters": [
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -11126,6 +13055,135 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/notifications/{notification_id}/read": {
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Mark Read",
+        "description": "Mark one notification read. Ownership is enforced in the UPDATE's\nWHERE clause (tenant + member), so the mutation and the check are a\nsingle statement — no read-then-write race.",
+        "operationId": "me.notifications_mark_read",
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Notification Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Notification does not exist for this member/tenant — a foreign id is indistinguishable from a missing one.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "NOTIFICATION_NOT_FOUND"
+                  }
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -11665,9 +13723,60 @@
           "me"
         ],
         "summary": "List Sessions",
-        "description": "Return active sessions for the authenticated member.\n\nv1 is a single-entry synthetic list derived from the current\nrequest — refresh-token persistence is deferred until\npost-redesign (REDESIGN_PLAN.md §14.2 — sessions). The contract\nmatches what the dashboard expects so the UI does not need a\nfeature flag to render the panel.",
+        "description": "Return the authenticated member's persisted devices (\"sessions\").\n\nBacked by the ``member_devices`` table (Stream G): every device that\nsigned in with a fingerprint is a revocable row. The active request is\nflagged ``is_current`` when ``device_fingerprint`` matches a persisted\nrow; otherwise the current device is surfaced as a synthetic leading\nentry so the panel always shows at least the device in use (and web\nmembers who signed in without a fingerprint still see one session).\n``ip_redacted`` is only known for the live request — persisted rows\nreport ``\"unknown\"`` (no IP is stored). Every query is scoped by\n``(tenant_id, member_id)`` from the auth context.",
         "operationId": "me.sessions_list",
         "parameters": [
+          {
+            "name": "device_fingerprint",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The caller's own device fingerprint (as stored at sign-in). When supplied, the matching persisted device is flagged ``is_current`` and is preserved by ``DELETE /me/sessions`` (revoke others). Optional — omitted ⇒ the current device is surfaced as a synthetic entry derived from the request.",
+              "title": "Device Fingerprint"
+            },
+            "description": "The caller's own device fingerprint (as stored at sign-in). When supplied, the matching persisted device is flagged ``is_current`` and is preserved by ``DELETE /me/sessions`` (revoke others). Optional — omitted ⇒ the current device is surfaced as a synthetic entry derived from the request."
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -11745,9 +13854,60 @@
           "me"
         ],
         "summary": "Revoke Other Sessions",
-        "description": "Revoke every session except the current one.\n\nSame v1 rationale as ``DELETE /sessions/{id}`` — exposing the\ncontract now keeps the dashboard from gating the \"Sign out\neverywhere else\" button on a feature flag.",
+        "description": "Revoke every device except the current one (\"sign out everywhere else\").\n\nDeletes all of the member's ``member_devices`` rows except the one whose\nfingerprint matches ``device_fingerprint`` (the caller's current device).\nWhen no fingerprint is supplied, every device row is removed. Idempotent\nand scoped by ``(tenant_id, member_id)``.",
         "operationId": "me.sessions_revoke_others",
         "parameters": [
+          {
+            "name": "device_fingerprint",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The caller's own device fingerprint (as stored at sign-in). When supplied, the matching persisted device is flagged ``is_current`` and is preserved by ``DELETE /me/sessions`` (revoke others). Optional — omitted ⇒ the current device is surfaced as a synthetic entry derived from the request.",
+              "title": "Device Fingerprint"
+            },
+            "description": "The caller's own device fingerprint (as stored at sign-in). When supplied, the matching persisted device is flagged ``is_current`` and is preserved by ``DELETE /me/sessions`` (revoke others). Optional — omitted ⇒ the current device is surfaced as a synthetic entry derived from the request."
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -11820,7 +13980,7 @@
           "me"
         ],
         "summary": "Revoke Session",
-        "description": "Revoke a single session.\n\nv1 is a no-op success — the JWT itself is stateless and short-lived\nso there is no server-side state to remove. The endpoint exists so\nthe dashboard's \"Sign out from this device\" button has a stable\ncontract for the post-redesign refresh-token rollout.",
+        "description": "Revoke a single device session (\"sign out from this device\").\n\nDeletes the member's ``member_devices`` row scoped by\n``(tenant_id, member_id, id)``. A malformed id or one that belongs to\nanother member/tenant returns 404 (never 403) so a caller cannot probe\nwhich session ids exist. The JWT itself is stateless and short-lived, so\nrevocation removes the device record (and stops future re-recognition);\na hard token-revocation list is deferred.",
         "operationId": "me.sessions_revoke_one",
         "parameters": [
           {
@@ -11830,6 +13990,38 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
             }
           },
           {
@@ -11884,6 +14076,17 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "404": {
+            "description": "Session not registered for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "SESSION_NOT_FOUND",
+                  "message": "Session not found."
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -14117,6 +16320,385 @@
                 "example": {
                   "detail": {
                     "code": "ENTRY_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/follows": {
+      "get": {
+        "tags": [
+          "follows"
+        ],
+        "summary": "List Follows",
+        "description": "The authors the member follows (newest first).",
+        "operationId": "list_follows_api_v1_me_follows_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FollowedAuthor"
+                  },
+                  "title": "Response List Follows Api V1 Me Follows Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/follows/{author}": {
+      "put": {
+        "tags": [
+          "follows"
+        ],
+        "summary": "Follow",
+        "description": "Follow an author by slug. Idempotent — re-following is a no-op that\nstill returns ``following: true``.",
+        "operationId": "follow_api_v1_me_follows__author__put",
+        "parameters": [
+          {
+            "name": "author",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Author"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowState"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Author not found for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "PERSON_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "follows"
+        ],
+        "summary": "Unfollow",
+        "description": "Unfollow an author by slug. 404 when the author does not exist for\nthe tenant OR the member was not following them.",
+        "operationId": "unfollow_api_v1_me_follows__author__delete",
+        "parameters": [
+          {
+            "name": "author",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Author"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Author not found for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "PERSON_NOT_FOUND"
                   }
                 }
               }
@@ -16525,11 +19107,11 @@
             "required": false,
             "schema": {
               "type": "string",
-              "description": "Catalog ordering. ``recent`` (default) keeps the existing behavior; ``popular`` orders by rating engagement; ``title-asc`` orders alphabetically; ``rating-desc`` orders by rating with NULLS LAST.",
+              "description": "Catalog ordering. ``recent`` (default) keeps the existing behavior; ``popular`` orders by rating engagement; ``title-asc`` orders alphabetically; ``rating-desc`` orders by rating with NULLS LAST; ``release-asc`` orders by ``metadata.release_date`` ascending with NULLS LAST (coming-soon titles trail).",
               "default": "recent",
               "title": "Sort"
             },
-            "description": "Catalog ordering. ``recent`` (default) keeps the existing behavior; ``popular`` orders by rating engagement; ``title-asc`` orders alphabetically; ``rating-desc`` orders by rating with NULLS LAST."
+            "description": "Catalog ordering. ``recent`` (default) keeps the existing behavior; ``popular`` orders by rating engagement; ``title-asc`` orders alphabetically; ``rating-desc`` orders by rating with NULLS LAST; ``release-asc`` orders by ``metadata.release_date`` ascending with NULLS LAST (coming-soon titles trail)."
           },
           {
             "name": "kind",
@@ -16602,6 +19184,24 @@
             "description": "Platform availability filter (AM-27). ``app`` hides ``web_only`` items; ``web`` hides ``app_only`` items. Omitted ⇒ no filter (all items). Items without an ``availability`` value are treated as available everywhere (backward-compatible)."
           },
           {
+            "name": "has_audio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by audio playability (atlas-web W2). ``true`` keeps only items playable as audio (``kind == 'audio'`` OR a real mp3/m4a asset — the same derivation as the ``has_audio`` card flag); ``false`` keeps only non-audio items. Omitted ⇒ no filter (response byte-identical to the pre-filter shape). Filtered server-side so ``total`` and pagination stay correct.",
+              "title": "Has Audio"
+            },
+            "description": "Filter by audio playability (atlas-web W2). ``true`` keeps only items playable as audio (``kind == 'audio'`` OR a real mp3/m4a asset — the same derivation as the ``has_audio`` card flag); ``false`` keeps only non-audio items. Omitted ⇒ no filter (response byte-identical to the pre-filter shape). Filtered server-side so ``total`` and pagination stay correct."
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -16658,13 +19258,79 @@
         }
       }
     },
+    "/api/v1/public/stats": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Public Stats",
+        "description": "Catalog headline counts for the current tenant (atlas-web W1).\n\nAll three tallies are scoped to the resolved tenant and to\n``status == \"published\"`` only:\n\n* ``total`` — every published item.\n* ``audiobooks`` — published items playable as audio, using the SAME\n  derivation as the ``has_audio`` card flag (``kind == \"audio\"`` OR a\n  real mp3/m4a asset — the shared ``ContentRepository._has_audio_condition``,\n  the SQL twin of :func:`_has_audio`).\n* ``books`` — published items whose ``kind`` is a reading kind\n  (:data:`_READING_KINDS`).\n\n``books`` and ``audiobooks`` are intentionally NON-exclusive: a title\nwith a reading kind AND an audio asset counts in both, so their sum\ncan exceed ``total``.",
+        "operationId": "public.stats",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStats"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/items/{slug}": {
       "get": {
         "tags": [
           "public"
         ],
         "summary": "Item Detail",
-        "description": "Full detail for one library item — byline, genre, formats, related.\n\nServes ``published`` and ``scheduled`` (coming-soon) items so the\ndetail screen renders an upcoming title with its release date and a\nlocked download state. Draft/archived items 404 with the stable\n``CONTENT_NOT_FOUND`` code. Tenant-scoped via the slug lookup, so a\nslug from another tenant never resolves.",
+        "description": "Full detail for one library item — byline, genre, formats, related.\n\nServes ``published`` and ``scheduled`` (coming-soon) items so the\ndetail screen renders an upcoming title with its release date and a\nlocked download state. Draft/archived items 404 with the stable\n``CONTENT_NOT_FOUND`` code. Tenant-scoped via the slug lookup, so a\nslug from another tenant never resolves.\n\nThe embedded ``related`` rail uses the SAME ranking as the standalone\n``/items/{slug}/related`` endpoint (F1c: genre tier first, then\nsame-kind fill, each ordered rating desc) so both surfaces agree —\nonly the size differs (``related_limit`` default 8, cap 24, unchanged).\nThe earlier recency-only embedded ranking is superseded.",
         "operationId": "public.item_detail",
         "parameters": [
           {
@@ -16829,7 +19495,7 @@
           "public"
         ],
         "summary": "Related",
-        "description": "Top-N items of the same ``kind``, excluding the seed.\n\nv1 ranking is plain recency. Tag-overlap scoring is a post-redesign\nrefinement (see REDESIGN_PLAN.md §6.3 cut C5).",
+        "description": "Related rail for a published item (atlas-app redesign F1c).\n\nSame-tenant published items, excluding the seed: same-genre matches\nfirst, then same-kind fill, each tier ordered ``rating_avg`` desc\n(NULLS LAST). Default 6, capped at 12 — the app contract; the earlier\nrecency-only ranking (default 10, cap 50) is superseded. Cards reuse\nthe shared :class:`ContentSummary` serializer.",
         "operationId": "public.related",
         "parameters": [
           {
@@ -16847,9 +19513,9 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 50,
+              "maximum": 12,
               "minimum": 1,
-              "default": 10,
+              "default": 6,
               "title": "Limit"
             }
           },
@@ -16928,7 +19594,7 @@
           "public"
         ],
         "summary": "Genres",
-        "description": "Catalog genres derived from ``content_item.metadata.tags``.\n\nAggregation runs in Python (not SQL) so the call is portable across\nPostgres and SQLite. The published-only filter caps the worst-case\ncost; tenants with ≫10k items should switch to a `pg_trgm` materialised\nview (out of scope for v1).",
+        "description": "Catalog genres derived from ``content_item.metadata.tags``.\n\nAggregation runs in Python (not SQL) so the call is portable across\nPostgres and SQLite. The published-only filter caps the worst-case\ncost; tenants with ≫10k items should switch to a `pg_trgm` materialised\nview (out of scope for v1).\n\n``has_audio`` narrows the underlying row set (not the aggregation), so\nboth the counts *and* the visible chip set scope to audiobooks — no\nzero-audiobook genres leak into the ``/audiolibros`` sidebar.",
         "operationId": "public.genres",
         "parameters": [
           {
@@ -16940,6 +19606,24 @@
               "default": true,
               "title": "With Counts"
             }
+          },
+          {
+            "name": "has_audio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Scope genre counts to audiobook-only (``true``) or non-audio (``false``) — the same ``has_audio`` derivation as the catalog filter and the audiobook card flag. Powers the ``/audiolibros`` sidebar so only genres with audiobooks appear. Omitted ⇒ global counts (response byte-identical to the pre-filter shape).",
+              "title": "Has Audio"
+            },
+            "description": "Scope genre counts to audiobook-only (``true``) or non-audio (``false``) — the same ``has_audio`` derivation as the catalog filter and the audiobook card flag. Powers the ``/audiolibros`` sidebar so only genres with audiobooks appear. Omitted ⇒ global counts (response byte-identical to the pre-filter shape)."
           },
           {
             "name": "host",
@@ -17280,6 +19964,84 @@
           },
           "404": {
             "description": "Item not found or not published."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/people/{slug}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Author Profile",
+        "description": "Public author profile: typed bio/born/country + published works.\n\nTenant-scoped ``by_slug`` resolution (404 ``PERSON_NOT_FOUND``). Works\nare matched by ``metadata.people`` slug or the ``metadata.author``\nbyline — NOT ``cast_crew`` — so a library author's books actually\nsurface. Distinct from ``/people/{slug}/credits`` (cast_crew, grouped),\nwhich is left untouched for backward compatibility.",
+        "operationId": "public.author_profile",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorProfileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Person not found for this tenant."
           },
           "422": {
             "description": "Validation Error",
@@ -18796,11 +21558,31 @@
               "library",
               "streaming",
               "live",
+              "tv",
+              "education",
               "podcast",
-              "education"
+              "events",
+              "audio"
             ],
             "title": "Archetype",
             "default": "library"
+          },
+          "secondary_archetypes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "library",
+                "streaming",
+                "live",
+                "tv",
+                "education",
+                "podcast",
+                "events",
+                "audio"
+              ]
+            },
+            "type": "array",
+            "title": "Secondary Archetypes"
           },
           "primary_domain": {
             "anyOf": [
@@ -18863,6 +21645,13 @@
           "archetype": {
             "type": "string",
             "title": "Archetype"
+          },
+          "secondary_archetypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Secondary Archetypes"
           },
           "primary_domain": {
             "anyOf": [
@@ -18959,23 +21748,29 @@
             ],
             "title": "Name"
           },
-          "archetype": {
+          "secondary_archetypes": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "library",
-                  "streaming",
-                  "live",
-                  "podcast",
-                  "education"
-                ]
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "library",
+                    "streaming",
+                    "live",
+                    "tv",
+                    "education",
+                    "podcast",
+                    "events",
+                    "audio"
+                  ]
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Archetype"
+            "title": "Secondary Archetypes"
           },
           "primary_domain": {
             "anyOf": [
@@ -19271,6 +22066,16 @@
               }
             ]
           },
+          "genre_rails": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppGenreRailsConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "analytics": {
             "anyOf": [
               {
@@ -19390,6 +22195,18 @@
               }
             ],
             "title": "Reads Per Month"
+          },
+          "audio_chapters_per_day": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Chapters Per Day"
           }
         },
         "additionalProperties": false,
@@ -19530,6 +22347,79 @@
         },
         "type": "object",
         "title": "AppFunnel"
+      },
+      "AppGenreRailsConfig": {
+        "properties": {
+          "initial": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "prefetch_px": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefetch Px"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Size"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AppGenreRailsConfig",
+        "description": "Per-tenant editorial-home genre-rails knobs (AM-05) — mirrors ``AppReaderConfig``.\n\nAdditive sub-object of ``AppConfig``; ``None`` for every pre-existing tenant\n⇒ the app applies the safe defaults (``initial=4``, ``step=4``,\n``prefetch_px=800``, ``page_size=12``, ``max=20``) — no migration, zero\nregression. Every field is **optional** so the dashboard can clear one knob\nback to the app default independently; the app's ``resolveGenreRailsConfig``\nis tolerant and clamps ``initial``/``step`` to ``max``. ``extra=\"forbid\"``\nbecause the dashboard admin is the only writer.\n\nBounds keep a config from degrading the home: counts are capped at 100 and\nthe prefetch trigger at 10000px so a bad value can't request giant pages or\nmount an absurd number of rails."
       },
       "AppKpis": {
         "properties": {
@@ -19946,6 +22836,108 @@
         "title": "AppUpdateUrls",
         "description": "Per-platform download destinations for the update gate (AUG-01).\n\nAll https-only (``HttpsUrlStr``) so a hand-edited config can never route\nthe \"Update\" CTA to an http/data:/relative target (anti-phishing). The\napp prefers the platform-specific URL and falls back to ``web``:\nstore-distributed builds point ``android``/``ios`` at the store listing;\nsideload/enterprise builds point ``web`` at the download page (D-8/R-2)."
       },
+      "AudioChapterIn": {
+        "properties": {
+          "order": {
+            "type": "integer",
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Order"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "duration_sec": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Sec"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order",
+          "title"
+        ],
+        "title": "AudioChapterIn",
+        "description": "One audiobook chapter in the merge-preserve upsert payload.\n\nMirror of the public ``AudioChapterOut`` shape (``public.py``) so the\nwrite contract matches what the item detail derives back\n(``_derive_item_audio``). ``duration_sec`` is optional — a chapter can\nbe catalogued before its runtime is known; the public serializer sums\nonly the non-null durations."
+      },
+      "AudioChapterOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "duration_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Sec"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order",
+          "title"
+        ],
+        "title": "AudioChapterOut",
+        "description": "A single audiobook chapter as surfaced on the public detail."
+      },
+      "AudioUpsert": {
+        "properties": {
+          "narrator": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narrator"
+          },
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/AudioChapterIn"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Chapters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chapters"
+        ],
+        "title": "AudioUpsert",
+        "description": "Request body for ``PUT /content/items/{id}/audio`` (AUD-01).\n\nSets ONLY ``narrator`` + ``audio_chapters`` on the item's metadata;\nthe endpoint merge-preserves every other key (assets, cover, …) so\nthe upsert can never drop a downloadable asset (D-1). Orders must be\nunique and contiguous ``1..N`` — the endpoint persists them sorted so\ndelivery/public resolve chapters deterministically."
+      },
       "AuditLogEntry": {
         "properties": {
           "id": {
@@ -20096,6 +23088,87 @@
         "type": "object",
         "title": "AuthCopy"
       },
+      "AuthorProfileResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "born": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Born"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "works": {
+            "items": {
+              "$ref": "#/components/schemas/ContentSummary"
+            },
+            "type": "array",
+            "title": "Works"
+          },
+          "works_total": {
+            "type": "integer",
+            "title": "Works Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ],
+        "title": "AuthorProfileResponse",
+        "description": "Public author profile + works (atlas-redesign v2).\n\n``bio``/``born``/``country`` are projected from the person's free\n``metadata`` JSON (derive-at-read — no schema migration). ``works`` are\nthe author's published items matched by structured ``metadata.people``\nslug or the ``metadata.author`` byline (see\n``ContentRepository.list_by_author``)."
+      },
       "Body_upload_branding_favicon_api_v1_admin_settings_branding_favicon_post": {
         "properties": {
           "file": {
@@ -20123,6 +23196,19 @@
             "contentMediaType": "application/octet-stream",
             "title": "File",
             "description": "Binary asset payload."
+          },
+          "chapter": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter",
+            "description": "1-based audiobook chapter order (AUD-05). When set, the audio lands per-chapter (audio_ch_{order}) instead of the full file; must be an order already declared via PUT /audio."
           }
         },
         "type": "object",
@@ -20435,6 +23521,11 @@
             "title": "Coming Soon",
             "default": false
           },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
+          },
           "metadata": {
             "additionalProperties": true,
             "type": "object",
@@ -20693,7 +23784,8 @@
               "episode",
               "live",
               "podcast",
-              "article"
+              "article",
+              "audio"
             ],
             "title": "Kind"
           },
@@ -20765,7 +23857,8 @@
               "episode",
               "live",
               "podcast",
-              "article"
+              "article",
+              "audio"
             ],
             "title": "Kind"
           },
@@ -20798,6 +23891,30 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
+          },
+          "media_title_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Title Id"
+          },
+          "media_cover_title_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Cover Title Id"
           },
           "created_at": {
             "type": "string",
@@ -20849,7 +23966,8 @@
                   "episode",
                   "live",
                   "podcast",
-                  "article"
+                  "article",
+                  "audio"
                 ]
               },
               {
@@ -21161,7 +24279,8 @@
                   "live",
                   "website_sale",
                   "episode",
-                  "show"
+                  "show",
+                  "audio"
                 ]
               },
               {
@@ -21227,6 +24346,11 @@
           "coming_soon": {
             "type": "boolean",
             "title": "Coming Soon",
+            "default": false
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
             "default": false
           },
           "metadata": {
@@ -21315,6 +24439,11 @@
           "coming_soon": {
             "type": "boolean",
             "title": "Coming Soon",
+            "default": false
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
             "default": false
           },
           "metadata": {
@@ -21627,7 +24756,8 @@
                   "live",
                   "website_sale",
                   "episode",
-                  "show"
+                  "show",
+                  "audio"
                 ]
               },
               {
@@ -22264,6 +25394,53 @@
         "type": "object",
         "title": "FeaturedResponse"
       },
+      "FollowState": {
+        "properties": {
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "following": {
+            "type": "boolean",
+            "title": "Following"
+          }
+        },
+        "type": "object",
+        "required": [
+          "author",
+          "following"
+        ],
+        "title": "FollowState"
+      },
+      "FollowedAuthor": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "FollowedAuthor"
+      },
       "FooterBrandLink": {
         "properties": {
           "label": {
@@ -22789,6 +25966,53 @@
         "title": "GoogleAnalyticsConfig",
         "description": "Per-tenant measurement-tool property identifiers (AAN-01) — **non-secret**.\n\nOnly the public-ish identifiers live here (they ship in config, not in\nthe bundle): ``measurement_id`` (\"G-XXXXXXX\") routes the Measurement\nProtocol write, ``property_id`` (\"123456789\") scopes the Data API read.\nThe real secrets — the MP ``api_secret`` and the service-account JSON —\nlive in the server env (``GA4_API_SECRET`` / ``GA4_SERVICE_ACCOUNT_JSON``)\nand never appear in config, bootstrap, or the dashboard."
       },
+      "GuestCheckoutRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "plan_ref": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Plan Ref"
+          },
+          "return_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Return Url"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "item",
+              "series",
+              "live"
+            ],
+            "title": "Scope",
+            "default": "item"
+          },
+          "scope_ref": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Scope Ref",
+            "default": "*"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "plan_ref",
+          "return_url"
+        ],
+        "title": "GuestCheckoutRequest",
+        "description": "Anonymous checkout: the buyer supplies only an email (the card is\nentered on the provider's hosted page, never here). The email creates or\nreuses a tenant-scoped member so the paid grant can be attributed on the\nwebhook. Same plan/scope fields as :class:`CheckoutRequest`."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -23072,6 +26296,42 @@
         "title": "IntegrationsSettings",
         "description": "Tracking IDs storeable today; injected by the frontend later.\n\nNEVER reference the vendor name in the field comment; see\n``feedback_provider_leak_via_exception``."
       },
+      "ItemAudio": {
+        "properties": {
+          "narrator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narrator"
+          },
+          "total_duration_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Duration Sec"
+          },
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/AudioChapterOut"
+            },
+            "type": "array",
+            "title": "Chapters"
+          }
+        },
+        "type": "object",
+        "title": "ItemAudio",
+        "description": "Audiobook block on the public item detail (atlas-app redesign F1a).\n\nPresent only when the item declares ``metadata.audio_chapters`` —\nitems without chapters keep their payload byte-identical (L-33c\nderive-at-read guard). ``total_duration_sec`` sums the non-null\nchapter durations, or is ``null`` when no chapter carries one."
+      },
       "ItemDetail": {
         "properties": {
           "id": {
@@ -23121,6 +26381,17 @@
               }
             ],
             "title": "Byline Author"
+          },
+          "byline_author_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Byline Author Slug"
           },
           "genre_label": {
             "anyOf": [
@@ -23239,6 +26510,21 @@
             },
             "type": "array",
             "title": "Related"
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
+          },
+          "audio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemAudio"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "metadata": {
             "additionalProperties": true,
@@ -24140,6 +27426,225 @@
         ],
         "title": "MediaListResponse"
       },
+      "MediaSubscriptionCreate": {
+        "properties": {
+          "match_kind": {
+            "type": "string",
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Match Kind"
+          },
+          "match_collection_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Collection Id"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filters"
+          },
+          "action_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "match_kind"
+        ],
+        "title": "MediaSubscriptionCreate"
+      },
+      "MediaSubscriptionPatch": {
+        "properties": {
+          "filters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filters"
+          },
+          "action_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Policy"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "MediaSubscriptionPatch"
+      },
+      "MediaSupplyConfigOut": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "api_key_set": {
+            "type": "boolean",
+            "title": "Api Key Set",
+            "default": false
+          },
+          "webhook_secret_set": {
+            "type": "boolean",
+            "title": "Webhook Secret Set",
+            "default": false
+          },
+          "action_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Policy"
+          },
+          "mask_delivery": {
+            "type": "boolean",
+            "title": "Mask Delivery",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "MediaSupplyConfigOut",
+        "description": "Admin read surface — never exposes the secret values."
+      },
+      "MediaSupplyConfigPatch": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "webhook_secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Secret"
+          },
+          "action_policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Policy"
+          },
+          "mask_delivery": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mask Delivery"
+          }
+        },
+        "type": "object",
+        "title": "MediaSupplyConfigPatch",
+        "description": "Admin write surface. Omitted secret fields preserve the stored value."
+      },
       "MemberInvite": {
         "properties": {
           "email": {
@@ -24430,21 +27935,46 @@
         "type": "object",
         "title": "NavCopy"
       },
-      "Notification": {
+      "NotificationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "unread_count": {
+            "type": "integer",
+            "title": "Unread Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "unread_count"
+        ],
+        "title": "NotificationListResponse"
+      },
+      "NotificationOut": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
             "title": "Id"
           },
-          "kind": {
+          "icon": {
             "type": "string",
-            "enum": [
-              "new_episode",
-              "live_starting",
-              "rental_expiring",
-              "billing",
-              "system"
+            "title": "Icon"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Kind"
           },
@@ -24456,33 +27986,25 @@
             "type": "string",
             "title": "Body"
           },
-          "read_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Read At"
-          },
           "created_at": {
             "type": "string",
-            "format": "date-time",
             "title": "Created At"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "kind",
+          "icon",
           "title",
           "body",
-          "created_at"
+          "created_at",
+          "read"
         ],
-        "title": "Notification"
+        "title": "NotificationOut"
       },
       "NotificationSubscribeRequest": {
         "properties": {
@@ -24774,6 +28296,39 @@
             ],
             "title": "Role"
           },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "born": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Born"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
           "metadata": {
             "additionalProperties": true,
             "type": "object",
@@ -24972,6 +28527,17 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Comparison"
+          },
+          "checkout_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkout Url"
           }
         },
         "type": "object",
@@ -25131,6 +28697,36 @@
         ],
         "title": "PlansResponse"
       },
+      "PlaybackChapter": {
+        "properties": {
+          "order": {
+            "type": "integer",
+            "title": "Order"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "duration_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Sec"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order",
+          "title"
+        ],
+        "title": "PlaybackChapter",
+        "description": "Echo of the resolved audiobook chapter (atlas-app redesign F1b)."
+      },
       "PlaybackTicket": {
         "properties": {
           "content_id": {
@@ -25181,6 +28777,16 @@
               }
             ],
             "title": "Render Format"
+          },
+          "chapter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlaybackChapter"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -25247,7 +28853,8 @@
                   "live",
                   "website_sale",
                   "episode",
-                  "show"
+                  "show",
+                  "audio"
                 ]
               },
               {
@@ -25300,6 +28907,18 @@
               }
             ],
             "title": "Finished At"
+          },
+          "chapter_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Order"
           }
         },
         "type": "object",
@@ -25355,6 +28974,18 @@
               }
             ],
             "title": "Finished"
+          },
+          "chapter_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Order"
           }
         },
         "type": "object",
@@ -25560,6 +29191,30 @@
           "rails"
         ],
         "title": "PublicRailsResponse"
+      },
+      "PublicStats": {
+        "properties": {
+          "books": {
+            "type": "integer",
+            "title": "Books"
+          },
+          "audiobooks": {
+            "type": "integer",
+            "title": "Audiobooks"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "books",
+          "audiobooks",
+          "total"
+        ],
+        "title": "PublicStats",
+        "description": "Catalog headline counts for the web landing (atlas-web W1).\n\n``total`` is every published item; ``books`` and ``audiobooks`` are\nNOT a partition — a title carrying both a reading kind and an mp3/m4a\nasset counts in both — so ``books + audiobooks`` may exceed ``total``."
       },
       "PublisherCreate": {
         "properties": {
@@ -26171,6 +29826,51 @@
         ],
         "title": "ReviewCreate"
       },
+      "ReviewEntryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "author_name": {
+            "type": "string",
+            "title": "Author Name"
+          },
+          "author_initials": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Initials"
+          },
+          "rating": {
+            "type": "integer",
+            "title": "Rating"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "author_name",
+          "rating",
+          "body",
+          "created_at"
+        ],
+        "title": "ReviewEntryOut"
+      },
       "ReviewItem": {
         "properties": {
           "id": {
@@ -26277,6 +29977,58 @@
           "created_at"
         ],
         "title": "ReviewOut"
+      },
+      "ReviewSubmitIn": {
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "maximum": 5,
+            "minimum": 1,
+            "title": "Rating"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "rating"
+        ],
+        "title": "ReviewSubmitIn"
+      },
+      "ReviewsListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewEntryOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ReviewsListOut"
       },
       "SearchCopy": {
         "properties": {
@@ -26392,6 +30144,11 @@
           "coming_soon": {
             "type": "boolean",
             "title": "Coming Soon",
+            "default": false
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
             "default": false
           },
           "metadata": {
@@ -27597,7 +31354,8 @@
                 "items": {
                   "type": "string"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 50
               },
               {
                 "type": "null"
@@ -27611,6 +31369,7 @@
               "format": "uuid"
             },
             "type": "array",
+            "maxItems": 5000,
             "title": "Excluded Item Ids"
           },
           "seo_rewrite": {
@@ -28158,6 +31917,13 @@
             "title": "Archetype",
             "default": "library"
           },
+          "secondary_archetypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Secondary Archetypes"
+          },
           "primary_domain": {
             "anyOf": [
               {
@@ -28190,7 +31956,8 @@
               "episode",
               "live",
               "podcast",
-              "article"
+              "article",
+              "audio"
             ],
             "title": "Kind"
           },
@@ -28226,6 +31993,20 @@
           "archetype": {
             "type": "string",
             "title": "Archetype"
+          },
+          "secondary_archetypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Secondary Archetypes"
+          },
+          "allowed_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Kinds"
           },
           "primary_domain": {
             "anyOf": [
@@ -28493,7 +32274,8 @@
                 "episode",
                 "live",
                 "podcast",
-                "article"
+                "article",
+                "audio"
               ]
             },
             "type": "object",
@@ -28531,7 +32313,8 @@
                     "episode",
                     "live",
                     "podcast",
-                    "article"
+                    "article",
+                    "audio"
                   ]
                 },
                 "type": "object"
@@ -28931,7 +32714,8 @@
                   "live",
                   "website_sale",
                   "episode",
-                  "show"
+                  "show",
+                  "audio"
                 ]
               },
               {

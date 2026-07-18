@@ -158,6 +158,12 @@
   --duration-fast: 150ms;
   --duration-normal: 250ms;
 
+  /* The one icon that cannot be a component: the sidebar's "Overview" entry is
+     a plain link, so its glyph is a CSS mask. Same path as `home` in
+     src/components/Icon/icons.ts. Stroked in black because a mask reads alpha,
+     not colour — the ink comes from `background-color: currentColor`. */
+  --icon-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3Cpolyline points='9 22 9 12 15 12 15 22'/%3E%3C/svg%3E");
+
   color-scheme: light;
 }
 
@@ -216,6 +222,30 @@
 
   /* Code */
   --docusaurus-highlighted-code-line-bg: var(--color-accent-soft);
+}
+
+/* ─── Scalar mapping (the API reference) ──────────────────────────────────────
+   The two Scalar instances are the most technical surface in the portal, and
+   they used to be the one that broke the brand: the palette was re-declared as
+   hex literals inside docusaurus.config.ts, a second place where colour was
+   decided. Those variables now map onto the same tokens as everything else.
+
+   The doubled class is deliberate. Scalar sets its own defaults ON `.light-mode`,
+   and a value set directly on an element beats one inherited from :root no
+   matter the source order. `.light-mode.light-mode` matches the same element
+   with higher specificity, so our mapping wins without !important and without
+   depending on which stylesheet loads first. */
+.light-mode.light-mode {
+  --scalar-color-accent: var(--color-accent);
+  --scalar-color-1: var(--color-text);
+  --scalar-color-2: var(--color-text-secondary);
+  --scalar-color-3: var(--color-text-tertiary);
+  --scalar-background-1: var(--color-bg-alt);
+  --scalar-background-2: var(--color-bg);
+  --scalar-background-3: var(--color-bg-muted);
+  --scalar-border-color: var(--color-border);
+  --scalar-font: var(--font-sans);
+  --scalar-font-code: var(--font-mono);
 }
 
 /* ─── Eyebrow — the structural label device ───────────────────────────────────
@@ -408,20 +438,19 @@
   font-weight: 600;
   color: var(--color-text);
 }
+/* The "home" glyph from src/components/Icon/icons.ts, as a mask so it inherits
+   currentColor like every other icon. It is a CSS pseudo-element rather than a
+   component because this entry is a plain sidebar link (only categories go
+   through the DocSidebarItem swizzle). If the registry's `home` path changes,
+   change it here too. */
 .sidebar-overview > .menu__link::before {
-  content: '🏠';
+  content: '';
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 30px;
   height: 30px;
-  border-radius: 9px;
-  font-size: 0.95rem;
-  background: var(--color-bg-elevated);
-}
-[data-theme='dark'] .sidebar-overview > .menu__link::before {
-  background: rgba(255, 255, 255, 0.06);
+  background-color: currentColor;
+  -webkit-mask: var(--icon-home) center / 18px 18px no-repeat;
+  mask: var(--icon-home) center / 18px 18px no-repeat;
 }
 
 /* Audience section label (Products (per tenant) / SaaS & API). */
@@ -518,7 +547,7 @@
 pre {
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-lg) !important;
-  background: var(--color-bg-alt) !important;
+  background: var(--color-bg-muted) !important;
 }
 
 [data-theme='dark'] pre {
@@ -626,28 +655,31 @@ blockquote {
   border-width: 1px;
 }
 
+/* Every admonition colour derives from a status token. The foregrounds were
+   hardcoded hex from the old palette; each is now verified AA against BOTH its
+   own tint and the three general surfaces. */
 .alert--info {
   --ifm-alert-background-color: var(--color-accent-soft);
   --ifm-alert-border-color: var(--color-accent-border);
-  --ifm-alert-foreground-color: #1e40af;
+  --ifm-alert-foreground-color: var(--color-accent-hover);
 }
 
 .alert--success {
   --ifm-alert-background-color: var(--color-success-bg);
-  --ifm-alert-border-color: #bbf7d0;
-  --ifm-alert-foreground-color: #166534;
+  --ifm-alert-border-color: var(--color-success);
+  --ifm-alert-foreground-color: var(--color-success);
 }
 
 .alert--warning {
   --ifm-alert-background-color: var(--color-warning-bg);
-  --ifm-alert-border-color: #fde68a;
-  --ifm-alert-foreground-color: #92400e;
+  --ifm-alert-border-color: var(--color-warning);
+  --ifm-alert-foreground-color: var(--color-warning);
 }
 
 .alert--danger {
   --ifm-alert-background-color: var(--color-danger-bg);
-  --ifm-alert-border-color: #fecaca;
-  --ifm-alert-foreground-color: #991b1b;
+  --ifm-alert-border-color: var(--color-danger);
+  --ifm-alert-foreground-color: var(--color-danger);
 }
 
 [data-theme='dark'] .alert--info {
@@ -796,15 +828,21 @@ blockquote {
 .button--primary {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  transition: background-color var(--duration-normal) var(--ease-out-expo), transform var(--duration-fast) ease,
-    box-shadow var(--duration-normal) var(--ease-out-expo);
 }
 
+/* No lift and no coloured glow: the shadow was built from the OLD accent as an
+   rgba triplet, so it survived every hex-based search while still painting the
+   retired blue. The colour change alone reports the hover. */
 .button--primary:hover {
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button--primary {
+    transition: background-color var(--duration-normal) var(--ease-out-expo),
+      border-color var(--duration-normal) var(--ease-out-expo);
+  }
 }
 
 [data-theme='dark'] .button--primary:hover {

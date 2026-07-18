@@ -6,21 +6,12 @@ import type * as Preset from '@docusaurus/preset-classic';
 // One Scalar instance per SaaS API. Specs are served from static/openapi/<id>.json
 // (downloaded at build time by scripts/fetch-openapi.mjs, committed as cache).
 // Each instance MUST have a unique `id`.
-const SCALAR_LIGHT_CSS = `
-  .light-mode {
-    --scalar-color-accent: #2563eb;
-    --scalar-color-1: #0f172a;
-    --scalar-color-2: #475569;
-    --scalar-color-3: #64748b;
-    --scalar-background-1: #ffffff;
-    --scalar-background-2: #f8fafc;
-    --scalar-background-3: #f1f5f9;
-    --scalar-border-color: #e2e8f0;
-    --scalar-font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --scalar-font-code: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
-  }
-`;
-
+//
+// Scalar's theme is NOT configured here. It used to re-declare the whole
+// palette as hex literals, which made this file a second place where colour
+// was decided and guaranteed drift from the stylesheet. The `--scalar-*`
+// variables now live in src/css/custom.css, mapped onto the same tokens as
+// everything else.
 const scalarPlugin = (id: string, label: string, route: string, specPath: string) => [
   '@scalar/docusaurus',
   {
@@ -34,7 +25,6 @@ const scalarPlugin = (id: string, label: string, route: string, specPath: string
       darkMode: false,
       forceDarkModeState: 'light' as const,
       hideDarkModeToggle: true,
-      customCss: SCALAR_LIGHT_CSS,
     },
   },
 ];

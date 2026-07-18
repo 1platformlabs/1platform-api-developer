@@ -238,13 +238,22 @@ copyright the swizzle renders itself), so none of them could ever match.
 Babel and does **not** check types, so a type error in a swizzle would otherwise
 compile green and deploy.
 
-`scripts/check-tells.sh` guards the design system: emoji as icons, palette hex
-outside the token layer (including rgba triplets), `var(--token,#fallback)`,
-`transition:all`, decorative gradients, pastel tiles, backdrop-filter, hover
-lifts, fonts actually embedded and preloaded, and provider names outside the
-permitted paths. Every category has a matching entry in
-`scripts/tells-fixtures/` proving it fails when the tell is present — a guard
-nobody watched fail is not a guard.
+`scripts/check-tells.sh` guards the design system across 12 categories: emoji and
+entity glyphs as icons, palette hex outside the token layer, the retired palette
+as rgba triplets, `--ifm-*`/`--scalar-*` given literal values,
+`var(--token,#fallback)`, unreachable dark CSS, `transition:all` /
+backdrop-filter / hover lifts, decorative gradients, pastel tiles, fonts
+actually embedded and preloaded, third-party font requests, and provider names
+in the chrome.
+
+`scripts/check-tells-self-test.sh` (`pnpm check:tells:self-test`, and a required
+CI step) injects each tell into a throwaway copy of the tree and requires the
+guard to fail **on that specific category** — plus a control asserting that a
+comment merely naming a retired pattern is NOT a finding. A guard nobody has
+watched fail is not a guard: writing it this way immediately exposed that the
+emoji scan was blind to every real emoji (perl was reading UTF-8 as bytes) and
+that the entity pattern could not match the six-digit example in its own
+comment. Both were inherited from the website's version of this script.
 
 ## CI/CD Pipeline (`.github/workflows/prod.yml`)
 

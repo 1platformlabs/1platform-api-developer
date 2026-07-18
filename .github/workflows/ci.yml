@@ -1,0 +1,77 @@
+name: CI — Pull Request
+
+# Validation only. This is deliberately NOT part of prod.yml: that workflow is
+# the deployment pipeline, and giving it a `pull_request` trigger would drag the
+# PROD environment and its credentials into every pull request.
+#
+# Until this file existed, nothing at all ran before a merge — a broken build, a
+# broken internal link, a type error or a provider leak was only discovered
+# after it had already deployed, because prod.yml runs on push to main and this
+# repo has no paths-ignore.
+on:
+  pull_request:
+    branches: [main]
+
+# No job needs to write anything. Read-only by default, narrowed per job.
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Build, types and design system
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        # Version comes from `packageManager` in package.json, so CI and a
+        # developer machine resolve the same pnpm rather than drifting.
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+
+      # Types are checked separately because `docusaurus build` transpiles TSX
+      # with Babel and never type-checks it. A type error in the 347-line
+      # sidebar swizzle compiled green and deployed.
+      - name: Typecheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm typecheck
+
+      # Proves the guard still fails on each tell BEFORE trusting it to pass.
+      # A guard is only evidence if you have watched it fail.
+      - name: Design-system guard — self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:tells:self-test
+
+      - name: Design-system guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:tells
+
+      # Includes the provider-leak compliance gate and onBrokenLinks:'throw'.
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm build

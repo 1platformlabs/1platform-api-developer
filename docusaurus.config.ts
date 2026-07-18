@@ -53,6 +53,34 @@ const config: Config = {
 
   onBrokenLinks: 'throw',
 
+  // Preload the two faces that render above the fold on every page: the display
+  // face that draws the h1 and the text face that draws the body. The other
+  // four are discovered from the stylesheet as usual. `crossorigin` is required
+  // even same-origin — a font fetch is always CORS-mode, and without it the
+  // browser downloads the file twice.
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preload',
+        href: '/fonts/space-grotesk-latin-700-normal.woff2',
+        as: 'font',
+        type: 'font/woff2',
+        crossorigin: 'anonymous',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preload',
+        href: '/fonts/inter-latin-400-normal.woff2',
+        as: 'font',
+        type: 'font/woff2',
+        crossorigin: 'anonymous',
+      },
+    },
+  ],
+
   // Spanish-only for now: the source content is the canonical Spanish version
   // (audited and improved here). English will be re-introduced later as a
   // translated, non-default locale. Single locale ⇒ no locale switcher.

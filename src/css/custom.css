@@ -1,161 +1,233 @@
 /**
- * 1Platform Developer Docs — Light Theme (default)
- * Aligned with the shared 1Platform Design System
- * (see 1platform-design-system/project/colors_and_type.css and
- *  ui_kits/api-developer/kit.css).
+ * 1Platform Developer Docs — theme.
  *
- * Light-first for technical documentation clarity. Dark mode
- * available via manual toggle (respectPrefersColorScheme: false).
+ * The portal shares one design system with the marketing site
+ * (1platform-website). Colour, type and spacing decisions are made ONCE, in the
+ * token layer below, and everything else — Infima's chrome, Scalar's API
+ * reference, the swizzled components — consumes those tokens. If you need a
+ * colour, add or reference a token; never write a hex outside :root.
+ *
+ * Light-only. The colour-mode switch is disabled in docusaurus.config.ts
+ * (`disableSwitch: true`, `respectPrefersColorScheme: false`), so there is no
+ * dark theme and no unreachable dark CSS. Reintroducing dark mode means adding
+ * a second token set here, not resurrecting the old palette.
  */
 
-/* ─── Font Imports ─────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* ─── Typefaces — self-hosted (SIL OFL, see static/fonts/LICENSE-*.txt) ───────
+   Display: Space Grotesk · Text: Inter · Data/labels: JetBrains Mono
+   The same six latin-subset faces the marketing site ships, so the letterforms
+   are identical across the two domains rather than "whatever the CDN serves". */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/space-grotesk-latin-500-normal.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
 
-/* ─── Light Palette (default) ──────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/space-grotesk-latin-700-normal.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-latin-500-normal.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-latin-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── Design tokens — "ink & signal" ──────────────────────────────────────────
+   Ported verbatim from 1platform-website/src/styles/global.css. One accent
+   (cobalt). One signal (amber), reserved for graphics — never text. Everything
+   else is ink on paper. Text tokens are verified against WCAG AA on their WORST
+   surface (--paper / --surface / --recessed), not just the one they happen to
+   sit on today. */
 :root {
-  /* Primary — Blue scale (design-system accent: #2563eb) */
-  --ifm-color-primary: #2563eb;
-  --ifm-color-primary-dark: #1d4ed8;
-  --ifm-color-primary-darker: #1e40af;
-  --ifm-color-primary-darkest: #1e3a8a;
-  --ifm-color-primary-light: #3b82f6;
-  --ifm-color-primary-lighter: #60a5fa;
-  --ifm-color-primary-lightest: #93c5fd;
+  /* Primitives */
+  --ink:         #14161B;
+  --paper:       #F6F5F2;
+  --surface:     #FFFFFF;
+  --recessed:    #EFEEEA;
+  --cobalt:      #1F4FE0;
+  --cobalt-deep: #1A44C4;
+  --cobalt-wash: #ECF0FD;
+  /* Reserved for graphics. Never text — 1.87:1 on paper. */
+  --signal:      #F5A524;
+  --muted:       #5B5F6B;
+  /* Checked against every surface it can land on, not just --paper: the
+     earlier #696D79 cleared paper (4.74) and surface (5.17) but fell to 4.45
+     on --recessed, which is where code-block headers sit. */
+  --subtle:      #656974;
+  --hairline:        rgba(20, 22, 27, 0.10);
+  --hairline-strong: rgba(20, 22, 27, 0.16);
+
+  /* Semantic surfaces */
+  --color-bg:          var(--paper);
+  --color-bg-alt:      var(--surface);
+  --color-bg-elevated: var(--surface);
+  --color-surface:     var(--surface);
+  --color-bg-muted:    var(--recessed);
+
+  /* Semantic borders */
+  --color-border:        var(--hairline);
+  --color-border-hover:  var(--hairline-strong);
+  --color-border-strong: var(--hairline-strong);
+
+  /* Semantic foreground */
+  --color-text:           var(--ink);
+  --color-text-secondary: var(--muted);
+  --color-text-tertiary:  var(--subtle);
+  --color-text-inverse:   var(--surface);
+
+  /* Accent */
+  --color-accent:       var(--cobalt);
+  --color-accent-hover: var(--cobalt-deep);
+  --color-accent-soft:  var(--cobalt-wash);
+  --color-accent-glow:  rgba(31, 79, 224, 0.07);
+  --color-accent-ring:  rgba(31, 79, 224, 0.28);
+  /* Docs-only: the site has no accent-tinted border because it has no
+     admonitions or inline-code chips. Derived from cobalt, not a new hue. */
+  --color-accent-border: rgba(31, 79, 224, 0.22);
+
+  /* Functional status only — never decoration */
+  --color-success:    #0F7B4F;
+  --color-success-bg: #E9F6EF;
+  --color-danger:     #B4291F;
+  --color-danger-bg:  #FBEDEC;
+  --color-warning:    #8A5A08;
+  --color-warning-bg: #FBF3E4;
+
+  /* Shadows — restrained, neutral */
+  --shadow-sm:         0 1px 2px rgba(20, 22, 27, 0.04);
+  --shadow-md:         0 4px 12px rgba(20, 22, 27, 0.05), 0 1px 2px rgba(20, 22, 27, 0.04);
+  --shadow-lg:         0 12px 32px rgba(20, 22, 27, 0.07), 0 2px 6px rgba(20, 22, 27, 0.04);
+  --shadow-card-hover: 0 6px 20px rgba(20, 22, 27, 0.06);
+  --shadow-glow-ring:  0 0 0 3px var(--color-accent-ring);
 
   /* Typography */
-  --ifm-font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, sans-serif;
-  --ifm-font-family-monospace: 'JetBrains Mono', 'Fira Code', 'SF Mono',
-    Consolas, monospace;
-  --ifm-heading-font-weight: 600;
-  --ifm-code-font-size: 95%;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans:    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
-  /* Backgrounds */
-  --ifm-background-color: #ffffff;
-  --ifm-background-surface-color: #f8fafc;
-  --ifm-navbar-background-color: rgba(255, 255, 255, 0.92);
-  --ifm-footer-background-color: #f8fafc;
+  /* Layout */
+  --header-height: 64px;
+  --border-radius:      6px;
+  --border-radius-lg:  10px;
+  --border-radius-xl:  14px;
+  --border-radius-pill: 9999px;
 
-  /* Text */
-  --ifm-font-color-base: #1e293b;
-  --ifm-font-color-secondary: #475569;
-  --ifm-heading-color: #0f172a;
-
-  /* Borders */
-  --ifm-toc-border-color: #e2e8f0;
-  --ifm-table-border-color: #e2e8f0;
-  --ifm-hr-border-color: #e2e8f0;
-
-  /* Cards & surfaces */
-  --ifm-card-background-color: #ffffff;
-  --ifm-table-stripe-background: #f8fafc;
-
-  /* Code */
-  --docusaurus-highlighted-code-line-bg: rgba(37, 99, 235, 0.08);
-
-  /* Custom tokens — mirror of kit.css --dev-* tokens */
-  --1p-bg:           #ffffff;
-  --1p-bg-alt:       #f8fafc;
-  --1p-bg-elevated:  #f1f5f9;
-  --1p-surface:      #ffffff;
-  --1p-bg-muted:     #f4f4f5;
-
-  --1p-border:        #e2e8f0;
-  --1p-border-hover:  #cbd5e1;
-  --1p-border-strong: #94a3b8;
-
-  --1p-text:           #0f172a;
-  --1p-text-secondary: #475569;
-  --1p-text-tertiary:  #64748b;
-  --1p-text-muted:     #94a3b8;
-
-  --1p-accent:       #2563eb;
-  --1p-accent-hover: #1d4ed8;
-  --1p-accent-soft:  #eff6ff;
-  --1p-accent-ring:  rgba(37, 99, 235, 0.24);
-  --1p-accent-glow:  rgba(37, 99, 235, 0.08);
-  --1p-accent-border: #bfdbfe;
-
-  --1p-purple: #7c3aed;
-  --1p-cyan:   #0891b2;
-  --1p-green:  #059669;
-  --1p-red:    #dc2626;
-  --1p-amber:  #d97706;
-
-  --1p-success-bg: #f0fdf4;
-  --1p-warning-bg: #fffbeb;
-  --1p-danger-bg:  #fef2f2;
-
-  --1p-radius:     8px;
-  --1p-radius-lg:  12px;
-  --1p-radius-pill: 9999px;
-
-  --1p-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --1p-dur-fast: 150ms;
-  --1p-dur: 250ms;
-
-  --1p-shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.04);
-  --1p-shadow-md:    0 4px 12px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --1p-shadow-card:  0 8px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  /* Animation */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
 
   color-scheme: light;
 }
 
-/* ─── Dark Mode (manual toggle only) ───────────────────────────────────────── */
-[data-theme='dark'] {
-  --ifm-color-primary: #3b82f6;
-  --ifm-color-primary-dark: #2563eb;
-  --ifm-color-primary-darker: #1d4ed8;
-  --ifm-color-primary-darkest: #1e40af;
-  --ifm-color-primary-light: #60a5fa;
-  --ifm-color-primary-lighter: #93c5fd;
-  --ifm-color-primary-lightest: #bfdbfe;
+/* ─── Infima mapping ──────────────────────────────────────────────────────────
+   Docusaurus paints its chrome with --ifm-* variables. We MAP them onto the
+   tokens above rather than replacing them: an upgrade that introduces a new
+   --ifm-* keeps working, and there is still exactly one place where a colour is
+   decided. Never give an --ifm-* a hex literal — the tells guard rejects it. */
+:root {
+  /* Primary. The system has ONE accent, so the light/dark shade ramp collapses
+     onto cobalt and its single deeper step instead of inventing five blues. */
+  --ifm-color-primary:         var(--color-accent);
+  --ifm-color-primary-dark:    var(--color-accent-hover);
+  --ifm-color-primary-darker:  var(--color-accent-hover);
+  --ifm-color-primary-darkest: var(--color-accent-hover);
+  --ifm-color-primary-light:   var(--color-accent);
+  --ifm-color-primary-lighter: var(--color-accent);
+  --ifm-color-primary-lightest: var(--color-accent);
 
-  --ifm-background-color: #0a0a0a;
-  --ifm-background-surface-color: #111111;
-  --ifm-navbar-background-color: rgba(10, 10, 10, 0.9);
-  --ifm-footer-background-color: #0a0a0a;
-  --ifm-font-color-base: #ededed;
-  --ifm-font-color-secondary: #a1a1a1;
-  --ifm-heading-color: #ededed;
-  --ifm-toc-border-color: rgba(255, 255, 255, 0.06);
-  --ifm-table-border-color: rgba(255, 255, 255, 0.06);
-  --ifm-hr-border-color: rgba(255, 255, 255, 0.06);
-  --ifm-card-background-color: #111111;
-  --ifm-table-stripe-background: rgba(255, 255, 255, 0.02);
-  --docusaurus-highlighted-code-line-bg: rgba(59, 130, 246, 0.15);
+  /* Typography */
+  --ifm-font-family-base: var(--font-sans);
+  --ifm-font-family-monospace: var(--font-mono);
+  --ifm-heading-font-family: var(--font-display);
+  --ifm-heading-font-weight: 700;
+  --ifm-code-font-size: 95%;
 
-  --1p-bg:          #0a0a0a;
-  --1p-bg-alt:      #111111;
-  --1p-bg-elevated: #191919;
-  --1p-surface:     #1a1a1a;
-  --1p-bg-muted:    #191919;
+  /* Surfaces */
+  --ifm-background-color: var(--color-bg);
+  --ifm-background-surface-color: var(--color-bg-alt);
+  --ifm-navbar-background-color: var(--color-bg);
+  --ifm-footer-background-color: var(--color-bg);
+  --ifm-card-background-color: var(--color-bg-alt);
+  --ifm-table-stripe-background: var(--color-bg-muted);
 
-  --1p-border:        rgba(255, 255, 255, 0.06);
-  --1p-border-hover:  rgba(255, 255, 255, 0.12);
-  --1p-border-strong: rgba(255, 255, 255, 0.18);
+  /* Text */
+  --ifm-font-color-base: var(--color-text);
+  --ifm-font-color-secondary: var(--color-text-secondary);
+  --ifm-heading-color: var(--color-text);
+  --ifm-link-color: var(--color-accent);
+  --ifm-link-hover-color: var(--color-accent-hover);
 
-  --1p-text:           #ededed;
-  --1p-text-secondary: #a1a1a1;
-  --1p-text-tertiary:  #666666;
-  --1p-text-muted:     #555555;
+  /* Emphasis ramp — consumed by swizzled components and Infima internals. */
+  --ifm-color-emphasis-200: var(--color-border);
+  --ifm-color-emphasis-300: var(--color-border-hover);
+  --ifm-color-emphasis-600: var(--color-text-tertiary);
+  --ifm-color-emphasis-700: var(--color-text-secondary);
 
-  --1p-accent:       #3b82f6;
-  --1p-accent-hover: #60a5fa;
-  --1p-accent-soft:  rgba(59, 130, 246, 0.12);
-  --1p-accent-ring:  rgba(59, 130, 246, 0.24);
-  --1p-accent-glow:  rgba(59, 130, 246, 0.15);
-  --1p-accent-border: rgba(59, 130, 246, 0.28);
+  /* Borders */
+  --ifm-toc-border-color: var(--color-border);
+  --ifm-table-border-color: var(--color-border);
+  --ifm-hr-border-color: var(--color-border);
 
-  color-scheme: dark;
+  /* Geometry */
+  --ifm-global-radius: var(--border-radius);
+  --ifm-navbar-height: var(--header-height);
+
+  /* Code */
+  --docusaurus-highlighted-code-line-bg: var(--color-accent-soft);
+}
+
+/* ─── Eyebrow — the structural label device ───────────────────────────────────
+   Mono, tracked out, naming a section. Same voice as the marketing site. */
+.eyebrow {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
 }
 
 /* ─── Navbar ───────────────────────────────────────────────────────────────── */
 .navbar {
-  border-bottom: 1px solid var(--1p-border);
+  border-bottom: 1px solid var(--color-border);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
-  box-shadow: var(--1p-shadow-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 [data-theme='dark'] .navbar {
@@ -212,22 +284,22 @@
 .navbar__title {
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: var(--1p-text);
+  color: var(--color-text);
 }
 
 .navbar__link {
   font-weight: 500;
   font-size: 0.9rem;
-  color: var(--1p-text-secondary);
-  transition: color var(--1p-dur) var(--1p-ease);
+  color: var(--color-text-secondary);
+  transition: color var(--duration-normal) var(--ease-out-expo);
 }
 
 .navbar__link:hover {
-  color: var(--1p-accent);
+  color: var(--color-accent);
 }
 
 .navbar__link--active {
-  color: var(--1p-accent);
+  color: var(--color-accent);
   font-weight: 600;
 }
 
@@ -241,15 +313,15 @@
   font-size: 0.8rem;
   font-weight: 500;
   color: #ffffff !important;
-  background: var(--1p-accent);
-  border-radius: var(--1p-radius);
+  background: var(--color-accent);
+  border-radius: var(--border-radius);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  transition: background-color var(--1p-dur) var(--1p-ease),
-    transform var(--1p-dur-fast) ease, box-shadow var(--1p-dur) var(--1p-ease);
+  transition: background-color var(--duration-normal) var(--ease-out-expo),
+    transform var(--duration-fast) ease, box-shadow var(--duration-normal) var(--ease-out-expo);
 }
 
 .navbar__cta:hover {
-  background: var(--1p-accent-hover);
+  background: var(--color-accent-hover);
   color: #ffffff !important;
   text-decoration: none;
   transform: translateY(-1px);
@@ -264,34 +336,34 @@
 .menu__link {
   font-size: 0.875rem;
   font-weight: 500;
-  border-radius: var(--1p-radius);
-  color: var(--1p-text-secondary);
-  transition: background-color var(--1p-dur) var(--1p-ease), color var(--1p-dur) var(--1p-ease);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  transition: background-color var(--duration-normal) var(--ease-out-expo), color var(--duration-normal) var(--ease-out-expo);
 }
 
 .menu__link:hover:not(.menu__link--active) {
-  background-color: var(--1p-accent-soft);
-  color: var(--1p-accent-hover);
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent-hover);
 }
 
 .menu__link--active {
-  background-color: var(--1p-accent-soft);
-  color: var(--1p-accent) !important;
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent) !important;
   font-weight: 600;
 }
 
 .menu__list-item-collapsible:hover {
-  background-color: var(--1p-accent-soft);
+  background-color: var(--color-accent-soft);
 }
 
 [data-theme='dark'] .menu__link:hover:not(.menu__link--active) {
   background-color: rgba(59, 130, 246, 0.08);
-  color: var(--1p-accent-hover);
+  color: var(--color-accent-hover);
 }
 
 [data-theme='dark'] .menu__link--active {
   background-color: rgba(59, 130, 246, 0.12);
-  color: var(--1p-accent) !important;
+  color: var(--color-accent) !important;
 }
 
 [data-theme='dark'] .menu__list-item-collapsible:hover {
@@ -313,7 +385,7 @@
   align-items: center;
   gap: 0.6rem;
   font-weight: 600;
-  color: var(--1p-text);
+  color: var(--color-text);
 }
 .sidebar-overview > .menu__link::before {
   content: '🏠';
@@ -325,7 +397,7 @@
   height: 30px;
   border-radius: 9px;
   font-size: 0.95rem;
-  background: var(--1p-bg-elevated);
+  background: var(--color-bg-elevated);
 }
 [data-theme='dark'] .sidebar-overview > .menu__link::before {
   background: rgba(255, 255, 255, 0.06);
@@ -347,7 +419,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--1p-text-muted) !important;
+  color: var(--color-text-tertiary) !important;
   background: transparent !important;
   padding: 0.25rem 0.5rem;
   pointer-events: none;
@@ -382,35 +454,55 @@
   font-size: 0.825rem;
 }
 
-/* ─── Headings ─────────────────────────────────────────────────────────────── */
+/* ─── Headings ─────────────────────────────────────────────────────────────────
+   The display face carries the headings; the text face carries the reading.
+   Metrics match 1platform-website so a heading is the same shape on both
+   domains. */
 .markdown h1,
 .markdown h2,
 .markdown h3,
-.markdown h4 {
-  letter-spacing: -0.02em;
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-family: var(--font-display);
+  line-height: 1.12;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+  color: var(--color-text);
 }
 
 .markdown h1 {
   font-size: 2.25rem;
-  font-weight: 700;
-  color: var(--1p-text);
+  letter-spacing: -0.032em;
 }
 
 .markdown h2 {
-  border-bottom: 1px solid var(--1p-border);
+  letter-spacing: -0.026em;
+  border-bottom: 1px solid var(--color-border);
   padding-bottom: 0.5rem;
+}
+
+.markdown h3 {
+  font-weight: 500;
+  letter-spacing: -0.014em;
+}
+
+.markdown h4 {
+  font-weight: 500;
+  letter-spacing: -0.012em;
 }
 
 /* ─── Code blocks ──────────────────────────────────────────────────────────── */
 pre {
-  border: 1px solid var(--1p-border);
-  border-radius: var(--1p-radius-lg) !important;
-  background: var(--1p-bg-alt) !important;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg) !important;
+  background: var(--color-bg-alt) !important;
 }
 
 [data-theme='dark'] pre {
-  background: var(--1p-bg-alt) !important;
-  border-color: var(--1p-border);
+  background: var(--color-bg-alt) !important;
+  border-color: var(--color-border);
 }
 
 code {
@@ -419,9 +511,9 @@ code {
 }
 
 :not(pre) > code {
-  background: var(--1p-accent-soft);
-  color: var(--1p-accent-hover);
-  border: 1px solid var(--1p-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-hover);
+  border: 1px solid var(--color-accent-border);
   border-radius: 6px;
   padding: 0.15rem 0.4rem;
 }
@@ -436,30 +528,30 @@ code {
 table {
   border-collapse: separate;
   border-spacing: 0;
-  border: 1px solid var(--1p-border);
-  border-radius: var(--1p-radius-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
   overflow: hidden;
 }
 
 table thead tr {
-  background: var(--1p-bg-alt);
+  background: var(--color-bg-alt);
 }
 
 table thead th {
-  border-bottom: 1px solid var(--1p-border);
+  border-bottom: 1px solid var(--color-border);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
-  color: var(--1p-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 table tbody tr {
-  transition: background-color var(--1p-dur-fast) ease;
+  transition: background-color var(--duration-fast) ease;
 }
 
 table tbody tr:hover {
-  background: var(--1p-accent-soft);
+  background: var(--color-accent-soft);
 }
 
 [data-theme='dark'] table tbody tr:hover {
@@ -468,18 +560,18 @@ table tbody tr:hover {
 
 table td,
 table th {
-  border-color: var(--1p-border);
+  border-color: var(--color-border);
 }
 
 /* ─── Links ────────────────────────────────────────────────────────────────── */
 .markdown a {
-  color: var(--1p-accent);
+  color: var(--color-accent);
   text-decoration: none;
-  transition: color var(--1p-dur) var(--1p-ease);
+  transition: color var(--duration-normal) var(--ease-out-expo);
 }
 
 .markdown a:hover {
-  color: var(--1p-accent-hover);
+  color: var(--color-accent-hover);
   text-decoration: underline;
 }
 
@@ -496,43 +588,43 @@ table th {
 
 /* ─── Blockquotes ──────────────────────────────────────────────────────────── */
 blockquote {
-  border-left: 3px solid var(--1p-accent);
-  background: var(--1p-accent-soft);
-  color: var(--1p-text-secondary);
-  border-radius: 0 var(--1p-radius) var(--1p-radius) 0;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-text-secondary);
+  border-radius: 0 var(--border-radius) var(--border-radius) 0;
 }
 
 [data-theme='dark'] blockquote {
   background: rgba(59, 130, 246, 0.05);
-  color: var(--1p-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 /* ─── Admonitions ──────────────────────────────────────────────────────────── */
 .alert {
-  border-radius: var(--1p-radius-lg);
+  border-radius: var(--border-radius-lg);
   border-width: 1px;
 }
 
 .alert--info {
-  --ifm-alert-background-color: var(--1p-accent-soft);
-  --ifm-alert-border-color: var(--1p-accent-border);
+  --ifm-alert-background-color: var(--color-accent-soft);
+  --ifm-alert-border-color: var(--color-accent-border);
   --ifm-alert-foreground-color: #1e40af;
 }
 
 .alert--success {
-  --ifm-alert-background-color: var(--1p-success-bg);
+  --ifm-alert-background-color: var(--color-success-bg);
   --ifm-alert-border-color: #bbf7d0;
   --ifm-alert-foreground-color: #166534;
 }
 
 .alert--warning {
-  --ifm-alert-background-color: var(--1p-warning-bg);
+  --ifm-alert-background-color: var(--color-warning-bg);
   --ifm-alert-border-color: #fde68a;
   --ifm-alert-foreground-color: #92400e;
 }
 
 .alert--danger {
-  --ifm-alert-background-color: var(--1p-danger-bg);
+  --ifm-alert-background-color: var(--color-danger-bg);
   --ifm-alert-border-color: #fecaca;
   --ifm-alert-foreground-color: #991b1b;
 }
@@ -563,8 +655,8 @@ blockquote {
 
 /* ─── Footer ───────────────────────────────────────────────────────────────── */
 .footer {
-  border-top: 1px solid var(--1p-border);
-  background: var(--1p-bg-alt);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
 }
 
 [data-theme='dark'] .footer {
@@ -578,74 +670,74 @@ blockquote {
 
 .footer__link-item {
   font-size: 0.875rem;
-  transition: color var(--1p-dur) var(--1p-ease);
+  transition: color var(--duration-normal) var(--ease-out-expo);
 }
 
 .footer__link-item:hover {
-  color: var(--1p-accent);
+  color: var(--color-accent);
 }
 
 .footer__copyright {
   font-size: 0.8rem;
-  color: var(--1p-text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 /* ─── Pagination ───────────────────────────────────────────────────────────── */
 .pagination-nav__link {
-  border: 1px solid var(--1p-border);
-  border-radius: var(--1p-radius-lg);
-  background: var(--1p-bg);
-  transition: border-color var(--1p-dur) var(--1p-ease), box-shadow var(--1p-dur) var(--1p-ease);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--color-bg);
+  transition: border-color var(--duration-normal) var(--ease-out-expo), box-shadow var(--duration-normal) var(--ease-out-expo);
 }
 
 .pagination-nav__link:hover {
-  border-color: var(--1p-accent-border);
-  box-shadow: 0 2px 8px var(--1p-accent-glow);
+  border-color: var(--color-accent-border);
+  box-shadow: 0 2px 8px var(--color-accent-glow);
 }
 
 [data-theme='dark'] .pagination-nav__link {
-  background: var(--1p-bg-alt);
+  background: var(--color-bg-alt);
   border-color: rgba(255, 255, 255, 0.06);
 }
 
 [data-theme='dark'] .pagination-nav__link:hover {
   border-color: rgba(59, 130, 246, 0.3);
-  box-shadow: 0 2px 8px var(--1p-accent-glow);
+  box-shadow: 0 2px 8px var(--color-accent-glow);
 }
 
 .pagination-nav__sublabel {
-  color: var(--1p-text-tertiary);
+  color: var(--color-text-tertiary);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .pagination-nav__label {
-  color: var(--1p-accent);
+  color: var(--color-accent);
   font-weight: 600;
 }
 
 /* ─── TOC ──────────────────────────────────────────────────────────────────── */
 .table-of-contents__link {
-  color: var(--1p-text-tertiary);
+  color: var(--color-text-tertiary);
   font-size: 0.8rem;
-  transition: color var(--1p-dur) var(--1p-ease);
+  transition: color var(--duration-normal) var(--ease-out-expo);
 }
 
 .table-of-contents__link:hover,
 .table-of-contents__link--active {
-  color: var(--1p-accent);
+  color: var(--color-accent);
 }
 
 /* ─── Breadcrumbs ──────────────────────────────────────────────────────────── */
 .breadcrumbs__link {
-  color: var(--1p-text-tertiary);
+  color: var(--color-text-tertiary);
   font-size: 0.8rem;
-  transition: color var(--1p-dur) var(--1p-ease);
+  transition: color var(--duration-normal) var(--ease-out-expo);
 }
 
 .breadcrumbs__link:hover {
-  color: var(--1p-accent-hover);
+  color: var(--color-accent-hover);
 }
 
 /* ─── Scrollbar ────────────────────────────────────────────────────────────── */
@@ -659,12 +751,12 @@ blockquote {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--1p-border-hover);
+  background: var(--color-border-hover);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--1p-border-strong);
+  background: var(--color-border-strong);
 }
 
 [data-theme='dark'] ::-webkit-scrollbar-thumb {
@@ -677,15 +769,15 @@ blockquote {
 
 /* ─── Buttons ──────────────────────────────────────────────────────────────── */
 .button--primary {
-  background: var(--1p-accent);
-  border-color: var(--1p-accent);
-  transition: background-color var(--1p-dur) var(--1p-ease), transform var(--1p-dur-fast) ease,
-    box-shadow var(--1p-dur) var(--1p-ease);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  transition: background-color var(--duration-normal) var(--ease-out-expo), transform var(--duration-fast) ease,
+    box-shadow var(--duration-normal) var(--ease-out-expo);
 }
 
 .button--primary:hover {
-  background: var(--1p-accent-hover);
-  border-color: var(--1p-accent-hover);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
@@ -695,22 +787,22 @@ blockquote {
 }
 
 .button--secondary {
-  color: var(--1p-accent);
-  border-color: var(--1p-border-hover);
+  color: var(--color-accent);
+  border-color: var(--color-border-hover);
   background: transparent;
-  transition: border-color var(--1p-dur) var(--1p-ease), color var(--1p-dur) var(--1p-ease),
-    box-shadow var(--1p-dur) var(--1p-ease);
+  transition: border-color var(--duration-normal) var(--ease-out-expo), color var(--duration-normal) var(--ease-out-expo),
+    box-shadow var(--duration-normal) var(--ease-out-expo);
 }
 
 .button--secondary:hover {
-  border-color: var(--1p-accent);
-  color: var(--1p-accent-hover);
-  box-shadow: 0 2px 8px var(--1p-accent-glow);
+  border-color: var(--color-accent);
+  color: var(--color-accent-hover);
+  box-shadow: 0 2px 8px var(--color-accent-glow);
 }
 
 /* ─── Sidebar border ──────────────────────────────────────────────────────── */
 .theme-doc-sidebar-container {
-  border-right: 1px solid var(--1p-border) !important;
+  border-right: 1px solid var(--color-border) !important;
 }
 
 /* ─── Two-audience IA: top-level group labels read as section headers ──────── */
@@ -722,12 +814,12 @@ blockquote {
   letter-spacing: 0.06em;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--1p-text-tertiary, #94a3b8);
+  color: var(--color-text-tertiary);
 }
 
 /* Product categories (level 2) highlight the accent when active. */
 .theme-doc-sidebar-item-category-level-2
   > .menu__list-item-collapsible
   > .menu__link--active {
-  color: var(--1p-accent);
+  color: var(--color-accent);
 }

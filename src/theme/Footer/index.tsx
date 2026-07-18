@@ -62,7 +62,7 @@ export default function Footer(): ReactNode {
     <footer className={styles.footer}>
       <div className={styles.container}>
         <div className={styles.cta}>
-          <h2 className={styles.ctaTitle}>Deja de hacer malabares con 6 servicios distintos</h2>
+          <h2 className={styles.ctaTitle}>Deja de hacer malabares con herramientas separadas</h2>
           <p className={styles.ctaLead}>
             Empieza con una sola plataforma. Vende en línea, emite facturas y publica contenido, todo desde un panel, una API y una sola factura.
           </p>

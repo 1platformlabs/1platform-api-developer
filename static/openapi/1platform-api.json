@@ -149,6 +149,100 @@
         }
       }
     },
+    "/api/v1/posts": {
+      "get": {
+        "tags": [
+          "Keywords Content & Indexing"
+        ],
+        "summary": "List Generated Articles",
+        "description": "List the authenticated user's generated articles — i.e. completed content-generation jobs — newest first. Powers the dashboard 'articles published' KPI, which buckets `created_at` by month.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n\nItems are capped at the 1000 most recent; `total` is the exact count.\n\n**cURL example:**\n```bash\ncurl https://api.1platform.pro/api/v1/posts \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
+        "operationId": "listPosts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Articles retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ArticleListResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "total": 2,
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011",
+                        "created_at": "2026-01-15T10:30:00Z"
+                      },
+                      {
+                        "id": "507f1f77bcf86cd799439012",
+                        "created_at": "2025-12-02T08:15:00Z"
+                      }
+                    ]
+                  },
+                  "msg": "Articles retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed — invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/posts/keywords/": {
       "post": {
         "tags": [
@@ -447,18 +541,8 @@
               }
             }
           },
-          "502": {
-            "description": "Search provider unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "504": {
-            "description": "Keyword extraction timed out",
+          "503": {
+            "description": "Search provider unavailable or keyword extraction timed out",
             "content": {
               "application/json": {
                 "schema": {
@@ -2197,7 +2281,7 @@
               }
             }
           },
-          "502": {
+          "503": {
             "description": "Link-building service unavailable",
             "content": {
               "application/json": {
@@ -2354,7 +2438,7 @@
               }
             }
           },
-          "502": {
+          "503": {
             "description": "Google Search Console API error",
             "content": {
               "application/json": {
@@ -3835,7 +3919,7 @@
               }
             }
           },
-          "502": {
+          "503": {
             "description": "Payment provider temporarily unavailable",
             "content": {
               "application/json": {
@@ -5036,7 +5120,7 @@
           "Businesses & Branches"
         ],
         "summary": "Create Business",
-        "description": "Register a new business entity for invoicing.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The business is used as the issuing party on invoices\n- Business identifiers (tax ID) must be unique\n- Optionally include a `branch` object (`name`, `commerceId`). When provided, the branch and an owner link (UserBranch, role `admin`) are created in the same call so the business is immediately visible in `GET /businesses`. Omitting it creates a standalone (unlinked) business; add a branch later via `POST /businesses/{businessId}/branches`.",
+        "description": "Register a new business entity for invoicing.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- The business is used as the issuing party on invoices\n- Business identifiers (tax ID) must be unique\n- A `branch` object with a `name` is required; the branch's commerce id is assigned automatically from the business id (clients do not send `commerceId`). The branch and an owner link (UserBranch, role `admin`) are created together with the business in the same call, so the business is always linked to the caller and immediately visible in `GET /businesses`. A business is never created without a branch.",
         "operationId": "createBusiness",
         "security": [
           {
@@ -5077,8 +5161,7 @@
                 "address": "4a Avenida, Zona 1, Guatemala",
                 "status": "active",
                 "branch": {
-                  "name": "Sucursal Central",
-                  "commerceId": "COM-001"
+                  "name": "Sucursal Central"
                 }
               }
             }
@@ -5376,9 +5459,258 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Businesses & Branches"
+        ],
+        "summary": "Update Business",
+        "description": "Partially update a business (`name`, `address`, `status`).\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Accessible to the business owner or an `app_admin` of the same tenant\n- **Fiscal identity is immutable:** `documentNumber` and `documentType` are not part of this schema. Invoices were already certified against that tax id, so changing it would desynchronise them — sending either field returns `422`\n- Setting `status` to `inactive` deactivates the business; invoices already issued are not altered",
+        "operationId": "updateBusiness",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Business ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Businessid"
+            },
+            "description": "Business ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBusinessRequest"
+              },
+              "example": {
+                "name": "Mi Empresa S.A.",
+                "status": "inactive"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Business updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_BusinessResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "name": "Mi Empresa S.A.",
+                    "documentType": "NIT",
+                    "documentNumber": "12345678-9",
+                    "address": "4a Avenida, Zona 1, Guatemala",
+                    "status": "inactive",
+                    "created_at": "2026-04-30T12:00:00Z",
+                    "updated_at": "2026-05-02T09:15:00Z"
+                  },
+                  "msg": "Business updated successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (e.g. attempt to change the fiscal identity)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/businesses/{businessId}/branches": {
+      "get": {
+        "tags": [
+          "Businesses & Branches"
+        ],
+        "summary": "List Branches",
+        "description": "List every branch of a business, each with its assigned users.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Accessible to the business owner or an `app_admin` of the same tenant",
+        "operationId": "listBranches",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Business ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Businessid"
+            },
+            "description": "Business ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branches retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_BranchResponse__"
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "id": "507f1f77bcf86cd799439013",
+                      "business_id": "507f1f77bcf86cd799439011",
+                      "name": "Sucursal Central",
+                      "commerceId": "COM-001",
+                      "status": "active",
+                      "assigned_users": [
+                        {
+                          "user_id": "507f1f77bcf86cd799439012",
+                          "email": "user@example.com",
+                          "role": "admin",
+                          "assigned_at": "2026-04-30T12:00:00Z"
+                        }
+                      ],
+                      "created_at": "2026-04-30T12:00:00Z",
+                      "updated_at": "2026-04-30T12:00:00Z"
+                    }
+                  ],
+                  "msg": "Branches retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Businesses & Branches"
@@ -5433,8 +5765,7 @@
                 "$ref": "#/components/schemas/CreateBranchRequest"
               },
               "example": {
-                "name": "Sucursal Central",
-                "commerceId": "COM-001"
+                "name": "Sucursal Central"
               }
             }
           }
@@ -5639,6 +5970,349 @@
           },
           "404": {
             "description": "Business or branch not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{businessId}/branches/{branchId}/users": {
+      "post": {
+        "tags": [
+          "Businesses & Branches"
+        ],
+        "summary": "Assign a user to a branch",
+        "description": "Assign a user of the same tenant to a branch.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Requires the `app_admin` role: deciding who can reach a business is an admin capability (`403` otherwise)\n- The role defaults to `viewer`. Assigning a user must not silently mean handing them control of the business\n- **Idempotent:** re-assigning the same user does not duplicate the link\n- A user from another tenant returns `404` (their existence is not disclosed)",
+        "operationId": "assignBranchUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Business ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Businessid"
+            },
+            "description": "Business ID"
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Branch ID",
+              "examples": [
+                "507f1f77bcf86cd799439012"
+              ],
+              "title": "Branchid"
+            },
+            "description": "Branch ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignBranchUserRequest"
+              },
+              "example": {
+                "user_id": "507f1f77bcf86cd799439012",
+                "role": "viewer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User assigned; returns the branch with its assigned users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_BranchResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439013",
+                    "business_id": "507f1f77bcf86cd799439011",
+                    "name": "Sucursal Central",
+                    "commerceId": "COM-001",
+                    "status": "active",
+                    "assigned_users": [
+                      {
+                        "user_id": "507f1f77bcf86cd799439012",
+                        "email": "user@example.com",
+                        "role": "viewer",
+                        "assigned_at": "2026-04-30T12:00:00Z"
+                      }
+                    ],
+                    "created_at": "2026-04-30T12:00:00Z",
+                    "updated_at": "2026-04-30T12:00:00Z"
+                  },
+                  "msg": "User assigned to branch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Branch does not belong to this business",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business, branch or user not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/businesses/{businessId}/branches/{branchId}/users/{userId}": {
+      "delete": {
+        "tags": [
+          "Businesses & Branches"
+        ],
+        "summary": "Remove a user from a branch",
+        "description": "Remove a user's assignment to a branch.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Requires the `app_admin` role (`403` otherwise)\n- Returns `409` when it would leave the business with **no owner**: owners are the `admin`-role assignments counted across ALL of the business's branches, so a business can never be left holding only viewers\n- Returns `404` when the user is not assigned to that branch",
+        "operationId": "unassignBranchUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Business ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Businessid"
+            },
+            "description": "Business ID"
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Branch ID",
+              "examples": [
+                "507f1f77bcf86cd799439012"
+              ],
+              "title": "Branchid"
+            },
+            "description": "Branch ID"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "User ID",
+              "examples": [
+                "507f1f77bcf86cd799439013"
+              ],
+              "title": "Userid"
+            },
+            "description": "User ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User removed; returns the branch with its remaining users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_BranchResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439013",
+                    "business_id": "507f1f77bcf86cd799439011",
+                    "name": "Sucursal Central",
+                    "commerceId": "COM-001",
+                    "status": "active",
+                    "assigned_users": [],
+                    "created_at": "2026-04-30T12:00:00Z",
+                    "updated_at": "2026-04-30T12:00:00Z"
+                  },
+                  "msg": "User removed from branch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Branch does not belong to this business",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business, branch or user not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Would leave the business without an owner",
             "content": {
               "application/json": {
                 "schema": {
@@ -6513,7 +7187,17 @@
             }
           },
           "422": {
-            "description": "FEL provider error",
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -6522,8 +7206,8 @@
               }
             }
           },
-          "429": {
-            "description": "Rate limit exceeded",
+          "503": {
+            "description": "FEL provider failed, refused the request, or timed out",
             "content": {
               "application/json": {
                 "schema": {
@@ -6624,7 +7308,17 @@
             }
           },
           "422": {
-            "description": "FEL provider error",
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -6633,8 +7327,8 @@
               }
             }
           },
-          "429": {
-            "description": "Rate limit exceeded",
+          "503": {
+            "description": "FEL provider failed, refused the request, or timed out",
             "content": {
               "application/json": {
                 "schema": {
@@ -6773,6 +7467,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Person lookup provider unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -6783,7 +7487,7 @@
           "Electronic Invoicing (FEL)"
         ],
         "summary": "List invoices across all businesses for current user",
-        "description": "Flat list of recent invoices issued by any business the authenticated user has access to.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Sorted by `created_at` descending. Capped at 100 items.",
+        "description": "Flat list of recent invoices issued by any business the authenticated user has access to.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Sorted by `created_at` descending. Capped at 100 items.\n- `currency` states what `total` is denominated in — render the amount with it rather than assuming GTQ.\n- `invoiceUrl` is the public FEEL URL of the certified document, or `null` when the invoice has none (not certified yet, or a mock invoice). Use it to enable/disable view & download per row without fetching each invoice's detail.",
         "operationId": "listInvoicesForUser",
         "security": [
           {
@@ -6827,9 +7531,20 @@
                       "branch_id": "507f1f77bcf86cd799439013",
                       "receiver_name": "Empresa Ejemplo S.A.",
                       "total": 1000,
+                      "currency": "GTQ",
                       "status": "issued",
                       "fel_id": "98765",
+                      "invoiceUrl": "https://report.feel.com.gt/ingfacereport/ingfacereport_documento?uuid=A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
                       "created_at": "2026-04-30T12:00:00Z"
+                    },
+                    {
+                      "id": "507f1f77bcf86cd799439021",
+                      "business_id": "507f1f77bcf86cd799439011",
+                      "receiver_name": "Cliente Sin Certificar",
+                      "total": 250.5,
+                      "currency": "USD",
+                      "status": "issued",
+                      "created_at": "2026-04-29T09:15:00Z"
                     }
                   ],
                   "msg": "Invoices retrieved"
@@ -6983,7 +7698,7 @@
         }
       }
     },
-    "/api/v1/logs/": {
+    "/api/v1/logs": {
       "get": {
         "tags": [
           "Activity Logs"
@@ -15911,6 +16626,374 @@
         }
       }
     },
+    "/api/v1/provisioning/tenants": {
+      "post": {
+        "tags": [
+          "Provisioning"
+        ],
+        "summary": "Provision a new Atlas tenant (one click, async)",
+        "description": "Start the asynchronous provisioning of a new Atlas tenant (dashboard + app) for a domain.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (app_admin)\n- **Rate limit:** 5 req/min",
+        "operationId": "startTenantProvisioning",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisioningCreateRequest"
+              },
+              "example": {
+                "domain": "bajaebooks.app",
+                "primary_archetype": "library",
+                "secondary_archetypes": [
+                  "audio"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Provisioning started",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "job_id": "507f1f77bcf86cd799439011",
+                    "status": "pending",
+                    "domain": "bajaebooks.app",
+                    "slug": "bajaebooks",
+                    "primary_archetype": "library",
+                    "secondary_archetypes": [
+                      "audio"
+                    ],
+                    "steps": [
+                      {
+                        "name": "cloudflare",
+                        "status": "pending"
+                      }
+                    ],
+                    "result": {}
+                  },
+                  "msg": "Provisioning started"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin privileges required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid domain or archetypes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provisioning disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Provisioning"
+        ],
+        "summary": "List provisioning jobs for the workspace",
+        "description": "List the Atlas tenant-provisioning jobs that belong to the caller's workspace, most recent first, with simple `skip`/`limit` pagination.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (app_admin)\n- **Rate limit:** 60 req/min\n- **Scope:** results are always filtered to the caller's own workspace (`app_id`); jobs from other tenants are never returned.",
+        "operationId": "listTenantProvisioning",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum number of jobs to return (1–100, default 20).",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum number of jobs to return (1–100, default 20)."
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of jobs to skip from the start of the result set (default 0).",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of jobs to skip from the start of the result set (default 0)."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provisioning jobs",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "jobs": [
+                      {
+                        "job_id": "507f1f77bcf86cd799439011",
+                        "status": "succeeded",
+                        "domain": "bajaebooks.app",
+                        "slug": "bajaebooks",
+                        "primary_archetype": "library",
+                        "secondary_archetypes": [
+                          "audio"
+                        ],
+                        "steps": [
+                          {
+                            "name": "cloudflare",
+                            "status": "succeeded"
+                          }
+                        ],
+                        "result": {
+                          "tenant_slug": "bajaebooks"
+                        }
+                      }
+                    ],
+                    "total": 1,
+                    "limit": 20,
+                    "skip": 0
+                  },
+                  "msg": "OK"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/provisioning/tenants/{job_id}": {
+      "get": {
+        "tags": [
+          "Provisioning"
+        ],
+        "summary": "Get provisioning job status",
+        "description": "Poll the status of a single Atlas tenant-provisioning job, including the per-step progress and, once finished, its result.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (app_admin)\n- **Rate limit:** 60 req/min\n- **Scope:** the job must belong to the caller's workspace (`app_id`); a job id from another tenant returns `404`, never leaking its existence.",
+        "operationId": "getTenantProvisioning",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Provisioning job id",
+              "title": "Job Id"
+            },
+            "description": "Provisioning job id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provisioning job status",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "job_id": "507f1f77bcf86cd799439011",
+                    "status": "running",
+                    "domain": "bajaebooks.app",
+                    "slug": "bajaebooks",
+                    "primary_archetype": "library",
+                    "secondary_archetypes": [
+                      "audio"
+                    ],
+                    "steps": [
+                      {
+                        "name": "cloudflare",
+                        "status": "succeeded"
+                      },
+                      {
+                        "name": "atlas_tenant",
+                        "status": "running"
+                      },
+                      {
+                        "name": "app_build",
+                        "status": "pending"
+                      }
+                    ],
+                    "result": {}
+                  },
+                  "msg": "OK"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/onboarding/": {
       "post": {
         "tags": [
@@ -16624,6 +17707,16 @@
           },
           "400": {
             "description": "Invalid refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token expired — re-authenticate",
             "content": {
               "application/json": {
                 "schema": {
@@ -17701,6 +18794,138 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "Tenant Admin"
+        ],
+        "summary": "Create a user in the tenant (with roles) and send them the access link",
+        "description": "Create a user in the caller's tenant with the given roles and email them the magic link that lets them in.\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 10/hour per caller.\n\n1Platform has no passwords, so 'create a user' means: create the account, grant it the roles, and send the link. Distinct from `POST /users/invite`, which merely re-sends a link and is idempotent — this one is a `409` if the address is already registered.\n\n- `role_ids` must belong to the caller's tenant (`400` otherwise). Omit it and the user lands with the baseline role on first login.\n- An email already registered — **in any tenant** — is a `409` with a deliberately generic message, and NO email is sent.\n- If the email cannot be delivered, the link is invalidated and the call answers `503`: a 2xx would let the caller lift the token from the response and walk in as the new user.",
+        "operationId": "adminCreateUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserCreateRequest"
+              },
+              "example": {
+                "email": "nuevo@acme.example",
+                "role_ids": [
+                  "507f1f77bcf86cd799439012"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created and the access link dispatched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439013",
+                    "email": "nuevo@acme.example",
+                    "role_ids": [
+                      "507f1f77bcf86cd799439012"
+                    ]
+                  },
+                  "msg": "User created"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid email or cross-tenant role ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That email is already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Email dispatch failed; the link was invalidated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/users/{user_id}": {
@@ -18065,6 +19290,97 @@
         }
       }
     },
+    "/api/v1/admin/roles": {
+      "get": {
+        "tags": [
+          "Tenant Admin"
+        ],
+        "summary": "List the roles of the caller's tenant",
+        "description": "The roles that can be granted within the caller's tenant (`app_admin`, `user`).\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 60 req/min.\n\nRoles are tenant-scoped documents; this never returns another tenant's.",
+        "operationId": "adminListRoles",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Roles retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_AdminRoleResponse__"
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "id": "507f1f77bcf86cd799439011",
+                      "name": "app_admin"
+                    },
+                    {
+                      "id": "507f1f77bcf86cd799439012",
+                      "name": "user"
+                    }
+                  ],
+                  "msg": "Roles retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/users/invite": {
       "post": {
         "tags": [
@@ -18234,6 +19550,25 @@
             "description": "Filter by owning user id"
           },
           {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Match name or documentNumber",
+              "title": "Search"
+            },
+            "description": "Match name or documentNumber"
+          },
+          {
             "name": "x-user-token",
             "in": "header",
             "required": false,
@@ -18360,16 +19695,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^(draft|emitted|cancelled)$"
+                  "pattern": "^(issued|cancelled|failed)$"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Filter by FEL invoice status",
+              "description": "Filter by FEL invoice status (issued, cancelled, failed)",
               "title": "Status"
             },
-            "description": "Filter by FEL invoice status"
+            "description": "Filter by FEL invoice status (issued, cancelled, failed)"
           },
           {
             "name": "x-user-token",
@@ -18674,6 +20009,114 @@
           },
           "403": {
             "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/domains/{domain_id}/owner": {
+      "patch": {
+        "tags": [
+          "Tenant Admin"
+        ],
+        "summary": "Reassign a domain to another tenant user",
+        "description": "Move an existing domain to a different user in the SAME tenant. The domain's current owner and the new owner must both belong to the caller's tenant (fail-closed).\n\n**Auth:** tenant `app_admin` role required.",
+        "operationId": "adminReassignDomainOwner",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Domain id (24-char ObjectId)",
+              "title": "Domain Id"
+            },
+            "description": "Domain id (24-char ObjectId)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReassignDomainOwnerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Domain reassigned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AdminDomainItem_"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a tenant admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain or user not in tenant",
             "content": {
               "application/json": {
                 "schema": {
@@ -19523,7 +20966,7 @@
           "Notifications"
         ],
         "summary": "List notifications for the authenticated user",
-        "description": "Lists in-app notifications targeted at the authenticated user (direct + broadcasts). Supports pagination via `skip`/`limit` and an `unread_only` filter.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n\n**Rate limit:** 50 req/min",
+        "description": "Lists in-app notifications targeted at the authenticated user (direct + broadcasts). Supports pagination via `skip`/`limit`, an `unread_only` filter, and a `category` filter (`billing`, `system` or `team`) backing the inbox tabs.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n\n**Rate limit:** 50 req/min",
         "operationId": "listNotifications",
         "security": [
           {
@@ -19542,6 +20985,29 @@
               "title": "Unread Only"
             },
             "description": "Filter to unread only"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "billing",
+                    "system",
+                    "team"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to a single inbox tab: billing, system or team",
+              "title": "Category"
+            },
+            "description": "Filter to a single inbox tab: billing, system or team"
           },
           {
             "name": "skip",
@@ -19602,10 +21068,18 @@
                   "data": [
                     {
                       "id": "507f1f77bcf86cd799439011",
-                      "title": "Invoice emitted",
-                      "body": "Your invoice #00045 has been issued.",
+                      "title": "Invoice issued",
+                      "body": "Your invoice A-00045 for 250.00 GTQ was issued successfully.",
                       "severity": "success",
-                      "link_url": "https://app.1platform.pro/main/invoices/45",
+                      "category": "billing",
+                      "template_key": "invoice_issued",
+                      "params": {
+                        "serie": "A",
+                        "numero": "00045",
+                        "amount": "250.00",
+                        "currency": "GTQ"
+                      },
+                      "link_url": "/main/invoicing",
                       "read_at": "2026-04-30T12:05:00Z",
                       "created_at": "2026-04-30T12:00:00Z"
                     }
@@ -19702,6 +21176,9 @@
                     "title": "Welcome to your dashboard",
                     "body": "Take a quick tour of the new modules.",
                     "severity": "info",
+                    "category": "system",
+                    "template_key": "dashboard_welcome",
+                    "params": {},
                     "link_url": "https://app.1platform.pro/main/dashboard",
                     "read_at": "2026-04-30T12:05:00Z",
                     "created_at": "2026-04-30T12:00:00Z"
@@ -19793,6 +21270,12 @@
                     "title": "Invoice emitted",
                     "body": "Your invoice #00045 has been issued.",
                     "severity": "success",
+                    "category": "billing",
+                    "template_key": "invoice_issued",
+                    "params": {
+                      "serie": "A",
+                      "numero": "00045"
+                    },
                     "link_url": "https://app.1platform.pro/main/invoices/45",
                     "read_at": "2026-04-30T12:05:00Z",
                     "created_at": "2026-04-30T12:00:00Z"
@@ -19808,6 +21291,80 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark every notification as read for the authenticated user",
+        "description": "Marks the authenticated user's whole inbox as read in a single operation, and returns how many notifications it changed. Idempotent — calling it again returns `{\"updated\": 0}` and never moves an existing `read_at` forward.\n\nBroadcasts are intentionally left untouched: a broadcast stores one shared `read_at`, so marking it here would mark it read for every user in the tenant.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n\n**Rate limit:** 20 req/min",
+        "operationId": "markAllNotificationsRead",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "updated": 12
+                  },
+                  "msg": "Notifications marked as read"
                 }
               }
             }
@@ -21912,6 +23469,76 @@
           "name": "Acme Co"
         }
       },
+      "AdminDomainItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Domain document ID"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "Fully qualified domain name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DomainStatus",
+            "description": "Current domain lifecycle status"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At",
+            "description": "Expiration timestamp"
+          },
+          "auto_renew": {
+            "type": "boolean",
+            "title": "Auto Renew",
+            "description": "Whether auto-renewal is enabled"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnerRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Owning user of the domain (Domain.user_id resolved to {user_id, email})."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Record creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Record last update timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "domain",
+          "status",
+          "auto_renew",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AdminDomainItem",
+        "description": "Shape returned by `GET /admin/domains` (tenant-wide listing), with owner.\n\nDeliberately NOT `DomainResponse` and deliberately NOT passed through the\nadmin ``_safe_dump`` serialiser: that helper selects its field allowlist by\nthe document's CLASS name and falls back to ``{id, created_at, updated_at}``\nfor classes it doesn't know — so returning raw ``Domain`` documents would\nanswer 200 with blank rows. Returning an explicit DTO makes the payload the\ncontract. Deliberately omits ``provider``: the domain registrar is an\ninternal implementation detail and must never reach a client."
+      },
       "AdminImpersonateRequest": {
         "properties": {
           "reason": {
@@ -22090,6 +23717,60 @@
           "page_size"
         ],
         "title": "AdminPaginatedItemsResponse"
+      },
+      "AdminRoleResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "app_admin"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "AdminRoleResponse"
+      },
+      "AdminUserCreateRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "title": "Email"
+          },
+          "role_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Role Ids",
+            "description": "Roles to grant, from GET /admin/roles. Must belong to the caller's tenant. Omit for the baseline role."
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "AdminUserCreateRequest",
+        "example": {
+          "email": "newuser@acme.example",
+          "role_ids": [
+            "507f1f77bcf86cd799439012"
+          ]
+        }
       },
       "AdminUserDetail": {
         "properties": {
@@ -23565,6 +25246,17 @@
               }
             ],
             "description": "Domain registrar credentials"
+          },
+          "cloudflare": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CloudflareKeys"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cloudflare provisioning token (per-app override)"
           }
         },
         "type": "object",
@@ -23627,6 +25319,90 @@
         ],
         "title": "AppResponse",
         "description": "Safe App projection — NEVER carries keys / api_key.\n\nUsed for all non-superadmin consumers. Any route that would expose\nprovider credentials (OpenAI, Claude, Pixabay, etc.) MUST serialize\nthrough this schema."
+      },
+      "ArticleListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Content job identifier",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the article was generated",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "title": "ArticleListItem",
+        "description": "One generated article, reduced to what the dashboard KPI needs.\n\nBacked by a completed content Job; the dashboard buckets `created_at`\nby month to compute the \"articles published\" count."
+      },
+      "ArticleListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Exact number of completed articles for the user",
+            "examples": [
+              42
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArticleListItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Articles, newest first (capped at the 1000 most recent)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total"
+        ],
+        "title": "ArticleListResponse",
+        "description": "List of the user's generated articles (completed content jobs)."
+      },
+      "AssignBranchUserRequest": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User of the same tenant",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/BranchUserRole",
+            "description": "Role in the branch",
+            "default": "viewer",
+            "examples": [
+              "viewer"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "AssignBranchUserRequest",
+        "description": "Assign a user of the same tenant to a branch.\n\nThe role defaults to VIEWER, NOT admin: \"assign a user\" must not mean \"hand\nthem full control\". (The `UserBranch` model's own default is ADMIN — the very\ndefault that made `POST /businesses/{id}/branches` a privilege escalation.)",
+        "example": {
+          "role": "viewer",
+          "user_id": "507f1f77bcf86cd799439012"
+        }
       },
       "AssignedUserResponse": {
         "properties": {
@@ -24000,6 +25776,15 @@
           "updated_at"
         ],
         "title": "BranchResponse"
+      },
+      "BranchUserRole": {
+        "type": "string",
+        "enum": [
+          "admin",
+          "cashier",
+          "viewer"
+        ],
+        "title": "BranchUserRole"
       },
       "BusinessResponse": {
         "properties": {
@@ -24632,6 +26417,25 @@
           "error_type"
         ],
         "title": "ClientLogEntry"
+      },
+      "CloudflareKeys": {
+        "properties": {
+          "api_token_encrypted": {
+            "type": "string",
+            "title": "Api Token Encrypted",
+            "description": "Encrypted Cloudflare API token (Fernet)",
+            "default": ""
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account Id",
+            "description": "Cloudflare account id (non-secret)",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "CloudflareKeys",
+        "description": "Per-App Cloudflare API token for tenant provisioning (Fernet-encrypted).\n\nMirrors AnalyticsKeys (encrypted secret): the plaintext token is NEVER\npersisted — use get_api_token()/set_api_token(). Deliberately NOT the\nplaintext DomainRegistrarKeys pattern. When unset, provisioning falls back\nto the platform default (PlatformSettings provisioning.cloudflare).\nAdmin responses expose only a boolean flag, never the token."
       },
       "CommentGenerationInput": {
         "properties": {
@@ -25417,26 +27221,14 @@
             "examples": [
               "Sucursal Central"
             ]
-          },
-          "commerceId": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Commerceid",
-            "description": "Commerce ID for FEL integration",
-            "examples": [
-              "COM-001"
-            ]
           }
         },
         "type": "object",
         "required": [
-          "name",
-          "commerceId"
+          "name"
         ],
         "title": "CreateBranchRequest",
         "example": {
-          "commerceId": "COM-001",
           "name": "Sucursal Central"
         }
       },
@@ -25488,15 +27280,23 @@
             ]
           },
           "branch": {
+            "$ref": "#/components/schemas/CreateBranchRequest",
+            "description": "Initial branch (required). The branch and an owner link (UserBranch, role=admin) are created in the same call so the business is always linked to the caller and immediately visible in GET /businesses. A business is never created without a branch."
+          },
+          "owner_user_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/CreateBranchRequest"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Optional initial branch. When provided, the branch and an owner link (UserBranch, role=admin) are created in the same call so the business is immediately visible to the caller in GET /businesses. Omit to create a standalone (unlinked) business."
+            "title": "Owner User Id",
+            "description": "Assign the business to another user of the same tenant. Requires the caller to hold the `app_admin` role (403 otherwise) and the target to belong to the caller's tenant (404 otherwise). When omitted the caller becomes the owner — the existing behaviour.",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
           }
         },
         "type": "object",
@@ -25504,13 +27304,13 @@
           "name",
           "documentType",
           "documentNumber",
-          "address"
+          "address",
+          "branch"
         ],
         "title": "CreateBusinessRequest",
         "example": {
           "address": "4a Avenida, Zona 1, Guatemala",
           "branch": {
-            "commerceId": "COM-001",
             "name": "Sucursal Central"
           },
           "documentNumber": "12345678-9",
@@ -26363,6 +28163,19 @@
             ],
             "title": "Nameservers",
             "description": "Custom nameservers (omit for default)"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id",
+            "description": "Register on behalf of another user in the tenant (their balance is charged, they own the domain). Tenant admins only; ignored/forbidden otherwise. Omit to register for yourself."
           }
         },
         "additionalProperties": false,
@@ -26419,6 +28232,18 @@
         "type": "object",
         "title": "DomainRenewRequest",
         "description": "Payload for renewing an existing domain."
+      },
+      "DomainStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "active",
+          "expired",
+          "suspended",
+          "transferring"
+        ],
+        "title": "DomainStatus",
+        "description": "Lifecycle status of a registered domain."
       },
       "DomainTransferRequest": {
         "properties": {
@@ -29351,6 +31176,16 @@
             "title": "Severity",
             "default": "info"
           },
+          "category": {
+            "type": "string",
+            "enum": [
+              "billing",
+              "system",
+              "team"
+            ],
+            "title": "Category",
+            "default": "system"
+          },
           "link_url": {
             "anyOf": [
               {
@@ -29360,7 +31195,8 @@
                 "type": "null"
               }
             ],
-            "title": "Link Url"
+            "title": "Link Url",
+            "description": "In-app path (/main/billing) or an https URL"
           },
           "user_id": {
             "anyOf": [
@@ -29387,8 +31223,9 @@
         "title": "NotificationCreateRequest",
         "example": {
           "body": "Take a quick tour of the new modules.",
+          "category": "system",
           "is_global": false,
-          "link_url": "https://app.1platform.pro/main/dashboard",
+          "link_url": "/main/dashboard",
           "severity": "info",
           "title": "Welcome to your dashboard",
           "user_id": "507f1f77bcf86cd799439022"
@@ -29417,6 +31254,31 @@
               "error"
             ],
             "title": "Severity"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "billing",
+              "system",
+              "team"
+            ],
+            "title": "Category"
+          },
+          "template_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Key"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
           },
           "link_url": {
             "anyOf": [
@@ -29453,6 +31315,9 @@
           "title",
           "body",
           "severity",
+          "category",
+          "template_key",
+          "params",
           "link_url",
           "read_at",
           "created_at"
@@ -29468,6 +31333,33 @@
           "expired"
         ],
         "title": "OnboardingStatus"
+      },
+      "OwnerRef": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "Owner user ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "Owner email",
+            "examples": [
+              "empleado@appstart.gt"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email"
+        ],
+        "title": "OwnerRef",
+        "description": "The user a business is assigned to (see AdminBusinessItem.owner)."
       },
       "PageEarningItem": {
         "properties": {
@@ -30293,6 +32185,43 @@
           "slug": "acme-co"
         }
       },
+      "ProvisioningCreateRequest": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "FQDN of the tenant (e.g. bajaebooks.app)"
+          },
+          "primary_archetype": {
+            "type": "string",
+            "title": "Primary Archetype",
+            "default": "library"
+          },
+          "secondary_archetypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Secondary Archetypes"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain"
+        ],
+        "title": "ProvisioningCreateRequest"
+      },
       "PublisuitesActionRequest": {
         "properties": {
           "action": {
@@ -30514,6 +32443,23 @@
         "minLength": 24,
         "pattern": "^[0-9a-f]{24}$",
         "example": "5eb7cf5a86d9755df3a6c593"
+      },
+      "ReassignDomainOwnerRequest": {
+        "properties": {
+          "owner_user_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$",
+            "title": "Owner User Id",
+            "description": "New owner's user id (24-char ObjectId)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "owner_user_id"
+        ],
+        "title": "ReassignDomainOwnerRequest",
+        "description": "Payload for reassigning an existing domain to a different tenant user."
       },
       "RecaptchaConfig": {
         "properties": {
@@ -31255,6 +33201,38 @@
         ],
         "title": "SuccessResponse[AdminAppResponse]"
       },
+      "SuccessResponse_AdminDomainItem_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AdminDomainItem",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AdminDomainItem]"
+      },
       "SuccessResponse_AdminImpersonateResponse_": {
         "properties": {
           "success": {
@@ -31670,6 +33648,38 @@
           "msg"
         ],
         "title": "SuccessResponse[AppFullResponse]"
+      },
+      "SuccessResponse_ArticleListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ArticleListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[ArticleListResponse]"
       },
       "SuccessResponse_BalanceHoldListResponse_": {
         "properties": {
@@ -33339,6 +35349,42 @@
         ],
         "title": "SuccessResponse[list]"
       },
+      "SuccessResponse_list_AdminRoleResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AdminRoleResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[AdminRoleResponse]]"
+      },
       "SuccessResponse_list_AppResponse__": {
         "properties": {
           "success": {
@@ -33374,6 +35420,42 @@
           "msg"
         ],
         "title": "SuccessResponse[list[AppResponse]]"
+      },
+      "SuccessResponse_list_BranchResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BranchResponse"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[list[BranchResponse]]"
       },
       "SuccessResponse_list_BusinessResponse__": {
         "properties": {
@@ -34768,6 +36850,63 @@
           "name": "SEO Content Agent v2"
         }
       },
+      "UpdateBusinessRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "examples": [
+              "Mi Empresa S.A."
+            ]
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address",
+            "examples": [
+              "4a Avenida, Zona 1, Guatemala"
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "inactive"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "UpdateBusinessRequest",
+        "description": "Partial update of a business. Fiscal identity is immutable.\n\n`documentNumber` / `documentType` are absent BY CONTRACT: invoices were\nalready certified against that NIT with the FEL provider, so changing it\nwould desynchronise them. `extra=\"forbid\"` is what turns \"absent from the\nschema\" into an actual 422 — Pydantic's default silently ignores unknown\nkeys, which would answer 200 while quietly dropping the change.",
+        "example": {
+          "name": "Mi Empresa S.A.",
+          "status": "inactive"
+        }
+      },
       "UpdateWebhookEventsRequest": {
         "properties": {
           "on_approved": {
@@ -34929,6 +37068,14 @@
             "description": "Invoice total amount",
             "default": 0
           },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Currency of `total`. Always present — do not assume GTQ: read this field to render the amount.",
+            "examples": [
+              "GTQ"
+            ]
+          },
           "status": {
             "type": "string",
             "title": "Status",
@@ -34949,6 +37096,21 @@
             "title": "Fel Id",
             "description": "External FEL ID, if emitted"
           },
+          "invoiceUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoiceurl",
+            "description": "Public FEEL URL of the certified document, or `null` when the invoice has none (not yet certified, or a mock invoice). A `null` here means there is nothing to view or download — the client can disable those affordances from the list alone, with no per-row detail request.",
+            "examples": [
+              "https://report.feel.com.gt/ingfacereport/ingfacereport_documento?uuid=A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -34960,6 +37122,7 @@
         "required": [
           "id",
           "business_id",
+          "currency",
           "status",
           "created_at"
         ],
@@ -36175,6 +38338,10 @@
     {
       "name": "Tenant Admin",
       "description": "Per-tenant administration scoped to the actor's `app_id`. Lets the tenant `app_admin` role list/manage users, roles and impersonation, plus read business, invoicing, billing, domain and operational data for their own tenant."
+    },
+    {
+      "name": "Provisioning",
+      "description": "One-click asynchronous provisioning of new Atlas tenants (dashboard + app) for a domain. The `app_admin` role starts a job and polls its progress; every resource is scoped to the caller's own workspace (`app_id`), so a cross-tenant job id returns 404 without leaking its existence."
     }
   ]
 }

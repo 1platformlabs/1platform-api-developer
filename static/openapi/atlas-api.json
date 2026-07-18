@@ -134,6 +134,18 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "The sign-in token was issued but the email could not be delivered. Transient — the caller should invite the user to retry.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "EMAIL_DELIVERY_FAILED"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -924,7 +936,7 @@
           "content"
         ],
         "summary": "List content items (operator)",
-        "description": "Paginated operator listing of the tenant's catalog across **all**\nstatuses (including ``draft`` and ``archived``). For the public,\npublished-only, filterable grid use ``GET /public/catalog`` instead.",
+        "description": "Paginated operator listing of the tenant's catalog across **all**\nstatuses (including ``draft`` and ``archived``). For the public,\npublished-only, filterable grid use ``GET /public/catalog`` instead.\n\nOptional filters mirror the dashboard search form (issue atlas-dash#203,\nwhere these were silently dropped and every search returned the full\ncatalog): ``q`` is a free-text match over title, slug and\n``metadata.{author,isbn}``; ``kind`` / ``status`` narrow by catalog type\nand lifecycle. Unknown ``kind`` / ``status`` values are ignored rather than\nzeroing the list, matching the dashboard's own input validation. ``total``\nreflects the same filters so pagination stays correct.",
         "operationId": "list_items_api_v1_content_items_get",
         "parameters": [
           {
@@ -948,6 +960,55 @@
               "minimum": 1,
               "default": 20,
               "title": "Page Size"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
             }
           },
           {
@@ -1715,7 +1776,7 @@
           "content"
         ],
         "summary": "Upload a downloadable asset",
-        "description": "Upload a downloadable asset (PDF / EPUB / MOBI / MP3 / M4A) for a\ncontent item. The file lands at the canonical storage key\n``items/{item_id}/file.{format}`` so the DOWNLOAD delivery strategy\ncan return a signed URL to entitled members without further wiring.\n\nRe-uploading the same format overwrites the previous payload (the\nstorage key is deterministic) and bumps ``metadata.assets[format]``\non the content item. With ``chapter=N`` (AUD-05) the audio lands at\n``items/{id}/audio_ch_{N}.{format}`` and bumps ``metadata.assets[\"audio_ch_{N}\"]``\nso delivery signs the chapter's own object (and charges the per-chapter gate).",
+        "description": "Upload a downloadable asset (PDF / EPUB / MOBI / MP3 / M4A) for a\ncontent item.\n\nWith ``config.media_supply`` on (MNA-01, the default for a Media-native\ntenant) the bytes are content-addressed into 1Platform Media as the\nCANONICAL store and NO tenant-bucket object is written; the asset records\n``media_title_id`` + ``local_fallback=false`` and delivery signs from the\nCDN. Media is a hard dependency here — an ingest failure/timeout fails the\nrequest closed (``503 MEDIA_UNAVAILABLE``), never a bytes-less asset. With\n``media_supply`` off the legacy path writes the canonical key\n``items/{item_id}/file.{format}`` (``local_fallback=true``) so the DOWNLOAD\nstrategy signs it locally.\n\nEither way the recorded key is deterministic, so re-uploading the same\nformat overwrites the previous record and bumps ``metadata.assets[format]``.\nWith ``chapter=N`` (AUD-05) the audio is keyed at\n``items/{id}/audio_ch_{N}.{format}`` under ``metadata.assets[\"audio_ch_{N}\"]``\nso delivery signs the chapter's own object (and charges the per-chapter gate).",
         "operationId": "upload_item_asset_api_v1_content_items__item_id__assets_post",
         "parameters": [
           {
@@ -1900,6 +1961,16 @@
                   "detail": {
                     "code": "ASSET_STORAGE_FAILED"
                   }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media-native upload (media_supply on): 1Platform Media — the canonical store — could not accept the bytes and there is no local bucket copy, so the upload fails closed (MNA-01). Retry when Media recovers.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "MEDIA_UNAVAILABLE"
                 }
               }
             }
@@ -4100,6 +4171,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The requested asset is Media-native (local_fallback=false) and 1Platform Media produced no signed envelope (outage, media_supply off after the local cleanup, or a non-media-backed chapter). There is no local object to fall back to, so delivery fails closed instead of signing a dead key (MNA-02).",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "MEDIA_UNAVAILABLE"
                 }
               }
             }
@@ -14393,7 +14474,7 @@
           "me"
         ],
         "summary": "Get Lists",
-        "description": "Return one summary per non-library watchlist bucket.\n\nBacks the Listas tab in ``/me/library``: surfaces Favoritos, Ver\nmás tarde and Lista de lectura with item counts and a preview\nof up to three items each. The default ``library`` bucket stays\non the Watchlist tab and is intentionally excluded.",
+        "description": "Everything the Listas tab shows: the fixed buckets, the member's own\nlists, and the lists they saved from other members.\n\n``buckets`` keeps byte-for-byte the shape it had before user lists\nexisted (Favoritos / Ver más tarde / Lista de lectura), so the app\nalready in the stores keeps working — ``lists`` and ``saved`` are purely\nadditive and unknown keys are ignored by both clients.\n\nThis handler is where the summary has to live. The user-lists router is\nmounted at ``/me/lists`` too, so a ``GET \"\"`` over there would be a\nsecond handler on this exact path: Starlette matches in insertion order,\n``me_router`` is registered first, and FastAPI says nothing — the new\nhandler would simply never run and the tab would render empty.",
         "operationId": "me.lists_get",
         "parameters": [
           {
@@ -14483,7 +14564,140 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListsResponse"
+                  "$ref": "#/components/schemas/MemberListsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Create List",
+        "description": "Create a list. It starts private and unslugged.",
+        "operationId": "me.lists_create",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User lists are disabled for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "FEATURE_DISABLED",
+                  "message": "Lists are not available here."
                 }
               }
             }
@@ -15875,6 +16089,1095 @@
                   "detail": {
                     "code": "APP_RELEASE_NOT_FOUND"
                   }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/lists/{list_id}": {
+      "get": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Get List",
+        "operationId": "me.lists_get_one",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "List Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "LIST_NOT_FOUND",
+                  "message": "List not found."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Update List",
+        "description": "Rename, re-describe, publish or unpublish.\n\nPublishing assigns the slug the first time and never again, so a link\nalready shared survives renames and unpublish/republish cycles.",
+        "operationId": "me.lists_update",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "List Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "LIST_NOT_FOUND",
+                  "message": "List not found."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Delete List",
+        "operationId": "me.lists_delete",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "List Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such list for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "LIST_NOT_FOUND",
+                  "message": "List not found."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/lists/{list_id}/items": {
+      "post": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Add Item",
+        "description": "Append a published title of this tenant to the list. Idempotent.",
+        "operationId": "me.lists_add_item",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "List Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListItemIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "LIST_NOT_FOUND",
+                  "message": "List not found."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/lists/{list_id}/items/{content_id}": {
+      "delete": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Remove Item",
+        "operationId": "me.lists_remove_item",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "List Id"
+            }
+          },
+          {
+            "name": "content_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Content Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such list for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "LIST_NOT_FOUND",
+                  "message": "List not found."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/lists/{list_id}/items/order": {
+      "patch": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Reorder Items",
+        "description": "Reorder by sending the whole list. The payload must be an exact\npermutation of what the list holds; anything else is a 422 and the stored\norder is untouched.",
+        "operationId": "me.lists_reorder",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "List Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListOrderIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "LIST_NOT_FOUND",
+                  "message": "List not found."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/lists/{list_id}/save": {
+      "put": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Save List",
+        "description": "Follow another member's public list. Idempotent; a live reference, not\na copy, so the owner's later edits show up.",
+        "operationId": "me.lists_save",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "List Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "LIST_NOT_FOUND",
+                  "message": "List not found."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "member-lists"
+        ],
+        "summary": "Unsave List",
+        "operationId": "me.lists_unsave",
+        "parameters": [
+          {
+            "name": "list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "List Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such list for this member.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "LIST_NOT_FOUND",
+                  "message": "List not found."
                 }
               }
             }
@@ -17651,7 +18954,7 @@
           "recommendations"
         ],
         "summary": "Public Rails",
-        "description": "Editorial home rails for the dashboard's catalogue surface.\n\nThe shape is stable: callers always receive a ``rails`` array.\nMembership is opt-in — anonymous calls succeed and just omit\n``continue_watching``. ``surface`` is reserved for future\nhorizontal expansion (``catalog``, ``live``); v1 only honours\n``home``.\n\nWhen the tenant has curated rails saved via ``/admin/rails`` (and\nat least one is enabled), the response mirrors that curation —\noperator order, operator titles, ``source=\"curated\"``. Tenants\nthat never touched the admin keep the legacy algorithmic\ncomposition (``source=\"default\"``), so this is opt-in per tenant\nwith zero migration.\n\nCaching is intentionally deferred: the queries are tenant-scoped\nindexed reads and the dashboard already short-caches the SSR\nfetch. A 60s Valkey layer is the obvious next refinement once\nrail traffic is observable in production.",
+        "description": "Editorial home rails for the dashboard's catalogue surface.\n\nThe shape is stable: callers always receive a ``rails`` array.\nMembership is opt-in — anonymous calls succeed and just omit\n``continue_watching``. ``surface`` is reserved for future\nhorizontal expansion (``catalog``, ``live``); v1 only honours\n``home``.\n\nWhen the tenant has curated rails saved via ``/admin/rails`` (and\nat least one is enabled), the response mirrors that curation —\noperator order, operator titles, ``source=\"curated\"``. Tenants\nthat never touched the admin keep the legacy algorithmic\ncomposition (``source=\"default\"``), so this is opt-in per tenant\nwith zero migration.\n\nAnonymous calls are cached (stale-while-revalidate); a member's call is\nnot, because it carries ``continue_watching`` — a per-member rail that\nmust never land in a shared payload.",
         "operationId": "public.rails",
         "parameters": [
           {
@@ -19688,7 +20991,7 @@
           "public"
         ],
         "summary": "Search",
-        "description": "Full-text search over the published catalog, grouped by kind.\n\nPostgres path uses the FTS GIN index from migration 0014 and emits\na server-rendered highlight (``ts_headline``) wrapping matched\ntokens in ``<mark>`` so the dashboard can render them as HTML\nsafely.\n\nSQLite test path uses an ILIKE fallback over title and\nmetadata.author and produces an equivalent ``<mark>``-wrapped\nhighlight in Python, keeping the response contract identical for\nthe dashboard regardless of backing store.",
+        "description": "Full-text search over the published catalog, grouped by kind.\n\nPostgres path uses the diacritic-folding FTS GIN index from migration\n0045 and emits a server-rendered highlight (``ts_headline``) wrapping\nmatched tokens in ``<mark>`` so the dashboard can render them as HTML\nsafely.\n\nSQLite test path uses an ILIKE fallback over title and\nmetadata.author and produces an equivalent ``<mark>``-wrapped\nhighlight in Python, keeping the response contract identical for\nthe dashboard regardless of backing store.",
         "operationId": "public.search",
         "parameters": [
           {
@@ -20503,6 +21806,245 @@
         }
       }
     },
+    "/api/v1/public/lists/{slug}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Public member-authored list",
+        "description": "One member's published list, readable without an account. Paginated: the cover of every item is resolved through the media pipeline, so an unbounded page would fan out one signing call per item. Carries no member id and no email — the owner is identified only by the public name they chose.",
+        "operationId": "public.list_by_slug",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicList"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "List not found.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "LIST_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/home": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "The public home of the tenant in a single cached payload",
+        "description": "Everything the anonymous home needs, in one tenant-scoped payload.\n\nCached per tenant with stale-while-revalidate. Contains no member state:\nsigned-in personalisation (continue-reading) is fetched separately by the\ncaller and layered on top.",
+        "operationId": "public.home",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 12,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeSnapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/public/branding/{tenant_slug}/{asset}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Serve a tenant branding asset (favicon/logo/og) without exposing storage",
+        "description": "Stream one branding asset for ``tenant_slug``.",
+        "operationId": "public.branding_asset",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(favicon|logo|og)$",
+              "title": "Asset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown tenant, asset, or nothing uploaded."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/search/suggest": {
       "get": {
         "tags": [
@@ -20726,6 +22268,77 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants": {
+      "post": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Provision a new Atlas tenant + operator (service-to-service)",
+        "description": "Create the tenant + config presets + operator in one transaction.\n\nIdempotency is the caller's job: a duplicate ``slug`` returns 409\n``TENANT_SLUG_TAKEN`` (the 1platform-api job then re-reads the tenant\nby slug and continues). The service key's own ``tenant_id`` is not\nconsulted for authorization — this route mints a *new* tenant.",
+        "operationId": "provision_tenant_api_v1_platform_tenants_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformTenantProvisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformTenantProvisionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.provision capability"
+          },
+          "409": {
+            "description": "Slug already in use by another tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_SLUG_TAKEN"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid slug/archetype/domain or config presets"
           }
         }
       }
@@ -22905,7 +24518,7 @@
           "title"
         ],
         "title": "AudioChapterOut",
-        "description": "A single audiobook chapter as surfaced on the public detail."
+        "description": "A single audiobook chapter as surfaced on item responses.\n\nShared shape between the public detail (``/public/items/{slug}``) and\nthe dashboard-facing ``/content/items/by-slug/{slug}`` so the web\naudiobook player has one contract. Mirror of :class:`AudioChapterIn`."
       },
       "AudioUpsert": {
         "properties": {
@@ -23916,6 +25529,21 @@
             ],
             "title": "Media Cover Title Id"
           },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
+          },
+          "audio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemAudio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -24288,6 +25916,11 @@
               }
             ],
             "title": "Kind"
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
           }
         },
         "type": "object",
@@ -24765,6 +26398,11 @@
               }
             ],
             "title": "Kind"
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
           },
           "id": {
             "type": "string",
@@ -26172,6 +27810,41 @@
         "type": "object",
         "title": "HomeCopy"
       },
+      "HomeSnapshot": {
+        "properties": {
+          "featured": {
+            "$ref": "#/components/schemas/FeaturedResponse"
+          },
+          "catalog": {
+            "$ref": "#/components/schemas/CatalogPage"
+          },
+          "genres": {
+            "$ref": "#/components/schemas/GenresResponse"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/PublicStats"
+          },
+          "rails": {
+            "$ref": "#/components/schemas/PublicRailsResponse"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "featured",
+          "catalog",
+          "genres",
+          "stats",
+          "rails",
+          "generated_at"
+        ],
+        "title": "HomeSnapshot",
+        "description": "The public home of a tenant, as of ``generated_at``.\n\nEvery field mirrors the response model of the endpoint it replaces, so\nthe dashboard can consume this snapshot with the types it already has."
+      },
       "ImportSummaryResult": {
         "properties": {
           "enqueued": {
@@ -26330,7 +28003,7 @@
         },
         "type": "object",
         "title": "ItemAudio",
-        "description": "Audiobook block on the public item detail (atlas-app redesign F1a).\n\nPresent only when the item declares ``metadata.audio_chapters`` —\nitems without chapters keep their payload byte-identical (L-33c\nderive-at-read guard). ``total_duration_sec`` sums the non-null\nchapter durations, or is ``null`` when no chapter carries one."
+        "description": "Audiobook block surfaced on an item response.\n\nPresent only when the item declares ``metadata.audio_chapters``; items\nwithout chapters keep ``audio`` null (derive-at-read guard).\n``total_duration_sec`` sums the non-null chapter durations, or is\n``null`` when no chapter carries one."
       },
       "ItemDetail": {
         "properties": {
@@ -26988,6 +28661,390 @@
         ],
         "title": "LibraryView"
       },
+      "ListCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ListCreate"
+      },
+      "ListDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ],
+            "title": "Visibility"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "share_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Url"
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "default": 0
+          },
+          "preview": {
+            "items": {
+              "$ref": "#/components/schemas/ContentRef"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Preview",
+            "default": []
+          },
+          "owner_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Display Name"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ListItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "visibility",
+          "updated_at"
+        ],
+        "title": "ListDetail"
+      },
+      "ListItem": {
+        "properties": {
+          "content_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Content Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "book",
+                  "film",
+                  "series",
+                  "podcast",
+                  "live",
+                  "website_sale",
+                  "episode",
+                  "show",
+                  "audio"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "added_at": {
+            "type": "string",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content_id",
+          "position",
+          "added_at"
+        ],
+        "title": "ListItem"
+      },
+      "ListItemIn": {
+        "properties": {
+          "content_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Content Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content_id"
+        ],
+        "title": "ListItemIn"
+      },
+      "ListOrderIn": {
+        "properties": {
+          "content_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Content Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content_ids"
+        ],
+        "title": "ListOrderIn"
+      },
+      "ListPatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "private",
+                  "public"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          }
+        },
+        "type": "object",
+        "title": "ListPatch",
+        "description": "Partial update — an omitted field is left alone.\n\n``visibility`` is what publishes or unpublishes the list; the slug is\nassigned on the first publish and never recomputed."
+      },
+      "ListSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ],
+            "title": "Visibility"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "share_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Url"
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "default": 0
+          },
+          "preview": {
+            "items": {
+              "$ref": "#/components/schemas/ContentRef"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Preview",
+            "default": []
+          },
+          "owner_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Display Name"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "visibility",
+          "updated_at"
+        ],
+        "title": "ListSummary"
+      },
       "ListsBucketSummary": {
         "properties": {
           "bucket": {
@@ -27027,21 +29084,43 @@
         ],
         "title": "ListsBucketSummary"
       },
-      "ListsResponse": {
+      "ListsSettings": {
         "properties": {
-          "buckets": {
-            "items": {
-              "$ref": "#/components/schemas/ListsBucketSummary"
-            },
-            "type": "array",
-            "title": "Buckets"
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "max_lists_per_member": {
+            "type": "integer",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Max Lists Per Member",
+            "default": 100
+          },
+          "max_items_per_list": {
+            "type": "integer",
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Max Items Per List",
+            "default": 500
+          },
+          "max_saved_lists": {
+            "type": "integer",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Max Saved Lists",
+            "default": 200
+          },
+          "indexable": {
+            "type": "boolean",
+            "title": "Indexable",
+            "default": false
           }
         },
         "type": "object",
-        "required": [
-          "buckets"
-        ],
-        "title": "ListsResponse"
+        "title": "ListsSettings",
+        "description": "Per-tenant config for member-authored lists (AUL).\n\nA block of its own, deliberately NOT a key under ``features``: the\nsettings PATCH replaces ``config[\"features\"]`` wholesale with\n``payload.features.model_dump()``, so the next save from a settings form\nthat knows nothing about lists would wipe the key and silently reset the\nfeature. A top-level block the form never sends is left untouched.\n\nLike ``app`` / ``custom_code`` / ``payments``, this has no column on\n``tenant_settings`` — it lives only in ``tenants.config``, which is what\nthe public resolver and the runtime read."
       },
       "LiveStreamCreate": {
         "properties": {
@@ -27159,9 +29238,16 @@
             "title": "Email"
           },
           "return_url": {
-            "type": "string",
-            "title": "Return Url",
-            "default": "/me/library"
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Url"
           },
           "surface": {
             "type": "string",
@@ -27645,6 +29731,18 @@
         "title": "MediaSupplyConfigPatch",
         "description": "Admin write surface. Omitted secret fields preserve the stored value."
       },
+      "MediaSupplyPreset": {
+        "properties": {
+          "mask_delivery": {
+            "type": "boolean",
+            "title": "Mask Delivery",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "MediaSupplyPreset",
+        "description": "Covers-CDN masking opt-in (``config.media_supply``)."
+      },
       "MemberInvite": {
         "properties": {
           "email": {
@@ -27669,6 +29767,39 @@
           "email"
         ],
         "title": "MemberInvite"
+      },
+      "MemberListsResponse": {
+        "properties": {
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/ListsBucketSummary"
+            },
+            "type": "array",
+            "title": "Buckets"
+          },
+          "lists": {
+            "items": {
+              "$ref": "#/components/schemas/ListSummary"
+            },
+            "type": "array",
+            "title": "Lists",
+            "default": []
+          },
+          "saved": {
+            "items": {
+              "$ref": "#/components/schemas/ListSummary"
+            },
+            "type": "array",
+            "title": "Saved",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "buckets"
+        ],
+        "title": "MemberListsResponse",
+        "description": "``GET /me/lists``.\n\n``buckets`` keeps the exact shape it has today — the app in the stores\nand any cached web client read only that key, and both ignore keys they\ndo not know, so ``lists``/``saved`` are additive."
       },
       "MemberOut": {
         "properties": {
@@ -27985,6 +30116,28 @@
           "body": {
             "type": "string",
             "title": "Body"
+          },
+          "target_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Kind"
+          },
+          "target_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Slug"
           },
           "created_at": {
             "type": "string",
@@ -28697,6 +30850,154 @@
         ],
         "title": "PlansResponse"
       },
+      "PlatformTenantProvisionRequest": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 2,
+            "pattern": "^[a-z0-9-]+$",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "archetype": {
+            "type": "string",
+            "enum": [
+              "library",
+              "streaming",
+              "live",
+              "tv",
+              "education",
+              "podcast",
+              "events",
+              "audio"
+            ],
+            "title": "Archetype",
+            "default": "library"
+          },
+          "secondary_archetypes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "library",
+                "streaming",
+                "live",
+                "tv",
+                "education",
+                "podcast",
+                "events",
+                "audio"
+              ]
+            },
+            "type": "array",
+            "title": "Secondary Archetypes"
+          },
+          "primary_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Domain"
+          },
+          "branding": {
+            "$ref": "#/components/schemas/BrandingSettings"
+          },
+          "integrations": {
+            "$ref": "#/components/schemas/IntegrationsSettings"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/DeliverySettings"
+          },
+          "features": {
+            "$ref": "#/components/schemas/FeatureFlags"
+          },
+          "default_locale": {
+            "type": "string",
+            "title": "Default Locale",
+            "default": "es"
+          },
+          "supported_locales": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Locales"
+          },
+          "operator_email": {
+            "type": "string",
+            "format": "email",
+            "title": "Operator Email"
+          },
+          "config_presets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenantConfigPresets"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "operator_email"
+        ],
+        "title": "PlatformTenantProvisionRequest"
+      },
+      "PlatformTenantProvisionResponse": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "operator_email": {
+            "type": "string",
+            "format": "email",
+            "title": "Operator Email"
+          },
+          "operator_password": {
+            "type": "string",
+            "title": "Operator Password"
+          },
+          "primary_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Domain"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "slug",
+          "operator_email",
+          "operator_password",
+          "primary_domain"
+        ],
+        "title": "PlatformTenantProvisionResponse"
+      },
       "PlaybackChapter": {
         "properties": {
           "order": {
@@ -28862,6 +31163,11 @@
               }
             ],
             "title": "Kind"
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
           },
           "position": {
             "type": "integer",
@@ -29060,6 +31366,94 @@
         "title": "PublicAppView",
         "description": "``GET /public/app`` — listing + availability, gated by the master\ntoggle (404 when disabled, never ``enabled=false``)."
       },
+      "PublicKindCount": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "count"
+        ],
+        "title": "PublicKindCount",
+        "description": "One kind's published-item total for the tenant (per-kind home counts)."
+      },
+      "PublicList": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "owner_display_name": {
+            "type": "string",
+            "title": "Owner Display Name"
+          },
+          "indexable": {
+            "type": "boolean",
+            "title": "Indexable",
+            "default": false
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "default": 0
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ListItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "default": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "default": 50
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "owner_display_name"
+        ],
+        "title": "PublicList",
+        "description": "``GET /public/lists/{slug}`` — served to anonymous callers.\n\nDeliberately carries no ``member_id`` and no email: the only thing said\nabout the owner is the public name they chose.\n\nIt DOES carry the list's own ``id``. Following a list is\n``PUT /me/lists/{id}/save``, and a visitor reading /l/<slug> has only the\nslug — without the id there is no way to act on the list they are looking\nat. Exposing it is safe: every id-addressed route is either owner-scoped\n(404 for anyone else) or requires the list to be public anyway, which this\none is by definition."
+      },
       "PublicPlatformInfo": {
         "properties": {
           "version": {
@@ -29205,6 +31599,13 @@
           "total": {
             "type": "integer",
             "title": "Total"
+          },
+          "kinds": {
+            "items": {
+              "$ref": "#/components/schemas/PublicKindCount"
+            },
+            "type": "array",
+            "title": "Kinds"
           }
         },
         "type": "object",
@@ -29214,7 +31615,7 @@
           "total"
         ],
         "title": "PublicStats",
-        "description": "Catalog headline counts for the web landing (atlas-web W1).\n\n``total`` is every published item; ``books`` and ``audiobooks`` are\nNOT a partition — a title carrying both a reading kind and an mp3/m4a\nasset counts in both — so ``books + audiobooks`` may exceed ``total``."
+        "description": "Catalog headline counts for the web landing (atlas-web W1).\n\n``total`` is every published item; ``books`` and ``audiobooks`` are\nNOT a partition — a title carrying both a reading kind and an mp3/m4a\nasset counts in both — so ``books + audiobooks`` may exceed ``total``.\n\n``kinds`` is the per-kind published breakdown (richest kind first),\nlisting only kinds the tenant actually carries. It lets the web render a\n\"N libros · N artículos · …\" line covering *every* kind in the tenant\ninstead of the fixed books/audiobooks split. ``books`` (a reading-kinds\naggregate) and ``audiobooks`` (an ``has_audio`` tally, not a kind) stay\nfor back-compat and the audiobook headphones part."
       },
       "PublisherCreate": {
         "properties": {
@@ -31845,6 +34246,58 @@
         "type": "object",
         "title": "TenantConfig"
       },
+      "TenantConfigPresets": {
+        "properties": {
+          "app": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeoSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plans": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plans"
+          },
+          "media_supply": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaSupplyPreset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "TenantConfigPresets",
+        "description": "Optional per-tenant config the base create doesn't accept.\n\nOmit any field to take the epublibre-shaped default. ``app`` and\n``seo`` are validated (scheme pattern, host format). ``plans`` is\nstored verbatim under ``config.plans`` (sibling of ``config.payments``).\n``media_supply.mask_delivery`` opts the tenant into covers-CDN masking."
+      },
       "TenantCopy": {
         "properties": {
           "nav": {
@@ -32109,6 +34562,16 @@
                 "type": "null"
               }
             ]
+          },
+          "lists": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListsSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -32251,6 +34714,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ConfigPayments"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lists": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListsSettings"
               },
               {
                 "type": "null"
@@ -32723,6 +35196,11 @@
               }
             ],
             "title": "Kind"
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
           },
           "bucket": {
             "type": "string",

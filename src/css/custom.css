@@ -85,6 +85,17 @@
      admonitions or inline-code chips. Derived from cobalt, not a new hue. */
   --color-accent-border: rgba(31, 79, 224, 0.22);
 
+  /* Syntax highlighting — functional differentiation, like status, not
+     decoration. The bundled github Prism theme colours two large token groups
+     with values that fail AA on every surface this portal has: teal #36acaa at
+     2.37:1 and pink #e3116c at 3.96:1 on --recessed, which is where code blocks
+     sit. On a documentation site that is mostly code examples, that was 419
+     failing nodes on a single flow page. These keep the hue and clear AA on
+     paper, surface AND recessed (worst case 5.22 and 6.42). */
+  --syntax-ink:  #2C2E28;
+  --syntax-teal: #0F6E6C;
+  --syntax-pink: #A3155C;
+
   /* Functional status only — never decoration */
   --color-success:    #0F7B4F;
   --color-success-bg: #E9F6EF;
@@ -214,6 +225,15 @@
   --scalar-font: var(--font-sans);
   --scalar-font-code: var(--font-mono);
 }
+
+/* NOT mapped here, deliberately: --scalar-color-{blue,green,red,yellow,orange,
+   purple}, the HTTP method badge colours. Scalar re-declares them deeper in its
+   own component tree, so setting them at this level has no effect — measured,
+   the GET badge still computes to Scalar's #0082d0 (4.11:1, below AA at its
+   10px size) with the mapping in place. Reaching them means overriding inside
+   Scalar's markup, which is beyond re-theming and would need re-checking on
+   every Scalar upgrade. Left as a documented limitation of the vendored
+   reference rather than an unverified change that looks like a fix. */
 
 /* ─── Reduced motion ──────────────────────────────────────────────────────────
    A blanket reset rather than eleven individually wrapped rules, because most of
@@ -529,6 +549,38 @@ code {
   font-size: 0.875rem;
 }
 
+/* Syntax tokens.
+   prism-react-renderer writes its theme as INLINE styles on every token, so
+   this is the one place !important is doing real work rather than papering over
+   specificity: there is no other way to reach an inline style from a stylesheet.
+   Only the two groups that fail AA are overridden; the rest of the github theme
+   is left alone. See the --syntax-* tokens for the measured ratios. */
+.token.string,
+.token.attr-value {
+  color: var(--syntax-pink) !important;
+}
+
+.token.entity,
+.token.url,
+.token.symbol,
+.token.number,
+.token.boolean,
+.token.variable,
+.token.constant,
+.token.property,
+.token.regex,
+.token.inserted {
+  color: var(--syntax-teal) !important;
+}
+
+/* The theme also carries its own near-white background, which would sit inside
+   our recessed surface as a lighter panel. */
+pre[class*='language-'],
+.theme-code-block,
+.theme-code-block > div {
+  background-color: var(--color-bg-muted) !important;
+}
+
 :not(pre) > code {
   background: var(--color-accent-soft);
   color: var(--color-accent-hover);
@@ -572,16 +624,39 @@ table th {
   border-color: var(--color-border);
 }
 
-/* ─── Links ────────────────────────────────────────────────────────────────── */
+/* ─── Links ──────────────────────────────────────────────────────────────────
+   Inline prose links are underlined, not merely tinted. Cobalt on ink measures
+   2.8:1 against the surrounding text — below the 3:1 that WCAG requires when
+   colour is the ONLY thing distinguishing a link — so without the underline a
+   reader who cannot separate those hues cannot find the links at all. This is
+   the same principle as D-6 (no product identified by colour alone) applied to
+   body copy, and axe flagged it on three templates.
+
+   The underline sits below the baseline and takes its weight from the font, so
+   it reads as typography rather than as a border. */
 .markdown a {
   color: var(--color-accent);
-  text-decoration: none;
-  transition: color var(--duration-normal) var(--ease-out-expo);
+  text-decoration: underline;
+  text-decoration-thickness: from-font;
+  text-underline-offset: 0.18em;
 }
 
 .markdown a:hover {
   color: var(--color-accent-hover);
-  text-decoration: underline;
+}
+
+/* Links that are not prose: whole-card links, heading anchors and the
+   breadcrumb/TOC chrome carry their own affordances (a surface, a hover, an
+   icon) and are not embedded in a sentence, so an underline there would be
+   noise rather than information. */
+.markdown a.homeCard,
+.markdown a.homeCard:hover,
+.markdown a.homeCard:focus,
+.markdown a.hash-link,
+.markdown a.card,
+.markdown .pagination-nav__link,
+.markdown .tabs__item {
+  text-decoration: none;
 }
 
 /* Whole-card links (landing-page HomeCards) wrap the card's own title +

@@ -138,6 +138,14 @@
   --font-sans:    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono:    'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
   /* Layout */
   --header-height: 64px;
   --border-radius:      6px;
@@ -222,15 +230,15 @@
   color: var(--color-text-tertiary);
 }
 
-/* ─── Navbar ───────────────────────────────────────────────────────────────── */
+/* ─── Navbar ─────────────────────────────────────────────────────────────────
+   The frosted, saturated glass bar went, for the same two reasons the site
+   retired it: it was a hardcoded white at 92% sitting over warm paper, so it
+   read as a colour mismatch rather than a decision; and `saturate() blur()` is
+   the generic SaaS chrome this refinement is trying to stop sounding like. The
+   header is now simply paper with a hairline. */
 .navbar {
+  background: var(--color-bg);
   border-bottom: 1px solid var(--color-border);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  box-shadow: var(--shadow-sm);
-}
-
-[data-theme='dark'] .navbar {
   box-shadow: none;
 }
 
@@ -303,33 +311,46 @@
   font-weight: 600;
 }
 
-/* "Get Started Free" CTA — mirrors the website's .btn--primary.btn--sm */
+/* Rule separating the five solutions from the catch-all link in the dropdown,
+   mirroring the marketing site's menu. */
+.dropdown__divider {
+  border: 0;
+  height: 1px;
+  background: var(--color-border);
+  margin: 0.35rem 0;
+}
+
+/* "Comenzar gratis" CTA — the site's .btn--primary.
+   The 44px floor is the WCAG target size the design system mandates; this
+   button used to be 32px, which failed it on touch. */
 .navbar__cta {
   display: inline-flex;
   align-items: center;
-  height: 32px;
-  padding: 0 0.75rem;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 1rem;
   margin-left: 0.5rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   font-weight: 500;
-  color: #ffffff !important;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  color: var(--color-text-inverse) !important;
   background: var(--color-accent);
   border-radius: var(--border-radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  transition: background-color var(--duration-normal) var(--ease-out-expo),
-    transform var(--duration-fast) ease, box-shadow var(--duration-normal) var(--ease-out-expo);
 }
 
 .navbar__cta:hover {
   background: var(--color-accent-hover);
-  color: #ffffff !important;
+  color: var(--color-text-inverse) !important;
   text-decoration: none;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
 
-[data-theme='dark'] .navbar__cta:hover {
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+/* The lift-on-hover went with the rest of the template kit: the colour change
+   already reports the state, and a moving button under the cursor is noise. */
+@media (prefers-reduced-motion: no-preference) {
+  .navbar__cta {
+    transition: background-color var(--duration-normal) var(--ease-out-expo);
+  }
 }
 
 /* ─── Sidebar ──────────────────────────────────────────────────────────────── */
@@ -653,10 +674,14 @@ blockquote {
   --ifm-alert-foreground-color: #fca5a5;
 }
 
-/* ─── Footer ───────────────────────────────────────────────────────────────── */
+/* ─── Footer ─────────────────────────────────────────────────────────────────
+   The footer itself is rendered by the swizzle at src/theme/Footer/, which
+   carries its own module CSS. These rules only cover the Infima classes that
+   survive around it; keep the surface identical to the swizzle's (paper) so
+   the two can never disagree. */
 .footer {
   border-top: 1px solid var(--color-border);
-  background: var(--color-bg-alt);
+  background: var(--color-bg);
 }
 
 [data-theme='dark'] .footer {

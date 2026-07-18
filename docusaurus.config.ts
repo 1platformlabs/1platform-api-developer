@@ -186,6 +186,9 @@ const config: Config = {
             {href: 'https://1platform.pro/solutions/content/', label: 'Contenido con IA', target: '_self'},
             {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Panel white-label', target: '_self'},
             {href: 'https://1platform.pro/payments-invoicing/', label: 'Pagos y facturación', target: '_self'},
+            // The site separates the five solutions from the catch-all link
+            // with a rule; mirror it so the two menus read identically.
+            {type: 'html', value: '<hr class="dropdown__divider" />'},
             {href: 'https://1platform.pro/solutions/', label: 'Ver todas las soluciones', target: '_self'},
           ],
         },

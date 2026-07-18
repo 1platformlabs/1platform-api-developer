@@ -49,6 +49,13 @@ const config: Config = {
   // even same-origin — a font fetch is always CORS-mode, and without it the
   // browser downloads the file twice.
   headTags: [
+    // The portal is light-only (see colorMode below). Declaring it means the
+    // browser chrome and form controls match the paper surface instead of
+    // guessing from the OS preference.
+    {
+      tagName: 'meta',
+      attributes: {name: 'theme-color', content: '#F6F5F2'},
+    },
     {
       tagName: 'link',
       attributes: {

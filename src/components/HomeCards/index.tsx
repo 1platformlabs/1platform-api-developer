@@ -9,6 +9,17 @@ import styles from './styles.module.css';
  * Card grid used on the docs landing page (docs/intro.mdx). Extracted from the
  * former standalone marketing homepage so the same product/API entry points now
  * live inside the documentation layout (sidebar + breadcrumb + TOC).
+ *
+ * SOURCE OF TRUTH FOR THESE STRINGS: the `message` values below.
+ *
+ * `i18n/es/code.json` used to carry a copy of all thirteen of them. Because
+ * Spanish is the default AND only locale, that copy is what actually rendered,
+ * so editing this file changed nothing on the page — and the two had already
+ * drifted (the shipped Dashboard blurb read "facturación, facturas", a
+ * redundant pair, where the source read the better "cobros, facturación").
+ * Those overrides are gone; `code.json` now holds only real `theme.*` UI
+ * translations. If a second locale is ever added, translate via `code.json` for
+ * THAT locale and leave these as the source.
  */
 type Card = {
   icon: IconName;

@@ -13,57 +13,24 @@
  * a second token set here, not resurrecting the old palette.
  */
 
-/* ─── Typefaces — self-hosted (SIL OFL, see static/fonts/LICENSE-*.txt) ───────
-   Display: Space Grotesk · Text: Inter · Data/labels: JetBrains Mono
-   The same six latin-subset faces the marketing site ships, so the letterforms
-   are identical across the two domains rather than "whatever the CDN serves". */
-@font-face {
-  font-family: 'Space Grotesk';
-  src: url('/fonts/space-grotesk-latin-500-normal.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
+/* ─── Typefaces ───────────────────────────────────────────────────────────────
+   The six @font-face rules are NOT here. They live in `headTags` in
+   docusaurus.config.ts, next to the two `rel=preload` links, and this is a
+   deliberate trade rather than an oversight.
 
-@font-face {
-  font-family: 'Space Grotesk';
-  src: url('/fonts/space-grotesk-latin-700-normal.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+   webpack's css-loader rewrites every `url()` it can resolve into a
+   content-hashed copy under /assets/fonts/. So a stylesheet saying
+   `url('/fonts/inter-latin-400-normal.woff2')` shipped TWO copies of every face
+   — the static passthrough and the hashed one — while the preload pointed at the
+   static path and the page actually fetched the hashed path. The preload was
+   downloading 24 KB that nothing on the page ever used, which is worse than
+   having no preload at all. Measured, not assumed: the browser made seven woff2
+   requests for six faces.
 
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/inter-latin-400-normal.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/inter-latin-500-normal.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/inter-latin-600-normal.woff2') format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
+   Declaring the faces in the head keeps the URL webpack never sees, so the
+   preload and the @font-face agree by construction, and there is exactly one
+   copy of each file. Everything else about typography — the families, the roles,
+   the scale — is still decided here in the token layer below. */
 
 /* ─── Design tokens — "ink & signal" ──────────────────────────────────────────
    Ported verbatim from 1platform-website/src/styles/global.css. One accent
@@ -246,6 +213,27 @@
   --scalar-border-color: var(--color-border);
   --scalar-font: var(--font-sans);
   --scalar-font-code: var(--font-mono);
+}
+
+/* ─── Reduced motion ──────────────────────────────────────────────────────────
+   A blanket reset rather than eleven individually wrapped rules, because most of
+   the motion on this site is not ours: Infima and Scalar ship their own
+   transitions and we cannot wrap those at the source. Verified in a browser with
+   the media feature emulated — before this, every landing card still animated
+   under `prefers-reduced-motion: reduce`, since the card links inherit a colour
+   transition from `.markdown a`.
+
+   Durations collapse to 0.01ms rather than 0 so that `transitionend` listeners
+   still fire and nothing hangs waiting for an event that never arrives. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ─── Eyebrow — the structural label device ───────────────────────────────────

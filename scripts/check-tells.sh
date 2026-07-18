@@ -198,14 +198,23 @@ report "no pastel product tiles" \
 # shipping zero files, and every page rendered in system-ui while every probe
 # said the fonts were present.
 m=$({
-  face_count=$(grep -c '@font-face' src/css/custom.css || true)
+  # The faces are declared in docusaurus.config.ts headTags, not the stylesheet,
+  # so that their URLs bypass webpack and match the preloads. See the comment at
+  # the top of src/css/custom.css.
+  face_count=$(grep -c '@font-face' docusaurus.config.ts || true)
   woff_count=$(find static/fonts -name '*.woff2' 2>/dev/null | wc -l | tr -d ' ')
   licence_count=$(find static/fonts -name 'LICENSE-*.txt' 2>/dev/null | wc -l | tr -d ' ')
   preload_count=$(grep -c "rel: 'preload'" docusaurus.config.ts || true)
-  [ "${face_count:-0}" -ge 6 ] || echo "only ${face_count:-0} @font-face rules in src/css/custom.css (expected 6)"
+  [ "${face_count:-0}" -ge 6 ] || echo "only ${face_count:-0} @font-face rules in docusaurus.config.ts (expected 6)"
   [ "${woff_count:-0}" -ge 6 ] || echo "only ${woff_count:-0} .woff2 files in static/fonts/ (expected 6)"
   [ "${licence_count:-0}" -ge 3 ] || echo "only ${licence_count:-0} LICENSE-*.txt in static/fonts/ (the OFL travels with the files)"
   [ "${preload_count:-0}" -ge 2 ] || echo "only ${preload_count:-0} font preloads in docusaurus.config.ts headTags (expected 2)"
+
+  # Every preloaded file must actually exist under static/fonts/. A preload
+  # pointing at a path the build does not serve is a silent 24 KB of nothing.
+  for f in $(grep -oE "/fonts/[a-z0-9-]+\.woff2" docusaurus.config.ts | sort -u); do
+    [ -f "static${f}" ] || echo "referenced font ${f} is missing from static/fonts/"
+  done
 })
 report "fonts are self-hosted, licensed and preloaded" \
        "faces can be declared and still absent; count the files, not the rules" "$m"

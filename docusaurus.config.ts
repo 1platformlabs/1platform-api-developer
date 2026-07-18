@@ -43,12 +43,34 @@ const config: Config = {
 
   onBrokenLinks: 'throw',
 
-  // Preload the two faces that render above the fold on every page: the display
-  // face that draws the h1 and the text face that draws the body. The other
-  // four are discovered from the stylesheet as usual. `crossorigin` is required
-  // even same-origin — a font fetch is always CORS-mode, and without it the
-  // browser downloads the file twice.
+  // ─── Typography ───────────────────────────────────────────────────────────
+  // The @font-face rules live HERE rather than in src/css/custom.css, and the
+  // reason is measurable: webpack's css-loader rewrites any `url()` it can
+  // resolve into a content-hashed copy under /assets/fonts/. With the faces
+  // declared in the stylesheet, every file shipped twice — the static
+  // passthrough and the hashed copy — and the preloads below pointed at the
+  // static path while the page actually fetched the hashed one. The browser made
+  // seven woff2 requests for six faces, and the "preload" was 24 KB that nothing
+  // used. Declared here, the URL never passes through webpack, so the preload
+  // and the @font-face agree by construction.
+  //
+  // The two preloaded faces are the ones that render above the fold on every
+  // page: the display face that draws the h1 and the text face that draws the
+  // body. `crossorigin` is required even same-origin, because a font fetch is
+  // always CORS-mode and omitting it downloads the file a second time.
   headTags: [
+    {
+      tagName: 'style',
+      attributes: {},
+      innerHTML: [
+        "@font-face{font-family:'Space Grotesk';src:url('/fonts/space-grotesk-latin-500-normal.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'Space Grotesk';src:url('/fonts/space-grotesk-latin-700-normal.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-500-normal.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-600-normal.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'JetBrains Mono';src:url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
+      ].join(''),
+    },
     // The portal is light-only (see colorMode below). Declaring it means the
     // browser chrome and form controls match the paper surface instead of
     // guessing from the OS preference.

@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"ak-your-app-api-key\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv3.26.2"
+    "version": "PRODv3.26.3"
   },
   "servers": [
     {
@@ -7414,6 +7414,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_ActivationStatusResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "state": "otp_pending",
+                    "display_status": "otp_pending",
+                    "ready": false,
+                    "otp_requested_at": "2026-07-18T14:05:00Z",
+                    "updated_at": "2026-07-18T14:05:00Z"
+                  },
+                  "msg": "Activation started"
                 }
               }
             }
@@ -7543,6 +7554,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_ActivationStatusResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "state": "otp_validated",
+                    "display_status": "active",
+                    "ready": true,
+                    "ready_at": "2026-07-17T09:30:00Z",
+                    "otp_requested_at": "2026-07-16T09:20:00Z",
+                    "updated_at": "2026-07-16T09:30:00Z"
+                  },
+                  "msg": "Activation status retrieved"
                 }
               }
             }
@@ -7657,6 +7680,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_ActivationStatusResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "state": "otp_validated",
+                    "display_status": "activating",
+                    "ready": false,
+                    "ready_at": "2026-07-19T14:12:00Z",
+                    "otp_requested_at": "2026-07-18T14:05:00Z",
+                    "updated_at": "2026-07-18T14:12:00Z"
+                  },
+                  "msg": "Activation verified"
                 }
               }
             }
@@ -17060,16 +17095,38 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PaymentLinkCreateRequest"
+              },
+              "example": {
+                "amount": 250,
+                "concept": "Consultoría — julio 2026",
+                "expires_in_days": 7,
+                "merchant_reference": "INV-2026-0042"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "Payment link created",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "business_id": "507f1f77bcf86cd799439012",
+                    "amount": 250,
+                    "currency": "GTQ",
+                    "concept": "Consultoría — julio 2026",
+                    "status": "active",
+                    "url": "https://api.1platform.pro/api/v1/pay/8f3c1d2b9a7e4f60",
+                    "expires_at": "2026-07-25T14:05:00Z",
+                    "created_at": "2026-07-18T14:05:00Z",
+                    "updated_at": "2026-07-18T14:05:00Z"
+                  },
+                  "msg": "Payment link created"
+                }
               }
             }
           },
@@ -17225,10 +17282,33 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Payment links retrieved",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "507f1f77bcf86cd799439011",
+                        "business_id": "507f1f77bcf86cd799439012",
+                        "amount": 250,
+                        "currency": "GTQ",
+                        "concept": "Consultoría — julio 2026",
+                        "status": "active",
+                        "url": "https://api.1platform.pro/api/v1/pay/8f3c1d2b9a7e4f60",
+                        "expires_at": "2026-07-25T14:05:00Z",
+                        "created_at": "2026-07-18T14:05:00Z",
+                        "updated_at": "2026-07-18T14:05:00Z"
+                      }
+                    ],
+                    "total": 1,
+                    "page": 1,
+                    "limit": 20
+                  },
+                  "msg": "Payment links retrieved"
+                }
               }
             }
           },
@@ -17332,10 +17412,26 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Payment link retrieved",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "business_id": "507f1f77bcf86cd799439012",
+                    "amount": 250,
+                    "currency": "GTQ",
+                    "concept": "Consultoría — julio 2026",
+                    "status": "active",
+                    "url": "https://api.1platform.pro/api/v1/pay/8f3c1d2b9a7e4f60",
+                    "expires_at": "2026-07-25T14:05:00Z",
+                    "created_at": "2026-07-18T14:05:00Z",
+                    "updated_at": "2026-07-18T14:05:00Z"
+                  },
+                  "msg": "Payment link retrieved"
+                }
               }
             }
           },
@@ -17439,10 +17535,26 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Payment link cancelled",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "business_id": "507f1f77bcf86cd799439012",
+                    "amount": 250,
+                    "currency": "GTQ",
+                    "concept": "Consultoría — julio 2026",
+                    "status": "cancelled",
+                    "url": "https://api.1platform.pro/api/v1/pay/8f3c1d2b9a7e4f60",
+                    "expires_at": "2026-07-25T14:05:00Z",
+                    "created_at": "2026-07-18T14:05:00Z",
+                    "updated_at": "2026-07-18T14:05:00Z"
+                  },
+                  "msg": "Payment link cancelled"
+                }
               }
             }
           },
@@ -17522,10 +17634,13 @@
         ],
         "responses": {
           "200": {
-            "description": "Status page (paid / unavailable)",
+            "description": "Status page (paid / cancelled / expired / unavailable)",
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>1Platform</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}.card{max-width:26rem;padding:2rem;text-align:center}.brand{font-weight:700;font-size:1.25rem;margin-bottom:1rem}.msg{font-size:1rem;line-height:1.5;color:#cbd5e1}</style></head><body><main class=\"card\"><div class=\"brand\">1Platform</div><p class=\"msg\">Este link de pago ya fue pagado.</p></main></body></html>"
               }
             }
           },
@@ -17533,7 +17648,14 @@
             "description": "Redirect to the hosted checkout"
           },
           "404": {
-            "description": "Unknown token"
+            "description": "Unknown token",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -17546,7 +17668,14 @@
             }
           },
           "503": {
-            "description": "Could not start the payment"
+            "description": "Could not start the payment, or the feature is disabled",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }
@@ -21015,6 +21144,9 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ReassignDomainOwnerRequest"
+              },
+              "example": {
+                "owner_user_id": "507f1f77bcf86cd799439012"
               }
             }
           }
@@ -21026,6 +21158,23 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_AdminDomainItem_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "domain": "ejemplo.gt",
+                    "status": "active",
+                    "expires_at": "2027-07-18T00:00:00Z",
+                    "auto_renew": true,
+                    "owner": {
+                      "user_id": "507f1f77bcf86cd799439012",
+                      "email": "empleado@appstart.gt"
+                    },
+                    "created_at": "2026-07-18T14:05:00Z",
+                    "updated_at": "2026-07-18T14:20:00Z"
+                  },
+                  "msg": "Domain reassigned"
                 }
               }
             }
@@ -39384,6 +39533,10 @@
     {
       "name": "Payments",
       "description": "Create payment transactions, get a checkout URL, and retrieve your full transaction history."
+    },
+    {
+      "name": "Payment Links",
+      "description": "Emit shareable payment links so a business can charge an external customer who is not a 1Platform user. Merchant endpoints require the two-token auth; the `/pay/{token}` link itself is public — the token is the capability."
     },
     {
       "name": "Subscriptions",

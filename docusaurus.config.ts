@@ -6,21 +6,12 @@ import type * as Preset from '@docusaurus/preset-classic';
 // One Scalar instance per SaaS API. Specs are served from static/openapi/<id>.json
 // (downloaded at build time by scripts/fetch-openapi.mjs, committed as cache).
 // Each instance MUST have a unique `id`.
-const SCALAR_LIGHT_CSS = `
-  .light-mode {
-    --scalar-color-accent: #2563eb;
-    --scalar-color-1: #0f172a;
-    --scalar-color-2: #475569;
-    --scalar-color-3: #64748b;
-    --scalar-background-1: #ffffff;
-    --scalar-background-2: #f8fafc;
-    --scalar-background-3: #f1f5f9;
-    --scalar-border-color: #e2e8f0;
-    --scalar-font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --scalar-font-code: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
-  }
-`;
-
+//
+// Scalar's theme is NOT configured here. It used to re-declare the whole
+// palette as hex literals, which made this file a second place where colour
+// was decided and guaranteed drift from the stylesheet. The `--scalar-*`
+// variables now live in src/css/custom.css, mapped onto the same tokens as
+// everything else.
 const scalarPlugin = (id: string, label: string, route: string, specPath: string) => [
   '@scalar/docusaurus',
   {
@@ -34,7 +25,6 @@ const scalarPlugin = (id: string, label: string, route: string, specPath: string
       darkMode: false,
       forceDarkModeState: 'light' as const,
       hideDarkModeToggle: true,
-      customCss: SCALAR_LIGHT_CSS,
     },
   },
 ];
@@ -52,6 +42,63 @@ const config: Config = {
   baseUrl: '/',
 
   onBrokenLinks: 'throw',
+
+  // ─── Typography ───────────────────────────────────────────────────────────
+  // The @font-face rules live HERE rather than in src/css/custom.css, and the
+  // reason is measurable: webpack's css-loader rewrites any `url()` it can
+  // resolve into a content-hashed copy under /assets/fonts/. With the faces
+  // declared in the stylesheet, every file shipped twice — the static
+  // passthrough and the hashed copy — and the preloads below pointed at the
+  // static path while the page actually fetched the hashed one. The browser made
+  // seven woff2 requests for six faces, and the "preload" was 24 KB that nothing
+  // used. Declared here, the URL never passes through webpack, so the preload
+  // and the @font-face agree by construction.
+  //
+  // The two preloaded faces are the ones that render above the fold on every
+  // page: the display face that draws the h1 and the text face that draws the
+  // body. `crossorigin` is required even same-origin, because a font fetch is
+  // always CORS-mode and omitting it downloads the file a second time.
+  headTags: [
+    {
+      tagName: 'style',
+      attributes: {},
+      innerHTML: [
+        "@font-face{font-family:'Space Grotesk';src:url('/fonts/space-grotesk-latin-500-normal.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'Space Grotesk';src:url('/fonts/space-grotesk-latin-700-normal.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-500-normal.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-600-normal.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}",
+        "@font-face{font-family:'JetBrains Mono';src:url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
+      ].join(''),
+    },
+    // The portal is light-only (see colorMode below). Declaring it means the
+    // browser chrome and form controls match the paper surface instead of
+    // guessing from the OS preference.
+    {
+      tagName: 'meta',
+      attributes: {name: 'theme-color', content: '#F6F5F2'},
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preload',
+        href: '/fonts/space-grotesk-latin-700-normal.woff2',
+        as: 'font',
+        type: 'font/woff2',
+        crossorigin: 'anonymous',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preload',
+        href: '/fonts/inter-latin-400-normal.woff2',
+        as: 'font',
+        type: 'font/woff2',
+        crossorigin: 'anonymous',
+      },
+    },
+  ],
 
   // Spanish-only for now: the source content is the canonical Spanish version
   // (audited and improved here). English will be re-introduced later as a
@@ -158,6 +205,9 @@ const config: Config = {
             {href: 'https://1platform.pro/solutions/content/', label: 'Contenido con IA', target: '_self'},
             {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Panel white-label', target: '_self'},
             {href: 'https://1platform.pro/payments-invoicing/', label: 'Pagos y facturación', target: '_self'},
+            // The site separates the five solutions from the catch-all link
+            // with a rule; mirror it so the two menus read identically.
+            {type: 'html', value: '<hr class="dropdown__divider" />'},
             {href: 'https://1platform.pro/solutions/', label: 'Ver todas las soluciones', target: '_self'},
           ],
         },

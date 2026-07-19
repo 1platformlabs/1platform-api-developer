@@ -1,16 +1,28 @@
 import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 import {translate} from '@docusaurus/Translate';
+
+import Icon, {type IconName} from '@site/src/components/Icon';
 import styles from './styles.module.css';
 
 /**
  * Card grid used on the docs landing page (docs/intro.mdx). Extracted from the
  * former standalone marketing homepage so the same product/API entry points now
  * live inside the documentation layout (sidebar + breadcrumb + TOC).
+ *
+ * SOURCE OF TRUTH FOR THESE STRINGS: the `message` values below.
+ *
+ * `i18n/es/code.json` used to carry a copy of all thirteen of them. Because
+ * Spanish is the default AND only locale, that copy is what actually rendered,
+ * so editing this file changed nothing on the page — and the two had already
+ * drifted (the shipped Dashboard blurb read "facturación, facturas", a
+ * redundant pair, where the source read the better "cobros, facturación").
+ * Those overrides are gone; `code.json` now holds only real `theme.*` UI
+ * translations. If a second locale is ever added, translate via `code.json` for
+ * THAT locale and leave these as the source.
  */
 type Card = {
-  icon: string;
-  iconClass: string;
+  icon: IconName;
   title: string;
   desc: string;
   href: string;
@@ -19,8 +31,7 @@ type Card = {
 // Group A — configurable end-products (per tenant). Non-technical audience.
 const TENANT_PRODUCTS: Card[] = [
   {
-    icon: '🧭',
-    iconClass: styles.iconBlue,
+    icon: 'dashboard',
     title: '1Platform Dashboard',
     desc: translate({
       id: 'home.product.dashboard.desc',
@@ -30,8 +41,7 @@ const TENANT_PRODUCTS: Card[] = [
     href: '/docs/products/dashboard/overview',
   },
   {
-    icon: '📚',
-    iconClass: styles.iconPurple,
+    icon: 'layers',
     title: 'Atlas Dashboard',
     desc: translate({
       id: 'home.product.atlasDashboard.desc',
@@ -41,8 +51,7 @@ const TENANT_PRODUCTS: Card[] = [
     href: '/docs/products/atlas-dashboard/overview',
   },
   {
-    icon: '📱',
-    iconClass: styles.iconGreen,
+    icon: 'mobile',
     title: 'Atlas App',
     desc: translate({
       id: 'home.product.atlasApp.desc',
@@ -56,8 +65,7 @@ const TENANT_PRODUCTS: Card[] = [
 // Group B — SaaS APIs. Developer audience.
 const SAAS_PRODUCTS: Card[] = [
   {
-    icon: '⚙️',
-    iconClass: styles.iconBlue,
+    icon: 'code',
     title: '1Platform API',
     desc: translate({
       id: 'home.saas.onepApi.desc',
@@ -67,8 +75,7 @@ const SAAS_PRODUCTS: Card[] = [
     href: '/docs/saas/1platform-api/overview',
   },
   {
-    icon: '🌐',
-    iconClass: styles.iconOrange,
+    icon: 'globe',
     title: 'Atlas API',
     desc: translate({
       id: 'home.saas.atlasApi.desc',
@@ -81,29 +88,25 @@ const SAAS_PRODUCTS: Card[] = [
 
 const QUICKLINKS: Card[] = [
   {
-    icon: '🔌',
-    iconClass: styles.iconBlue,
+    icon: 'console',
     title: translate({id: 'home.quick.apiref.title', message: 'Referencia de la API'}),
     desc: translate({id: 'home.quick.apiref.desc', message: 'Explora y prueba cada endpoint en vivo.'}),
     href: '/docs/saas/api-reference-index',
   },
   {
-    icon: '🚀',
-    iconClass: styles.iconGreen,
+    icon: 'launch',
     title: translate({id: 'home.quick.start.title', message: 'Primeros pasos'}),
     desc: translate({id: 'home.quick.start.desc', message: 'Haz tu primera llamada autenticada.'}),
     href: '/docs/saas/1platform-api/getting-started',
   },
   {
-    icon: '🧩',
-    iconClass: styles.iconPurple,
+    icon: 'share',
     title: translate({id: 'home.quick.flows.title', message: 'Flujos de integración'}),
     desc: translate({id: 'home.quick.flows.desc', message: 'Flujos de trabajo de punta a punta, paso a paso.'}),
     href: '/docs/saas/1platform-api/flows/generate-invoice',
   },
   {
-    icon: '🔔',
-    iconClass: styles.iconOrange,
+    icon: 'bell',
     title: translate({id: 'home.quick.webhooks.title', message: 'Webhooks'}),
     desc: translate({id: 'home.quick.webhooks.desc', message: 'Reacciona a los eventos en el momento en que ocurren.'}),
     href: '/docs/saas/1platform-api/webhooks/overview',
@@ -115,13 +118,13 @@ function CardGrid({cards, columns}: {cards: Card[]; columns: 2 | 3}): ReactNode 
     <div className={columns === 2 ? styles.grid2 : styles.grid3}>
       {cards.map((c) => (
         <Link key={c.href} className={`${styles.card} homeCard`} to={c.href}>
-          <div className={`${styles.cardIconBadge} ${c.iconClass}`} aria-hidden="true">
-            {c.icon}
-          </div>
+          <span className={styles.cardIcon}>
+            <Icon name={c.icon} size={20} />
+          </span>
           <div className={styles.cardTitle}>{c.title}</div>
           <p className={styles.cardDesc}>{c.desc}</p>
-          <span className={styles.cardArrow} aria-hidden="true">
-            →
+          <span className={styles.cardCue} aria-hidden="true">
+            <Icon name="arrow-right" size={14} />
           </span>
         </Link>
       ))}

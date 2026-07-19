@@ -2,12 +2,12 @@
  * Swizzled (ejected) from @docusaurus/theme-classic 3.9.2.
  *
  * The ONLY change vs. upstream is the category label rendering: top-level
- * product/API sections carry `customProps.{icon,tint,description}` (set in
- * sidebars.ts) and are rendered Migo-style as an icon badge + title + one-line
- * description. Every other category (audience group headers, deep sub-groups
- * like "Reference"/"Webhooks") has no `customProps.icon` and falls back to the
- * stock label. All collapse / auto-expand / SSR-fallback logic is unchanged —
- * keep this file in sync when upgrading Docusaurus.
+ * product/API sections carry `customProps.{icon,description}` (set in each
+ * _category_.json) and render as an icon + title + one-line description. Every
+ * other category (audience group headers, deep sub-groups like
+ * "Reference"/"Webhooks") has no `customProps.icon` and falls back to the stock
+ * label. All collapse / auto-expand / SSR-fallback logic is unchanged — keep
+ * this file in sync when upgrading Docusaurus.
  */
 
 import React, {
@@ -37,6 +37,8 @@ import useIsBrowser from '@docusaurus/useIsBrowser';
 import DocSidebarItems from '@theme/DocSidebarItems';
 import DocSidebarItemLink from '@theme/DocSidebarItem/Link';
 import type {Props} from '@theme/DocSidebarItem/Category';
+
+import Icon, {toIconName, type IconName} from '@site/src/components/Icon';
 
 import type {
   PropSidebarItemCategory,
@@ -129,13 +131,16 @@ function CollapseButton({
   );
 }
 
-type RichProps = {icon?: string; tint?: string; description?: string};
+type RichProps = {icon?: IconName; description?: string};
 
+/**
+ * `customProps` comes from a _category_.json, which nothing type-checks. An
+ * unknown icon name degrades to "no icon" rather than failing the build.
+ */
 function readRichProps(customProps: unknown): RichProps {
   const cp = (customProps ?? {}) as Record<string, unknown>;
   return {
-    icon: typeof cp.icon === 'string' ? cp.icon : undefined,
-    tint: typeof cp.tint === 'string' ? cp.tint : undefined,
+    icon: toIconName(cp.icon),
     description: typeof cp.description === 'string' ? cp.description : undefined,
   };
 }
@@ -147,16 +152,15 @@ function CategoryLinkLabel({
   label: string;
   customProps?: unknown;
 }) {
-  const {icon, tint, description} = readRichProps(customProps);
+  const {icon, description} = readRichProps(customProps);
 
-  // Migo-style rich label: icon badge + title + one-line description.
+  // Rich label: icon + title + one-line description. The icon sits in ink; no
+  // tile of colour identifies the product (that information is in the title).
   if (icon) {
     return (
       <span className={styles.richLabel}>
-        <span
-          className={clsx(styles.richIcon, tint && styles[`tint_${tint}`])}
-          aria-hidden="true">
-          {icon}
+        <span className={styles.richIcon}>
+          <Icon name={icon} size={18} />
         </span>
         <span className={styles.richText}>
           <span className={styles.richTitle}>{label}</span>

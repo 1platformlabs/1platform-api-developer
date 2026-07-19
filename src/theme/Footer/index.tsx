@@ -81,7 +81,9 @@ export default function Footer(): ReactNode {
         <div className={styles.links}>
           <div className={styles.brand}>
             <Link to={WEBSITE} className={styles.brandLogo} aria-label="1Platform">
-              <span className={styles.brandLogo1}>1</span>
+              <span className={styles.brandLogoMark} aria-hidden="true">
+                1
+              </span>
               <span className={styles.brandLogoText}>Platform</span>
             </Link>
             <p className={styles.brandTag}>One platform. Every solution.</p>

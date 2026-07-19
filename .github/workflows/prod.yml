@@ -42,9 +42,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
+        # Version comes from `packageManager` in package.json, so CI, prod and a
+        # developer machine resolve the same pnpm rather than drifting. Pinning
+        # it here as well makes pnpm/action-setup abort with "Multiple versions
+        # of pnpm specified" and skips every downstream job, deploy included.
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -108,9 +110,11 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
+        # Version comes from `packageManager` in package.json, so CI, prod and a
+        # developer machine resolve the same pnpm rather than drifting. Pinning
+        # it here as well makes pnpm/action-setup abort with "Multiple versions
+        # of pnpm specified" and skips every downstream job, deploy included.
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -634,7 +638,11 @@ jobs:
           python-version: "3.13"
 
       - name: Notify Slack — Build failed
-        if: needs.build.result == 'failure'
+        # `!= 'success'`, not `== 'failure'`: a job that never ran is `skipped`,
+        # not `failure`. Merging #25 aborted `update_spec`, which left build and
+        # deploy `skipped` — so prod silently stayed on the old build and no
+        # alert fired, because neither result was ever the string 'failure'.
+        if: needs.build.result != 'success'
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ALERTS }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
@@ -676,7 +684,9 @@ jobs:
           fi
 
       - name: Notify Slack — Deploy failed
-        if: needs.deploy.result == 'failure'
+        # See above: `skipped` must alert too. `deploy` has no standalone `if`
+        # beyond its upstreams, so any non-success means the deploy did not land.
+        if: needs.deploy.result != 'success'
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ALERTS }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}

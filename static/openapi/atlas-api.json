@@ -936,7 +936,7 @@
           "content"
         ],
         "summary": "List content items (operator)",
-        "description": "Paginated operator listing of the tenant's catalog across **all**\nstatuses (including ``draft`` and ``archived``). For the public,\npublished-only, filterable grid use ``GET /public/catalog`` instead.\n\nOptional filters mirror the dashboard search form (issue atlas-dash#203,\nwhere these were silently dropped and every search returned the full\ncatalog): ``q`` is a free-text match over title, slug and\n``metadata.{author,isbn}``; ``kind`` / ``status`` narrow by catalog type\nand lifecycle. Unknown ``kind`` / ``status`` values are ignored rather than\nzeroing the list, matching the dashboard's own input validation. ``total``\nreflects the same filters so pagination stays correct.",
+        "description": "Paginated operator listing of the tenant's catalog across **all**\nstatuses (including ``draft`` and ``archived``). For the public,\npublished-only, filterable grid use ``GET /public/catalog`` instead.\n\nOptional filters mirror the dashboard search form (issue atlas-dash#203,\nwhere these were silently dropped and every search returned the full\ncatalog): ``q`` is a free-text match over title, slug and\n``metadata.{author,isbn}``; ``kind`` / ``status`` narrow by catalog type\nand lifecycle. Unknown ``kind`` / ``status`` values are ignored rather than\nzeroing the list, matching the dashboard's own input validation. ``total``\nreflects the same filters so pagination stays correct.\n\nTenant scope is ``ContentTenantDep``, same as ``GET /{item_id}``. PR #36\nmoved every authenticated ``/content/items`` handler onto the JWT tenant\nand left this one on the header — so the list answered for the *host*\ntenant while the detail answered for the *operator's* tenant. When those\ntwo disagree the dashboard renders a list whose every row 404s on open\nand bounces to ``/admin/content?error=not-found`` (atlas-dash#281). It\nwas also a cross-tenant read: an operator of tenant B browsing tenant A's\nadmin host got A's full catalog, drafts included, which\n``test_get_item_jwt_tenant_blocks_cross_tenant_read`` already forbids on\nthe detail.\n\nRequires the admin/operator role. This listing returns the catalog in\n**every** status, so leaving it anonymous published the tenant's\nunreleased pipeline to anyone who could name the slug: measured in\nproduction on 2026-07-31, a request with no ``Authorization`` at all and\n``X-Tenant-Slug: epublibre`` returned ``total=207`` ``draft`` rows\n(issue #166). The module docstring has listed this handler under\n\"Admin / operator endpoints (RBAC-gated)\" since Stream C — the gate was\nsimply never wired, unlike every mutation on the same router. Anonymous\ncallers belong on ``GET /public/catalog`` (published-only) or on\n``GET /content/items/by-slug/{slug}``, both of which stay open.",
         "operationId": "list_items_api_v1_content_items_get",
         "parameters": [
           {
@@ -1012,7 +1012,7 @@
             }
           },
           {
-            "name": "host",
+            "name": "x-admin-tenant-slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -1024,7 +1024,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Host"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -1041,6 +1041,70 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
             }
           }
         ],
@@ -1074,7 +1138,7 @@
           "content"
         ],
         "summary": "Get a content item by slug",
-        "description": "Fetch a single item by its human-readable slug, scoped to the\nresolved tenant. Returns ``404 CONTENT_NOT_FOUND`` when no item with\nthat slug exists for the tenant.",
+        "description": "Fetch a single item by its human-readable slug, scoped to the\nresolved tenant. Returns ``404 CONTENT_NOT_FOUND`` when no item with\nthat slug exists for the tenant.\n\nAnonymous callers only see :data:`_ANONYMOUS_VISIBLE_STATUSES`; a\n``draft``/``archived`` item is indistinguishable from a missing one, same\nstable code, so the response cannot be used to probe which unreleased\nslugs exist. An authenticated operator of the tenant keeps the unfiltered\nread (see :func:`_may_read_unpublished`).",
         "operationId": "get_item_by_slug_api_v1_content_items_by_slug__slug__get",
         "parameters": [
           {
@@ -1116,6 +1180,38 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
             }
           }
         ],
@@ -1161,7 +1257,7 @@
           "content"
         ],
         "summary": "Get a content item by id",
-        "description": "Fetch a single item by its id, scoped to the resolved tenant.\nReturns ``404 CONTENT_NOT_FOUND`` when the id does not belong to the\ntenant.",
+        "description": "Fetch a single item by its id, scoped to the resolved tenant.\nReturns ``404 CONTENT_NOT_FOUND`` when the id does not belong to the\ntenant.\n\nRequires the admin/operator role, for the same reason as the list above\n(issue #166): this is the operator detail view and it serves ``draft``\nand ``archived`` rows verbatim — anonymously, in production, until this\ncommit. The anonymous item route is ``GET /by-slug/{slug}``, which is\ndeclared public and SEO-indexable; the reviews sub-resource stays open\ntoo. Enumerated by measurement rather than by grep: of the 15 routes\nunder ``/content/items``, these two were the only ones the module\ndocstring declared RBAC-gated while carrying no user dependency.",
         "operationId": "get_item_api_v1_content_items__item_id__get",
         "parameters": [
           {
@@ -1236,6 +1332,22 @@
                 }
               ],
               "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
             }
           },
           {
@@ -1983,8 +2095,8 @@
         "tags": [
           "content"
         ],
-        "summary": "Set the audiobook narrator + chapter list (merge-preserve)",
-        "description": "Upsert the audiobook block (``narrator`` + ``audio_chapters``) on an\nitem's ``metadata_`` WITHOUT touching any other key (D-1 merge-preserve).\n\nA plain ``PATCH /{id}`` with ``metadata`` replaces the whole blob and\nwould drop ``assets``/``cover`` — a data-loss trap. This endpoint reads\nthe current metadata under a row lock, sets only the two audio keys and\nwrites it back in one transaction (R-5), so an interleaved asset upload\nof the same row cannot be lost.\n\nThe public detail derives ``audio{narrator,total,chapters}`` from these\nkeys (``_derive_item_audio``); delivery gates playback per chapter.",
+        "summary": "Set the audiobook narrator, language + chapter list (merge-preserve)",
+        "description": "Upsert the audiobook block (``narrator`` + ``audio_language`` +\n``audio_chapters``) on an item's ``metadata_`` WITHOUT touching any other\nkey (D-1 merge-preserve).\n\nA plain ``PATCH /{id}`` with ``metadata`` replaces the whole blob and\nwould drop ``assets``/``cover`` — a data-loss trap. This endpoint reads\nthe current metadata under a row lock, sets only the three audio keys and\nwrites it back in one transaction (R-5), so an interleaved asset upload\nof the same row cannot be lost.\n\nThe public detail derives ``audio{narrator,language,total,chapters}``\nfrom these keys (``_derive_item_audio``); delivery gates playback per\nchapter.",
         "operationId": "put_item_audio_api_v1_content_items__item_id__audio_put",
         "parameters": [
           {
@@ -11249,6 +11361,1178 @@
         }
       }
     },
+    "/api/v1/admin/autopublish/settings": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-autopublish"
+        ],
+        "summary": "This site's autopublication settings",
+        "operationId": "adminAutopublishGetSettings",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutopublishSettingsView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission missing",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INSUFFICIENT_PERMISSION"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "admin",
+          "admin-autopublish"
+        ],
+        "summary": "Change kinds, policy or the manual pause",
+        "operationId": "adminAutopublishPatchSettings",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutopublishSettingsPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutopublishSettingsView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission missing",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INSUFFICIENT_PERMISSION"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Field is not writable here",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "AUTOPUBLISH_FIELD_NOT_WRITABLE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/autopublish/catalog": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-autopublish"
+        ],
+        "summary": "Catalog titles available to this site",
+        "operationId": "adminAutopublishCatalog",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/autopublish/costs": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-autopublish"
+        ],
+        "summary": "Monthly cost rollups for this site",
+        "operationId": "adminAutopublishCosts",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CostRollupView"
+                  },
+                  "title": "Response Adminautopublishcosts"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/autopublish/charges": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-autopublish"
+        ],
+        "summary": "Charge detail for this site",
+        "operationId": "adminAutopublishCharges",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeListView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/autopublish/charges.csv": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-autopublish"
+        ],
+        "summary": "Export the ACTIVE filter as CSV",
+        "description": "Exports what the operator is LOOKING AT, filters included.\n\nAn export that ignores the active filter is the classic reconciliation trap:\nthe numbers on screen and the numbers in the file disagree, and the operator\ntrusts the file.",
+        "operationId": "adminAutopublishChargesCsv",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/autopublish/jobs:requeue": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin-autopublish"
+        ],
+        "summary": "Return transiently-failed jobs to the queue",
+        "description": "Only jobs whose failure was TRANSIENT are re-offered.\n\nRequeuing a job that failed on a quality refusal would regenerate the same\ntext and be refused again, forever — burning a generation each round while\nthe operator watches a counter that never moves.",
+        "operationId": "adminAutopublishRequeueJobs",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequeueBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequeueResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/autopublish/platform/metrics": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-autopublish"
+        ],
+        "summary": "Cross-tenant consumption (platform-wide)",
+        "description": "The one cross-tenant read in this module.\n\nIt takes NO ``EffectiveAdminTenantDep`` on purpose — it is not scoped to a\ntenant, which is precisely why it requires a permission no operator role\ncarries.",
+        "operationId": "adminAutopublishPlatformMetrics",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMetricsView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requires autopublish.platform.read",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INSUFFICIENT_PERMISSION"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/rails": {
       "get": {
         "tags": [
@@ -11901,6 +13185,22 @@
         "operationId": "admin.plans.list",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -11917,7 +13217,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -11929,7 +13229,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12017,6 +13317,22 @@
         "operationId": "admin.plans.create",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12033,7 +13349,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12045,7 +13361,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12150,6 +13466,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12166,7 +13498,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12178,7 +13510,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12293,6 +13625,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12309,7 +13657,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12321,7 +13669,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12527,8 +13875,60 @@
           "admin-members"
         ],
         "summary": "List Members",
+        "description": "The tenant's members, oldest first.\n\nBoth parameters are optional and the no-parameter response is byte-identical\nto what this endpoint has always returned — uncapped, same order. That is\nnot politeness: ``/admin/users`` computes its KPI totals (members, admins,\npending invites) over the full list, so silently capping it would make three\nnumbers on the page wrong (AVG-03, D-5).\n\nA search DOES get a cap, defaulted rather than unbounded, because a\ntwo-character term over a large roster is otherwise the same 160 KiB\nresponse the search exists to avoid.",
         "operationId": "admin.members.list",
         "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 200,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
           {
             "name": "host",
             "in": "header",
@@ -12546,7 +13946,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12558,7 +13958,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12646,6 +14046,22 @@
         "operationId": "admin.members.invite",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12662,7 +14078,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12674,7 +14090,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12792,6 +14208,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12808,7 +14240,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12820,7 +14252,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12900,6 +14332,482 @@
                 "example": {
                   "detail": {
                     "code": "MEMBER_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/plan-grants": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-plan-grants"
+        ],
+        "summary": "List Plan Grants",
+        "description": "Who holds a plan in this tenant, newest grant first.\n\nEmails are resolved in ONE ``IN`` query over ``members`` — the roster is\nsmall (units to dozens) but a per-row lookup would still be an N+1 waiting\nto matter.\n\nReads ``limit + 1`` rows to distinguish a full page from a truncated one, so\nthe response can say ``truncated`` instead of letting the UI imply that a\ncapped list is the whole roster.",
+        "operationId": "admin.plan_grants.list",
+        "parameters": [
+          {
+            "name": "include_expired",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Expired"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanGrantList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin",
+          "admin-plan-grants"
+        ],
+        "summary": "Create Plan Grant",
+        "description": "Grant a catalog plan to a member of this tenant.\n\nGuard clauses run in this order, and each one returns BEFORE anything is\nwritten: expiry sanity → catalog → member (scoped by tenant) → duplicate.\n\n``scope_ref`` is never taken from the request. It is derived from the\ntenant's catalog through ``entitlement_ref_for``, which is what puts a comp\nin the same population as a purchase (D-1) and what keeps the ``\"*\"``\nwildcard — the ref that would satisfy every gate of every plan — out of the\ntable no matter how ``tenants.config`` was written.",
+        "operationId": "admin.plan_grants.create",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanGrantCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanGrantView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "expires_at is not in the future.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "EXPIRES_AT_IN_PAST"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No member with that id for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "MEMBER_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The member already holds a live seat of that plan.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "PLAN_GRANT_EXISTS"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The plan is absent from this tenant's catalog or switched off (PLAN_NOT_IN_CATALOG), or declares an unusable ledger identifier (PLAN_REF_INVALID).",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "PLAN_NOT_IN_CATALOG"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/plan-grants/{grant_id}": {
+      "delete": {
+        "tags": [
+          "admin",
+          "admin-plan-grants"
+        ],
+        "summary": "Revoke Plan Grant",
+        "description": "Revoke one seat by id.\n\nBy id, never by ``scope_ref``: ``EntitlementRepository.revoke`` deletes\nevery row matching (tenant, member, scope_ref) WITHOUT filtering on\n``scope``, so a plan named after a content id would take that content grant\nwith it (D-7). ``revoke_by_id`` filters on ``(id, tenant_id)`` and so cannot\ncross tenants.\n\nAccepts any id, including a purchase — this is the administration API and a\nfraud case needs it. Restricting revocation to manual seats is a property of\nthe SCREEN (D-14), because that is where the accident happens.",
+        "operationId": "admin.plan_grants.revoke",
+        "parameters": [
+          {
+            "name": "grant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Grant Id"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No plan grant with that id for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "PLAN_GRANT_NOT_FOUND"
                   }
                 }
               }
@@ -22045,6 +23953,57 @@
         }
       }
     },
+    "/api/v1/public/app-screenshots/{tenant_slug}/{digest}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Serve an app-store screenshot without exposing storage",
+        "description": "Stream one app-release screenshot for ``tenant_slug``.",
+        "operationId": "public.app_screenshot",
+        "parameters": [
+          {
+            "name": "tenant_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "title": "Tenant Slug"
+            }
+          },
+          {
+            "name": "digest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Digest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown tenant, or no such screenshot."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/search/suggest": {
       "get": {
         "tags": [
@@ -22339,6 +24298,950 @@
           },
           "422": {
             "description": "Invalid slug/archetype/domain or config presets"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/site-verification": {
+      "put": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Write a tenant's search-console verification token (service-to-service)",
+        "description": "Set (or clear) the tenant's verification token, preserving the rest.\n\nWrites BOTH copies in one transaction, which is the whole point of the\nendpoint: ``GET /tenants/by-host`` — the resolver the public site\nrenders from — serves ``tenants.config``, never ``tenant_settings``.\nWriting only the settings row is a no-op with a 200 response: the tag\nnever reaches the HTML. Writing only the mirror leaves the admin form\nshowing an empty field, which is how an operator deletes the token\nwithout meaning to. Both rows are locked ``FOR UPDATE`` first so a\nconcurrent operator save cannot lose one of the two writes.\n\nLike ``POST /tenants``, the service key's own ``tenant_id`` is not\nconsulted: authorization is the capability, held by a single\ncredential, and every write lands in the audit log.",
+        "operationId": "write_site_verification_api_v1_platform_tenants__slug__site_verification_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformTenantVerificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformTenantVerificationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.seo.write capability"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Token does not match the accepted format"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/tenants": {
+      "get": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Tenants eligible for autopublication",
+        "description": "Enabled, with an unexpired lease and remaining quota. Never returns the price.",
+        "operationId": "platformAutopublishTenants",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EligibleTenant"
+                  },
+                  "title": "Response Platformautopublishtenants"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_KEY_REQUIRED"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability or scope missing",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_SCOPE_INVALID"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/tenants/{tenant_id}/items": {
+      "post": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Publish one catalog title into a tenant (THE billable call)",
+        "description": "Publish and meter, in one transaction.\n\nDomain errors propagate as ``AtlasError`` and are mapped by the app-level\nhandler, so a refusal never half-commits: the unit is spent inside the same\ntransaction that inserts the ficha and the charge, or none of them are.",
+        "operationId": "platformAutopublishPublishItem",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Tenant Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_KEY_REQUIRED"
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Quota exhausted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "AUTOPUBLISH_ALLOWANCE_EXHAUSTED"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Autopublication disabled or item excluded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "AUTOPUBLISH_DISABLED"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Lease expired",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "AUTOPUBLISH_LEASE_EXPIRED"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Quality gate refused the text",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INSUFFICIENT_SOURCE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/tenants/{tenant_id}/candidates": {
+      "get": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Catalog titles this tenant does not have yet",
+        "description": "The server-side diff, bounded by what the tenant can still afford.\n\nCapping the page at ``remaining_units`` is not cosmetic: handing the agent\n500 candidates when 3 units remain means 497 publish attempts that each cost\na request, a generation and a 402. The quota decrement stays the control —\nthis only stops the agent from doing obviously wasted work.",
+        "operationId": "platformAutopublishCandidates",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Tenant Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_KEY_REQUIRED"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability or scope missing",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_SCOPE_INVALID"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such site",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/jobs:claim": {
+      "post": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Lease a batch of queued jobs",
+        "description": "Top the queue up from the diff, then lease.\n\n``autopublish_jobs`` had no producer at all: ``enqueue_missing`` shipped with\nzero callers, so the queue was permanently empty and every claim returned an\nempty list no matter how much catalog a site was missing. The diff already\nknows exactly which titles a tenant lacks, and it is bounded by the tenant's\nremaining quota, so filling from it here needs no new scheduler and cannot\noutrun what the site can pay for.\n\nTopping up is idempotent — ``enqueue_missing`` skips titles already queued —\nso a concurrent worker adds nothing and claims a disjoint batch under\n``FOR UPDATE SKIP LOCKED``.",
+        "operationId": "platformAutopublishClaimJobs",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClaimedJob"
+                  },
+                  "title": "Response Platformautopublishclaimjobs"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/jobs/{job_id}:release": {
+      "post": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Return a job to the queue without waiting for the lease to expire",
+        "description": "A worker may declare failure, never success.\n\n``done`` is written exclusively by the publish transaction. If a worker could\ndeclare it, a crashed run would mark a title published that was never\ninserted and never charged — and the title would never be retried.",
+        "operationId": "platformAutopublishReleaseJob",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Outcome invalid",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "OUTCOME_INVALID"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/charges/usage": {
+      "get": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Aggregate spend for one tenant in one period",
+        "description": "An AGGREGATE, computed in the database.\n\nThe alternative the caller would otherwise be forced into — page a month of\ncharge rows every fifteen minutes and sum them client-side — gets slower\nevery month and is wrong the moment the page cap truncates it. Deriving it as\n``price x count`` is wrong differently: it breaks as soon as a price rotates\nmid-month, which is exactly when the number matters.",
+        "operationId": "platformAutopublishPeriodUsage",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Tenant Id"
+            }
+          },
+          {
+            "name": "period_month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}$",
+              "title": "Period Month"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodUsageView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/source:sign": {
+      "post": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Sign a read of a catalog title's source file",
+        "description": "Atlas signs against media-api with the PLATFORM credential.\n\nThis route exists so the agent never holds an ``mk_`` key. If it did, a key\non a laptop would grant direct read access to the entire shared catalog —\nevery tenant's source material — with no per-title authorisation and nothing\nto revoke short of rotating the platform credential.\n\nThe title is re-checked against the MIRROR first. Signing whatever id the\ncaller sends would turn this into an open proxy for any object media-api\nholds, including the titles that are deliberately not in ``catalog``.",
+        "operationId": "platformAutopublishSignSource",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceSignBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSignResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_KEY_REQUIRED"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability or scope missing",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_SCOPE_INVALID"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Format not servable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "NO_DELIVERABLE_FORMAT"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Platform media credential missing",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_MEDIA_NOT_CONFIGURED"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/charges": {
+      "get": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Unsettled charges, keyset-paginated",
+        "operationId": "platformAutopublishCharges",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/autopublish/charges:settle": {
+      "post": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Acknowledge charges, per item",
+        "description": "Per-item acknowledgement. Replay-safe by construction.\n\n``ignored`` counts rows that had already left ``pending``. That is the\nexpected outcome of a retried batch, not an error — reporting it as one would\nmake an agent retry forever.",
+        "operationId": "platformAutopublishSettleCharges",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettleResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown settlement status",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "OUTCOME_INVALID"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/autopublish": {
+      "put": {
+        "tags": [
+          "platform-autopublish"
+        ],
+        "summary": "Grant, re-assert or withdraw a tenant's allowance (Core only)",
+        "description": "Idempotent by ``lease_id``. Re-pushing the SAME id must not reset spend.\n\nThis is the property that lets the Core run every fifteen minutes and\nconverge after a transient failure with nobody intervening. Resetting\n``consumed_units`` on a re-push would hand the tenant its whole allowance\nback every quarter hour — unmetered publishing with every gate green, which\nis the single most expensive bug this endpoint could have.\n\n``granted_units=0`` is the withdrawal: the row stays, so the consumption\nhistory and the reason survive, and the conditional decrement starts failing\nimmediately because ``consumed < granted`` is false.",
+        "operationId": "platformAutopublishPushLease",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Tenant Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeasePushBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeasePushResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_KEY_REQUIRED"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability or scope missing",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_SCOPE_INVALID"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such site",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -23107,6 +26010,18 @@
             "type": "boolean",
             "title": "Enabled",
             "default": true
+          },
+          "entitlement_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entitlement Ref",
+            "description": "Identifier this plan uses in the entitlements ledger. Defaults to the plan slug when unset."
           }
         },
         "additionalProperties": true,
@@ -23911,7 +26826,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 255
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9._-]+$"
               },
               {
                 "type": "null"
@@ -24534,6 +27450,18 @@
             ],
             "title": "Narrator"
           },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 12
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
           "chapters": {
             "items": {
               "$ref": "#/components/schemas/AudioChapterIn"
@@ -24549,7 +27477,7 @@
           "chapters"
         ],
         "title": "AudioUpsert",
-        "description": "Request body for ``PUT /content/items/{id}/audio`` (AUD-01).\n\nSets ONLY ``narrator`` + ``audio_chapters`` on the item's metadata;\nthe endpoint merge-preserves every other key (assets, cover, …) so\nthe upsert can never drop a downloadable asset (D-1). Orders must be\nunique and contiguous ``1..N`` — the endpoint persists them sorted so\ndelivery/public resolve chapters deterministically."
+        "description": "Request body for ``PUT /content/items/{id}/audio`` (AUD-01).\n\nSets ONLY ``narrator``, ``language`` and ``audio_chapters`` on the\nitem's metadata; the endpoint merge-preserves every other key (assets,\ncover, …) so the upsert can never drop a downloadable asset (D-1).\nOrders must be unique and contiguous ``1..N`` — the endpoint persists\nthem sorted so delivery/public resolve chapters deterministically.\n\n``language`` is the language the narration is spoken in (see\n:class:`ItemAudio`), NOT the language of the ebook files. Like\n``narrator`` it is write-through: omitting it clears the stored value,\nso a caller editing the chapter list must send it again."
       },
       "AuditLogEntry": {
         "properties": {
@@ -24781,6 +27709,125 @@
         ],
         "title": "AuthorProfileResponse",
         "description": "Public author profile + works (atlas-redesign v2).\n\n``bio``/``born``/``country`` are projected from the person's free\n``metadata`` JSON (derive-at-read — no schema migration). ``works`` are\nthe author's published items matched by structured ``metadata.people``\nslug or the ``metadata.author`` byline (see\n``ContentRepository.list_by_author``)."
+      },
+      "AutopublishSettingsPatch": {
+        "properties": {
+          "kinds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kinds"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy"
+          },
+          "paused": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused",
+            "description": "Manual pause. Does not grant the ability to RESUME past a Core-imposed stop — resuming clears only an operator pause."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AutopublishSettingsPatch",
+        "description": "What a tenant admin may change. Everything else is the Core's."
+      },
+      "AutopublishSettingsView": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "allowed_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Kinds"
+          },
+          "granted_units": {
+            "type": "integer",
+            "title": "Granted Units"
+          },
+          "consumed_units": {
+            "type": "integer",
+            "title": "Consumed Units"
+          },
+          "remaining_units": {
+            "type": "integer",
+            "title": "Remaining Units"
+          },
+          "lease_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lease Expires At"
+          },
+          "policy": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Policy"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "granted_units",
+          "consumed_units",
+          "remaining_units",
+          "lease_expires_at",
+          "paused_reason"
+        ],
+        "title": "AutopublishSettingsView"
       },
       "Body_upload_branding_favicon_api_v1_admin_settings_branding_favicon_post": {
         "properties": {
@@ -25045,6 +28092,92 @@
         ],
         "title": "BulkResponse"
       },
+      "CandidatePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateTitle"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "CandidatePage"
+      },
+      "CandidateTitle": {
+        "properties": {
+          "media_title_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Media Title Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "canonical_metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Canonical Metadata"
+          },
+          "formats": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Formats"
+          },
+          "chapter_count": {
+            "type": "integer",
+            "title": "Chapter Count",
+            "default": 0
+          },
+          "group_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Ref"
+          },
+          "source_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Source Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "media_title_id",
+          "kind",
+          "title",
+          "source_updated_at"
+        ],
+        "title": "CandidateTitle"
+      },
       "CatalogCopy": {
         "properties": {
           "eyebrow": {
@@ -25186,6 +28319,288 @@
         ],
         "title": "CatalogPage"
       },
+      "CatalogRow": {
+        "properties": {
+          "media_title_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Media Title Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "chapter_count": {
+            "type": "integer",
+            "title": "Chapter Count"
+          },
+          "source_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Source Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "media_title_id",
+          "kind",
+          "title",
+          "chapter_count",
+          "source_updated_at"
+        ],
+        "title": "CatalogRow"
+      },
+      "CatalogView": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "CatalogView"
+      },
+      "ChargeListView": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChargeRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ChargeListView"
+      },
+      "ChargePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChargeView"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ChargePage"
+      },
+      "ChargeRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "media_title_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Media Title Id"
+          },
+          "content_item_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Item Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "unit_price_micros": {
+            "type": "integer",
+            "title": "Unit Price Micros"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "settlement_status": {
+            "type": "string",
+            "title": "Settlement Status"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "media_title_id",
+          "content_item_id",
+          "kind",
+          "unit_price_micros",
+          "currency",
+          "settlement_status",
+          "occurred_at"
+        ],
+        "title": "ChargeRow"
+      },
+      "ChargeView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "media_title_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Media Title Id"
+          },
+          "content_item_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Item Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "unit_price_micros": {
+            "type": "integer",
+            "title": "Unit Price Micros"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "lease_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lease Id"
+          },
+          "settlement_status": {
+            "type": "string",
+            "title": "Settlement Status"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tenant_id",
+          "media_title_id",
+          "content_item_id",
+          "kind",
+          "unit_price_micros",
+          "currency",
+          "lease_id",
+          "settlement_status",
+          "occurred_at"
+        ],
+        "title": "ChargeView"
+      },
       "CheckoutRequest": {
         "properties": {
           "plan_ref": {
@@ -25238,6 +28653,135 @@
           "url"
         ],
         "title": "CheckoutResponse"
+      },
+      "ClaimBody": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "worker_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Worker Id"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 25,
+            "minimum": 1,
+            "title": "Limit",
+            "default": 1
+          },
+          "lease_seconds": {
+            "type": "integer",
+            "maximum": 900,
+            "minimum": 60,
+            "title": "Lease Seconds",
+            "default": 900
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "worker_id"
+        ],
+        "title": "ClaimBody"
+      },
+      "ClaimedJob": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "media_title_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Media Title Id"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "leased_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leased Until"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "default": ""
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "canonical_metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Canonical Metadata"
+          },
+          "formats": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Formats"
+          },
+          "chapter_count": {
+            "type": "integer",
+            "title": "Chapter Count",
+            "default": 0
+          },
+          "text_source_title_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Source Title Id"
+          },
+          "text_source_formats": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Text Source Formats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "tenant_id",
+          "media_title_id",
+          "attempts",
+          "leased_until"
+        ],
+        "title": "ClaimedJob",
+        "description": "A leased job, WITH the mirror row the worker needs to act on it.\n\nThe identifiers alone are not a work order. To publish a title the worker has\nto pick a readable format, read the language, and send a title back in the\nbody — and it has no other way to learn any of that: the catalog belongs to\nmedia-api, the worker holds no media credential, and ``/candidates`` is a\ndifferent (read-only) page that does not correspond row-for-row with what was\nleased. Shipping only the ids made the very first claim useless: the worker\nsaw no ``formats``, released everything as ``NO_DELIVERABLE_FORMAT``, and the\nqueue drained into failures.\n\nThe fields are the mirror's, not a second source of truth: whatever ends up\npublished is still re-checked against ``media_catalog_titles`` inside the\npublish transaction."
       },
       "ComingSoonCopy": {
         "properties": {
@@ -25743,6 +29287,19 @@
             ],
             "title": "Original Language"
           },
+          "audio_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 12,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Language"
+          },
           "year": {
             "anyOf": [
               {
@@ -26001,6 +29558,49 @@
         ],
         "title": "ContentSummary",
         "description": "Compact public shape reused by /featured, /related, /search.\n\nIncludes rating denorm so the dashboard renders ★ averages without\na second roundtrip."
+      },
+      "CostRollupView": {
+        "properties": {
+          "period_month": {
+            "type": "string",
+            "title": "Period Month"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "gross_micros": {
+            "type": "integer",
+            "title": "Gross Micros"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "settled_items": {
+            "type": "integer",
+            "title": "Settled Items"
+          },
+          "settled_micros": {
+            "type": "integer",
+            "title": "Settled Micros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period_month",
+          "kind",
+          "items",
+          "gross_micros",
+          "currency",
+          "settled_items",
+          "settled_micros"
+        ],
+        "title": "CostRollupView"
       },
       "CreditGroup": {
         "properties": {
@@ -26462,6 +30062,61 @@
           "items"
         ],
         "title": "DownloadList"
+      },
+      "EligibleTenant": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "archetype": {
+            "type": "string",
+            "title": "Archetype"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "allowed_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Kinds"
+          },
+          "remaining_units": {
+            "type": "integer",
+            "title": "Remaining Units"
+          },
+          "policy": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Policy"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/QueueCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "slug",
+          "archetype",
+          "kinds",
+          "allowed_kinds",
+          "remaining_units",
+          "queue"
+        ],
+        "title": "EligibleTenant",
+        "description": "A tenant the agent may work on.\n\nCarries NO price. The agent decides what to publish; it never learns what the\ntenant is charged, so a compromised agent cannot report a tariff back to the\ntenant or reason about which tenants are lucrative."
       },
       "EmptyStatesCopy": {
         "properties": {
@@ -27982,6 +31637,17 @@
             ],
             "title": "Narrator"
           },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
           "total_duration_sec": {
             "anyOf": [
               {
@@ -28003,7 +31669,7 @@
         },
         "type": "object",
         "title": "ItemAudio",
-        "description": "Audiobook block surfaced on an item response.\n\nPresent only when the item declares ``metadata.audio_chapters``; items\nwithout chapters keep ``audio`` null (derive-at-read guard).\n``total_duration_sec`` sums the non-null chapter durations, or is\n``null`` when no chapter carries one."
+        "description": "Audiobook block surfaced on an item response.\n\nPresent only when the item declares ``metadata.audio_chapters``; items\nwithout chapters keep ``audio`` null (derive-at-read guard).\n``total_duration_sec`` sums the non-null chapter durations, or is\n``null`` when no chapter carries one.\n\n``language`` is the language the narration is *spoken in*, which is a\ndifferent fact from the item's ``language`` (the language of the ebook\nfiles). A library can legitimately pair an English ebook with a Spanish\nnarration; before this field existed the payload had nowhere to say so\nand the client could only guess from the item, which is wrong for those\npairings. ``null`` means \"not declared\" — clients must not fall back to\nthe item's language to fill it in."
       },
       "ItemDetail": {
         "properties": {
@@ -28391,6 +32057,118 @@
           "deltas"
         ],
         "title": "KpisResponse"
+      },
+      "LeasePushBody": {
+        "properties": {
+          "lease_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Lease Id"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "granted_units": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Granted Units"
+          },
+          "unit_price_micros": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Unit Price Micros"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "title": "Currency"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Kinds"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lease_id",
+          "enabled",
+          "granted_units",
+          "unit_price_micros",
+          "currency"
+        ],
+        "title": "LeasePushBody",
+        "description": "The allowance the Core is granting. Written ONLY by the Core.\n\nEvery field here is one an operator is refused on the admin surface: the\nprice, the quota and `enabled`. This is the other side of that split — the\nparty that grants credit is the party that sets what it costs."
+      },
+      "LeasePushResult": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "lease_id": {
+            "type": "string",
+            "title": "Lease Id"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "granted_units": {
+            "type": "integer",
+            "title": "Granted Units"
+          },
+          "consumed_units": {
+            "type": "integer",
+            "title": "Consumed Units"
+          },
+          "remaining_units": {
+            "type": "integer",
+            "title": "Remaining Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "lease_id",
+          "enabled",
+          "granted_units",
+          "consumed_units",
+          "remaining_units"
+        ],
+        "title": "LeasePushResult"
       },
       "LegacyRedirectBulkResult": {
         "properties": {
@@ -30379,6 +34157,40 @@
         "title": "PaymentsPage",
         "description": "A page of the member's payment history.\n\nDegrades gracefully: when the upstream payment service is\nunavailable the endpoint returns ``stale=true`` with the last known\npage (from cache) instead of a 5xx, so the app keeps rendering the\nhistory. ``last_synced_at`` tells the client how fresh the data is."
       },
+      "PeriodUsageView": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "spent_micros": {
+            "type": "integer",
+            "title": "Spent Micros"
+          },
+          "settled_items": {
+            "type": "integer",
+            "title": "Settled Items"
+          },
+          "settled_micros": {
+            "type": "integer",
+            "title": "Settled Micros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "items",
+          "spent_micros",
+          "settled_items",
+          "settled_micros"
+        ],
+        "title": "PeriodUsageView",
+        "description": "What the tenant has already committed this period, in ITS currency.\n\n``spent_micros`` sums every charge that is not ``voided`` — settled, pending\nAND uncollectible. Excluding uncollectible would hand the budget back to a\ntenant whose balance ran dry, and the next cycle would publish the same\nvolume again on top of items that are already live."
+      },
       "PersonCreate": {
         "properties": {
           "slug": {
@@ -30620,6 +34432,20 @@
             "type": "boolean",
             "title": "Enabled",
             "default": true
+          },
+          "entitlement_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9._-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entitlement Ref",
+            "description": "Identifier this plan uses in the entitlements ledger. Defaults to the plan slug when unset."
           }
         },
         "type": "object",
@@ -30701,6 +34527,160 @@
           "period"
         ],
         "title": "PlanEntry"
+      },
+      "PlanGrantCreate": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "plan_slug": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "title": "Plan Slug",
+            "description": "Slug of a plan declared in this tenant's catalog."
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At",
+            "description": "When the seat lapses. Omit or null for a lifetime seat."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "member_id",
+          "plan_slug"
+        ],
+        "title": "PlanGrantCreate",
+        "description": "Request body of ``POST /admin/plan-grants``.\n\n``extra=\"forbid\"`` so a typo in a field name is a 422 instead of a silently\nignored intent — notably a misspelled ``expires_at``, which would hand out a\nlifetime plan when a dated one was meant.\n\nWhat is NOT here is deliberate: no ``scope_ref``, no ``granted_by``, no\n``tenant_id``. The ledger identifier is derived server-side from the\ntenant's catalog (D-1) and the provenance is fixed (D-3); letting the caller\nname either would be letting the caller mint a seat that looks like a\npurchase, or a wildcard seat that unlocks every gate."
+      },
+      "PlanGrantList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlanGrantView"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit"
+        ],
+        "title": "PlanGrantList",
+        "description": "Response of ``GET /admin/plan-grants``.\n\nAn envelope rather than a bare array because the read is capped, and a\ncapped list that cannot say so reads as \"this is everyone\" (A-4). ``limit``\ntravels back so the UI can word the notice without hardcoding the cap."
+      },
+      "PlanGrantView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "member_email": {
+            "type": "string",
+            "title": "Member Email"
+          },
+          "plan_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Slug"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          },
+          "scope_ref": {
+            "type": "string",
+            "title": "Scope Ref"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "purchase",
+              "manual",
+              "trial",
+              "other"
+            ],
+            "title": "Origin"
+          },
+          "granted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Granted At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "member_id",
+          "member_email",
+          "plan_slug",
+          "plan_name",
+          "scope_ref",
+          "origin",
+          "granted_at",
+          "expires_at",
+          "active"
+        ],
+        "title": "PlanGrantView",
+        "description": "One plan seat, as the admin surfaces read it.\n\nCarries BOTH identifiers on purpose: ``plan_slug`` is what the operator\nchose and recognises, ``scope_ref`` is what actually landed in the ledger.\nThey differ whenever the tenant declares an ``entitlement_ref`` (epublibre:\n``vip`` → ``vip-lifetime``), and the roster is the one place where seeing\nthe difference tells the operator whether the identity is wired correctly.\n\n``plan_slug`` is null for a seat whose ``scope_ref`` matches no current\ncatalog entry — a real state (the plan was renamed or deleted after the\nseat was granted) that must be visible rather than back-filled with a\nguess."
       },
       "PlanPatch": {
         "properties": {
@@ -30818,6 +34798,20 @@
               }
             ],
             "title": "Enabled"
+          },
+          "entitlement_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9._-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entitlement Ref",
+            "description": "Identifier this plan uses in the entitlements ledger. Defaults to the plan slug when unset."
           }
         },
         "type": "object",
@@ -30849,6 +34843,76 @@
           "plans"
         ],
         "title": "PlansResponse"
+      },
+      "PlatformMetricRow": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "gross_micros": {
+            "type": "integer",
+            "title": "Gross Micros"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "pending_items": {
+            "type": "integer",
+            "title": "Pending Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "slug",
+          "items",
+          "gross_micros",
+          "currency",
+          "pending_items"
+        ],
+        "title": "PlatformMetricRow"
+      },
+      "PlatformMetricsView": {
+        "properties": {
+          "period_month": {
+            "type": "string",
+            "title": "Period Month"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PlatformMetricRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "total_items": {
+            "type": "integer",
+            "title": "Total Items"
+          },
+          "total_gross_micros": {
+            "type": "integer",
+            "title": "Total Gross Micros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period_month",
+          "rows",
+          "total_items",
+          "total_gross_micros"
+        ],
+        "title": "PlatformMetricsView"
       },
       "PlatformTenantProvisionRequest": {
         "properties": {
@@ -30997,6 +35061,45 @@
           "primary_domain"
         ],
         "title": "PlatformTenantProvisionResponse"
+      },
+      "PlatformTenantVerificationRequest": {
+        "properties": {
+          "google": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Google",
+            "description": "Verification token — the value of the meta tag's `content` attribute, never the whole element. Null or empty clears it."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PlatformTenantVerificationRequest",
+        "description": "The token to publish in the tenant's ``<head>`` — and nothing else.\n\nOnly the token travels. The rest of the SEO namespace is merged\nserver-side from what is already stored, because the caller has no\nbusiness knowing (let alone resending) a tenant's canonical host,\nrobots policy or title templates — and a caller that forgot one of\nthem would erase it."
+      },
+      "PlatformTenantVerificationResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "google_set": {
+            "type": "boolean",
+            "title": "Google Set"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "google_set"
+        ],
+        "title": "PlatformTenantVerificationResponse",
+        "description": "Presence, not the value.\n\nThe token is public by design (it ships in the tenant's HTML), but a\nservice-to-service response has no reason to echo it back."
       },
       "PlaybackChapter": {
         "properties": {
@@ -31617,6 +35720,175 @@
         "title": "PublicStats",
         "description": "Catalog headline counts for the web landing (atlas-web W1).\n\n``total`` is every published item; ``books`` and ``audiobooks`` are\nNOT a partition — a title carrying both a reading kind and an mp3/m4a\nasset counts in both — so ``books + audiobooks`` may exceed ``total``.\n\n``kinds`` is the per-kind published breakdown (richest kind first),\nlisting only kinds the tenant actually carries. It lets the web render a\n\"N libros · N artículos · …\" line covering *every* kind in the tenant\ninstead of the fixed books/audiobooks split. ``books`` (a reading-kinds\naggregate) and ``audiobooks`` (an ``has_audio`` tally, not a kind) stay\nfor back-compat and the audiobook headphones part."
       },
+      "PublishBody": {
+        "properties": {
+          "media_title_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Media Title Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Summary"
+          },
+          "synopsis_long": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synopsis Long"
+          },
+          "meta_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta Title"
+          },
+          "meta_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta Description"
+          },
+          "genres": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Genres"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "source_chars": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Source Chars",
+            "default": 0
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "media_title_id",
+          "title",
+          "summary"
+        ],
+        "title": "PublishBody",
+        "description": "The body of the only call that costs money.\n\nNote the absence of ``kind`` and of any price field. Both are derived\nserver-side — ``kind`` from the mirror, the price from the frozen lease — so\nthat no value the caller controls can change what is published or what it\ncosts."
+      },
+      "PublishItemResponse": {
+        "properties": {
+          "content_item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Content Item Id"
+          },
+          "media_title_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Media Title Id"
+          },
+          "charge_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charge Id"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "charged": {
+            "type": "boolean",
+            "title": "Charged"
+          },
+          "already_published": {
+            "type": "boolean",
+            "title": "Already Published"
+          },
+          "remaining_units": {
+            "type": "integer",
+            "title": "Remaining Units"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content_item_id",
+          "media_title_id",
+          "charge_id",
+          "slug",
+          "charged",
+          "already_published",
+          "remaining_units",
+          "outcome"
+        ],
+        "title": "PublishItemResponse"
+      },
       "PublisherCreate": {
         "properties": {
           "slug": {
@@ -31817,6 +36089,37 @@
         ],
         "title": "PushTokenOut",
         "description": "Public view of a stored push token — never echoes the token value."
+      },
+      "QueueCounts": {
+        "properties": {
+          "queued": {
+            "type": "integer",
+            "title": "Queued",
+            "default": 0
+          },
+          "leased": {
+            "type": "integer",
+            "title": "Leased",
+            "default": 0
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          },
+          "blocked": {
+            "type": "integer",
+            "title": "Blocked",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "QueueCounts"
       },
       "Rail": {
         "properties": {
@@ -32158,6 +36461,71 @@
           "items"
         ],
         "title": "RelatedResponse"
+      },
+      "ReleaseBody": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "failed | blocked"
+          },
+          "outcome_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Reason"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "ReleaseBody"
+      },
+      "RequeueBody": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "default": 100
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RequeueBody"
+      },
+      "RequeueResult": {
+        "properties": {
+          "requeued": {
+            "type": "integer",
+            "title": "Requeued"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requeued"
+        ],
+        "title": "RequeueResult"
       },
       "RevalidateRequest": {
         "properties": {
@@ -33430,6 +37798,86 @@
         ],
         "title": "SessionsResponse"
       },
+      "SettleBody": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SettleItem"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "SettleBody"
+      },
+      "SettleItem": {
+        "properties": {
+          "charge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Charge Id"
+          },
+          "settlement_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Ref"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "outcome_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "charge_id",
+          "status"
+        ],
+        "title": "SettleItem"
+      },
+      "SettleResult": {
+        "properties": {
+          "settled": {
+            "type": "integer",
+            "title": "Settled"
+          },
+          "ignored": {
+            "type": "integer",
+            "title": "Ignored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "settled",
+          "ignored"
+        ],
+        "title": "SettleResult"
+      },
       "ShowCreate": {
         "properties": {
           "slug": {
@@ -33575,6 +38023,69 @@
         "type": "object",
         "title": "SiteVerification",
         "description": "Operator-pasted verification tokens for search engine consoles.\n\nStored on ``tenant_settings.seo`` (JSONB). Each value is the\n``content`` attribute the provider gives you in their console — NOT\nthe full ``<meta>`` element. The dashboard wraps the token in a\n``<meta>`` tag via Next.js's ``metadata.verification`` API so\nattribute escaping is owned by the framework."
+      },
+      "SourceSignBody": {
+        "properties": {
+          "media_title_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Media Title Id"
+          },
+          "fmt": {
+            "type": "string",
+            "maxLength": 8,
+            "title": "Fmt",
+            "default": "epub"
+          },
+          "chapter": {
+            "type": "integer",
+            "maximum": 5000,
+            "minimum": 0,
+            "title": "Chapter",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "media_title_id"
+        ],
+        "title": "SourceSignBody",
+        "description": "Ask Atlas to sign a read of the source file.\n\nDeliberately NOT a tenant-scoped request: the source lives in the shared\ncatalog, and the tenant that will publish it has no rights over it yet. What\nauthorises this is the platform capability, nothing about a tenant."
+      },
+      "SourceSignResult": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "delivery_kind": {
+            "type": "string",
+            "title": "Delivery Kind"
+          },
+          "checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "expires_in",
+          "delivery_kind"
+        ],
+        "title": "SourceSignResult"
       },
       "SubscriptionCreate": {
         "properties": {

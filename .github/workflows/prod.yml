@@ -176,13 +176,20 @@ jobs:
           # red. `feat:` → minor, `!:`/`BREAKING CHANGE` → major, resto → patch.
           # A RUNNER_TEMP porque `Validate version bump diff` falla el job si
           # aparece en el árbol cualquier archivo que no sea package.json.
-          META="${RUNNER_TEMP}/bump_metadata.txt"
-          git log -1 --pretty=%B > "$META"
+          # El SUBJECT lleva la clasificación del autor (este repo mergea por
+          # squash); el trailer de ruptura vive en el CUERPO y va anclado a
+          # inicio de línea CON dos puntos, como manda Conventional Commits.
+          # Buscar la frase suelta en todo el mensaje es el defecto que hizo
+          # que este repo publicara un `major` por DOCUMENTAR esta misma regla
+          # en el cuerpo de un PR: 0.20.9 → 1.0.0 el 2026-08-04.
+          SUBJECT="$(git log -1 --pretty=%s)"
+          BODY="${RUNNER_TEMP}/bump_body.txt"
+          git log -1 --pretty=%b > "$BODY"
 
-          if grep -qE 'BREAKING[ -]CHANGE' "$META" \
-            || grep -qE '^[[:space:]]*[a-z][a-z0-9]*(\([^)]*\))?!:' "$META"; then
+          if printf '%s\n' "$SUBJECT" | grep -qE '^[a-z][a-z0-9]*(\([^)]*\))?!:' \
+            || grep -qE '^[[:space:]]*BREAKING[ -]CHANGE:' "$BODY"; then
             BUMP_TYPE="major"
-          elif grep -qE '^[[:space:]]*feat(\([^)]*\))?:' "$META"; then
+          elif printf '%s\n' "$SUBJECT" | grep -qE '^feat(\([^)]*\))?:'; then
             BUMP_TYPE="minor"
           else
             BUMP_TYPE="patch"

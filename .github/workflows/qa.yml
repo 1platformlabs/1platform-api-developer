@@ -1,0 +1,266 @@
+name: 1Platform API Developer — QA
+
+# Canal de QA de developer.1platform.pro → `developer-qa.1platform.pro`, en la
+# cuenta cPanel COMPARTIDA `karefxzp` (premium119), la misma donde ya viven
+# `atlas-qa.1platform.pro` y `qa.bowerfans.com`.
+#
+# Es el mismo canal checksum-gated que PROD (`deploy/cpanel/`), apuntado a otro
+# host: CI sube app.zip + sha256 + latest.json por FTPS a `.deploy/incoming` y
+# un cron corre `activate.sh`, que verifica el checksum ANTES de extraer y el
+# MANIFEST DESPUÉS, y recién ahí re-apunta el symlink del docroot.
+#
+# Por qué NO es un `rsync`: la cuenta no tiene SSH. Y por qué el gate por
+# checksum no es decorativo: FTPS contra estos hosts trunca subidas grandes de
+# forma no determinista y aun así reporta éxito (medido el 2026-07-31 migrando
+# psicoguia.org). Un zip corto no activa nada.
+#
+# El cron de ESTE sitio corre en `4-59/5`, no en `*/5`: la cuenta es compartida
+# y los otros dos activadores ya ocupan `*/5` (atlas) y `2-59/5` (bower). Dos
+# activaciones en el mismo minuto sobre la misma cuenta ya se pisaron una vez
+# (bower-dashboard#155) y esa línea quedó neutralizada en el crontab.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: qa-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (QA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        # La versión sale de `packageManager` en package.json. Pinearla acá
+        # además hace que pnpm/action-setup aborte con "Multiple versions of
+        # pnpm specified" y se salte todo lo que viene después, deploy incluido.
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docusaurus-build-qa-${{ github.run_id }}
+          path: build/
+          retention-days: 7
+
+  deploy:
+    name: Deploy to QA (cPanel karefxzp)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: QA
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docusaurus-build-qa-${{ github.run_id }}
+          path: build/
+
+      - name: Assemble bundle
+        env:
+          BUNDLE_VERSION: qa-${{ github.run_number }}.${{ github.run_attempt }}
+          BUNDLE_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: bash deploy/cpanel/assemble.sh build cpanel-dist deploy/cpanel/htaccess/docs.htaccess
+
+      - name: Package app.zip + checksum + manifest
+        id: pkg
+        env:
+          # `run_number` es estable ante un "Re-run", así que un re-run
+          # construiría un artefacto distinto bajo la misma versión y el gate de
+          # igualdad del host lo saltearía en silencio. Por eso va run_attempt.
+          BUNDLE_VERSION: qa-${{ github.run_number }}.${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ( cd cpanel-dist && zip -qr ../app.zip . )
+          sha256sum app.zip | awk '{print $1}' > app.zip.sha256
+          cat > latest.json <<EOF
+          {
+            "version": "${BUNDLE_VERSION}",
+            "sha256": "$(cat app.zip.sha256)",
+            "commit": "${{ github.sha }}",
+            "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          echo "version=${BUNDLE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "app.zip $(du -h app.zip | cut -f1), sha256 $(cat app.zip.sha256)"
+
+      - name: Upload bundle as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpanel-bundle-qa
+          path: |
+            app.zip
+            app.zip.sha256
+            latest.json
+            cpanel-dist/BUNDLE_INFO
+            cpanel-dist/MANIFEST.sha256
+          retention-days: 14
+          if-no-files-found: error
+
+      # Tres estados, distinguidos a propósito:
+      #   ninguno seteado → el canal no está provisionado. Skip con notice; el
+      #                     bundle igual queda descargable como artifact.
+      #   todos seteados  → publicar.
+      #   algunos         → misconfiguración. FALLA — nunca subir medio canal ni
+      #                     reportar éxito sobre él.
+      - name: Detect FTPS config
+        id: ftps
+        # Los nombres son los MISMOS que en prod.yml a propósito: lo que separa
+        # QA de PROD es el `environment:` del job, no un prefijo en el nombre.
+        # Un juego paralelo de nombres a nivel repo es justo lo que hizo que
+        # este job leyera valores rotos mientras PROD leía los buenos.
+        env:
+          H: ${{ secrets.CPANEL_FTP_HOST }}
+          U: ${{ secrets.CPANEL_FTP_USER }}
+          P: ${{ secrets.CPANEL_FTP_PASS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SET=0; TOTAL=3
+          [ -n "${H}" ] && SET=$((SET+1)) || true
+          [ -n "${U}" ] && SET=$((SET+1)) || true
+          [ -n "${P}" ] && SET=$((SET+1)) || true
+          if [ "$SET" -eq "$TOTAL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          elif [ "$SET" -eq 0 ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CPANEL_FTP_* del environment QA no está seteado — se saltea el push por FTPS. El bundle queda descargable como artifact 'cpanel-bundle-qa'."
+          else
+            echo "::error::CPANEL_FTP_* del environment QA está parcialmente configurado (${SET}/${TOTAL}). No publico medio canal."
+            exit 1
+          fi
+
+      - name: Install lftp
+        if: steps.ftps.outputs.configured == 'true'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Upload via FTPS (atomic)
+        if: steps.ftps.outputs.configured == 'true'
+        env:
+          CPANEL_FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          CPANEL_FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          CPANEL_FTP_PASS: ${{ secrets.CPANEL_FTP_PASS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # FTPS explícito verificando el certificado contra el hostname del
+          # SERVIDOR — su cert `*.web-hosting.com` matchea. FTP no atraviesa
+          # Cloudflare, así que esto tiene que ser el host de origen y nunca
+          # developer-qa.1platform.pro.
+          #
+          # Atomicidad: app.zip aterriza como .part y se renombra; latest.json
+          # se sube ÚLTIMO, porque su presencia con un sha256 coincidente es la
+          # señal de "listo para activar" que lee el host. El cron nunca debe
+          # ver un zip a medio escribir descrito por un manifest completo.
+          for attempt in 1 2 3; do
+            if lftp -u "$CPANEL_FTP_USER","$CPANEL_FTP_PASS" "$CPANEL_FTP_HOST" <<'FTPEOF'
+          set cmd:fail-exit yes
+          set xfer:clobber on
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ssl:verify-certificate yes
+          set net:max-retries 3
+          set net:timeout 20
+          cd .deploy/incoming
+          put app.zip -o app.zip.part
+          put app.zip.sha256
+          mv app.zip.part app.zip
+          put latest.json -o latest.json.part
+          mv latest.json.part latest.json
+          bye
+          FTPEOF
+            then
+              echo "FTPS upload OK en el intento ${attempt}"
+              exit 0
+            fi
+            echo "::warning::intento ${attempt}/3 de FTPS falló"
+            [ "$attempt" -lt 3 ] && sleep 15
+          done
+          echo "::error::el upload por FTPS falló tras 3 intentos"
+          exit 1
+
+      # ── El gate que convierte a este job en uno que realmente despliega ─────
+      # Un job verde significa «el zip está en incoming». NO significa que el
+      # release esté vivo: lo activa un cron, minutos después. Esperar un 200 en
+      # la home no distinguiría el build nuevo del viejo.
+      #
+      # El sha256 del documento de entrada es exacto y no puede colisionar.
+      # La ventana es más larga que en PROD porque el cron de este sitio corre
+      # en `4-59/5` y comparte cuenta con otros dos activadores.
+      - name: Verify the release actually activated
+        if: steps.ftps.outputs.configured == 'true'
+        env:
+          SITE_URL: https://developer-qa.1platform.pro
+          ENTRY_PATH: '/'
+        shell: bash
+        run: |
+          set -euo pipefail
+          WANT="$(grep -m1 '^index_sha=' cpanel-dist/BUNDLE_INFO | cut -d= -f2-)"
+          URL="${SITE_URL%/}${ENTRY_PATH}"
+          echo "esperando el fingerprint ${WANT:0:16}… en ${URL}"
+
+          H="$(mktemp)"; B="$(mktemp)"
+          DEADLINE=$(( SECONDS + 720 )); GOT=""
+          while [[ "$SECONDS" -lt "$DEADLINE" ]]; do
+            curl -sSL --max-time 20 -o "$B" -D "$H" "$URL" >/dev/null 2>&1 || true
+            GOT="$(sha256sum "$B" | awk '{print $1}')"
+            [[ "$GOT" == "$WANT" ]] && break
+            echo "  … todavía no (servido ${GOT:0:16}…)"
+            sleep 20
+          done
+          if [[ "$GOT" != "$WANT" ]]; then
+            echo "::error::el cron no activó este release en 12 min (servido ${GOT:0:16}…, esperado ${WANT:0:16}…). El bundle está en .deploy/incoming; mirá .deploy/logs/activate.log."
+            exit 1
+          fi
+          if ! grep -qi '^x-turbo-charged-by:[[:space:]]*litespeed' "$H"; then
+            echo "::error::el fingerprint coincide pero la respuesta no salió del origen cPanel"
+            exit 1
+          fi
+          echo "QA sirve ESTE build, desde cPanel"
+
+      - name: Note the activation delay
+        if: steps.ftps.outputs.configured == 'true'
+        env:
+          V: ${{ steps.pkg.outputs.version }}
+        shell: bash
+        run: |
+          echo "::notice::Bundle ${V} publicado en .deploy/incoming de developer-qa. El cron activa en 4-59/5; el paso anterior es el que prueba que está vivo."

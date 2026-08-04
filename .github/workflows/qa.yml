@@ -143,10 +143,14 @@ jobs:
       #                     reportar éxito sobre él.
       - name: Detect FTPS config
         id: ftps
+        # Los nombres son los MISMOS que en prod.yml a propósito: lo que separa
+        # QA de PROD es el `environment:` del job, no un prefijo en el nombre.
+        # Un juego paralelo de nombres a nivel repo es justo lo que hizo que
+        # este job leyera valores rotos mientras PROD leía los buenos.
         env:
-          H: ${{ secrets.CPANEL_QA_FTP_HOST }}
-          U: ${{ secrets.CPANEL_QA_FTP_USER }}
-          P: ${{ secrets.CPANEL_QA_FTP_PASS }}
+          H: ${{ secrets.CPANEL_FTP_HOST }}
+          U: ${{ secrets.CPANEL_FTP_USER }}
+          P: ${{ secrets.CPANEL_FTP_PASS }}
         shell: bash
         run: |
           set -euo pipefail
@@ -158,9 +162,9 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           elif [ "$SET" -eq 0 ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::CPANEL_QA_FTP_* no está seteado — se saltea el push por FTPS. El bundle queda descargable como artifact 'cpanel-bundle-qa'."
+            echo "::notice::CPANEL_FTP_* del environment QA no está seteado — se saltea el push por FTPS. El bundle queda descargable como artifact 'cpanel-bundle-qa'."
           else
-            echo "::error::CPANEL_QA_FTP_* está parcialmente configurado (${SET}/${TOTAL}). No publico medio canal."
+            echo "::error::CPANEL_FTP_* del environment QA está parcialmente configurado (${SET}/${TOTAL}). No publico medio canal."
             exit 1
           fi
 
@@ -172,9 +176,9 @@ jobs:
       - name: Upload via FTPS (atomic)
         if: steps.ftps.outputs.configured == 'true'
         env:
-          CPANEL_FTP_HOST: ${{ secrets.CPANEL_QA_FTP_HOST }}
-          CPANEL_FTP_USER: ${{ secrets.CPANEL_QA_FTP_USER }}
-          CPANEL_FTP_PASS: ${{ secrets.CPANEL_QA_FTP_PASS }}
+          CPANEL_FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          CPANEL_FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          CPANEL_FTP_PASS: ${{ secrets.CPANEL_FTP_PASS }}
         shell: bash
         run: |
           set -euo pipefail

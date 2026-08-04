@@ -455,87 +455,212 @@ jobs:
         if: always()
         shell: bash
         run: rm -f release_notes.txt final_release_notes.txt 1platform-api-developer.zip || true
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 5: Deploy — canal cPanel (cuenta mascehgw @ business138)
+  #
+  # Por qué un zip por FTPS y no rsync: la cuenta cPanel compartida NO tiene
+  # SSH. El canal anterior desplegaba con `rsync -e ssh` contra
+  # 65.109.101.46 (Hetzner/WHM), que sí lo tenía; ese box quedó fuera del
+  # camino de este sitio el 2026-07-31. Ver deploy/cpanel/README.md.
+  #
+  # El id del job sigue siendo `deploy` a propósito: el job `notify` referencia
+  # `needs.deploy.result`, y renombrarlo lo dejaría reportando sobre un job que
+  # no existe — verde en Slack sin haber desplegado nada.
+  # ───────────────────────────────────────────────────────────────────────────
 
   deploy:
-    name: Deploy to Hetzner
+    name: Deploy to cPanel (mascehgw)
     needs: [build, version_bump, release]
     if: needs.release.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     environment: PROD
     permissions:
       contents: read
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: docusaurus-build
           path: build/
 
-      - name: Setup SSH key
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "${{ secrets.HETZNER_PORT }}" "${{ secrets.HETZNER_HOST }}" \
-            >> ~/.ssh/known_hosts 2>/dev/null
-
-      - name: Deploy via staged rsync (atomic swap)
+      - name: Assemble bundle
         env:
-          DEPLOY_PATH: ${{ secrets.HETZNER_DEPLOY_PATH }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
+          BUNDLE_VERSION: ${{ needs.version_bump.outputs.new_version }}-${{ github.run_number }}.${{ github.run_attempt }}
+          BUNDLE_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: bash deploy/cpanel/assemble.sh build cpanel-dist deploy/cpanel/htaccess/docs.htaccess
+
+      - name: Package app.zip + checksum + manifest
+        id: pkg
+        env:
+          # run_number solo es ESTABLE ante un "Re-run", así que un re-run
+          # construiría un artefacto distinto bajo la misma versión y el gate de
+          # igualdad del host lo saltearía en silencio. Incluir run_attempt.
+          BUNDLE_VERSION: ${{ needs.version_bump.outputs.new_version }}-${{ github.run_number }}.${{ github.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="v${{ needs.version_bump.outputs.new_version }}"
-          STAGING_PATH="${DEPLOY_PATH}_staging"
-          BACKUP_PATH="${DEPLOY_PATH}_backup"
+          ( cd cpanel-dist && zip -qr ../app.zip . )
+          sha256sum app.zip | awk '{print $1}' > app.zip.sha256
+          cat > latest.json <<EOF
+          {
+            "version": "${BUNDLE_VERSION}",
+            "sha256": "$(cat app.zip.sha256)",
+            "commit": "${{ github.sha }}",
+            "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          echo "version=${BUNDLE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "app.zip $(du -h app.zip | cut -f1), sha256 $(cat app.zip.sha256)"
 
-          # Step 1: rsync to staging (current deploy is untouched on failure)
-          rsync -avz --delete --chown=platform:platform \
-            -e "ssh -i ~/.ssh/deploy_key -p ${HETZNER_PORT} -o StrictHostKeyChecking=accept-new" \
-            build/ \
-            "${HETZNER_USER}@${HETZNER_HOST}:${STAGING_PATH}/"
+      - name: Upload bundle as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpanel-bundle-prod
+          path: |
+            app.zip
+            app.zip.sha256
+            latest.json
+            cpanel-dist/BUNDLE_INFO
+            cpanel-dist/MANIFEST.sha256
+          retention-days: 14
+          if-no-files-found: error
 
-          # Step 2: Atomic swap — backup current, promote staging
-          ssh -i ~/.ssh/deploy_key \
-            -p "${HETZNER_PORT}" \
-            -o StrictHostKeyChecking=accept-new \
-            "${HETZNER_USER}@${HETZNER_HOST}" \
-            "mv '${DEPLOY_PATH}' '${BACKUP_PATH}' 2>/dev/null || true \
-             && mv '${STAGING_PATH}' '${DEPLOY_PATH}' \
-             && rm -rf '${BACKUP_PATH}'"
-
-          echo "Deploy of ${VERSION} completed"
-
-      - name: Health check
+      # Tres estados, distinguidos a propósito:
+      #   ninguno seteado → el canal no está provisionado. Skip con notice; el
+      #                     bundle igual queda descargable como artifact.
+      #   todos seteados  → publicar.
+      #   algunos         → misconfiguración. FALLA — nunca subir medio canal ni
+      #                     reportar éxito sobre él.
+      - name: Detect FTPS config
+        id: ftps
+        env:
+          H: ${{ secrets.CPANEL_FTP_HOST }}
+          U: ${{ secrets.CPANEL_FTP_USER }}
+          P: ${{ secrets.CPANEL_FTP_PASS }}
         shell: bash
         run: |
           set -euo pipefail
-          echo "Waiting for docs site to be ready..."
-          for i in $(seq 1 10); do
-            HTTP_CODE=$(curl -sSL -o /dev/null -w "%{http_code}" \
-              "https://developer.1platform.pro/" \
-              --max-time 10 2>/dev/null || echo "000")
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "Health check passed (attempt ${i})"
+          SET=0; TOTAL=3
+          [ -n "${H}" ] && SET=$((SET+1)) || true
+          [ -n "${U}" ] && SET=$((SET+1)) || true
+          [ -n "${P}" ] && SET=$((SET+1)) || true
+          if [ "$SET" -eq "$TOTAL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          elif [ "$SET" -eq 0 ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CPANEL_FTP_* no está seteado — se saltea el push por FTPS. El bundle queda descargable como artifact 'cpanel-bundle-prod'."
+          else
+            echo "::error::CPANEL_FTP_* está parcialmente configurado (${SET}/${TOTAL}). No publico medio canal."
+            exit 1
+          fi
+
+      - name: Install lftp
+        if: steps.ftps.outputs.configured == 'true'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Upload via FTPS (atomic)
+        if: steps.ftps.outputs.configured == 'true'
+        env:
+          CPANEL_FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          CPANEL_FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          CPANEL_FTP_PASS: ${{ secrets.CPANEL_FTP_PASS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # FTPS explícito con verificación de certificado contra el hostname
+          # del SERVIDOR — su cert *.web-hosting.com matchea. FTP no atraviesa
+          # Cloudflare, así que esto tiene que ser el host de origen y nunca
+          # developer.1platform.pro.
+          #
+          # Atomicidad: app.zip aterriza como .part y se renombra; latest.json
+          # se sube ÚLTIMO, porque su presencia con un sha256 coincidente es la
+          # señal de "listo para activar" que lee el host. El cron nunca debe
+          # ver un zip a medio escribir descrito por un manifest completo.
+          #
+          # Medido el 2026-07-31 migrando psicoguia.org: FTPS contra este host
+          # trunca subidas grandes de forma NO determinista y aun así reporta
+          # éxito. Por eso el canal es checksum-gated de punta a punta: si el
+          # zip llega corto, el sha no coincide y activate.sh se niega a
+          # extraerlo — se queda el release anterior, no se sirve basura.
+          for attempt in 1 2 3; do
+            if lftp -u "$CPANEL_FTP_USER","$CPANEL_FTP_PASS" "$CPANEL_FTP_HOST" <<'FTPEOF'
+          set cmd:fail-exit yes
+          set xfer:clobber on
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ssl:verify-certificate yes
+          set net:max-retries 3
+          set net:timeout 20
+          cd .deploy/incoming
+          put app.zip -o app.zip.part
+          put app.zip.sha256
+          mv app.zip.part app.zip
+          put latest.json -o latest.json.part
+          mv latest.json.part latest.json
+          bye
+          FTPEOF
+            then
+              echo "FTPS upload OK en el intento ${attempt}"
               exit 0
             fi
-            echo "Attempt ${i}/10: HTTP ${HTTP_CODE}, retrying in 5s..."
-            sleep 5
+            echo "::warning::intento ${attempt}/3 de FTPS falló"
+            [ "$attempt" -lt 3 ] && sleep 15
           done
-          echo "::error::Docs site health check failed after 10 attempts"
+          echo "::error::el upload por FTPS falló tras 3 intentos"
           exit 1
 
-      - name: Cleanup SSH key
-        if: always()
+      # ── El gate que convierte a este job en uno que realmente despliega ─────
+      # Un job verde significa «el zip está en incoming». NO significa que el
+      # release esté vivo: lo activa un cron, minutos después. El health check
+      # anterior (esperar un 200 en la home) no distinguía el build nuevo del
+      # viejo — habría dado verde sirviendo todavía la versión anterior.
+      #
+      # El sha256 del documento de entrada es exacto y no puede colisionar.
+      - name: Verify the release actually activated
+        if: steps.ftps.outputs.configured == 'true'
+        env:
+          SITE_URL: https://developer.1platform.pro
+          ENTRY_PATH: '/'
         shell: bash
-        run: rm -f ~/.ssh/deploy_key || true
+        run: |
+          set -euo pipefail
+          WANT="$(grep -m1 '^index_sha=' cpanel-dist/BUNDLE_INFO | cut -d= -f2-)"
+          URL="${SITE_URL%/}${ENTRY_PATH}"
+          echo "esperando el fingerprint ${WANT:0:16}… en ${URL}"
+
+          H="$(mktemp)"; B="$(mktemp)"
+          DEADLINE=$(( SECONDS + 600 )); GOT=""
+          while [[ "$SECONDS" -lt "$DEADLINE" ]]; do
+            curl -sSL --max-time 20 -o "$B" -D "$H" "$URL" >/dev/null 2>&1 || true
+            GOT="$(sha256sum "$B" | awk '{print $1}')"
+            [[ "$GOT" == "$WANT" ]] && break
+            echo "  … todavía no (servido ${GOT:0:16}…)"
+            sleep 20
+          done
+          if [[ "$GOT" != "$WANT" ]]; then
+            echo "::error::el cron no activó este release en 10 min (servido ${GOT:0:16}…, esperado ${WANT:0:16}…). El bundle está en .deploy/incoming; mirá .deploy/logs/activate.log."
+            exit 1
+          fi
+          if ! grep -qi '^x-turbo-charged-by:[[:space:]]*litespeed' "$H"; then
+            echo "::error::el fingerprint coincide pero la respuesta no salió del origen cPanel"
+            exit 1
+          fi
+          echo "el público ve ESTE build, servido por cPanel"
+
+      - name: Note the activation delay
+        if: steps.ftps.outputs.configured == 'true'
+        env:
+          V: ${{ steps.pkg.outputs.version }}
+        shell: bash
+        run: |
+          echo "::notice::Bundle ${V} publicado en .deploy/incoming. El cron de activación corre cada 5 minutos; el paso anterior es el que prueba que está vivo."
 
   notify:
     name: Slack Notification

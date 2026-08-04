@@ -1,0 +1,32 @@
+# Contrato de servido de developer.1platform.pro en cPanel (LiteSpeed).
+#
+# El origen viejo (65.109.101.46) NO tenía .htaccess propio y por eso HEREDABA
+# el de WordPress de su directorio padre `public_html/` — el de la landing, que
+# ya migró y se llevó su index.php. Consecuencia medida el 2026-07-31:
+#
+#   GET /no-existe  ->  500  (RewriteRule . /index.php sobre un index.php ausente)
+#   GET /img/       ->  200  con el listado de directorio de Apache
+#   GET /openapi/   ->  200  con el listado de directorio de Apache
+#
+# Este archivo es el contrato explícito, y arregla las tres cosas. No se replicó
+# el defecto a propósito: copiar bit-a-bit habría shipeado un 500 en cada URL
+# tipeada mal y un índice navegable de los assets.
+DirectoryIndex index.html
+Options -Indexes
+ErrorDocument 404 /404.html
+
+# Un directorio real SIN index.html (/img/, /openapi/, /api-reference/) no es
+# una ruta del sitio: no existe. Con sólo `Options -Indexes` LiteSpeed contesta
+# 403, que dice "no podés listarlo" cuando la verdad es "no hay nada acá" — y
+# además no sirve la 404 de marca. Esta regla lo convierte en un 404 real, que
+# dispara el ErrorDocument de arriba.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteCond %{REQUEST_FILENAME}/index.html !-f
+RewriteRule ^ - [R=404,L]
+</IfModule>
+
+# NO agregar aquí un redirect a https. La zona de Cloudflare habla HTTP con el
+# origen, así que un `RewriteRule ... https://` sería un bucle infinito.
+# assemble.sh falla el build si detecta uno.

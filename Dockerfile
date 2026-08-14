@@ -28,7 +28,19 @@ COPY . .
 RUN pnpm run build
 
 # ── Etapa 2: servir ──────────────────────────────────────────────────────────
-FROM nginx:alpine AS runtime
+# ⚠️ VERSIÓN FIJADA, y no es cosmético: `nginx:alpine` y `nginx:stable-alpine`
+# (hoy 1.29/1.30) **NO ARRANCAN** en el dedicado. Medido el 2026-08-14 sobre el
+# host real (CentOS 7.9, kernel 3.10):
+#
+#   nginx:alpine         → Exited (1) · pwrite() "/run/nginx.pid" failed (1: Operation not permitted)
+#   nginx:stable-alpine  → Exited (1) · idéntico
+#   nginx:1.27-alpine    → running ✅
+#
+# El molde del que sale este pipeline (`bower-dashboard`) nunca lo tocó porque
+# su contenedor es Node, no nginx. Con un tag flotante el build sale verde, la
+# imagen se publica, y el contenedor muere al arrancar: el pipeline sólo se
+# entera si el health check sondea de verdad — por eso también existe ese probe.
+FROM nginx:1.27-alpine AS runtime
 
 COPY deploy/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/build /usr/share/nginx/html

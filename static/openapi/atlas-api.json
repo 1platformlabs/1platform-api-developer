@@ -24710,7 +24710,7 @@
           "platform-autopublish"
         ],
         "summary": "Lease a batch of queued jobs",
-        "description": "Top the queue up from the diff, then lease.\n\n``autopublish_jobs`` had no producer at all: ``enqueue_missing`` shipped with\nzero callers, so the queue was permanently empty and every claim returned an\nempty list no matter how much catalog a site was missing. The diff already\nknows exactly which titles a tenant lacks, and it is bounded by the tenant's\nremaining quota, so filling from it here needs no new scheduler and cannot\noutrun what the site can pay for.\n\nTopping up is idempotent — ``enqueue_missing`` skips titles already queued —\nso a concurrent worker adds nothing and claims a disjoint batch under\n``FOR UPDATE SKIP LOCKED``.",
+        "description": "Top the queue up from the diff, then lease.\n\n``autopublish_jobs`` had no producer at all: ``enqueue_missing`` shipped with\nzero callers, so the queue was permanently empty and every claim returned an\nempty list no matter how much catalog a site was missing. The diff already\nknows exactly which titles a tenant lacks, and it is bounded by the tenant's\nremaining quota, so filling from it here needs no new scheduler and cannot\noutrun what the site can pay for.\n\nTopping up is idempotent — ``enqueue_missing`` skips titles already queued —\nso a concurrent worker adds nothing and claims a disjoint batch under\n``FOR UPDATE SKIP LOCKED``.\n\n``limit`` is what the worker ASKS for; what it gets is capped by the tenant's\nown allowance (``_claim_budget``). The agent already did this arithmetic on\nits side, which meant a misconfigured or compromised worker could lease a\nwhole queue a withdrawn tenant could never pay for — leased jobs that can\nonly end in 402, and a quota that stops being the control it is supposed to\nbe. The cap belongs on this side of the wire.",
         "operationId": "platformAutopublishClaimJobs",
         "parameters": [
           {
@@ -26146,6 +26146,36 @@
             },
             "type": "array",
             "title": "Supported Locales"
+          },
+          "appearance": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "dark"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appearance"
+          },
+          "typeface": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cinematic",
+                  "editorial"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typeface"
           }
         },
         "type": "object",
@@ -28272,6 +28302,18 @@
             "title": "Has Audio",
             "default": false
           },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
           "metadata": {
             "additionalProperties": true,
             "type": "object",
@@ -28669,14 +28711,14 @@
           },
           "limit": {
             "type": "integer",
-            "maximum": 25,
+            "maximum": 100,
             "minimum": 1,
             "title": "Limit",
             "default": 1
           },
           "lease_seconds": {
             "type": "integer",
-            "maximum": 900,
+            "maximum": 3600,
             "minimum": 60,
             "title": "Lease Seconds",
             "default": 900
@@ -35010,6 +35052,21 @@
                 "type": "null"
               }
             ]
+          },
+          "appearance": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "dark"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appearance"
           }
         },
         "type": "object",

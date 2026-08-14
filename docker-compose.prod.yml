@@ -1,0 +1,26 @@
+# developer.1platform.pro — PROD en el dedicado 144.76.163.230.
+#
+# El front door (185.125.168.236) es el único que debe alcanzar este puerto: la
+# regla de `DOCKER-USER` restringe 3042 a esa IP de origen. Docker publica con
+# DNAT y saltea el `-P INPUT DROP` del host.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: 1platform-api-developer-prod
+    restart: unless-stopped
+    ports:
+      # ⚠️ ENTRECOMILLADO: el verificador del pipeline deriva el puerto con un
+      # `awk` que busca `"NNNN:NN"` entre comillas.
+      - "3042:80"
+    healthcheck:
+      # `wget` y no `curl` (nginx:alpine no trae curl), con `Host` explícito: el
+      # nginx de esta imagen tiene un `default_server` que devuelve 444 a
+      # cualquier Host ajeno, y wget a 127.0.0.1 manda `Host: 127.0.0.1`.
+      test: ["CMD", "wget", "-qO-", "--header=Host: developer.1platform.pro", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

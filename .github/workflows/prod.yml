@@ -456,22 +456,155 @@ jobs:
         shell: bash
         run: rm -f release_notes.txt final_release_notes.txt 1platform-api-developer.zip || true
   # ───────────────────────────────────────────────────────────────────────────
-  # JOB 5: Deploy — canal cPanel (cuenta mascehgw @ business138)
+  # JOB 5: Deploy al dedicado de Hetzner — EL canal de deploy desde 2026-08-14
+  #
+  # Épica `core-hetzner-cutover`. El hosting compartido de cPanel se cayó dos
+  # veces (el box 65 en agosto, y el apagón del 13-ago que se llevó 8 hosts
+  # >12 h), así que el sitio de docs vuelve a infraestructura propia: un
+  # contenedor nginx en el dedicado 144.76.163.230, servido al público por el
+  # front door 185.125.168.236.
+  #
+  # ⚠️ Se llama `deploy_hetzner` y NO `deploy` porque la clave `deploy` ya está
+  # tomada por el job de cPanel de abajo. Dos jobs con la misma clave es YAML
+  # inválido: el workflow no arranca. Y renombrar el de cPanel dejaría a
+  # `notify` referenciando un job inexistente.
+  # ───────────────────────────────────────────────────────────────────────────
+
+  deploy_hetzner:
+    name: Deploy al dedicado (PROD)
+    needs: [build, version_bump, release]
+    if: needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # El environment es el de ESTE repo (`PROD`), no el del molde (`prod`). Los
+    # secrets son environment-scoped: el nombre equivocado instancia un
+    # environment vacío y todo resuelve a cadena vacía SIN error de sintaxis.
+    environment: PROD
+    permissions:
+      contents: read
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_GH_TOKEN: ${{ github.token }}
+          # `v` + la versión: este repo expone `new_version` SIN la `v`.
+          VERSION: v${{ needs.version_bump.outputs.new_version }}
+        with:
+          host: ${{ secrets.HETZNER_SSH_HOST }}
+          username: ${{ secrets.HETZNER_SSH_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          port: ${{ vars.HETZNER_SSH_PORT }}
+          envs: DEPLOY_GH_TOKEN,VERSION
+          script: |
+            set -euo pipefail
+            APP_DIR="/home/apps/1platform-api-developer"
+            CLEAN_URL="https://github.com/1platformlabs/1platform-api-developer.git"
+
+            # `git remote set-url` PERSISTE la credencial en `.git/config` con
+            # modo 644, en un host compartido. El scrub corre también si el
+            # deploy aborta por `set -e`.
+            scrub_credencial() {
+              git --git-dir="$APP_DIR/.git" remote set-url origin "$CLEAN_URL" >/dev/null 2>&1 || true
+              chmod 600 "$APP_DIR/.git/config" >/dev/null 2>&1 || true
+            }
+            trap scrub_credencial EXIT
+
+            # Primer deploy sobre host virgen.
+            if [ ! -d "$APP_DIR/.git" ]; then
+              mkdir -p /home/apps
+              git clone "https://x-access-token:${DEPLOY_GH_TOKEN}@github.com/1platformlabs/1platform-api-developer.git" "$APP_DIR"
+              chmod 600 "$APP_DIR/.git/config"
+            fi
+
+            cd "$APP_DIR"/
+            git remote set-url origin "https://x-access-token:${DEPLOY_GH_TOKEN}@github.com/1platformlabs/1platform-api-developer.git"
+            chmod 600 .git/config
+            git fetch --prune --force --all --tags
+            git reset --hard "${VERSION}"
+
+            # `deploy.sh` aborta si falta `.env.prod`, antes de construir. El
+            # sitio de docs es estático y sin secretos de runtime, pero el
+            # contrato del helper exige que el archivo exista.
+            umask 077
+            : > .env.prod
+            chmod 600 .env.prod
+
+            ./deploy.sh prod build
+            ./deploy.sh prod stop || true
+            ./deploy.sh prod start
+
+            # ── Verificar EL CONTENEDOR QUE ESTE PASO ACABA DE LEVANTAR ──────
+            # Contra 127.0.0.1:<puerto>, NO contra la URL pública: durante el
+            # cutover el DNS todavía apunta al cPanel, así que sondear el
+            # dominio mediría otro servidor.
+            PORT="$(awk '/^[[:space:]]*ports:/{f=1;next} f&&/"[0-9]+:[0-9]+"/{gsub(/[^0-9:]/,"");split($0,a,":");print a[1];exit}' docker-compose.prod.yml)"
+            if [ -z "${PORT}" ]; then
+              echo "::error::no pude derivar el puerto publicado de docker-compose.prod.yml"
+              exit 1
+            fi
+            HOST_HDR="developer.1platform.pro"
+            echo "verificando 1platform-api-developer-prod en 127.0.0.1:${PORT} con Host: ${HOST_HDR}"
+
+            probe() {
+              path="$1"; tries="$2"; expected="$3"; code=000
+              i=1
+              while [ "$i" -le "$tries" ]; do
+                code="$(curl -s -o /dev/null -w '%{http_code}' \
+                  -H "Host: ${HOST_HDR}" \
+                  "http://127.0.0.1:${PORT}${path}" --max-time 10 2>/dev/null)" || code=000
+                if [ "$code" = "$expected" ]; then
+                  echo "  ${path} → ${code} (intento ${i}/${tries})"
+                  return 0
+                fi
+                i=$((i + 1))
+                sleep 5
+              done
+              echo "::error::${path} nunca devolvió ${expected} en ${tries} intentos (último código: ${code})"
+              return 1
+            }
+
+            probe / 12 200
+            # Control negativo EN LA MISMA CORRIDA: sin esto el probe de arriba
+            # mediría "el puerto responde", no "el sitio se sirve".
+            probe /__ruta-que-no-existe__ 1 404
+            # La regla central del contrato: un directorio real SIN index.html
+            # es 404, no 403. `/openapi/` es de donde Scalar lee sus specs.
+            probe /openapi/ 1 404
+
+            # T-28: este deploy no puede haber tocado el contenedor de
+            # bowerfans.com, que vive en el mismo host.
+            if docker ps --format '{{.Names}}' | grep -Fxq 'bower-dashboard-prod'; then
+              echo "  bower-dashboard-prod sigue corriendo ✓"
+            else
+              echo "::error::bower-dashboard-prod NO está corriendo tras este deploy"
+              exit 1
+            fi
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 6: Deploy — canal cPanel GATEADO (cuenta mascehgw @ business138)
   #
   # Por qué un zip por FTPS y no rsync: la cuenta cPanel compartida NO tiene
   # SSH. El canal anterior desplegaba con `rsync -e ssh` contra
   # 65.109.101.46 (Hetzner/WHM), que sí lo tenía; ese box quedó fuera del
   # camino de este sitio el 2026-07-31. Ver deploy/cpanel/README.md.
   #
-  # El id del job sigue siendo `deploy` a propósito: el job `notify` referencia
-  # `needs.deploy.result`, y renombrarlo lo dejaría reportando sobre un job que
-  # no existe — verde en Slack sin haber desplegado nada.
+  # El id del job sigue siendo `deploy`: renombrarlo ahora sería un cambio sin
+  # beneficio y rompería la ruta de vuelta. Desde core-hetzner-cutover (2026-08-14)
+  # `notify` YA NO lo referencia — apunta a `deploy_hetzner`, porque con este job
+  # gateado su `result` es siempre `skipped` y las condiciones que lo comparaban
+  # con 'success' quedaron o siempre falsas (el aviso de éxito) o siempre
+  # verdaderas (la alerta de fallo, que se dispararía en cada corrida buena).
   # ───────────────────────────────────────────────────────────────────────────
 
   deploy:
     name: Deploy to cPanel (mascehgw)
     needs: [build, version_bump, release]
-    if: needs.release.result == 'success'
+    # GATEADO por core-hetzner-cutover (2026-08-14), no borrado: es la ruta de
+    # vuelta si el dedicado falla. Borrar el canal anterior es justamente por
+    # qué esta épica no pudo revertir el DNS al origen viejo.
+    # Condición original: needs.release.result == 'success'
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: PROD
@@ -664,7 +797,7 @@ jobs:
 
   notify:
     name: Slack Notification
-    needs: [build, version_bump, release, deploy]
+    needs: [build, version_bump, release, deploy_hetzner, deploy]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -727,7 +860,10 @@ jobs:
       - name: Notify Slack — Deploy failed
         # See above: `skipped` must alert too. `deploy` has no standalone `if`
         # beyond its upstreams, so any non-success means the deploy did not land.
-        if: needs.deploy.result != 'success'
+        # Apunta a `deploy_hetzner`: con el canal de cPanel gateado su `result`
+        # es SIEMPRE `skipped`, y `skipped != 'success'` es VERDADERO ⇒ esta
+        # alerta se dispararía en CADA corrida exitosa, para siempre.
+        if: needs.deploy_hetzner.result != 'success'
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ALERTS }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
@@ -767,7 +903,9 @@ jobs:
           fi
 
       - name: Notify Slack — Release & deploy success
-        if: needs.release.result == 'success' && needs.deploy.result == 'success'
+        # Idem: con cPanel en `skipped` esta condición nunca volvería a ser
+        # verdadera y el aviso de deploy exitoso desaparecería para siempre.
+        if: needs.release.result == 'success' && needs.deploy_hetzner.result == 'success'
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_DEPLOYS }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}

@@ -5,10 +5,28 @@
 # propio Node; la imagen final sólo lleva nginx y el `build/` de Docusaurus.
 
 # ── Etapa 1: construir el sitio ──────────────────────────────────────────────
-# Node 24, el de `.nvmrc`, el mismo que usa el job `build` del pipeline: si CI y
-# la imagen construyeran con runtimes distintos, el artefacto verificado en CI
-# no sería el que se sirve.
-FROM node:24-alpine AS build
+# ⚠️ Node 20, y NO el 24 de `.nvmrc` — divergencia deliberada y medida.
+#
+# El dedicado corre CentOS 7.9 con kernel 3.10. Sobre ese kernel, instalar las
+# dependencias de este repo falla DENTRO del contenedor:
+#
+#   node:24-alpine + pnpm install  →  EPERM: operation not permitted, write
+#   node:22-alpine + pnpm install  →  idéntico
+#   node:20-alpine + pnpm install  →  OK ✅ (build completo verificado en el host)
+#
+# Medido el 2026-08-14 sobre el host real, con este `pnpm-lock.yaml` (1195
+# paquetes). Causa probable: libuv de Node 22+ usa `copy_file_range` para copiar
+# archivos, syscall que el kernel 3.10 no tiene y que el perfil seccomp de
+# Docker devuelve como EPERM. Por eso tampoco lo arreglan
+# `--package-import-method=copy` ni `--node-linker=hoisted`: las dos copian MÁS,
+# y las dos fallan igual (ambas probadas en el host).
+#
+# Consecuencia aceptada y explícita: el CI verifica con Node 24 y la imagen
+# construye con Node 20. Para un sitio estático de documentación el riesgo de
+# divergencia es bajo, y el deploy no se cree el build — sondea el contenedor
+# recién levantado (`/`, una ruta inexistente y `/openapi/`) antes de darse por
+# bueno. El día que el dedicado suba de kernel, esto vuelve a 24.
+FROM node:20-alpine AS build
 
 WORKDIR /app
 

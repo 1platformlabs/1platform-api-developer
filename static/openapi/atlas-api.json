@@ -569,13 +569,12 @@
             }
           },
           "409": {
-            "description": "Slug already in use by another tenant.",
+            "description": "Slug already in use by another tenant. (TENANT_SLUG_TAKEN) The requested primary_domain already resolves to another tenant. (HOST_ALIAS_CONFLICT)",
             "content": {
               "application/json": {
                 "example": {
                   "detail": {
-                    "code": "TENANT_SLUG_TAKEN",
-                    "message": "..."
+                    "code": "HOST_ALIAS_CONFLICT"
                   }
                 }
               }
@@ -630,6 +629,54 @@
                 }
               ],
               "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -728,6 +775,54 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
             "name": "atlas_session",
             "in": "cookie",
             "required": false,
@@ -751,6 +846,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TenantOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The {tenant_id} in the path is not the caller's effective tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_SWITCH_FORBIDDEN"
+                  }
                 }
               }
             }
@@ -3188,6 +3295,22 @@
         "operationId": "grant_api_v1_entitlements_post",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -3204,7 +3327,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -3216,7 +3339,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -3371,6 +3494,54 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
             }
           }
         ],
@@ -3935,6 +4106,54 @@
               ],
               "title": "X-Tenant-Slug"
             }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
           }
         ],
         "responses": {
@@ -3984,6 +4203,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -4000,7 +4235,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -4012,7 +4247,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -4254,13 +4489,11 @@
             }
           },
           "403": {
-            "description": "Requested format is not in the tenant's allow-list.",
+            "description": "Access denied. ``ENTITLEMENT_DENIED`` — the member has no active entitlement. ``ASSET_FORMAT_NOT_ALLOWED`` — the requested format is not in the tenant's allow-list. ``ASSET_KEY_FORBIDDEN`` — the item declares a storage key outside its own object namespace and outside the canonical keys the sync engine recorded for it, so delivery fails closed instead of signing another tenant's object (#190); that one is a domain error, so its body is flat (``{code, message}``) rather than wrapped in ``detail``.",
             "content": {
               "application/json": {
                 "example": {
-                  "detail": {
-                    "code": "ASSET_FORMAT_NOT_ALLOWED"
-                  }
+                  "code": "ASSET_KEY_FORBIDDEN"
                 }
               }
             }
@@ -4467,6 +4700,22 @@
         "operationId": "get_settings_api_v1_admin_settings_get",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -4483,7 +4732,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -4495,7 +4744,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -4579,6 +4828,22 @@
         "operationId": "patch_settings_api_v1_admin_settings_patch",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -4595,7 +4860,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -4607,7 +4872,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -4704,6 +4969,22 @@
         "operationId": "upload_branding_favicon_api_v1_admin_settings_branding_favicon_post",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -4720,7 +5001,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -4732,7 +5013,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -4934,12 +5215,12 @@
             }
           },
           "409": {
-            "description": "Slug already in use by another tenant.",
+            "description": "Slug already in use by another tenant. (TENANT_SLUG_TAKEN) The requested primary_domain already resolves to another tenant. (HOST_ALIAS_CONFLICT)",
             "content": {
               "application/json": {
                 "example": {
                   "detail": {
-                    "code": "TENANT_SLUG_TAKEN"
+                    "code": "HOST_ALIAS_CONFLICT"
                   }
                 }
               }
@@ -4995,6 +5276,54 @@
                 }
               ],
               "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -5094,6 +5423,54 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
             "name": "atlas_session",
             "in": "cookie",
             "required": false,
@@ -5117,6 +5494,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminTenantOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The {tenant_id} in the path is not the caller's effective tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_SWITCH_FORBIDDEN"
+                  }
                 }
               }
             }
@@ -5196,6 +5585,54 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
             "name": "atlas_session",
             "in": "cookie",
             "required": false,
@@ -5233,6 +5670,18 @@
               }
             }
           },
+          "403": {
+            "description": "The {tenant_id} in the path is not the caller's effective tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_SWITCH_FORBIDDEN"
+                  }
+                }
+              }
+            }
+          },
           "404": {
             "description": "Tenant id does not exist.",
             "content": {
@@ -5240,6 +5689,18 @@
                 "example": {
                   "detail": {
                     "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The requested primary_domain already resolves to another tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "HOST_ALIAS_CONFLICT"
                   }
                 }
               }
@@ -5310,6 +5771,54 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
             "name": "atlas_session",
             "in": "cookie",
             "required": false,
@@ -5329,6 +5838,18 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "403": {
+            "description": "The {tenant_id} in the path is not the caller's effective tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_SWITCH_FORBIDDEN"
+                  }
+                }
+              }
+            }
           },
           "404": {
             "description": "Tenant id does not exist.",
@@ -5408,6 +5929,54 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
             "name": "atlas_session",
             "in": "cookie",
             "required": false,
@@ -5441,6 +6010,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TenantUrlRouting"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The {tenant_id} in the path is not the caller's effective tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_SWITCH_FORBIDDEN"
+                  }
                 }
               }
             }
@@ -5611,22 +6192,6 @@
             }
           },
           {
-            "name": "host",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Host"
-            }
-          },
-          {
             "name": "x-tenant-slug",
             "in": "header",
             "required": false,
@@ -5640,6 +6205,22 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
             }
           },
           {
@@ -5758,22 +6339,6 @@
             }
           },
           {
-            "name": "host",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Host"
-            }
-          },
-          {
             "name": "x-tenant-slug",
             "in": "header",
             "required": false,
@@ -5787,6 +6352,22 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
             }
           },
           {
@@ -7135,6 +7716,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -7151,7 +7748,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -7163,7 +7760,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -8090,6 +8687,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -8106,7 +8719,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -8118,7 +8731,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -8238,22 +8851,6 @@
             }
           },
           {
-            "name": "host",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Host"
-            }
-          },
-          {
             "name": "x-tenant-slug",
             "in": "header",
             "required": false,
@@ -8267,6 +8864,22 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
             }
           },
           {
@@ -8376,6 +8989,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -8392,7 +9021,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -8404,7 +9033,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -8514,6 +9143,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -8530,7 +9175,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -8542,7 +9187,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -8678,22 +9323,6 @@
             }
           },
           {
-            "name": "host",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Host"
-            }
-          },
-          {
             "name": "x-tenant-slug",
             "in": "header",
             "required": false,
@@ -8707,6 +9336,22 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
             }
           },
           {
@@ -8823,6 +9468,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -8839,7 +9500,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -8851,7 +9512,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -8939,6 +9600,22 @@
         "operationId": "create_publisher_api_v1_admin_publishers_post",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -8955,7 +9632,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -8967,7 +9644,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -9073,6 +9750,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -9089,7 +9782,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -9101,7 +9794,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -9205,6 +9898,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -9221,7 +9930,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -9233,7 +9942,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -9352,6 +10061,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -9368,7 +10093,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -9380,7 +10105,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -9468,6 +10193,22 @@
         "operationId": "upsert_redirect_api_v1_admin_redirects_put",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -9484,7 +10225,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -9496,7 +10237,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -9599,6 +10340,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -9615,7 +10372,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -9627,7 +10384,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -9706,6 +10463,22 @@
         "operationId": "bulk_upsert_redirects_api_v1_admin_redirects_bulk_post",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -9722,7 +10495,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -9734,7 +10507,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -9830,6 +10603,22 @@
         "operationId": "revalidate_api_v1_admin_revalidate_post",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -9846,7 +10635,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -9858,7 +10647,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -9977,6 +10766,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -9993,7 +10798,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -10005,7 +10810,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -10092,6 +10897,22 @@
         "operationId": "invalidate_cache_api_v1_admin_seo_health_invalidate_cache_post",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -10108,7 +10929,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -10120,7 +10941,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12543,6 +13364,22 @@
         "operationId": "admin.rails.list",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12559,7 +13396,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12571,7 +13408,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12659,6 +13496,22 @@
         "operationId": "admin.rails.create",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12675,7 +13528,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12687,7 +13540,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12783,6 +13636,22 @@
         "operationId": "admin.rails.reorder",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12799,7 +13668,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12811,7 +13680,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -12923,6 +13792,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -12939,7 +13824,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -12951,7 +13836,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -13066,6 +13951,22 @@
             }
           },
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -13082,7 +13983,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -13094,7 +13995,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -13760,6 +14661,22 @@
         "operationId": "admin.notifications.list",
         "parameters": [
           {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
             "name": "host",
             "in": "header",
             "required": false,
@@ -13776,7 +14693,7 @@
             }
           },
           {
-            "name": "x-tenant-slug",
+            "name": "X-Admin-Tenant-Slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -13788,7 +14705,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Tenant-Slug"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -20986,7 +21903,7 @@
         "operationId": "create_person_api_v1_people_post",
         "parameters": [
           {
-            "name": "host",
+            "name": "x-admin-tenant-slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -20998,7 +21915,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Host"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -21015,6 +21932,22 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
             }
           },
           {
@@ -21297,7 +22230,7 @@
         "operationId": "create_show_api_v1_shows_post",
         "parameters": [
           {
-            "name": "host",
+            "name": "x-admin-tenant-slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -21309,7 +22242,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Host"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -21326,6 +22259,22 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
             }
           },
           {
@@ -21617,7 +22566,7 @@
             }
           },
           {
-            "name": "host",
+            "name": "x-admin-tenant-slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -21629,7 +22578,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Host"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -21646,6 +22595,22 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
             }
           },
           {
@@ -21837,7 +22802,7 @@
           "shows"
         ],
         "summary": "Add Episode",
-        "description": "Create an episode under a show + season pair.\n\nReturns 404 SEASON_NOT_FOUND when the show or season doesn't exist\nso the dashboard can branch deterministically. Slug uniqueness is\nenforced per-season at the DB layer.",
+        "description": "Create an episode under a show + season pair.\n\nReturns 404 SEASON_NOT_FOUND when the show or season doesn't exist\nso the dashboard can branch deterministically, and 404\nCONTENT_ITEM_NOT_FOUND when ``content_item_id`` does not name an item\nof this tenant. Slug uniqueness is enforced per-season at the DB\nlayer.",
         "operationId": "add_episode_api_v1_shows__slug__seasons__season_number__episodes_post",
         "parameters": [
           {
@@ -21859,7 +22824,7 @@
             }
           },
           {
-            "name": "host",
+            "name": "x-admin-tenant-slug",
             "in": "header",
             "required": false,
             "schema": {
@@ -21871,7 +22836,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Host"
+              "title": "X-Admin-Tenant-Slug"
             }
           },
           {
@@ -21888,6 +22853,22 @@
                 }
               ],
               "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
             }
           },
           {
@@ -21961,7 +22942,7 @@
             }
           },
           "404": {
-            "description": "Season not found for this show.",
+            "description": "Season not found for this show (SEASON_NOT_FOUND), or the linked content item does not belong to this tenant (CONTENT_ITEM_NOT_FOUND).",
             "content": {
               "application/json": {
                 "example": {
@@ -28711,7 +29692,7 @@
           },
           "limit": {
             "type": "integer",
-            "maximum": 100,
+            "maximum": 80,
             "minimum": 1,
             "title": "Limit",
             "default": 1
@@ -30905,7 +31886,14 @@
               "x",
               "telegram",
               "rss",
-              "mail"
+              "mail",
+              "linkedin",
+              "instagram",
+              "tiktok",
+              "youtube",
+              "kick",
+              "facebook",
+              "website"
             ],
             "title": "Kind"
           },
@@ -32181,7 +33169,15 @@
             "title": "Tenant Id"
           },
           "lease_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Lease Id"
           },
           "enabled": {
@@ -32210,7 +33206,8 @@
           "consumed_units",
           "remaining_units"
         ],
-        "title": "LeasePushResult"
+        "title": "LeasePushResult",
+        "description": "The allowance as it now stands, read back from the stored row.\n\n``lease_id`` is the identity the lease is keyed on, or ``null`` when there is\nnone — it describes the row, it does not repeat the request."
       },
       "LegacyRedirectBulkResult": {
         "properties": {

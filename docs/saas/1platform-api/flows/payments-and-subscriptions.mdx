@@ -73,6 +73,8 @@ SUBSCRIPTION_ID=""    # Obtenido en el Paso 2 (de la respuesta de facturación)
 | `description` | string | No | Descripción de la transacción (máx. 500 caracteres) |
 | `metadata` | object | No | Metadatos adicionales (pares clave-valor). **Se devuelven sin cambios** en el payload del webhook saliente. |
 | `merchant_reference` | string | No | Identificador libre del comercio (máx. 128 caracteres). **Se devuelve sin cambios** en el webhook saliente — asígnale el ID de tu pedido local para una correlación determinista. |
+| `customer_email` | string | No | Dirección de tu **comprador** (máx. 254 caracteres). Si la envías, le mandamos el comprobante cuando el pago se aprueba. Nunca se devuelve en ninguna respuesta. Ver [`customer_email`](#customer-email). |
+| `return_url` | string | No | A dónde vuelve el navegador del pagador al terminar el checkout (HTTPS, host registrado). Ver [`return_url`](#return-url). |
 
 ---
 
@@ -249,6 +251,7 @@ curl -X POST "$BASE_URL/users/transactions" \
     "description": "Account top-up - March 2026",
     "merchant_reference": "order_abc123",
     "return_url": "https://tu-sitio.com/checkout/resultado?order={{merchant_reference}}",
+    "customer_email": "ana@ejemplo.com",
     "metadata": {
       "source": "web",
       "campaign_id": "spring-promo-2026"
@@ -299,6 +302,59 @@ Redirige al usuario a `data.payment_url` para completar el pago. Guarda `data.id
 - `return_url` — la redirección que quedó registrada, con los marcadores ya
   sustituidos. Se devuelve para que un dominio mal registrado se note al crear y
   no después del primer pago real.
+- `customer_email` — **no aparece en la respuesta**, ni acá ni en el detalle ni
+  en el listado. Es la dirección de tu cliente, no un dato tuyo que te
+  devolvamos: guárdala de tu lado si la necesitas. Que se aceptó lo confirma el
+  `201`; que era válida, el hecho de no haber recibido un `400`.
+
+#### `customer_email` — que tu comprador reciba el comprobante {#customer-email}
+
+Si nos das la dirección de tu comprador al crear la transacción, **nosotros le
+escribimos cuando el pago se aprueba**. La pasarela no le manda nada: es un
+correo que sale de 1Platform, con la marca de tu tenant.
+
+```json
+{ "customer_email": "ana@ejemplo.com" }
+```
+
+| Regla | Detalle |
+|---|---|
+| Obligatoriedad | Opcional. Si lo omites no cambia absolutamente nada |
+| Formato | Una dirección bien formada. Hasta 254 caracteres (RFC 5321) |
+| Validación | Al **crear**, antes de contactar a la pasarela: una dirección mal escrita responde `400` y no deja una sesión de pago viva detrás |
+| Lectura | Nunca se devuelve, por ninguna respuesta |
+| Cuándo se envía | Sólo cuando la transacción pasa a `approved` |
+
+**Qué desenlaces disparan correo:**
+
+| Desenlace | ¿Se le escribe al comprador? |
+|---|---|
+| `approved` | **Sí** — una vez, y sólo una |
+| `denied` | No |
+| `dismiss` (cerró la ventana de pago) | No |
+| `cancelled` · `expired` | No |
+
+Sólo el pago aprobado le concierne al comprador. Decirle que su pago "falló"
+porque cerró una pestaña es ruido sobre algo que todavía puede completar.
+
+Una reentrega del aviso de la pasarela **no** produce un segundo correo, y eso
+vale también semanas después: la constancia de haberlo enviado vive en la
+transacción, no en un registro que caduque.
+
+:::warning[El correo no sustituye al webhook]
+Es una cortesía para tu comprador, no una señal de liquidación. **El webhook
+sigue siendo lo único que liquida un pedido.** No lo uses para conciliar, y no
+asumas que un pago se cobró porque el correo salió — ni que no se cobró porque no
+salió: si tu comprador no nos dio una dirección, o el envío falló, el pago se
+liquidó igual.
+:::
+
+:::caution[No uses `metadata.userId` para esto]
+Ese valor **se le entrega a la pasarela** como identificador del pagador, que es
+otra cosa. Es un canal que existe desde antes y que seguimos respetando tal
+cual, pero no es una dirección de comprobante y no dispara ningún correo. La
+dirección del comprador va en `customer_email`, que no viaja a la pasarela.
+:::
 
 #### `return_url` — devolver al pagador a tu sitio {#return-url}
 
@@ -363,6 +419,7 @@ Solución alternativa:
 |---|---|---|---|
 | 400 | — | Datos de la solicitud inválidos | Verifica que `amount` sea un número positivo |
 | 400 | — | El host de `return_url` no está registrado para esta App | Regístralo con `POST /webhooks/config/domains` (no requiere verificación DNS) |
+| 400 | — | `customer_email` no es una dirección válida | Corrige la dirección. Se comprueba antes de contactar a la pasarela, así que no queda nada creado |
 | 401 | — | Se requiere autenticación | Regenera los tokens. Consulta [cacheo de tokens](#token-caching-pattern) |
 | 404 | — | No se encontró el registro de facturación del usuario | Asegúrate de que el usuario tenga un registro de facturación (creado durante el registro del usuario) |
 | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El tenant no tiene una pasarela activa | Configura primero una pasarela — consulta el aviso de requisitos previos más arriba |
@@ -762,7 +819,8 @@ TRANSACTION_RESPONSE=$(curl -s -X POST "$BASE_URL/users/transactions" \
   -H "Content-Type: application/json" \
   -d '{
     "amount": 25.00,
-    "description": "Account top-up"
+    "description": "Account top-up",
+    "customer_email": "ana@ejemplo.com"
   }')
 
 PAYMENT_URL=$(echo $TRANSACTION_RESPONSE | jq -r '.data.payment_url')

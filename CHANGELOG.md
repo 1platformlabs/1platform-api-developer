@@ -4,6 +4,9 @@ All notable changes to the 1Platform API Developer Docs will be documented in th
 
 ## [Unreleased]
 
+### Added
+- **`flows/payments-and-subscriptions`**: `customer_email` documented in step 3 — the merchant hands us their BUYER's address at creation and 1Platform emails them the receipt when the payment is approved (the gateway sends the buyer nothing). Covers the optional 254-character format, the `400` raised before the gateway is contacted, the outcome table stating that only `approved` mails anybody, the fact that the value is never echoed back by any response, that a redelivered callback does not produce a second email, a warning that the receipt never substitutes the webhook as the thing that settles an order, and an explicit note not to use `metadata.userId` for this (that value is forwarded to the gateway as the payer identifier and triggers no email). Added to the request field table and the end-to-end example
+
 ### Changed
 - **`webhooks/receiving-notifications`**: `status` documented as always concordant with `event`, plus a dated note on the defect corrected on 2026-08-18 (it used to carry the status the transaction had at CREATION time — normally `created` — next to the right `event`, so a handler routing on `status` recorded approved payments as pending). The status enum row for `created` now says outright that it never arrives in a notification
 - **`webhooks/configuring-urls`**: two sections added — the registered URL is requested verbatim, **query string included** (only the host is matched against the allowlist), and `headers`, which are now delivered on every attempt with the rules verified at save time (20 max, valid HTTP field name, printable ASCII value, reserved names refused with `422`). Includes a dated note that before 2026-08-18 only six header names travelled and everything else was dropped without a word

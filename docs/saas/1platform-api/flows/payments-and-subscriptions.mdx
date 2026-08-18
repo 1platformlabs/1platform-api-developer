@@ -247,6 +247,8 @@ curl -X POST "$BASE_URL/users/transactions" \
   -d '{
     "amount": 10.00,
     "description": "Account top-up - March 2026",
+    "merchant_reference": "order_abc123",
+    "return_url": "https://tu-sitio.com/checkout/resultado?order={{merchant_reference}}",
     "metadata": {
       "source": "web",
       "campaign_id": "spring-promo-2026"
@@ -270,6 +272,7 @@ curl -X POST "$BASE_URL/users/transactions" \
     "payment_url": "https://checkout.payment-service.com/pay/abc123",
     "reference": null,
     "description": "Account top-up - March 2026",
+    "return_url": "https://tu-sitio.com/checkout/resultado?order=order_abc123",
     "created_at": "2026-03-18T10:30:00Z",
     "updated_at": "2026-03-18T10:30:00Z"
   },
@@ -293,6 +296,44 @@ Redirige al usuario a `data.payment_url` para completar el pago. Guarda `data.id
   tiempo limitado — redirige sin demora.
 - `status` — comienza como `"created"`. El estado final llega vía webhook —
   consulta [recibir notificaciones](../webhooks/receiving-notifications).
+- `return_url` — la redirección que quedó registrada, con los marcadores ya
+  sustituidos. Se devuelve para que un dominio mal registrado se note al crear y
+  no después del primer pago real.
+
+#### `return_url` — devolver al pagador a tu sitio {#return-url}
+
+Sin `return_url`, quien termina de pagar se queda en la página de pago: un
+dominio que no es el tuyo, sin confirmación y sin manera de volver.
+
+```json
+{ "return_url": "https://tu-sitio.com/checkout/resultado?order={{merchant_reference}}" }
+```
+
+| Regla | Detalle |
+|---|---|
+| Esquema | HTTPS obligatorio |
+| Host | Debe estar **registrado** para tu App vía `POST /webhooks/config/domains` — la misma lista que usan los webhooks. **No** hace falta verificarlo por DNS |
+| Marcadores | `{{transaction_id}}` y `{{merchant_reference}}`, sustituidos y codificados para URL |
+| Longitud | Hasta 2048 caracteres |
+
+El `id` de la transacción no existe todavía cuando envías esta URL, y por eso
+existe `{{transaction_id}}`: es la única forma de que tu página de retorno sepa
+qué transacción volvió si no llevas tu propia referencia. Si envías
+`{{merchant_reference}}` sin haber enviado `merchant_reference`, el marcador
+resuelve a cadena vacía — nunca queda el literal a la vista del pagador.
+
+:::warning[Es una redirección, no una notificación]
+La redirección ocurre en el navegador del pagador, y el pagador puede cerrar la
+pestaña antes. **El webhook sigue siendo lo único que liquida un pedido**: usa
+la página de retorno para mostrar el resultado, nunca para darlo por cobrado.
+Además ocurre en todos los desenlaces —aprobado, rechazado, cancelado— y sin
+parámetros añadidos por nosotros, así que consulta el estado real por
+`GET /users/transactions` o espera el webhook antes de afirmar nada.
+:::
+
+Un host no registrado responde `400` nombrando el host y el endpoint con el que
+registrarlo, **antes** de crear nada con el proveedor: una `return_url`
+rechazada no deja una sesión de pago viva detrás.
 
 :::warning[Sin clave de idempotencia en este endpoint]
 `POST /users/transactions` **no** acepta un header `Idempotency-Key`.
@@ -313,6 +354,7 @@ Solución alternativa:
 | Código | `data.code` | Causa | Solución |
 |---|---|---|---|
 | 400 | — | Datos de la solicitud inválidos | Verifica que `amount` sea un número positivo |
+| 400 | — | El host de `return_url` no está registrado para esta App | Regístralo con `POST /webhooks/config/domains` (no requiere verificación DNS) |
 | 401 | — | Se requiere autenticación | Regenera los tokens. Consulta [cacheo de tokens](#token-caching-pattern) |
 | 404 | — | No se encontró el registro de facturación del usuario | Asegúrate de que el usuario tenga un registro de facturación (creado durante el registro del usuario) |
 | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El tenant no tiene una pasarela activa | Configura primero una pasarela — consulta el aviso de requisitos previos más arriba |

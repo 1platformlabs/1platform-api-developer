@@ -35,6 +35,21 @@ sigue esta forma canónica:
 Si configuraste un `body_template`, el dispatcher emite lo que tú definiste —
 el cuerpo canónico es el **valor por defecto** cuando renuncias al uso de plantillas.
 
+:::info[`status` y `event` dicen lo mismo, siempre]
+`status` es el estado **al que acaba de transicionar** la transacción, y siempre
+concuerda con `event`: `on_approved` viaja con `"status": "approved"`,
+`on_denied` con `"denied"`, y así con los cinco. Puedes enrutar por cualquiera
+de los dos.
+
+**Corregido el 2026-08-18.** Hasta esa fecha `status` traía el estado que la
+transacción tenía **al crearse** —normalmente `"created"`— junto al `event`
+correcto. Un manejador que enrutaba por `status` registraba como pendientes
+pagos realmente aprobados, sin ningún error visible en ninguna de las dos
+partes. Si escribiste una defensa contra eso (por ejemplo, ignorar `status` y
+enrutar sólo por `event`), sigue siendo válida: `event` no cambió y las dos
+lecturas coinciden ahora.
+:::
+
 ## Referencia de campos
 
 | Campo | Origen | Úsalo para |
@@ -64,7 +79,7 @@ el comercio.
 
 | `status` entrante | ¿Final? | Significado |
 |---|---|---|
-| `created` | No | Transacción creada, el comprador aún no ha pagado (no se dispara webhook para este estado) |
+| `created` | No | Transacción creada, el comprador aún no ha pagado. **Nunca llega en una notificación**: si lo ves, es el defecto corregido el 2026-08-18 descrito arriba |
 | `approved` | Sí | El comprador pagó; los fondos se liquidaron |
 | `denied` | Sí | Tarjeta rechazada |
 | `cancelled` | Sí | El comprador canceló antes de pagar |

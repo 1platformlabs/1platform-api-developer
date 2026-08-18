@@ -38,6 +38,59 @@ curl -X PUT "$BASE_URL/webhooks/config/events" \
   }'
 ```
 
+## La URL se usa tal cual — query string incluido
+
+Lo que registras es lo que se solicita, byte por byte: si tu URL lleva
+parámetros de query, viajan en cada entrega.
+
+```json
+{ "url": "https://api.bowerfans.com/webhooks/payments?token=abc123" }
+```
+
+Contra la lista de dominios permitidos se compara **sólo el host**
+(`api.bowerfans.com`); la ruta y el query string no se inspeccionan, no se
+normalizan y no se reordenan.
+
+## headers — encabezados propios en cada entrega
+
+Cada manejador de eventos acepta un objeto `headers` que se envía en **todos**
+los intentos de entrega de ese evento. Es la vía para atravesar una protección
+de acceso delante de tu receptor (los entornos de vista previa de los hostings
+suelen abrirse con un encabezado o con un parámetro de query; ambos funcionan).
+
+```bash
+curl -X PUT "$BASE_URL/webhooks/config/events" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "on_approved": {
+      "url": "https://api.bowerfans.com/webhooks/payments",
+      "method": "POST",
+      "headers": { "X-Api-Key": "clave-de-tu-receptor" }
+    }
+  }'
+```
+
+Reglas, todas verificadas al guardar (respuesta `422` con el motivo, nunca un
+descarte silencioso en la entrega):
+
+| Regla | Detalle |
+|---|---|
+| Máximo | 20 encabezados por evento |
+| Nombre | Token HTTP válido (letras, dígitos y ``!#$%&'*+-.^_`\|~``), hasta 128 caracteres |
+| Valor | ASCII imprimible, sin saltos de línea, hasta 1024 caracteres |
+| Reservados | `Authorization`, `Content-Type`, `Content-Length`, `Host`, `X-Webhook-Signature`, `X-Webhook-Timestamp`, y los de conexión (`Connection`, `Transfer-Encoding`, `Upgrade`, `TE`, `Trailer`, `Expect`, `Keep-Alive`, `Proxy-*`) |
+
+:::info[Antes del 2026-08-18 sólo pasaban seis nombres]
+El dispatcher reenviaba únicamente `x-idempotency-key`, `x-request-id` y los que
+él mismo pone, y **descartaba el resto sin avisar** — aunque el ejemplo de la
+API y el editor del panel invitaban a escribir uno propio. Un receptor detrás de
+una compuerta que se abre con un encabezado quedaba perfectamente configurado y
+no recibía nada. Hoy viaja todo lo que no esté reservado, y lo reservado se
+rechaza al guardar.
+:::
+
 ## body_template — renunciar al cuerpo canónico
 
 Cada manejador de eventos acepta un objeto opcional `body_template`. Cuando está

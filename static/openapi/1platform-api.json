@@ -6357,7 +6357,7 @@
           "Payments"
         ],
         "summary": "Create Payment Transaction",
-        "description": "Create a new payment transaction and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Payment is processed via the integrated payment service\n- Returns a `payment_url` where the user completes checkout\n- Transaction starts with status `CREATED`; status updates arrive via webhook\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 25.00, \"currency\": \"USD\", \"description\": \"Credit purchase\"}'\n```",
+        "description": "Create a new payment transaction and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Payment is processed via the integrated payment service\n- Returns a `payment_url` where the user completes checkout\n- Transaction starts with status `CREATED`; status updates arrive via webhook\n- Optional `return_url`: where the payer's browser lands after checkout. HTTPS, and its host must be registered via `POST /webhooks/config/domains`. Two variables are substituted into it, URL-encoded: `{{transaction_id}}` and `{{merchant_reference}}`. It is a redirect, not a notification — the webhook is still the only thing that settles an order\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 25.00, \"currency\": \"USD\", \"description\": \"Credit purchase\"}'\n```",
         "operationId": "createPaymentTransaction",
         "security": [
           {
@@ -6398,7 +6398,8 @@
                   "source": "web",
                   "campaign_id": "abc123"
                 },
-                "merchant_reference": "order_abc123"
+                "merchant_reference": "order_abc123",
+                "return_url": "https://shop.example.com/checkout/result?order={{merchant_reference}}"
               }
             }
           }
@@ -6423,6 +6424,7 @@
                     "status": "created",
                     "payment_url": "https://checkout.example.com/pay/abc123",
                     "description": "Credit purchase",
+                    "return_url": "https://shop.example.com/checkout/result?order=order_abc123",
                     "created_at": "2026-04-30T12:00:00Z",
                     "updated_at": "2026-04-30T12:00:00Z"
                   },
@@ -6432,7 +6434,7 @@
             }
           },
           "400": {
-            "description": "Invalid request data",
+            "description": "Invalid request data. Also returned when `return_url`'s host is not registered for this App — register it via `POST /webhooks/config/domains` (DNS verification is not required).",
             "content": {
               "application/json": {
                 "schema": {
@@ -7791,7 +7793,7 @@
           "Webhook Configuration"
         ],
         "summary": "Update Webhook Events",
-        "description": "Update the webhook event configurations for the authenticated App (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`). Each event URL must use HTTPS and resolve either to a 1Platform domain or to a **registered** domain in this App's allowlist. Verification is not required: a registered-but-unverified domain is accepted and delivered to, because a tenant hosted on a PaaS subdomain could never verify one. A domain that was never registered is still rejected with 422 — register it first via `POST /webhooks/config/domains`. Authentication requires BOTH an app token (`Authorization: Bearer <app_token>`) and a tenant admin user token (`x-user-token`). The tenant acted on is the ADMIN's, never the app token's. Rate limit: 20 req/min.",
+        "description": "Update the webhook event configurations for the authenticated App (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`). Each event URL must use HTTPS and resolve either to a 1Platform domain or to a **registered** domain in this App's allowlist. Verification is not required: a registered-but-unverified domain is accepted and delivered to, because a tenant hosted on a PaaS subdomain could never verify one. A domain that was never registered is still rejected with 422 — register it first via `POST /webhooks/config/domains`. The URL is stored and requested **verbatim, query string included** — only its host is matched against the allowlist. `headers` are delivered with every attempt (up to 20); reserved names such as `Authorization`, `Content-Type`, `Host` and `X-Webhook-*` are rejected with 422 because the dispatcher sets them itself. Authentication requires BOTH an app token (`Authorization: Bearer <app_token>`) and a tenant admin user token (`x-user-token`). The tenant acted on is the ADMIN's, never the app token's. Rate limit: 20 req/min.",
         "operationId": "updateWebhookEvents",
         "security": [
           {
@@ -7830,7 +7832,7 @@
                   "url": "https://api.bazar.com/webhooks/payments/approved",
                   "method": "POST",
                   "headers": {
-                    "X-Custom-Header": "value"
+                    "X-Api-Key": "your-receiver-key"
                   },
                   "body_template": {
                     "transaction_id": "{{transaction_id}}",
@@ -12916,6 +12918,184 @@
           },
           "429": {
             "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/catalog/{slug}/install": {
+      "post": {
+        "tags": [
+          "Agents Catalog"
+        ],
+        "summary": "Create an agent from a catalog template, switched on",
+        "description": "Create an agent from a template with the template's own tools, cadence, iteration ceiling and tier already applied, optionally assigning its sites and its spending cap in the same call.\n\nUse this instead of `POST /agents` from a UI: that route requires the full tool definitions including each `input_schema`, which no client has — `GET /agents/tools` publishes display copy, not schemas — and an agent created with `tools: []` runs, spends and cannot close its own task.\n\n**The agent is born active.** `is_active` defaults to `true` and the cadence defaults to the template's `default_schedule`; send `\"schedule\": \"\"` to create one that never runs by itself.\n\n**Several agents may share a template.** The uniqueness the domain enforces is one objective per *site*, so a second copy pointed at a different site is legal.\n\nA tool the template requires but this workspace's plan does not grant is **skipped and reported** in `skipped_tools`, not fatal — unless the plan grants none of them, which is a 403.\n\n- **Auth:** `Authorization: Bearer <app_token>` **and** `x-user-token`\n- **Rate limit:** 30 req/min\n- Maximum 50 agents per app",
+        "operationId": "installCatalogTemplate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Template slug",
+              "examples": [
+                "seo-organic-growth"
+              ],
+              "title": "Slug"
+            },
+            "description": "Template slug"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored.",
+              "title": "X-User-Token"
+            },
+            "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallTemplateRequest"
+              },
+              "example": {
+                "name": "Aurora — megaepub",
+                "website_ids": [
+                  "507f1f77bcf86cd799439011"
+                ],
+                "monthly_budget_usd": "25.00"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Agent created from the template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_InstallTemplateResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "agent": {
+                      "id": "507f1f77bcf86cd799439011",
+                      "app_id": "507f1f77bcf86cd799439012",
+                      "name": "Aurora — megaepub",
+                      "description": "Crecimiento orgánico para megaepub.app",
+                      "system_prompt": "Operás el sitio de contenido...",
+                      "tools": [],
+                      "model_tier": "standard",
+                      "max_iterations": 15,
+                      "schedule": "0 9 * * 1",
+                      "webhook_url": "https://example.com/webhooks/agent-result",
+                      "is_active": true,
+                      "max_concurrent_runs": 1,
+                      "template_slug": "seo-organic-growth",
+                      "created_at": "2026-08-18T12:00:00Z",
+                      "updated_at": "2026-08-18T12:00:00Z"
+                    },
+                    "skipped_tools": [
+                      {
+                        "id": "get_seo_opportunities",
+                        "name": "Oportunidades de posicionamiento",
+                        "reason": "not_in_plan"
+                      }
+                    ]
+                  },
+                  "msg": "Agent created from template successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid app token, or a missing/invalid `x-user-token`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This workspace's plan grants none of the tools the template needs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found, or a site that is not the owner's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another agent of the same objective already watches one of those sites",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded or quota exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -34359,6 +34539,134 @@
         }
       }
     },
+    "/api/v1/platform/apps/{app_id}/agent-capabilities": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Which agent tools one tenant's plan unlocks (superadmin)",
+        "description": "Every feature flag that gates an agent tool, whether this tenant has it, and the tools each one unlocks.\n\n**Derived from `TOOL_PERMISSION_MAP`, never from a list in the console.** A premium tool added to that map appears here the same day, and a console with its own copy of the list would keep offering a flag that unlocks nothing — or, worse, stay silent about one that a tenant is paying for and cannot use.\n\nThis is a DIFFERENT axis from `GET /platform/features`, and the two are easy to confuse: that one is the dashboard's module rail and writes `App.config.<namespace>.enabled`, while these are agent tool permissions and live in `App.config.features.<flag>`. Switching a module on does not grant a tool, and granting a tool does not put a section in anyone's sidebar.\n\nWrite them through `PATCH /platform/apps/{app_id}` with `config_patch: {\"features\": {\"<flag>\": true}}` — the `features` namespace accepts booleans only.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)",
+        "operationId": "getAppAgentCapabilities",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Tenant App ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "App Id"
+            },
+            "description": "Tenant App ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent capabilities for this tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentCapabilitiesView_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "capabilities": [
+                      {
+                        "flag": "search_console",
+                        "enabled": false,
+                        "tools": [
+                          "get_search_console_data",
+                          "get_seo_opportunities"
+                        ]
+                      },
+                      {
+                        "flag": "site_management",
+                        "enabled": true,
+                        "tools": [
+                          "update_site_content",
+                          "update_site_curation",
+                          "update_site_presentation",
+                          "update_site_seo_copy"
+                        ]
+                      }
+                    ]
+                  },
+                  "msg": "Agent capabilities retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/platform/apps/{app_id}/keys/ads": {
       "patch": {
         "tags": [
@@ -49456,6 +49764,73 @@
           "remaining_usd": "21.60"
         }
       },
+      "AgentCapabilitiesView": {
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "title": "App Id",
+            "description": "Tenant App ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCapabilityOut"
+            },
+            "type": "array",
+            "title": "Capabilities",
+            "description": "Derived from the server's tool permission map, never from a list in a client"
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_id"
+        ],
+        "title": "AgentCapabilitiesView",
+        "description": "Every agent-tool permission of one tenant."
+      },
+      "AgentCapabilityOut": {
+        "properties": {
+          "flag": {
+            "type": "string",
+            "title": "Flag",
+            "description": "The key inside `App.config.features` that grants these tools",
+            "examples": [
+              "search_console"
+            ]
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether this tenant has it. Only a literal `true` in the config counts — the same rule the server applies when it denies the tool.",
+            "examples": [
+              false
+            ]
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools",
+            "description": "The tools this one flag unlocks, sorted",
+            "examples": [
+              [
+                "get_search_console_data",
+                "get_seo_opportunities"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "flag",
+          "enabled"
+        ],
+        "title": "AgentCapabilityOut",
+        "description": "One feature flag that gates agent tools, for one tenant.\n\nDistinct from :class:`FeatureStateOut`, which describes a MODULE of the\nclient dashboard. The two are one word apart and administer different keys:\na module is ``App.config.<namespace>.enabled``, a capability is\n``App.config.features.<flag>``."
+      },
       "AgentListResponse": {
         "properties": {
           "agents": {
@@ -53726,6 +54101,14 @@
             "description": "Recommended max_iterations for this template",
             "examples": [
               10
+            ]
+          },
+          "default_model_tier": {
+            "$ref": "#/components/schemas/AgentModelTier",
+            "description": "Capacity tier this template runs on unless the caller overrides it",
+            "default": "standard",
+            "examples": [
+              "standard"
             ]
           }
         },
@@ -58880,6 +59263,145 @@
         "example": {
           "url": "https://example.com/new-article"
         }
+      },
+      "InstallTemplateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name. Absent falls back to the template's own name.",
+            "examples": [
+              "Aurora — megaepub"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What this copy does. Absent falls back to the template's description.",
+            "examples": [
+              "Crecimiento orgánico para megaepub.app"
+            ]
+          },
+          "website_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Website Ids",
+            "description": "Sites this agent is in charge of. Assigned in the same call because an agent of this kind with no site is inert, and leaving the assignment to a second request is what makes half-made agents.",
+            "examples": [
+              [
+                "507f1f77bcf86cd799439011"
+              ]
+            ]
+          },
+          "monthly_budget_usd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "decimal",
+                "description": "Decimal monetary value as string (preserves precision over the wire).",
+                "example": "0.05"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Budget Usd",
+            "description": "Spend ceiling per cycle in USD. Absent is NOT unlimited: the agent is created in proposal mode, which is the fail-safe reading.",
+            "examples": [
+              "25.00"
+            ]
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule",
+            "description": "Cron expression. `null` (the default) adopts the template's own cadence — which is what 'born switched on' means here. An EMPTY string is the explicit 'no cadence', and is the only way to create one that never runs by itself.",
+            "examples": [
+              "0 9 * * 1"
+            ]
+          },
+          "model_tier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelTier"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Overrides the template's own tier. Absent uses the template's.",
+            "examples": [
+              "standard"
+            ]
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "Born active by default — the whole point of this route.",
+            "default": true,
+            "examples": [
+              true
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "InstallTemplateRequest",
+        "description": "Payload for creating an agent from a catalog template (alta corta).\n\nEverything here is OPTIONAL on purpose: the template already carries the\nanswers — its tools, its cadence, its iteration ceiling and its tier — and\na form that made the caller restate them would be the wizard with worse\nmanners. What the body holds is only what the template CANNOT know: which\nsites this copy is in charge of, what it may spend, and how to tell it\napart from the other copies of the same template.",
+        "example": {
+          "monthly_budget_usd": "25.00",
+          "name": "Aurora — megaepub",
+          "website_ids": [
+            "507f1f77bcf86cd799439011"
+          ]
+        }
+      },
+      "InstallTemplateResponse": {
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentResponse",
+            "description": "The agent as it was persisted"
+          },
+          "skipped_tools": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedToolResponse"
+            },
+            "type": "array",
+            "title": "Skipped Tools",
+            "description": "Tools the template requires that this tenant's plan or wiring denied"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent"
+        ],
+        "title": "InstallTemplateResponse",
+        "description": "The agent that was created, and what it did not get."
       },
       "InstalledPlugin": {
         "properties": {
@@ -66294,6 +66816,42 @@
           "name": "Diseño gráfico"
         }
       },
+      "SkippedToolResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Tool identifier",
+            "examples": [
+              "get_seo_opportunities"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name",
+            "examples": [
+              "Oportunidades de posicionamiento"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "`not_in_plan` or `not_wired` — the same vocabulary the tool catalog uses",
+            "examples": [
+              "not_in_plan"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "reason"
+        ],
+        "title": "SkippedToolResponse",
+        "description": "A tool the template asked for that this tenant did not get.\n\nReported rather than silently dropped. The install still succeeds — a plan\nthat lacks one capability should not block the other fourteen — but a\ncaller who is never told cannot tell \"the agent ignored my site\" from \"the\nagent was never given the tool that reads it\"."
+      },
       "SpendPoint": {
         "properties": {
           "week": {
@@ -67464,6 +68022,38 @@
           "msg"
         ],
         "title": "SuccessResponse[AgentBudgetResponse]"
+      },
+      "SuccessResponse_AgentCapabilitiesView_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentCapabilitiesView",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentCapabilitiesView]"
       },
       "SuccessResponse_AgentListResponse_": {
         "properties": {
@@ -68968,6 +69558,38 @@
           "msg"
         ],
         "title": "SuccessResponse[I18nLanguagesResponse]"
+      },
+      "SuccessResponse_InstallTemplateResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/InstallTemplateResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[InstallTemplateResponse]"
       },
       "SuccessResponse_InvoiceCancelResponse_": {
         "properties": {
@@ -73166,6 +73788,22 @@
             "examples": [
               "bower_order_abc123"
             ]
+          },
+          "return_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Url",
+            "description": "Where the payer's BROWSER lands once checkout finishes — approved or not. Without it the payer stops on the payment page, on a domain that is not yours, with no way back.\n\nMust be HTTPS and its host must be registered for this App via `POST /webhooks/config/domains` (the same allowlist the outbound webhooks use; DNS verification is NOT required).\n\nTwo variables are substituted into it, URL-encoded: `{{transaction_id}}` and `{{merchant_reference}}` — the transaction id does not exist yet when you send this, so a return page that needs it has no other way to receive it.\n\nIt is a REDIRECT, not a notification: the payer can close the tab before it happens. The webhook remains the only thing that settles an order.",
+            "examples": [
+              "https://shop.example.com/checkout/result?order={{merchant_reference}}"
+            ]
           }
         },
         "type": "object",
@@ -73181,7 +73819,8 @@
           "metadata": {
             "campaign_id": "abc123",
             "source": "web"
-          }
+          },
+          "return_url": "https://shop.example.com/checkout/result?order={{merchant_reference}}"
         }
       },
       "TransactionHistoryResponse": {
@@ -73339,6 +73978,21 @@
               "Account top-up"
             ]
           },
+          "return_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Url",
+            "description": "The post-checkout redirect actually registered with the payment page, with its placeholders already substituted. Echoed back so a silent typo in the allowlist is visible at creation time instead of after the first real payment.",
+            "examples": [
+              "https://shop.example.com/checkout/result?order=order_abc123"
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -73379,6 +74033,7 @@
           "id": "65a1b2c3d4e5f6789abcdef0",
           "payment_url": "https://checkout.example.com/pay/abc123",
           "reference": "GT123456",
+          "return_url": "https://shop.example.com/checkout/result?order=order_abc123",
           "status": "created",
           "updated_at": "2024-01-01T12:00:00Z",
           "usd_amount": 10,
@@ -73941,7 +74596,7 @@
               "transaction_id": "{{transaction_id}}"
             },
             "headers": {
-              "X-Custom-Header": "value"
+              "X-Api-Key": "your-receiver-key"
             },
             "method": "POST",
             "url": "https://api.bazar.com/webhooks/payments/approved"
@@ -74671,7 +75326,7 @@
             "type": "string",
             "maxLength": 2048,
             "title": "Url",
-            "description": "Webhook destination URL"
+            "description": "Webhook destination URL. Sent verbatim, **query string included** — register `https://host/path?token=…` and the dispatcher requests exactly that. Only the host is matched against the allowlist."
           },
           "method": {
             "type": "string",
@@ -74689,7 +75344,7 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Headers",
-            "description": "Additional headers"
+            "description": "Extra headers sent with every delivery of this event — up to 20. Use them to get past an access gate in front of your receiver. Reserved names (`Authorization`, `Content-Type`, `Host`, `X-Webhook-*`, …) are refused here rather than dropped at delivery time: the dispatcher sets them itself."
           },
           "body_template": {
             "additionalProperties": true,

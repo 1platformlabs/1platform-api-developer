@@ -2150,6 +2150,18 @@
               }
             }
           },
+          "409": {
+            "description": "This tenant has no byte store: its ``media_supply`` block is not sealed and it has not opted into local assets. Seal the integration (preferred) or set ``config.allow_local_assets = true`` deliberately.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "ASSET_STORE_UNCONFIGURED"
+                  }
+                }
+              }
+            }
+          },
           "413": {
             "description": "Uploaded file exceeds the configured size limit.",
             "content": {
@@ -2515,6 +2527,18 @@
                 "example": {
                   "detail": {
                     "code": "CONTENT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This tenant has no byte store: its ``media_supply`` block is not sealed and it has not opted into local assets. Seal the integration (preferred) or set ``config.allow_local_assets = true`` deliberately.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "ASSET_STORE_UNCONFIGURED"
                   }
                 }
               }
@@ -3292,6 +3316,7 @@
           "entitlement"
         ],
         "summary": "Grant",
+        "description": "Grant an entitlement to a member of this tenant.\n\nThe member is resolved before anything is written. An id that does not\nbelong to this tenant returns ``404 MEMBER_NOT_FOUND`` — the same\nresponse whether the member belongs to another tenant or to nobody, so\nthis endpoint cannot be used to probe for members of other tenants.",
         "operationId": "grant_api_v1_entitlements_post",
         "parameters": [
           {
@@ -3408,6 +3433,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EntitlementOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No member with that id for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "MEMBER_NOT_FOUND"
+                  }
                 }
               }
             }
@@ -24985,6 +25022,46 @@
         }
       }
     },
+    "/api/v1/public/covers/{item_id}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Serve an item cover image without exposing storage",
+        "description": "Stream one published item's cover.",
+        "operationId": "public.item_cover",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown/unpublished item, or nothing uploaded."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/search/suggest": {
       "get": {
         "tags": [
@@ -25359,6 +25436,560 @@
           },
           "422": {
             "description": "Token does not match the accepted format"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/settings": {
+      "get": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Read a tenant's agent-writable settings (service-to-service)",
+        "description": "The live editable state, built key by key from an allowlist.\n\nThe payload is CONSTRUCTED, not filtered. That is the difference between this\nand reusing the existing redaction helper, and it is not a style preference:\nthe config document is an open shape, so a \"remove the secrets\" pass grants\nevery key added after it was written — and the helper in question makes five\npasses, none of which covers the search-console ownership token. The value\nserved is the ``tenants.config`` mirror, because that is the copy the public\nsite renders from.",
+        "operationId": "read_settings_api_v1_platform_tenants__slug__settings_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsReadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.settings.read"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_ENROLLED"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Merge-write a tenant's agent-writable settings (service-to-service)",
+        "description": "Merge the named paths into both stores, in one transaction.\n\nOrdering is the contract: validate, then lock, then compare revisions, then\nsnapshot, then write. Validation runs before the lock so a refused body\nleaves nothing behind at all — not a held row, not a snapshot, not an audit\nentry describing a change that did not happen.",
+        "operationId": "patch_settings_api_v1_platform_tenants__slug__settings_patch",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsWriteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.settings.write"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_ENROLLED"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A written block changed since it was read.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "REVISION_STALE"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A path in the body is not writable.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "KEY_NOT_WRITABLE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/settings/revert": {
+      "post": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Restore a pre-write snapshot of a tenant's settings",
+        "description": "Restore both stores to a snapshot by exact assignment.\n\nAssignment and not merge: ``features`` is an open namespace, so a write can\nadd a flag that never existed, and no merge can express \"remove that one\" —\na merge-based revert would leave it behind and answer 200.\n\nReachable with the arm switched OFF, on purpose — see ``_resolve_for_revert``.",
+        "operationId": "revert_settings_api_v1_platform_tenants__slug__settings_revert_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsRevertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRevertResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.settings.write"
+          },
+          "404": {
+            "description": "No snapshot with that id.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "BACKUP_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/content/items": {
+      "get": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "List a tenant's content items (service-to-service)",
+        "description": "A page of the catalogue: enough to choose an item, never the whole thing.\n\nEach row carries its ``version`` so the caller can hand it back on a patch\nwithout a second round trip — that is what keeps the optimistic lock cheap\nenough to actually be used.",
+        "operationId": "list_items_api_v1_platform_tenants__slug__content_items_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Integration key lacks tenants.content.read"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_ENROLLED"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/content/items/{item_id}": {
+      "patch": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Correct the editorial fields of one content item",
+        "description": "Title and the editorial metadata leaves. Nothing else.\n\nThe metadata keys are checked against an allowlist before anything is read\nor locked, so a rejected field leaves no trace: the item is not fetched, no\nversion is bumped and no audit row claims an edit that did not happen.",
+        "operationId": "patch_item_api_v1_platform_tenants__slug__content_items__item_id__patch",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContentPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentPatchResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Integration key lacks tenants.content.write"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_ENROLLED"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item changed since it was read.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "OPTIMISTIC_LOCK_FAILED"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is not editorially writable.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "KEY_NOT_WRITABLE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/rails/order": {
+      "put": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Reorder a tenant's home rails",
+        "description": "Apply a complete rail order, or none of it.\n\nThe tenant row is taken ``FOR UPDATE`` because rails live inside the same\nsingle ``config`` document as everything else: writing them means writing the\nwhole document back, so without the lock a reorder silently reverts whatever\nconcurrent write touched a DIFFERENT block. Nothing about the reorder would\nlook wrong afterwards — the other block would simply be back where it was\nten minutes ago.",
+        "operationId": "reorder_rails_api_v1_platform_tenants__slug__rails_order_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RailOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RailOrderResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Integration key lacks tenants.curation.write"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_ENROLLED"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id set does not match the stored rails.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "KEY_NOT_WRITABLE"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -30072,6 +30703,20 @@
             "type": "object",
             "title": "Metadata"
           },
+          "genres": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ItemGenreOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genres"
+          },
           "media_title_id": {
             "anyOf": [
               {
@@ -30262,6 +30907,41 @@
         ],
         "title": "ContentList"
       },
+      "ContentListResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContentRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 50
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug"
+        ],
+        "title": "ContentListResponse"
+      },
       "ContentMetadataSchema": {
         "properties": {
           "summary": {
@@ -30432,6 +31112,79 @@
         "title": "ContentMetrics30d",
         "description": "Rolling 30-day metrics block surfaced on content detail.\n\nEmbedded into the content detail response under ``metrics`` so the\nadmin UI can render the sparkline + completion gauge without a\nsecond round trip."
       },
+      "ContentPatchRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Version"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "version"
+        ],
+        "title": "ContentPatchRequest"
+      },
+      "ContentPatchResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          },
+          "pinned_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pinned Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "changed_fields"
+        ],
+        "title": "ContentPatchResponse"
+      },
       "ContentRef": {
         "properties": {
           "content_id": {
@@ -30509,6 +31262,39 @@
         ],
         "title": "ContentRef",
         "description": "Minimal content reference used inside ``/me/library`` payloads.\n\n``title``/``slug``/``cover_url``/``kind`` are best-effort — when the\nunderlying ``content`` row was soft-deleted they come back ``null``\nso the dashboard can fall back to ``content_id``."
+      },
+      "ContentRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "slug",
+          "status",
+          "version"
+        ],
+        "title": "ContentRow"
       },
       "ContentSummary": {
         "properties": {
@@ -32947,6 +33733,25 @@
         ],
         "title": "ItemFormat",
         "description": "A downloadable format card on the detail screen (EPUB/PDF/MOBI…)."
+      },
+      "ItemGenreOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "label"
+        ],
+        "title": "ItemGenreOut",
+        "description": "One genre of an item, ready to render: the identity plus the label.\n\n``slug`` is the same value ``?genre=`` resolves on the public catalogue —\nit is deliberately NOT localized. ``label`` is presentation and follows the\ntenant's ``default_locale``."
       },
       "KpiChartPoint": {
         "properties": {
@@ -37240,6 +38045,53 @@
         ],
         "title": "RailOrder"
       },
+      "RailOrderRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "ids"
+        ],
+        "title": "RailOrderRequest"
+      },
+      "RailOrderResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "ids"
+        ],
+        "title": "RailOrderResponse"
+      },
       "RailPatch": {
         "properties": {
           "title": {
@@ -38852,6 +39704,154 @@
         ],
         "title": "SessionsResponse"
       },
+      "SettingsPatchRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "revisions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Revisions"
+          },
+          "blocks": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Blocks"
+          },
+          "allow_shrink": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Allow Shrink"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "SettingsPatchRequest",
+        "description": "PATCH body for the arm.\n\n``extra='forbid'`` is deliberate and load-bearing: a typo in ``blocks`` that\nlanded in an ignored sibling key would otherwise answer 200 having written\nnothing, which is the failure shape hardest to notice from the caller side."
+      },
+      "SettingsReadResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "blocks": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Blocks"
+          },
+          "revisions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Revisions"
+          },
+          "drift": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Drift"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "blocks",
+          "revisions"
+        ],
+        "title": "SettingsReadResponse"
+      },
+      "SettingsRevertRequest": {
+        "properties": {
+          "backup_id": {
+            "type": "string",
+            "title": "Backup Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "backup_id"
+        ],
+        "title": "SettingsRevertRequest"
+      },
+      "SettingsRevertResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "revisions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Revisions"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "revisions",
+          "applied"
+        ],
+        "title": "SettingsRevertResponse"
+      },
+      "SettingsWriteResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "revisions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Revisions"
+          },
+          "backup_id": {
+            "type": "string",
+            "title": "Backup Id"
+          },
+          "changed_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Paths"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "revisions",
+          "backup_id",
+          "changed_paths"
+        ],
+        "title": "SettingsWriteResponse"
+      },
       "SettleBody": {
         "properties": {
           "items": {
@@ -39805,6 +40805,11 @@
                 "type": "null"
               }
             ]
+          },
+          "allow_local_assets": {
+            "type": "boolean",
+            "title": "Allow Local Assets",
+            "default": false
           }
         },
         "additionalProperties": true,

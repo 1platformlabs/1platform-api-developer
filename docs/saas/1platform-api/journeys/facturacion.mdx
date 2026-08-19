@@ -13,6 +13,9 @@ la SAT. Este recorrido sigue exactamente ese orden — activar antes de emitir, 
 porque saltarlo es la fuente más común del `409`/`422` que ves en producción, no un error de tu lado del
 payload.
 
+Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN` tal como los define
+[Convenciones](../reference/convenciones).
+
 ## Paso 1 — Crear el Business
 
 **Por qué acá:** todo lo demás —activación, sucursales, facturas— cuelga de un Business con su
@@ -38,7 +41,7 @@ Guardá `data.id` como `$BUSINESS_ID`.
 
 ## Paso 2 — Activar la facturación electrónica
 
-**Por qué acá:** sin esto, `POST /invoices` responde `409` ("Business is not yet enabled to issue
+**Por qué acá:** sin esto, `POST /businesses/{businessId}/invoices` responde `409` ("Business is not yet enabled to issue
 invoices"). Activar desde las credenciales del portal tributario evita pedirle al comercio un archivo
 `.pfx` que la mayoría no tiene a mano — 1Platform obtiene el certificado y lo registra por vos. Existe
 también una vía por archivo de certificado, pero ésta es la que no exige que el comercio sepa qué es un
@@ -79,7 +82,7 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/activation/verify" \
   -d '{"code": "745631"}'
 ```
 
-El estado pasa a `activating`; sondeá `GET /invoicing/activation` hasta que `data.ready` sea `true`
+El estado pasa a `activating`; sondeá `GET /businesses/{businessId}/invoicing/activation` hasta que `data.ready` sea `true`
 (`display_status: "active"`) antes de intentar emitir — hay una ventana de activación entre la
 verificación y quedar listo para facturar, no es instantáneo.
 

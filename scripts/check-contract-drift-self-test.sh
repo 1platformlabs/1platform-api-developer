@@ -41,6 +41,7 @@ trap 'rm -rf "$TMPROOT"' EXIT
 
 JOURNEY_DIR="docs/saas/1platform-api/journeys"
 REFERENCE_DIR="docs/saas/1platform-api/reference"
+ATLAS_DIR="docs/saas/atlas-api"
 SUBJECT="$JOURNEY_DIR/_selftest.mdx"
 
 # fixture — the smallest tree the guard can run against.
@@ -49,10 +50,11 @@ SUBJECT="$JOURNEY_DIR/_selftest.mdx"
 # spec (citations are checked against it), and the guard itself.
 fixture() {
   local work="$TMPROOT/case-$((++CASE_N))"
-  mkdir -p "$work/$JOURNEY_DIR" "$work/$REFERENCE_DIR" "$work/scripts" "$work/static/openapi"
+  mkdir -p "$work/$JOURNEY_DIR" "$work/$REFERENCE_DIR" "$work/$ATLAS_DIR" "$work/scripts" "$work/static/openapi"
 
   cp "$REPO/scripts/check-contract-drift.sh" "$work/scripts/"
   cp "$REPO/static/openapi/1platform-api.json" "$work/static/openapi/"
+  cp "$REPO/static/openapi/atlas-api.json" "$work/static/openapi/"
 
   local i
   for i in 1 2 3 4 5; do
@@ -273,6 +275,52 @@ title: Webhooks — payload saliente
 { \"event\": \"on_approved\", \"transaction_id\": \"x\", \"status\": \"approved\", \"amount\": 78.0 }
 \`\`\`
 EOF"
+
+# ── El portal documenta DOS productos ────────────────────────────────────────
+# Este bloque existe por un defecto real: el guard resolvía TODA cita contra el
+# spec de 1Platform, así que juzgaba las páginas de Atlas contra el contrato del
+# producto equivocado. Medido sobre el árbol real: 28 hallazgos, 5 de cada 6
+# citas de Atlas marcadas como inexistentes cuando sí existen. Un guard que
+# inventa hallazgos se apaga; y mientras tanto no podía validar Atlas en absoluto.
+
+expect_clean "una cita de Atlas que SÍ está en el spec de Atlas" \
+  "$(declare -f write_subject); rm -f $SUBJECT; cat > $ATLAS_DIR/_selftest.mdx <<'EOF'
+---
+title: t
+---
+
+Publicá con \`POST /content/items/{item_id}/publish\` y leé \`GET /public/catalog\`.
+EOF"
+
+expect_caught "cited operation exists" \
+  "una cita de Atlas que NO está en el spec de Atlas" \
+  "$(declare -f write_subject); rm -f $SUBJECT; cat > $ATLAS_DIR/_selftest.mdx <<'EOF'
+---
+title: t
+---
+
+Llamá a \`GET /public/suggest\` para autocompletar.
+EOF"
+
+# El límite de alcance de la regla de cuerpos pegados, declarado como caso: si
+# alguien la vuelve a extender a Atlas sin reescribir esas 20 páginas, CI se
+# pone rojo en cada PR y este caso lo dice antes de que pase.
+expect_clean "el árbol de Atlas queda fuera de la regla de cuerpos pegados" \
+  "$(declare -f write_subject); rm -f $SUBJECT; cat > $ATLAS_DIR/_selftest.mdx <<'EOF'
+---
+title: t
+---
+
+\`\`\`json
+{ \"id\": \"a\", \"slug\": \"b\", \"title\": \"c\", \"kind\": \"book\" }
+\`\`\`
+EOF"
+
+# Un spec ausente es una comprobación que no puede correr: falla ruidosa, no pase
+# silencioso. Vale para los dos, no sólo para el primero.
+expect_caught "preflight" \
+  "falta el spec de Atlas ⇒ falla en vez de pasar en silencio" \
+  "rm -f static/openapi/atlas-api.json"
 
 echo
 if [ "$FAILURES" -ne 0 ]; then

@@ -48,20 +48,20 @@ Tres trampas:
 3. **Comparar el prefijo.** Elimina el prefijo `sha256=` de `X-Webhook-Signature`
    **antes** de comparar. No lo incluyas en el valor calculado.
 
-Consulta [seguridad de webhooks](../webhooks/security) para código de verificación en tres lenguajes.
+Consulta [seguridad de webhooks](./webhooks-security) para código de verificación en tres lenguajes.
 
 ## "Estoy alcanzando 429 en desarrollo"
 
 Probablemente estás generando un token nuevo en cada solicitud. Los endpoints de auth
 están limitados a 10 / min. Guarda los tokens en caché por `expires_in - 60s` y reutilízalos
 en todas las llamadas — consulta el
-[patrón de caché de tokens](../flows/payments-and-subscriptions#token-caching-pattern).
+[patrón de caché de tokens](../journeys/cobros-y-saldo).
 
 ## "El webhook llegó pero mi manejador se ejecutó dos veces"
 
 Los webhooks se entregan **al menos una vez**. Tu manejador debe ser idempotente.
 Deduplica con `(transaction_id, event)` — consulta
-[recibir notificaciones → idempotencia](../webhooks/receiving-notifications#idempotency-on-the-merchant-side).
+[recibir notificaciones → idempotencia](./webhooks-payload#idempotency-on-the-merchant-side).
 
 ## "Roté el secreto del webhook y ahora los webhooks legítimos fallan la verificación"
 
@@ -71,7 +71,7 @@ antiguo fallarán la verificación de tu lado.
 
 Mitigación: conserva el secreto anterior en tu verificador durante **24 horas** (acepta
 cualquiera de los dos) antes de eliminarlo. Consulta
-[seguridad de webhooks → rotación de secretos](../webhooks/security#secret-rotation).
+[seguridad de webhooks → rotación de secretos](./webhooks-security#secret-rotation).
 
 ## "El `amount` de la transacción se ve 7-8 veces más grande que lo que envié"
 

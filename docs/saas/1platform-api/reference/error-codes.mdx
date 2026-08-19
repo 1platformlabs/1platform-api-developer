@@ -17,7 +17,7 @@ debe hacer.
 | `POST /users/transactions` | 502 | `PAYMENT_PROVIDER_TIMEOUT` | El proveedor de pagos upstream agotó el tiempo de espera. | Reintenta con retroceso exponencial (máx. 3, base 30s). |
 | `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | La API de reembolsos aún no está implementada; usa el dashboard del operador. | **No reintentes.** Emite los reembolsos fuera de banda. |
 | `POST /webhooks/config/domains` | 409 | (sin código; solo `msg`) | El dominio ya está en `allowed_domains`. | Trátalo como éxito o llama primero a DELETE. |
-| `PUT /webhooks/config/events` | 400 | (sin código; solo `msg`) | El host de la URL no está en `allowed_domains`. | Registra el dominio mediante el [flujo de configuración de webhooks](../flows/webhook-configuration). |
+| `PUT /webhooks/config/events` | 400 | (sin código; solo `msg`) | El host de la URL no está en `allowed_domains`. | Registra el dominio mediante el [flujo de configuración de webhooks](../journeys/webhooks). |
 | (cualquiera) | 401 | (sin código; solo `msg`) | Token expirado o inválido. | Genera un token nuevo y reintenta **una vez**. |
 | (cualquiera) | 422 | (sin código; `detail` de Pydantic) | Error de validación de esquema. | Corrige en el cliente — nunca reintentes. |
 | (cualquiera) | 429 | (sin código; solo `msg`) | Límite de uso superado. | Respeta el header `Retry-After` (o usa 60s por defecto). |

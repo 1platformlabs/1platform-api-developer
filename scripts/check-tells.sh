@@ -45,8 +45,17 @@ command -v perl >/dev/null 2>&1 || {
 
 # Source surfaces that must stay on-system. `docs/**` prose is content, not
 # chrome, and is excluded — except the _category_.json files, which carry
-# presentation. Provider names inside docs/** are the job of
-# check-provider-leak.mjs, which exempts docs/saas/** deliberately.
+# presentation.
+#
+# Provider names inside docs/** used to be the job of check-provider-leak.mjs.
+# That gate was retired by the `docs-developer-minimalista` epic (decision D-6):
+# its subject was the client-facing per-tenant product docs, and once those 65
+# pages were withdrawn (D-1) it scanned zero files — reproduced live, it printed
+# "✓ no client-facing vendor mentions" and exited 0 with a file saying "OpenAI,
+# Stripe, Migo" in the tree. This portal is now 100% developer documentation,
+# where the ecosystem rule permits naming a provider when it is technically
+# necessary. If per-tenant operator docs are ever re-hosted here, that gate must
+# come back with them — and must fail loudly when its scan surface is empty.
 SRC_DIRS="src"
 CONFIG_FILES="docusaurus.config.ts sidebars.ts"
 
@@ -228,7 +237,9 @@ report "no third-party font requests" \
 # ── 12. Provider names in the chrome ─────────────────────────────────────────
 # The lookarounds are load-bearing: a bare \bstripe\b matches the Infima variable
 # --ifm-table-stripe-background, and a guard that cries wolf on real code is a
-# guard someone deletes. docs/** is covered by check-provider-leak.mjs.
+# guard someone deletes. This rule covers the CHROME (src/, config); docs/**
+# prose may name a provider where it is technically necessary — see the note at
+# the top of this file about the retired check-provider-leak.mjs.
 # shellcheck disable=SC2086
 m=$(scan '(?i)(?<![-\w])(?:openai|anthropic|migo|tributax|pixabay|pexels|valueserp|publisuites|nicho\.ai|stripe|resend)(?![-\w])' \
   $SRC_FILES $CONFIG_FILES)

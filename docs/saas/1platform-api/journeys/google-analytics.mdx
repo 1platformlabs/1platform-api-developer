@@ -1,0 +1,181 @@
+---
+title: "Google Analytics"
+description: "Recorrido para conectar Google Analytics 4 a un sitio web: autorización OAuth, aprovisionamiento asíncrono de la propiedad y envío de eventos del lado del servidor."
+sidebar_position: 7
+---
+
+# Google Analytics
+
+Este recorrido conecta un sitio (`website_id`) a una propiedad de Google Analytics 4: el usuario
+autoriza su propia cuenta de Google, la 1Platform API aprovisiona la propiedad y expone las métricas y
+el envío de eventos del lado del servidor. Dos particularidades no salen de la referencia OpenAPI: hay
+**dos sondeos distintos** — uno para la autorización OAuth y otro para el aprovisionamiento — y el
+segundo responde `202` sin el resultado, así que hay que consultarlo aparte. Confundirlos es el error
+más frecuente: sondear `oauth/status` esperando que ahí aparezca la propiedad activa, o sondear
+`analytics/status` antes de que el usuario haya terminado de autorizar en Google.
+
+**Prerrequisitos:** los dos tokens del recorrido de [Autenticación](./autenticacion) y un `website_id`
+— ver [Convenciones](../reference/convenciones) si todavía no tenés uno. Los dos tokens expiran a los
+30 minutos; si cualquier paso responde `401`, regenéralos y repetí la llamada — no hace falta reiniciar
+el recorrido desde el Paso 1.
+
+## Paso 1 — Pedir la URL de autorización
+
+**Qué conseguís:** la URL de consentimiento de Google (usa PKCE) para que el usuario conecte su propia
+cuenta de Analytics.
+
+**Por qué acá:** es el punto de entrada — nada del resto de este recorrido funciona hasta que el
+usuario autorizó.
+
+```bash
+curl -X GET "$BASE_URL/analytics/oauth/authorize?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Abrí `data.authorize_url` en un popup o pestaña nueva. El usuario inicia sesión con su cuenta de Google
+y concede acceso a Analytics — eso ocurre fuera de tu aplicación, en el dominio de Google. Cuando
+termina, Google redirige al callback de la API, que 1Platform maneja automáticamente; no lo llamás vos.
+
+Un `422` acá casi siempre significa que falta o es inválido el `website_id` de la query string; un
+`401` significa que alguno de los dos tokens venció. Este endpoint tiene un límite de 10 solicitudes
+por minuto — no hace falta pedir la URL más de una vez por sesión de autorización.
+
+[Analytics →](/api-reference/1platform-api#tag/analytics)
+
+---
+
+## Paso 2 — Sondear el estado de la autorización
+
+**Qué conseguís:** confirmar que el usuario completó el paso anterior antes de seguir.
+
+**Por qué acá:** el Paso 1 es interactivo y asíncrono desde tu perspectiva — no hay una respuesta HTTP
+que te avise "ya autorizó". Tenés que preguntarle a la API.
+
+```bash
+curl -X GET "$BASE_URL/analytics/oauth/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Repetí la consulta (unos 3 segundos de intervalo) hasta que `data.connected` sea `true`. Si seguís
+recibiendo `false` después de que el usuario dice haber autorizado, mandalo de nuevo a la URL del Paso
+1 — no hay otro camino para destrabarlo. La respuesta también trae `data.email`, útil para mostrarle al
+usuario con qué cuenta de Google quedó conectado antes de que elija la cuenta de Analytics en el paso
+siguiente.
+
+[Analytics →](/api-reference/1platform-api#tag/analytics)
+
+---
+
+## Paso 3 — Elegir la cuenta y aprovisionar la propiedad
+
+**Qué conseguís:** una propiedad GA4 nueva para el sitio, con dimensiones personalizadas y eventos
+clave creados por defecto.
+
+**Por qué acá:** aprovisionar necesita saber en qué cuenta de Google Analytics crear la propiedad, y
+esa cuenta recién es consultable una vez que el Paso 2 confirmó la autorización.
+
+Primero listá las cuentas disponibles (`GET /analytics/accounts`) y tomá el campo `name` de la que
+quieras usar como `$ACCOUNT_ID` (formato `accounts/123456789`). Después:
+
+```bash
+curl -X POST "$BASE_URL/analytics/setup" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"website_id": "'$WEBSITE_ID'", "account_id": "'$ACCOUNT_ID'"}'
+```
+
+La respuesta es `202`, no `200`: el aprovisionamiento sigue corriendo en segundo plano. Guardá
+`data.property_id` y `data.measurement_id`, pero todavía no están listos para usarse — eso lo confirma
+el paso siguiente. Si ya hay analytics activo para este sitio, la API responde `409` en vez de
+aprovisionar de nuevo; usá el Paso 5 directamente con la propiedad existente. Por defecto, `POST
+/analytics/setup` también crea dimensiones personalizadas y eventos clave — desactivalos con
+`create_content_dimensions: false` o `create_key_events: false` en el cuerpo si tu integración no los
+necesita.
+
+[Analytics →](/api-reference/1platform-api#tag/analytics)
+
+---
+
+## Paso 4 — Sondear el estado del aprovisionamiento
+
+**Qué conseguís:** saber cuándo la propiedad quedó lista para usarse.
+
+**Por qué acá:** es un sondeo distinto del Paso 2 — ahí esperabas la autorización del usuario en
+Google, acá esperás un trabajo en segundo plano de la propia API. Confundir los dos es el error más
+común al integrar esto.
+
+```bash
+curl -X GET "$BASE_URL/analytics/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.status` pasa de `"provisioning"` a `"active"` (o a `"error"`). Sondeá cada 3 segundos; en la
+práctica tarda entre 10 y 30 segundos. Configurá el cliente HTTP con al menos 30 segundos de timeout
+para este sondeo — no para la llamada individual, sino para el tiempo total que estás dispuesto a
+esperar antes de mostrarle un error al usuario.
+
+[Analytics →](/api-reference/1platform-api#tag/analytics)
+
+---
+
+## Paso 5 — Guardar el identificador de propiedad e instalar el tag
+
+**Qué conseguís:** el fragmento de JavaScript que hay que insertar en el `<head>` del sitio para que
+Analytics empiece a recibir tráfico del navegador.
+
+**Por qué acá:** recién ahora la propiedad está `active`, así que el `measurement_id` que devuelve este
+paso es el definitivo — no el que viste como adelanto en el Paso 3.
+
+```bash
+curl -X GET "$BASE_URL/analytics/streams/tag?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Guardá `property_id` (del Paso 4) junto con el sitio — lo vas a necesitar para pedir métricas después.
+Insertá `data.tag_html` en el `<head>` del HTML del sitio; sin ese fragmento la propiedad queda
+aprovisionada pero sin recibir tráfico real. Si el sitio tiene varios flujos de datos, `GET
+/analytics/streams` lista todos con su `stream_id` — normalmente hay uno solo para un sitio web
+estándar.
+
+[Analytics →](/api-reference/1platform-api#tag/analytics)
+
+---
+
+## Paso 6 — Enviar eventos de medición (opcional)
+
+**Qué conseguís:** registrar conversiones que ocurren fuera del navegador — por ejemplo, un artículo
+generado por tu integración, no un clic del visitante.
+
+**Por qué acá:** el Measurement Protocol solo tiene sentido una vez que la propiedad está activa (Paso
+4); antes de eso no hay a dónde mandar el evento.
+
+```bash
+curl -X POST "$BASE_URL/analytics/mp-event" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"website_id": "'$WEBSITE_ID'", "event_name": "article_published", "params": {"article_id": "507f1f77bcf86cd799439011"}}'
+```
+
+No es idempotente — cada llamada crea un evento nuevo. Si necesitás deduplicar reintentos, incluí un
+identificador propio dentro de `params`; la API no lo hace por vos. `event_name` y `website_id` son los
+únicos campos obligatorios; `params` es un objeto libre de pares clave-valor que después vas a poder
+filtrar en Google Analytics.
+
+[Analytics →](/api-reference/1platform-api#tag/analytics)
+
+---
+
+## Después de este recorrido
+
+Con la propiedad activa podés consultar `GET /analytics/overview` (sesiones, usuarios, vistas de
+página), `/realtime` (actividad de los últimos 30 minutos) y `/page` (métricas de una ruta puntual),
+además de listar dimensiones y eventos clave. Para desconectar sin perder la propiedad usá `DELETE
+/analytics/disconnect` — es reversible; para eliminarla del todo, `DELETE /analytics/deprovision`
+exige `confirm=true` y no se puede deshacer. Ninguna de estas llamadas tiene un orden obligatorio entre
+sí; todas están en la [referencia →](/api-reference/1platform-api#tag/analytics).

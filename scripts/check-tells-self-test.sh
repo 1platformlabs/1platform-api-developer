@@ -72,7 +72,7 @@ printf 'Injecting one tell per category into a throwaway copy of the tree.\n\n'
 
 expect_caught "emoji or entity glyphs" \
   "emoji as a category icon" \
-  "perl -CSD -i -pe 's/\"icon\": \"dashboard\"/\"icon\": \"\x{1F9ED}\"/' docs/products/dashboard/_category_.json"
+  "perl -CSD -i -pe 's/\"icon\": \"code\"/\"icon\": \"\x{1F9ED}\"/' docs/saas/1platform-api/_category_.json"
 
 expect_caught "emoji or entity glyphs" \
   "emoji hidden as an HTML entity" \
@@ -124,7 +124,7 @@ expect_caught "pastel product tiles" \
 
 expect_caught "pastel product tiles" \
   "customProps.tint returning to a category config" \
-  "perl -i -pe 's/(\"icon\": \"dashboard\")/\$1, \"tint\": \"blue\"/' docs/products/dashboard/_category_.json"
+  "perl -i -pe 's/(\"icon\": \"code\")/\$1, \"tint\": \"blue\"/' docs/saas/1platform-api/_category_.json"
 
 expect_caught "fonts are self-hosted" \
   "a font file going missing while its @font-face stays" \

@@ -1,0 +1,183 @@
+---
+title: Cobros y saldo
+description: Consultar el saldo, sumarlo con una transacción, y reservarlo (hold/capture) antes de gastarlo en una operación paga — el dinero tiene estados y el orden es el contenido.
+sidebar_position: 3
+---
+
+# Cobros y saldo
+
+En 1Platform el dinero de un usuario no es un solo número: `balance` (lo que tiene), `reserved_balance`
+(lo que está retenido por trabajos en curso) y `available_balance = balance - reserved_balance` (lo que
+puede gastar ahora mismo). Este recorrido sigue el orden en que esos tres números cambian — consultarlos,
+sumar saldo con una transacción, y **reservar antes de gastar** en operaciones que tardan. Una captura
+sobre una reserva ya liberada no es lo mismo que cobrar directo: por eso el orden es el contenido, no un
+detalle de estilo.
+
+## Paso 1 — Consultar el saldo y la suscripción
+
+**Por qué acá:** todo lo que sigue depende de si hay saldo disponible. Verificarlo primero evita crear una
+transacción o intentar una reserva que un `402` iba a rechazar de todos modos.
+
+```bash
+curl "$BASE_URL/users/billing" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Guardá `data.billing.balance` y, si vas a consultar la suscripción más adelante, `data.subscription.id`
+como `$SUBSCRIPTION_ID`.
+
+| Código | Causa |
+|---|---|
+| 401 | Falta o expiró alguno de los dos tokens |
+| 429 | Límite de tasa excedido (50 req/min) |
+
+[Balance & Billing →](/api-reference/1platform-api#tag/balance-billing)
+
+## Paso 2 — Recargar saldo con una transacción
+
+**Por qué acá:** si el saldo no alcanza, ésta es la única vía para sumarlo, vía la pasarela de pago
+configurada para tu App. El resultado no es inmediato: la transacción nace en `created` y sólo un
+[webhook](./webhooks) la mueve a un estado terminal — nunca asumas que se cobró porque la llamada devolvió
+`201`, y nunca uses la redirección de `return_url` como confirmación de pago.
+
+```bash
+curl -X POST "$BASE_URL/users/transactions" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 10.00, "merchant_reference": "order_abc123", "return_url": "https://tu-sitio.com/checkout/resultado", "customer_email": "ana@ejemplo.com"}'
+```
+
+Redirigí al usuario a `data.payment_url` de inmediato (expira pronto) y guardá `data.id` como
+`$TRANSACTION_ID`. `usd_amount` es lo que enviaste en tu moneda de comercio y es lo que usás para
+contabilidad; `amount` es sólo informativo, en la moneda del proveedor upstream. Si mandás
+`customer_email`, el comprador recibe un comprobante cuando el pago se aprueba — nunca en los demás
+desenlaces, y nunca reemplaza al webhook para liquidar un pedido.
+
+Este endpoint no acepta `Idempotency-Key`: si la llamada expira por timeout, fijá `merchant_reference` en
+cada intento y reconciliá con `GET /users/transactions?metadata.merchant_reference=...` antes de
+reintentar, en vez de arriesgarte a crear una segunda transacción.
+
+| Código | `data.code` | Causa |
+|---|---|---|
+| 400 | — | `amount` inválido, o el host de `return_url` no está registrado (`POST /webhooks/config/domains`) |
+| 404 | — | El usuario no tiene registro de facturación |
+| 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El tenant todavía no tiene una pasarela activa |
+| 429 | — | Límite de tasa excedido (20 req/min) |
+| 502 | — | Proveedor de pago temporalmente no disponible — reintentá con backoff, máx. 3 intentos |
+
+[Payments →](/api-reference/1platform-api#tag/payments)
+
+## Paso 3 — Reservar el saldo antes de una operación paga (Authorize)
+
+**Por qué acá:** para trabajos asíncronos (por ejemplo, generación de contenido), cobrar por adelantado y
+reembolsar si falla es más lento y menos seguro que reservar primero. Enviá `X-Plugin-Version: 2.36.0` o
+superior para activar la ruta de reserva; sin ese header el endpoint cobra directo, sin reembolso
+automático si el trabajo falla en segundo plano.
+
+```bash
+curl -X POST "$BASE_URL/posts/content/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "X-Plugin-Version: 2.36.0" \
+  -H "X-Idempotency-Key: client-supplied-uuid-v4" \
+  -H "Content-Type: application/json" \
+  -d '{"keyword": "best running shoes 2026", "lang": "en", "country": "us"}'
+```
+
+La respuesta es `202` con `X-Hold-Id` y `X-Available-Balance` en los encabezados, y `data.job_id` en el
+cuerpo. `balance` no se toca todavía — sólo sube `reserved_balance`. Guardá el `X-Hold-Id` como
+`$HOLD_ID`. Si repetís la solicitud con el mismo `X-Idempotency-Key` mientras la primera sigue en curso o
+ya terminó, el servidor devuelve la **misma** reserva en vez de crear una segunda.
+
+| Código | `error_code` | Causa |
+|---|---|---|
+| 402 | `insufficient_balance` | `available_balance` no alcanza el costo — pedile al usuario que recargue (Paso 2) |
+| 404 | `billing_not_found` | El usuario no tiene registro de facturación |
+| 422 | `no_keywords` / `content_invariant_violation` | El pipeline no produjo una salida válida — la reserva se libera, no se cobra |
+| 429 | `daily_limit_exceeded` | Cuota diaria de plan gratuito agotada |
+
+[Keywords Content & Indexing →](/api-reference/1platform-api#tag/keywords-content-indexing)
+
+## Paso 4 — Capturar o liberar la reserva
+
+**Por qué acá:** una reserva no es un cobro. El trabajo en segundo plano decide el desenlace: si termina
+bien, **captura** (debita `balance`, libera `reserved_balance`, escribe un registro de consumo); si falla,
+**libera** (devuelve `reserved_balance` sin tocar `balance`). Los dos son automáticos — no hay una llamada
+que el cliente haga para esto. Lo que sí hacés es consultar el resultado:
+
+```bash
+curl "$BASE_URL/holds/$HOLD_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.status` termina en `captured` o `released` — son estados terminales e inmutables, nunca vuelven de
+ahí. Una reserva sin resolver a los 15 minutos la libera un worker de TTL, señal de que el proceso se cayó
+a mitad de camino en vez de que alguien haya decidido no cobrar. `GET /holds/{hold_id}` responde `404` si
+la reserva no existe o pertenece a otro usuario.
+
+[Balance & Billing →](/api-reference/1platform-api#tag/balance-billing)
+
+## Paso 5 — Revisar transacciones y reservas
+
+**Por qué acá:** reconciliá contra tu propio `merchant_reference` o `idempotency_key`, no contra la
+memoria del cliente que hizo la llamada original — sobre todo después de un timeout o una caída del
+proceso.
+
+```bash
+curl "$BASE_URL/users/transactions?limit=10&skip=0" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`GET /holds` lista las reservas del usuario con el mismo patrón de paginación (`limit`, `skip`); agregá
+`?status=active` para aislar las que todavía no resolvieron. Los reembolsos vía API están reservados pero
+no implementados (`POST /users/transactions/{id}/refund` responde `501` de forma constante) — hasta que
+eso cambie, se emiten desde el panel del operador.
+
+[Payments →](/api-reference/1platform-api#tag/payments) ·
+[Balance & Billing →](/api-reference/1platform-api#tag/balance-billing)
+
+## Paso 6 — Consultar consumo y planes
+
+**Por qué acá:** una vez que el dinero se movió, esto es lo que explica **por qué** — qué operación cobró
+qué, y contra qué plan, útil para un dashboard de facturación propio.
+
+```bash
+curl "$BASE_URL/users/consumption/summary?from_date=2026-03-01&to_date=2026-03-31" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`GET /users/consumption` da el detalle evento por evento (filtrable por `operation` y rango de fechas);
+`GET /plans` lista los planes activos con su `plan_id`, tipo (`free` / `payg` / `subscription`) y precio,
+si vas a mostrar una mejora de plan.
+
+[Billing & Consumption →](/api-reference/1platform-api#tag/billing-consumption) ·
+[Subscriptions →](/api-reference/1platform-api#tag/subscriptions)
+
+## Alta de cuenta nueva vía pago
+
+Nada de lo anterior sirve sin `$USER_TOKEN`, y si el usuario todavía no existe el punto de entrada es
+otro: `POST /onboarding/` crea una sesión de checkout usando sólo el token de aplicación, y `GET
+/onboarding/status/{session_id}` te da la `api_key` del usuario nuevo apenas el pago se confirma —
+protección de lectura única, se devuelve una sola vez y una segunda lectura responde `410`. Un email que
+ya está registrado responde `409` al crear la sesión; no reintentes con el mismo email, consultá la sesión
+existente. Intercambiá la `api_key` por `$USER_TOKEN` en [Autenticación](./autenticacion) y arrancá desde
+el Paso 1.
+
+[Onboarding →](/api-reference/1platform-api#tag/onboarding)
+
+## Referencia rápida
+
+| Paso | Método | Endpoint |
+|---|---|---|
+| 1 | `GET` | `/users/billing` |
+| 2 | `POST` | `/users/transactions` |
+| 3 | `POST` | `/posts/content/` (con `X-Plugin-Version`) |
+| 4 | `GET` | `/holds/{hold_id}` |
+| 5 | `GET` | `/users/transactions` · `GET /holds` |
+| 6 | `GET` | `/users/consumption/summary` · `GET /users/consumption` · `GET /plans` |
+| — | `POST` | `/onboarding/` · `GET /onboarding/status/{session_id}` |

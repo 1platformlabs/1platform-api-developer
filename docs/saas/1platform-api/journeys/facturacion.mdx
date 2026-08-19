@@ -1,0 +1,196 @@
+---
+title: Facturación
+description: Precondiciones fiscales y orden obligatorio para emitir una factura electrónica (FEL) — NIT, activación en TribuTax, sucursal y sólo entonces la emisión.
+sidebar_position: 4
+---
+
+# Facturación
+
+Emitir una factura FEL tiene precondiciones fiscales que van antes que cualquier llamada de negocio: el
+comercio necesita un NIT válido y credenciales fiscales **activas** en TribuTax antes de que la primera
+factura pueda certificarse, y la sucursal que emite decide bajo qué establecimiento queda registrada ante
+la SAT. Este recorrido sigue exactamente ese orden — activar antes de emitir, sucursal antes de facturar —
+porque saltarlo es la fuente más común del `409`/`422` que ves en producción, no un error de tu lado del
+payload.
+
+Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN` tal como los define
+[Convenciones](../reference/convenciones).
+
+## Paso 1 — Crear el Business
+
+**Por qué acá:** todo lo demás —activación, sucursales, facturas— cuelga de un Business con su
+`documentNumber` (NIT). Es el emisor que TribuTax certifica en cada factura.
+
+```bash
+curl -X POST "$BASE_URL/businesses" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Company S.A.", "documentType": "NIT", "documentNumber": "12345678", "address": "Zona 10, Guatemala City"}'
+```
+
+Guardá `data.id` como `$BUSINESS_ID`.
+
+| Código | Causa |
+|---|---|
+| 401 | Token inválido o expirado |
+| 409 | Ya existe un Business con ese `documentNumber` — recuperalo con `GET /businesses/{businessId}` en vez de reintentar la creación |
+| 422 | Faltan `name`, `documentType`, `documentNumber` o `address` |
+
+[Businesses & Branches →](/api-reference/1platform-api#tag/businesses-branches)
+
+## Paso 2 — Activar la facturación electrónica
+
+**Por qué acá:** sin esto, `POST /businesses/{businessId}/invoices` responde `409` ("Business is not yet enabled to issue
+invoices"). Activar desde las credenciales del portal tributario evita pedirle al comercio un archivo
+`.pfx` que la mayoría no tiene a mano — 1Platform obtiene el certificado y lo registra por vos. Existe
+también una vía por archivo de certificado, pero ésta es la que no exige que el comercio sepa qué es un
+PKCS#12.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/activation/sat" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"satUser": "12345678", "satPassword": "el-password-del-portal", "telefono": "+50212345678"}'
+```
+
+Ni las credenciales ni la contraseña del certificado se guardan — se usan una sola vez, para esta llamada.
+El estado pasa a `otp_pending` y el comercio recibe un código por WhatsApp. Esta llamada conversa con el
+portal tributario en varios pasos: dale a tu cliente HTTP un timeout generoso, no los 5s de un endpoint de
+configuración común.
+
+| Código | Causa |
+|---|---|
+| 400 | El portal tributario rechazó las credenciales, o exige un código adicional que este endpoint no maneja |
+| 401 | Token inválido o expirado |
+| 403 | Tu rol en la sucursal no habilita esta operación — requiere `admin` |
+| — | Si el Business ya tiene un certificado, la llamada se rechaza salvo que envíes `force: true` — emitir uno nuevo **invalida el anterior**, incluida cualquier copia en uso fuera de 1Platform |
+
+[Electronic Invoicing (FEL) →](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Paso 3 — Verificar el código OTP
+
+**Por qué acá:** el certificado se emitió en el Paso 2 pero todavía no está confirmado — sin este paso el
+Business se queda en `otp_pending` y nunca llega a `ready: true`.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/activation/verify" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "745631"}'
+```
+
+El estado pasa a `activating`; sondeá `GET /businesses/{businessId}/invoicing/activation` hasta que `data.ready` sea `true`
+(`display_status: "active"`) antes de intentar emitir — hay una ventana de activación entre la
+verificación y quedar listo para facturar, no es instantáneo.
+
+[Electronic Invoicing (FEL) →](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Paso 4 — Sincronizar las sucursales con el registro de establecimientos
+
+**Por qué acá:** la SAT certifica bajo un **establecimiento**, y ese código vive en la sucursal, no en el
+Business. Sincronizar trae las sucursales reales del padrón fiscal en vez de crearlas a mano una por una
+— es seguro repetirlo (los establecimientos se emparejan por código, una segunda corrida no crea nada
+nuevo) y nunca borra ni desactiva una sucursal existente.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/establishments/sync" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Requiere que la activación del Paso 3 ya haya terminado. La respuesta reporta qué creó, qué actualizó y
+qué dejó igual — y avisa cuando el Business termina con más de una sucursal con establecimiento, porque
+desde ahí toda emisión futura debe nombrar `branchId` explícitamente.
+
+[Businesses & Branches →](/api-reference/1platform-api#tag/businesses-branches)
+
+## Paso 5 — Emitir la factura
+
+**Por qué acá:** recién ahora hay NIT, activación lista y sucursal resuelta — las tres precondiciones que
+la referencia interactiva no encadena por vos, porque cada una vive en un endpoint distinto.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"items": [{"description": "Consulting service", "unit_price": 1000.00, "quantity": 1}], "receptorInfo": {"name": "Client S.A.", "documentType": "NIT", "documentNumber": "98765432", "email": "client@example.com"}, "branchId": "'$BRANCH_ID'"}'
+```
+
+Guardá `data.id` como `$INVOICE_ID`.
+
+| Código | Causa |
+|---|---|
+| 404 | Business no encontrado, o el `branchId` enviado no existe |
+| 409 | La activación del Paso 2/3 todavía no terminó |
+| 422 `branch_selection_required` | Hay más de una sucursal con establecimiento y ninguna nombrada — `data.branches` trae las opciones. **No consume correlativo**: podés reintentar de inmediato con `branchId` |
+| 422 | Validación de TribuTax o campos inválidos — revisá el NIT del receptor y que haya al menos 1 item |
+
+[Electronic Invoicing (FEL) →](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Paso 6 — Consultar el resultado certificado
+
+**Por qué acá:** la creación puede responder con `fel_synced: false` si la obtención del reporte FEL falló
+después de certificar — esta consulta confirma el estado real sin volver a emitir y sin arriesgarte a una
+factura duplicada.
+
+```bash
+curl "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Guardá `uid`, `serieFEL` y `numeroFEL` como referencia fiscal — son los campos que identifican la factura
+ante la SAT. Si `fel_synced` sigue en `false` después de reintentar la consulta, los campos fiscales
+mínimos (`uid`, `serieFEL`, `numeroFEL`) ya están disponibles aunque los metadatos extendidos del reporte
+FEL sean `null`.
+
+[Electronic Invoicing (FEL) →](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Paso 7 — Anular la factura (si hace falta)
+
+**Por qué acá:** una anulación no es un estado más — retro-certifica el documento ante TribuTax y vuelve a
+sincronizar el reporte FEL, así que sólo tiene sentido después de confirmar que la factura ya está
+`issued` (Paso 6).
+
+```bash
+curl -X DELETE "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Error in receptor data"}'
+```
+
+| Código | Causa |
+|---|---|
+| 400 | La factura ya está anulada — no se puede anular dos veces |
+| 404 | Business o factura no encontrados |
+| 422 | Error de TribuTax durante la anulación — verificá que la factura tenga un `externalId` válido |
+
+[Electronic Invoicing (FEL) →](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Prellenar el receptor por CUI/DPI
+
+Si facturás a personas y no a empresas, `POST /identify` busca los datos de una persona por su número de
+CUI/DPI (13 dígitos) y te ahorra pedírselos a mano — combiná `first_name` + `second_name` +
+`first_surname` + `second_surname` en el `name` del receptor del Paso 5, y usá el `document_number`
+devuelto como `documentNumber` con `documentType: "CUI"`. Para receptores empresa, seguí usando NIT
+directamente; esta búsqueda es sólo para personas.
+
+[Electronic Invoicing (FEL) →](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Referencia rápida
+
+| Paso | Método | Endpoint |
+|---|---|---|
+| 1 | `POST` | `/businesses` |
+| 2 | `POST` | `/businesses/{businessId}/invoicing/activation/sat` |
+| 3 | `POST` | `/businesses/{businessId}/invoicing/activation/verify` |
+| 4 | `POST` | `/businesses/{businessId}/invoicing/establishments/sync` |
+| 5 | `POST` | `/businesses/{businessId}/invoices` |
+| 6 | `GET` | `/businesses/{businessId}/invoices/{invoiceId}` |
+| 7 | `DELETE` | `/businesses/{businessId}/invoices/{invoiceId}` |
+| — | `POST` | `/identify` |

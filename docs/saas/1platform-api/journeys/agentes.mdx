@@ -1,0 +1,132 @@
+---
+title: Agentes de IA
+description: Recorrido asíncrono y con intervención humana — explorar el catálogo, instalar un agente, disparar y sondear una ejecución, y atender una acción pendiente que requiere aprobación.
+sidebar_position: 6
+---
+
+# Agentes de IA
+
+Los agentes son trabajadores autónomos que ejecutan tareas, llaman herramientas y piden aprobación
+humana cuando hace falta. Este recorrido asume que ya tenés `$APP_TOKEN` y `$USER_TOKEN` — si no,
+resolvé primero [Autenticación](./autenticacion). Lo que justifica el orden acá es doble:
+**asincronía** (disparar una ejecución no espera a que termine) y **una acción pendiente que sólo una
+persona puede resolver**, no el agente. El resto — listar agentes, editarlos, borrarlos, ver métricas
+— es CRUD sin orden real y vive en la referencia.
+
+## Paso 1 — Explorar el catálogo
+
+El catálogo trae plantillas listas para instalar: cada una define sus propias herramientas, su
+cadencia y su costo por defecto, así que empezar por acá te ahorra escribir un `system_prompt` y una
+lista de herramientas desde cero.
+
+```bash
+curl -X GET "$BASE_URL/agents/catalog" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Cada entrada trae su `slug`, una `description` de lo que hace, la categoría y las `wizard_questions`
+que el asistente del Paso 2 te haría si eligieras esa vía en vez de instalar directo. Guardá el `slug`
+de la plantilla elegida como `$TEMPLATE_SLUG`. `GET /agents/catalog/{slug}` devuelve el detalle
+completo de una plantilla puntual si necesitás más que el resumen del listado.
+
+[Agents Catalog →](/api-reference/1platform-api#tag/agents-catalog)
+
+## Paso 2 — Instalar el agente
+
+Instalar una plantilla crea el agente ya activo, con sus herramientas y cadencia heredadas — sólo
+completás lo que la plantilla no puede saber por sí sola: qué sitios administra y cuánto puede gastar.
+
+```bash
+curl -X POST "$BASE_URL/agents/catalog/$TEMPLATE_SLUG/install" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"website_ids": ["'$WEBSITE_ID'"], "monthly_budget_usd": "25.00"}'
+```
+
+`website_ids` es el mismo `website_id` que [Convenciones](../reference/convenciones) pide como
+prerrequisito para las capacidades por sitio — un agente de este tipo sin sitio asignado queda
+inerte, por eso se asigna en la misma llamada que lo crea en vez de en un segundo paso. Omitir
+`monthly_budget_usd` **no** significa gasto ilimitado: el agente nace en modo propuesta, la lectura a
+prueba de fallos, hasta que le fijes un techo explícito. `schedule` es opcional — si lo omitís, el
+agente hereda la cadencia cron por defecto de la plantilla; una cadena vacía es la única forma de
+crear un agente que nunca corre solo. Guardá `data.id` como `$AGENT_ID`.
+
+Si necesitás una configuración a medida en vez de partir de una plantilla, `POST /agents` crea un
+agente desde cero con los mismos campos (`name`, `description`, `system_prompt`, `tools`,
+`max_iterations`, `schedule`) — ahí el modelo se elige por nivel de capacidad neutral (`fast`,
+`standard` o `advanced` en `model_tier`), nunca por el identificador comercial del LLM subyacente.
+Para una configuración guiada por conversación en lugar de un cuerpo JSON armado a mano, existe
+además el asistente: le describís lo que necesitás en lenguaje natural y te devuelve la configuración
+lista para confirmar.
+
+[Agents Catalog →](/api-reference/1platform-api#tag/agents-catalog) ·
+[Agents CRUD →](/api-reference/1platform-api#tag/agents-crud) ·
+[Agents Wizard →](/api-reference/1platform-api#tag/agents-wizard)
+
+## Paso 3 — Disparar una ejecución
+
+Con el agente instalado, disparás una ejecución manual con un mensaje de entrada opcional.
+
+```bash
+curl -X POST "$BASE_URL/agents/$AGENT_ID/run" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input_message": "Review all invoices created today and flag any over Q50,000"}'
+```
+
+Guardá `data.id` como `$RUN_ID`. La respuesta llega en `202` — la ejecución todavía no corrió, sólo
+quedó registrada. Un `503` significa agente inactivo o capacidad global de la plataforma llena; un
+`409`, que ya alcanzaste `max_concurrent_runs` para este agente y hay que esperar a que termine
+alguna de las ejecuciones en curso. Además de disparar manualmente, un agente con `schedule`
+configurado corre solo según esa expresión cron — este paso sirve igual para probar la configuración
+antes de dejarla en piloto automático.
+
+[Agents Execution →](/api-reference/1platform-api#tag/agents-execution)
+
+## Paso 4 — Sondear la ejecución
+
+La ejecución dispara en segundo plano — hay que consultar su estado hasta que salga de `pending` o
+`running`.
+
+```bash
+curl -X GET "$BASE_URL/agents/$AGENT_ID/runs/$RUN_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.status` transiciona `pending` → `running` → `completed`, `failed` o `stopped`. Una ejecución
+`running` puede detenerse a mitad de camino con `POST /agents/{agent_id}/runs/{run_id}/stop` si hace
+falta cancelarla. Cuando termina en `completed`, `data.result` trae el resumen en texto de lo que hizo
+el agente y `data.total_tokens` el consumo asociado — ese resumen es lo que decide si hace falta el
+paso siguiente: si el agente dice haber marcado algo para revisión humana, ahí está la acción
+pendiente que buscás.
+
+[Agents Execution →](/api-reference/1platform-api#tag/agents-execution)
+
+## Paso 5 — Atender una acción pendiente
+
+Cuando el agente encuentra algo que no puede decidir solo — aprobar una factura, publicar un
+contenido sensible, enviar un correo en nombre de alguien — la ejecución genera una acción con
+intervención humana en vez de resolverlo por su cuenta. Esa acción queda `pending` hasta que una
+persona la resuelve.
+
+```bash
+curl -X GET "$BASE_URL/agent-actions?agent_id=$AGENT_ID&status=pending" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Cada acción trae su `type` (por ejemplo `review_invoice` o `publish_content`), el `run_id` que la
+generó y un `payload` con los datos que la persona necesita para decidir. Guardá el `id` de la acción
+que vas a resolver como `$ACTION_ID`. Con la decisión humana ya tomada, consumís la acción con
+`PATCH /agent-actions/$ACTION_ID/consume`, enviando el resultado de esa decisión en `result` (por
+ejemplo `{"approved": true, "notes": "..."}`) y opcionalmente `consumed_by` para dejar registro de
+quién decidió. Un `409` significa que la acción ya fue consumida por otra llamada — tratalo como el
+estado final, no como algo para reintentar. Este paso es el que le da valor a haber programado el
+agente: la automatización hace el trabajo repetitivo, y sólo lo que de verdad requiere criterio
+humano llega hasta acá.
+
+[Agents Actions →](/api-reference/1platform-api#tag/agents-actions)

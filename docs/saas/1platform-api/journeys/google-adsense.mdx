@@ -1,0 +1,178 @@
+---
+title: "Google AdSense"
+description: "Recorrido para conectar Google AdSense a un sitio web: autorización OAuth, vinculación del sitio, sincronización de estado y consulta de ingresos y alertas."
+sidebar_position: 8
+---
+
+# Google AdSense
+
+Este recorrido conecta un sitio (`website_id`) a una cuenta de Google AdSense: el usuario autoriza su
+propia cuenta, vinculás el sitio y después consultás ingresos, alertas y problemas de políticas. Lo que
+la referencia OpenAPI no puede expresarte es el orden: no podés vincular (`POST /adsense/connect`)
+antes de que la autorización OAuth esté confirmada, y el estado del sitio que ves después de vincular
+puede quedar desactualizado hasta que lo sincronizás explícitamente — a diferencia de Analytics, acá no
+hay un aprovisionamiento asíncrono con `202`: `connect` responde `200` de forma directa, pero el estado
+que trae puede no reflejar cambios hechos recién en el panel de Google.
+
+**Prerrequisitos:** los dos tokens del recorrido de [Autenticación](./autenticacion) y un `website_id`
+— ver [Convenciones](../reference/convenciones) si todavía no tenés uno. Los dos tokens expiran a los
+30 minutos; si cualquier paso responde `401`, regenéralos y repetí la llamada — no hace falta reiniciar
+el recorrido desde el Paso 1.
+
+## Paso 1 — Pedir la URL de autorización
+
+**Qué conseguís:** la URL de consentimiento de Google para que el usuario conecte su propia cuenta de
+AdSense.
+
+**Por qué acá:** es el punto de entrada de todo el recorrido — sin esto no hay `oauth_connected` que
+verificar ni sitio que vincular.
+
+```bash
+curl -X GET "$BASE_URL/adsense/oauth/authorize?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Abrí `data.authorization_url` en el navegador del usuario. Inicia sesión con su cuenta de Google y
+concede el permiso de solo lectura sobre AdSense — eso pasa en el dominio de Google, fuera de tu
+aplicación. El parámetro `state` va embebido en la propia URL; el callback lo procesa la API
+automáticamente y no necesitás manejarlo vos.
+
+Un `422` acá casi siempre significa que falta o es inválido el `website_id` de la query string; un
+`401` significa que alguno de los dos tokens venció.
+
+[AdSense →](/api-reference/1platform-api#tag/adsense)
+
+---
+
+## Paso 2 — Sondear el estado de OAuth
+
+**Qué conseguís:** confirmar que el usuario terminó de autorizar antes de intentar vincular el sitio.
+
+**Por qué acá:** vincular (Paso 3) rechaza con `400` si la autorización todavía no está confirmada —
+sondear evita ese error en vez de solo reaccionar a él.
+
+```bash
+curl -X GET "$BASE_URL/adsense/oauth/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Repetí la consulta hasta que `data.oauth_connected` sea `true`. Recién ahí pasás al paso siguiente. La
+respuesta también trae `data.oauth_email` y `data.authorized_at`, útiles para mostrarle al usuario con
+qué cuenta de Google quedó conectado antes de vincular el sitio.
+
+[AdSense →](/api-reference/1platform-api#tag/adsense)
+
+---
+
+## Paso 3 — Vincular el sitio a la cuenta de AdSense
+
+**Qué conseguís:** activar la conexión — la API toma la cuenta de AdSense del usuario ya autorizado y
+la asocia a este `website_id`.
+
+**Por qué acá:** es el primer paso que devuelve datos de negocio reales (`publisher_id`, `site_state`);
+todo lo anterior era solo autorización.
+
+```bash
+curl -X POST "$BASE_URL/adsense/connect?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+La respuesta trae `status: "active"` y `site_state` (por ejemplo `"READY"` o `"REQUIRES_REVIEW"`) —
+guardá `publisher_id`, lo vas a usar para identificar la cuenta en pantalla. Si el sitio de Google
+todavía no está en revisión o rechazado, `site_state` te lo dice de entrada, sin tener que esperar a
+sincronizar. Si `connect` responde `400`, el OAuth del Paso 2 no llegó a confirmarse — volvé ahí antes
+de reintentar; si responde `409`, la conexión ya estaba activa y podés seguir directamente al Paso 4.
+Este endpoint tiene un límite de apenas 2 solicitudes por minuto — no lo llames en un loop de
+reintento ajustado, dale unos segundos entre intentos.
+
+[AdSense →](/api-reference/1platform-api#tag/adsense)
+
+---
+
+## Paso 4 — Listar los sitios y sincronizar su estado
+
+**Qué conseguís:** la lista de sitios de la cuenta y su estado de aprobación actualizado.
+
+**Por qué acá:** `site_state` puede cambiar del lado de Google (revisión aprobada, anuncios
+automáticos habilitados) sin que tu integración se entere — sincronizar es lo que trae ese cambio hacia
+la API.
+
+```bash
+curl -X GET "$BASE_URL/adsense/sites?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Si necesitás el estado más reciente después de un cambio hecho en el panel de Google, llamá `POST
+/adsense/sites/sync?website_id=$WEBSITE_ID` — devuelve `site_state`, `auto_ads_enabled` y `synced_at`
+ya actualizados. `GET /adsense/sites` acepta `page` y `page_size` para cuentas con muchos sitios; la
+sincronización, en cambio, actúa sobre el sitio del `website_id` que le pasás, no sobre toda la cuenta.
+
+[AdSense →](/api-reference/1platform-api#tag/adsense)
+
+---
+
+## Paso 5 — Consultar ingresos
+
+**Qué conseguís:** ingresos estimados, clics, impresiones y RPM del sitio, con comparación opcional
+contra el período anterior.
+
+**Por qué acá:** con el sitio vinculado y sincronizado, esta es la razón de negocio para haber hecho
+todo lo anterior.
+
+```bash
+curl -X GET "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=30d&compare=true" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Con `compare=true` cada métrica llega como `{current, previous, change_percent, trend}`; si lo omitís u
+omitís `period`, la API devuelve valores simples sin comparación. El plan gratuito del inquilino limita
+`period` a `"7d"`; pedir `"30d"` o `"90d"` sin un plan Pro responde `403`, no recorta el rango en
+silencio. Para el desglose por página usá `/adsense/earnings/by-page`, y para un reporte con
+dimensiones y métricas propias (país, unidad de anuncio, fecha) usá `POST /adsense/earnings/report` con
+`start_date`/`end_date` — ambos con el mismo `website_id`, sin pasos previos adicionales.
+
+[AdSense →](/api-reference/1platform-api#tag/adsense)
+
+---
+
+## Paso 6 — Monitorear alertas y problemas de políticas
+
+**Qué conseguís:** avisos de Google sobre la cuenta (pagos, `ads.txt`) y problemas de políticas que
+pueden restringir la entrega de anuncios en páginas concretas.
+
+**Por qué acá:** son de solo lectura y no bloquean nada del resto del recorrido, pero conviene
+revisarlos con la misma cadencia que los ingresos — una alerta `SEVERE` explica una caída que de otro
+modo parece un bug tuyo. Las alertas requieren plan Pro del inquilino; en plan gratuito, `GET
+/adsense/alerts` responde `403`.
+
+```bash
+curl -X GET "$BASE_URL/adsense/alerts?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`GET /adsense/policy-issues` sigue el mismo patrón para violaciones de contenido reportadas por Google
+— también requiere plan Pro — y cada elemento trae `entity` (la página o el sitio afectado), `topic`
+(el motivo, por ejemplo `"Sexual content"`) y `action` (por ejemplo `"MUST_FIX"`). Si un problema de
+políticas afecta a una página, corregila y volvé al Paso 4 para sincronizar el estado; Google no
+siempre revierte una restricción de inmediato aunque el contenido ya esté corregido, así que no lo
+trates como confirmación instantánea.
+
+[AdSense →](/api-reference/1platform-api#tag/adsense)
+
+---
+
+## Después de este recorrido
+
+Para desconectar sin perder la autorización usá `DELETE /adsense/disconnect` — `oauth_connected` sigue
+en `true` y podés reconectar directo con el Paso 3, sin repetir el OAuth. Para revocar OAuth por
+completo, `POST /adsense/oauth/revoke` (desconectá primero si la conexión sigue activa); después de
+revocar, reconectar exige repetir el recorrido entero desde el Paso 1. `POST /adsense/repair` es solo
+para soporte con acceso de administrador — resuelve conexiones atascadas en estado de error que no se
+arreglan con desconexión/reconexión normal, y no es parte de un flujo de usuario regular. Todo eso está
+en la [referencia →](/api-reference/1platform-api#tag/adsense).

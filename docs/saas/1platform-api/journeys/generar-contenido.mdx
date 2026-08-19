@@ -1,0 +1,111 @@
+---
+title: Generar contenido con IA
+description: Recorrido asíncrono para investigar keywords, encolar un trabajo de generación de contenido, sondearlo hasta que termine y enviar la URL publicada a indexación.
+sidebar_position: 2
+---
+
+# Generar contenido con IA
+
+Este recorrido asume que ya tenés `$APP_TOKEN` y `$USER_TOKEN` — si no, resolvé primero
+[Autenticación](./autenticacion) — y en [Convenciones](../reference/convenciones)
+están el resto de las variables que usan los ejemplos. Lo que lo justifica es la **asincronía**: generar un artículo no
+responde en la misma petición HTTP, así que el trabajo se encola y hay que sondearlo hasta que
+termine. Ese sondeo es el contenido real de esta página — la referencia documenta cada endpoint
+suelto, pero no el orden en que hay que llamarlos.
+
+## Paso 1 — Investigar keywords
+
+Antes de generar contenido necesitás una keyword con volumen de búsqueda real. Si ya tenés un sitio,
+extraés keywords analizando su dominio:
+
+```bash
+curl -X POST "$BASE_URL/posts/keywords/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "ecologiaverde.com", "country": "es", "lang": "en"}'
+```
+
+Si todavía no tenés un dominio o querés explorar un nicho nuevo, `POST /posts/keywords/topic/` hace lo
+mismo a partir de un `topic` en vez de un `domain` — usalo cuando el sitio todavía no existe o cuando
+estás buscando un ángulo nuevo para uno que sí existe. Ambas rutas devuelven un array `keywords` con
+volumen de búsqueda y categorías sugeridas; elegí una keyword con buen volumen para el paso siguiente,
+y guardá las categorías si querés clasificar el artículo más adelante. Un `402` significa saldo
+insuficiente; un `422`, que el `domain` (o el `topic`) es demasiado corto o falta en el cuerpo.
+
+[Keywords Content & Indexing →](/api-reference/1platform-api#tag/keywords-content-indexing)
+
+## Paso 2 — Encolar el trabajo de generación de contenido
+
+Envías la keyword elegida como un trabajo en segundo plano — la respuesta llega antes de que el
+contenido exista. Por detrás la plataforma genera variaciones de título, busca contenido relacionado,
+redacta el artículo con encabezados, trae imágenes del proveedor configurado y arma un slug —
+ninguno de esos sub-pasos es una llamada tuya, todos ocurren dentro del trabajo que este paso encola.
+
+```bash
+curl -X POST "$BASE_URL/posts/content/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"keyword": "sustainable gardening tips", "lang": "en", "country": "us", "image_provider": "default", "categories": ["Home & Garden"]}'
+```
+
+Guardá `data.job_id` como `$JOB_ID` — es lo único que necesitás para el paso siguiente. El costo de la
+operación queda **reservado**, no cobrado: si el trabajo falla (por ejemplo porque la investigación de
+keywords interna no encuentra nada usable para la palabra elegida), la reserva se libera sola y no se
+te cobra por una salida que nunca llegó a existir. El ciclo de vida completo de esa reserva —
+incluidos los headers `X-Hold-Id` y `X-Available-Balance` de la respuesta — está en
+[Cobros y saldo](./cobros-y-saldo). Este endpoint es intensivo en IA y está limitado a 5 solicitudes
+por minuto: un `429` acá es más frecuente que en el resto de la API.
+
+[Keywords Content & Indexing →](/api-reference/1platform-api#tag/keywords-content-indexing)
+
+## Paso 3 — Sondear el trabajo hasta que termine
+
+El envío del Paso 2 no espera al resultado — hay que consultar el estado hasta que el trabajo salga de
+`pending`/`processing`.
+
+```bash
+curl -X GET "$BASE_URL/posts/content/jobs/$JOB_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Repetí esta llamada cada 5 segundos aproximadamente — es el intervalo recomendado, ni tan seguido
+como para desperdiciar cupo de límite de tasa ni tan espaciado como para que la espera se sienta
+larga. El campo `data.status` transiciona `pending` → `processing` → `completed` (o `failed`, con el
+detalle en `data.error`). Ningún otro paso de este recorrido tiene sentido hasta que el estado sea
+`completed`; si es `failed`, revisá `data.error` antes de reintentar con una keyword distinta —
+reenviar la misma casi nunca cambia el resultado.
+
+[Keywords Content & Indexing →](/api-reference/1platform-api#tag/keywords-content-indexing)
+
+## Paso 4 — Consumir el resultado
+
+Una vez `completed`, la misma respuesta del Paso 3 trae `data.result` con el `title`, el `content`
+(HTML listo para insertar) y el `slug` del artículo generado. Publicalo en tu propio sitio o CMS —
+esa publicación ocurre del lado de tu aplicación, no es una llamada a 1Platform. `GET /posts` lista
+los artículos ya generados por tu app si necesitás recuperarlos más adelante sin guardar el
+`job_id` vos mismo. La URL pública que resulte de la publicación es lo que necesita el paso opcional
+siguiente.
+
+## Paso 5 — (Opcional) Enviar la URL para indexación
+
+Con el artículo ya publicado, podés acelerar su rastreo enviando la URL a la Google Indexing API.
+Requiere que tu propiedad esté verificada en Search Console.
+
+```bash
+curl -X POST "$BASE_URL/posts/indexing/" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://myblog.com/sustainable-gardening-tips-2026"}'
+```
+
+Un `400` acá suele significar que la URL no es públicamente accesible todavía — confirmá que la
+publicación del Paso 4 ya esté en vivo antes de reintentar; un `500`, que la propiedad no está
+verificada correctamente en Search Console. Este paso es independiente del resto: podés omitirlo si
+tu sitio ya tiene su propio pipeline de indexación, o llamarlo días después de publicar sin que eso
+afecte al artículo generado.
+
+[Keywords Content & Indexing →](/api-reference/1platform-api#tag/keywords-content-indexing)

@@ -1,0 +1,76 @@
+---
+title: Convenciones
+description: Lo que vale para todas las llamadas a la 1Platform API — autenticación, variables de los ejemplos, prerrequisitos, idempotencia y reintentos.
+sidebar_position: 0
+---
+
+# Convenciones
+
+Todo lo que se repite en cada recorrido vive acá, una sola vez. Los [Recorridos](../journeys/autenticacion) dan por
+sentado lo de esta página y no lo redefinen.
+
+## Autenticación — dos tokens
+
+Cada solicitud lleva **dos** tokens, que identifican cosas distintas:
+
+| Token | Header | Identifica |
+|---|---|---|
+| **Token de aplicación** (`ak-…`) | `Authorization: Bearer ak-…` | Tu aplicación |
+| **Token de usuario** (`sk-…`) | `x-user-token: sk-…` | El usuario final en cuyo nombre actúas |
+
+Los dos son de corta duración y se obtienen en el recorrido de
+[Autenticación](../journeys/autenticacion), que es el único que hay que hacer antes que cualquier otro.
+
+```
+Authorization: Bearer $APP_TOKEN
+x-user-token: $USER_TOKEN
+Content-Type: application/json
+```
+
+## Variables usadas en los ejemplos
+
+Los `curl` de los recorridos asumen estas variables. Exportalas una vez en tu terminal:
+
+```bash
+BASE_URL="https://api-qa.1platform.pro/api/v1"   # QA; producción: https://api.1platform.pro/api/v1
+APP_API_KEY="ak-your-app-api-key"
+USER_API_KEY="sk-user-abc123"
+APP_TOKEN=""     # lo devuelve el recorrido de Autenticación
+USER_TOKEN=""    # lo devuelve el recorrido de Autenticación
+```
+
+Las URLs base completas están en [Entornos](./environments).
+
+## Prerrequisito: el sitio web (`website_id`)
+
+Varias capacidades trabajan **sobre un sitio**, no sobre la cuenta: Analytics, AdSense, Search Console
+y publicación de enlaces. Todas necesitan un `website_id` que se obtiene una sola vez registrando el
+sitio con `POST /users/websites`, y que después se reutiliza en todos esos recorridos.
+
+Si un recorrido empieza pidiéndote `$WEBSITE_ID` y no tenés ninguno, ese es el paso que falta. La
+gestión completa de sitios (alta, listado, baja) está en la referencia —
+[Websites →](/api-reference/1platform-api#tag/websites).
+
+## Formato de las respuestas
+
+Todas las respuestas usan el mismo sobre, y los errores el mismo catálogo de códigos. La forma exacta
+está documentada una sola vez en [Formato de respuesta](./response-format) y
+[Códigos de error](./error-codes) — los recorridos nombran el campo que hace falta para el paso
+siguiente, pero no reproducen el cuerpo.
+
+## Idempotencia y reintentos
+
+- **Repetir una operación de escritura es seguro** cuando el endpoint acepta una clave de idempotencia;
+  la referencia lo indica por operación.
+- **`402 Payment Required`** significa saldo insuficiente: no reintentes sin recargar, el resultado no
+  va a cambiar.
+- **`429 Too Many Requests`** significa que superaste un límite de uso: reintentá con retroceso
+  exponencial. Los límites por familia de endpoint están en [Límites de uso](./rate-limits).
+- **`5xx`** es del lado del servidor: reintentá con retroceso exponencial, máximo 3 intentos.
+
+## Tiempos de espera
+
+Las operaciones que llaman a servicios externos (generación de contenido, aprovisionamiento de
+propiedades, emisión fiscal) son **asíncronas**: devuelven un identificador de trabajo y hay que
+sondear su estado. Ningún recorrido asume que una de esas llamadas termina dentro de la petición HTTP
+— el sondeo es parte del recorrido, y por eso esos recorridos existen.

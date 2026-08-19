@@ -5,9 +5,9 @@ name: CI — Pull Request
 # PROD environment and its credentials into every pull request.
 #
 # Until this file existed, nothing at all ran before a merge — a broken build, a
-# broken internal link, a type error or a provider leak was only discovered
-# after it had already deployed, because prod.yml runs on push to main and this
-# repo has no paths-ignore.
+# broken internal link, a type error or prose contradicting the API was only
+# discovered after it had already deployed, because prod.yml runs on push to
+# main and this repo has no paths-ignore.
 on:
   pull_request:
     branches: [main]
@@ -69,7 +69,28 @@ jobs:
           set -euo pipefail
           pnpm check:tells
 
-      # Includes the provider-leak compliance gate and onBrokenLinks:'throw'.
+      # Same discipline for the contract-drift gate: watch it fail on every one
+      # of its tells — and pass on legitimate content — before trusting a green.
+      # Its false-positive cases are as load-bearing as its false-negative ones:
+      # a gate that blocks a good PR is a gate someone switches off.
+      - name: Contract-drift guard — self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:contract:self-test
+
+      # The prose must not restate what the OpenAPI reference already publishes.
+      # Measured against origin/main with this same script, it fails with 192
+      # pasted response bodies, 3 citations of operations that do not exist and
+      # 48 retyped schema tables — 243 findings. Green here means the tree
+      # changed, not that the guard went quiet.
+      - name: Contract-drift guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:contract
+
+      # onBrokenLinks:'throw' — a bad internal link fails here.
       - name: Build
         shell: bash
         run: |

@@ -28,41 +28,10 @@ type Card = {
   href: string;
 };
 
-// Group A — configurable end-products (per tenant). Non-technical audience.
-const TENANT_PRODUCTS: Card[] = [
-  {
-    icon: 'dashboard',
-    title: '1Platform Dashboard',
-    desc: translate({
-      id: 'home.product.dashboard.desc',
-      message:
-        'El panel de control white-label para cobros, facturación, dominios, equipo y cada módulo habilitado.',
-    }),
-    href: '/docs/products/dashboard/overview',
-  },
-  {
-    icon: 'layers',
-    title: 'Atlas Dashboard',
-    desc: translate({
-      id: 'home.product.atlasDashboard.desc',
-      message:
-        'Opera una tienda de contenido con tu marca: catálogo, monetización, miembros, SEO y la app móvil.',
-    }),
-    href: '/docs/products/atlas-dashboard/overview',
-  },
-  {
-    icon: 'mobile',
-    title: 'Atlas App',
-    desc: translate({
-      id: 'home.product.atlasApp.desc',
-      message:
-        'Una app móvil white-label (iOS, Android, TV) con lector integrado, descargas offline y más.',
-    }),
-    href: '/docs/products/atlas-app/overview',
-  },
-];
-
-// Group B — SaaS APIs. Developer audience.
+// SaaS APIs. Developer audience — the portal's only audience since the
+// `docs-developer-minimalista` epic withdrew the per-tenant operator docs (D-1),
+// which is why the former TENANT_PRODUCTS grid and its `ProductCards` export are
+// gone: their 65 target pages no longer exist.
 const SAAS_PRODUCTS: Card[] = [
   {
     icon: 'code',
@@ -101,15 +70,15 @@ const QUICKLINKS: Card[] = [
   },
   {
     icon: 'share',
-    title: translate({id: 'home.quick.flows.title', message: 'Flujos de integración'}),
-    desc: translate({id: 'home.quick.flows.desc', message: 'Flujos de trabajo de punta a punta, paso a paso.'}),
-    href: '/docs/saas/1platform-api/flows/generate-invoice',
+    title: translate({id: 'home.quick.flows.title', message: 'Recorridos'}),
+    desc: translate({id: 'home.quick.flows.desc', message: 'Integraciones de punta a punta, en el orden en que se hacen.'}),
+    href: '/docs/saas/1platform-api/journeys/autenticacion',
   },
   {
     icon: 'bell',
     title: translate({id: 'home.quick.webhooks.title', message: 'Webhooks'}),
     desc: translate({id: 'home.quick.webhooks.desc', message: 'Reacciona a los eventos en el momento en que ocurren.'}),
-    href: '/docs/saas/1platform-api/webhooks/overview',
+    href: '/docs/saas/1platform-api/journeys/webhooks',
   },
 ];
 
@@ -130,10 +99,6 @@ function CardGrid({cards, columns}: {cards: Card[]; columns: 2 | 3}): ReactNode 
       ))}
     </div>
   );
-}
-
-export function ProductCards(): ReactNode {
-  return <CardGrid cards={TENANT_PRODUCTS} columns={3} />;
 }
 
 export function SaasCards(): ReactNode {

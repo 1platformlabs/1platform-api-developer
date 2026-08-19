@@ -1,0 +1,150 @@
+---
+title: Autenticación
+description: Recorrido de las credenciales encadenadas — token de app, alta de usuario, token de usuario y primera llamada — más el magic link como vía de alta para usuarios finales.
+sidebar_position: 1
+---
+
+# Autenticación
+
+La 1Platform API usa el modelo de dos tokens que describe [Convenciones](../reference/convenciones):
+un token de aplicación (`ak-…`) y un token de usuario (`sk-…`, intercambiado por un JWT de corta
+duración). Ninguno de los dos se pide suelto — cada paso de este recorrido necesita el resultado del
+anterior, y ese encadenamiento es justamente lo que hace que el orden importe. Es el único recorrido
+que hay que completar antes que cualquier otro.
+
+Cubre dos caminos para llegar al token de usuario: alta **servidor a servidor** (tu backend crea al
+usuario y guarda su API key) y **magic link** (el usuario final se autentica solo, sin que tu backend
+maneje contraseñas).
+
+## Paso 1 — Token de aplicación
+
+Todo empieza acá: sin token de aplicación no hay alta de usuario ni token de usuario. Autenticás tu
+app con la API key que gestionás desde el Dashboard (`ak-…`), y a cambio obtenés un JWT de corta
+duración que identifica a tu aplicación frente a cualquier usuario que actúe a través de ella.
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$APP_API_KEY'"}'
+```
+
+Guardá `data.access_token` como `$APP_TOKEN` — expira en 30 minutos, así que en un proceso de larga
+vida conviene regenerarlo proactivamente en vez de esperar el `401`. Un `401` significa API key
+inválida o app inactiva; un `429` significa que superaste el límite de 10 solicitudes por minuto para
+este endpoint en particular.
+
+[Get App Token →](/api-reference/1platform-api#tag/get-app-token)
+
+## Paso 2 — Alta de usuario (servidor a servidor)
+
+Con el token de aplicación ya podés registrar un usuario. La respuesta trae su `api_key`
+permanente (`sk-…`), que es lo que el paso siguiente necesita para emitirle un token. Detrás de esta
+única llamada la plataforma también crea el registro de facturación y la suscripción del usuario —
+no hay un paso separado para eso.
+
+```bash
+curl -X POST "$BASE_URL/users" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "carlos.mendez@example.com", "currency": "USD"}'
+```
+
+Guardá `data.api_key` como `$USER_API_KEY` en un lugar seguro — es la credencial que reemplaza a la
+contraseña en este flujo servidor a servidor, así que perderla obliga a rehacer el alta. `currency`
+es opcional (por defecto `"USD"`) y fija la moneda de facturación del usuario. Un `409` significa que
+el correo ya está registrado — usá el usuario existente en vez de reintentar la creación; un `400`,
+que el formato del correo no es válido.
+
+[Users & Tokens →](/api-reference/1platform-api#tag/users-tokens)
+
+## Paso 3 — Token de usuario a partir de la API key
+
+Intercambiás la API key del usuario (obtenida en el paso anterior, o guardada desde su alta) por un
+JWT de corta duración. Este es el token que después viaja en `x-user-token` junto al token de
+aplicación del Paso 1.
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'$USER_API_KEY'"}'
+```
+
+Guardá `data.access_token` como `$USER_TOKEN` — expira en 30 minutos, igual que el token de
+aplicación. La `$USER_API_KEY` del Paso 2 es reutilizable: cada vez que necesites un token nuevo (por
+expiración o porque cambiaste de proceso) volvés a este mismo endpoint en vez de recrear el usuario.
+
+[Users & Tokens →](/api-reference/1platform-api#tag/users-tokens)
+
+## Paso 4 — Alternativa: alta del usuario final por magic link
+
+Los Pasos 2 y 3 asumen que tu backend controla el alta. Para clientes de usuario final (un dashboard
+whitelabel, una app móvil) sin gestión de contraseñas, el magic link cubre lo mismo con una vía
+distinta: un correo con un enlace de un solo uso. Elegí este camino cuando quien se autentica es una
+persona frente a una pantalla; elegí el Paso 2-3 cuando el que se autentica es tu propio backend
+actuando en nombre de un usuario que ya conocés.
+
+```bash
+curl -X POST "$BASE_URL/auth/user/magic-link/request" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "'$USER_EMAIL'"}'
+```
+
+La respuesta es intencionalmente genérica — no confirma si el correo existe, para evitar
+enumeración de cuentas. El usuario hace clic en el enlace desde su cliente de correo (eso ocurre en su
+navegador, no en tu backend) y tu app captura el parámetro `token` de la URL de retorno. Con ese valor
+llamás a `POST /auth/user/magic-link/verify` (mismo header de aplicación, cuerpo `{"token": "..."}`),
+que devuelve un par `access_token` + `refresh_token`. El `access_token` es intercambiable con el
+`$USER_TOKEN` del Paso 3 — ambos son JWT con el mismo `user_id`. Un `410` significa que el enlace ya
+se usó o expiró: hay que pedir uno nuevo, nunca reintentar la misma verificación. El correo del
+usuario está limitado por tasa en la solicitud del enlace para evitar abuso — un `429` ahí no es un
+error de tu integración, es la plataforma protegiendo la bandeja de entrada del usuario.
+
+[User Authentication →](/api-reference/1platform-api#tag/user-authentication)
+
+## Paso 5 — Primera llamada autenticada
+
+Con `$APP_TOKEN` y `$USER_TOKEN` (o el `access_token` del magic link) en mano, cualquier endpoint
+protegido queda disponible. Esta llamada confirma que ambos tokens son válidos.
+
+```bash
+curl -X GET "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Un `401` acá significa que alguno de los dos tokens expiró o es inválido — repetí el paso que lo
+generó. La respuesta usa el mismo sobre `{success, data, msg}` que documenta
+[Formato de respuesta](../reference/response-format); a partir de acá cualquier endpoint protegido de
+la API se llama con estos mismos dos headers.
+
+[My Profile →](/api-reference/1platform-api#tag/my-profile)
+
+## Paso 6 — Rotar y cerrar sesión
+
+La forma de terminar la sesión depende de qué vía usaste para conseguir el token de usuario. Si
+entraste por magic link, rotá el `refresh_token` antes de que expire con `POST /auth/user/refresh`, y
+cerrá sesión revocando el token activo con `POST /auth/user/logout`:
+
+```bash
+curl -X POST "$BASE_URL/auth/user/refresh" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'$REFRESH_TOKEN'"}'
+```
+
+El refresh token anterior queda invalidado en cuanto se emite uno nuevo — un `409` en esta llamada es
+señal de que se reutilizó un token ya rotado, y conviene tratarlo como posible robo de sesión.
+
+Si en cambio usaste el camino servidor a servidor (Pasos 2-3), no hay refresh que rotar: para forzar
+el cierre de todas las sesiones del usuario llamás a `POST /users/revoke-tokens`, que invalida de
+una vez cualquier JWT emitido hasta ese momento (el usuario necesita un `$USER_TOKEN` nuevo del
+Paso 3 para volver a operar).
+
+Guardá los tokens de refresco en cookies `httpOnly` seguras o en el almacenamiento seguro de la
+plataforma (Keychain, Keystore) — nunca en `localStorage`, que cualquier script en la página puede
+leer.
+
+[User Authentication →](/api-reference/1platform-api#tag/user-authentication) ·
+[Users & Tokens →](/api-reference/1platform-api#tag/users-tokens)

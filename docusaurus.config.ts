@@ -29,9 +29,97 @@ const scalarPlugin = (id: string, label: string, route: string, specPath: string
   },
 ];
 
+
+// ── Redirect helpers (see the plugin block below for why these are explicit) ──
+//
+// Every retired route existed in TWO shapes and both answered 200: the nested
+// one Docusaurus generates from the file tree, and the flat one the old
+// createRedirects served. Each helper emits both, so a slug can never be
+// covered in one shape and 404 in the other.
+const flowRedirects = (slug: string, to: string) => [
+  {from: `/docs/saas/1platform-api/flows/${slug}`, to: `/docs/saas/1platform-api/${to}`},
+  {from: `/docs/flows/${slug}`, to: `/docs/saas/1platform-api/${to}`},
+];
+
+const webhookRedirects = (slug: string, to: string) => [
+  {from: `/docs/saas/1platform-api/webhooks/${slug}`, to: `/docs/saas/1platform-api/${to}`},
+  {from: `/docs/webhooks/${slug}`, to: `/docs/saas/1platform-api/${to}`},
+];
+
+// The 65 withdrawn per-tenant pages, taken from the pre-cut sitemap rather than
+// from filenames: each section's index.mdx publishes as `<section>/overview`,
+// so a filename-derived list would miss three URLs and invent three others.
+const PRODUCT_PAGES = [
+  'atlas-app/achievements',
+  'atlas-app/app-exclusive-content',
+  'atlas-app/app-store-presence',
+  'atlas-app/authentication',
+  'atlas-app/content-browser',
+  'atlas-app/devices',
+  'atlas-app/freemium',
+  'atlas-app/getting-started',
+  'atlas-app/multi-tenant-isolation',
+  'atlas-app/offline-downloads',
+  'atlas-app/overview',
+  'atlas-app/parental-controls',
+  'atlas-app/personalization',
+  'atlas-app/playback',
+  'atlas-app/profile-security',
+  'atlas-app/push-notifications',
+  'atlas-app/reader-experience',
+  'atlas-app/releases-and-updates',
+  'atlas-app/subscription-management',
+  'atlas-app/watchlist-library',
+  'atlas-app/white-label-branding',
+  'atlas-dashboard/admin-roles',
+  'atlas-dashboard/ads-and-revenue',
+  'atlas-dashboard/analytics',
+  'atlas-dashboard/app-analytics',
+  'atlas-dashboard/app-storefront',
+  'atlas-dashboard/audit-log',
+  'atlas-dashboard/branding-appearance',
+  'atlas-dashboard/catalog-and-taxonomy',
+  'atlas-dashboard/content-management',
+  'atlas-dashboard/copy-customization',
+  'atlas-dashboard/custom-code',
+  'atlas-dashboard/getting-started',
+  'atlas-dashboard/live-channels',
+  'atlas-dashboard/members',
+  'atlas-dashboard/notifications',
+  'atlas-dashboard/overview',
+  'atlas-dashboard/parental-controls',
+  'atlas-dashboard/promotional-rails',
+  'atlas-dashboard/purchases-and-rentals',
+  'atlas-dashboard/redirects',
+  'atlas-dashboard/seo-configuration',
+  'atlas-dashboard/seo-health',
+  'atlas-dashboard/storefront-pages',
+  'atlas-dashboard/subscription-tiers',
+  'atlas-dashboard/tenant-settings',
+  'dashboard/admin-impersonation',
+  'dashboard/admin-logs',
+  'dashboard/api-keys',
+  'dashboard/billing-credits',
+  'dashboard/branding-appearance',
+  'dashboard/dashboard-home',
+  'dashboard/domains',
+  'dashboard/getting-started',
+  'dashboard/invoicing',
+  'dashboard/invoicing-businesses',
+  'dashboard/modules',
+  'dashboard/onboarding',
+  'dashboard/overview',
+  'dashboard/settings-notifications',
+  'dashboard/settings-profile',
+  'dashboard/settings-security',
+  'dashboard/settings-workspace',
+  'dashboard/team-and-roles',
+  'dashboard/transactions',
+];
+
 const config: Config = {
   title: 'Documentación para desarrolladores de 1Platform',
-  tagline: 'Productos configurables y APIs SaaS sobre la infraestructura de 1Platform',
+  tagline: 'Integra tu aplicación con las APIs SaaS de 1Platform',
   favicon: 'img/favicon.ico',
 
   future: {
@@ -158,26 +246,87 @@ const config: Config = {
       '/api-reference/atlas-api',
       '/openapi/atlas-api.json',
     ),
-    // Backward-compat: old single-API route + migrated 1Platform API doc paths.
-    // The root `/` is handled by src/pages/index.tsx (a <Redirect> to /docs/),
-    // since this site is pure documentation — the marketing home lives at
-    // 1platform.pro.
+    // Backward-compat. The root `/` is handled by src/pages/index.tsx (a
+    // <Redirect> to /docs/), since this site is pure documentation — the
+    // marketing home lives at 1platform.pro.
+    //
+    // ── Why these are explicit and createRedirects is gone ──────────────────
+    //
+    // `createRedirects(existingPath)` is called ONCE PER PAGE THAT EXISTS in the
+    // build, and what it returns are old paths pointing AT that page. A page
+    // that was deleted is therefore never passed to it, and no redirect is ever
+    // produced. Cloning the old pattern for withdrawn routes yields zero entries
+    // and a green build — the failure is completely silent.
+    //
+    // The old createRedirects also could not survive this epic even for the
+    // pages that live on: every flows/ slug changed (23 pages consolidated into
+    // 8 journeys with different names), so it would have generated redirects
+    // pointing at pages that no longer exist.
+    //
+    // Both URL shapes are covered. `/docs/flows/<slug>` (flat) and
+    // `/docs/saas/1platform-api/flows/<slug>` (nested) BOTH return 200 today —
+    // the flat form was served by that createRedirects. Measured live before the
+    // cut: all 23 flat flow URLs and all 6 flat webhook URLs answered 200, and
+    // 1platform-dashboard links to /docs/flows/generate-ai-content from two
+    // production screens (DashboardHomePage, OnboardingWizardPage). Dropping the
+    // flat form would 404 those CTAs on deploy day.
     [
       '@docusaurus/plugin-client-redirects',
       {
         redirects: [
           {from: '/api-docs', to: '/api-reference/1platform-api'},
+
+          // Entry points that already 404 today, referenced 4× across the
+          // ecosystem (transactional emails and the dashboard onboarding
+          // wizard). Broken before this epic; the cut is when they get fixed.
+          {from: '/docs/quick-start', to: '/docs/saas/1platform-api/getting-started'},
+          {from: '/docs/flows', to: '/docs/saas/1platform-api/journeys/autenticacion'},
+
+          // ── Flows absorbed by a journey → the journey that replaced them ──
+          ...flowRedirects('magic-link-authentication', 'journeys/autenticacion'),
+          ...flowRedirects('user-onboarding', 'journeys/autenticacion'),
+          ...flowRedirects('generate-ai-content', 'journeys/generar-contenido'),
+          ...flowRedirects('ai-generations', 'journeys/generar-contenido'),
+          ...flowRedirects('payments-and-subscriptions', 'journeys/cobros-y-saldo'),
+          ...flowRedirects('billing-holds-and-captures', 'journeys/cobros-y-saldo'),
+          ...flowRedirects('paid-onboarding', 'journeys/cobros-y-saldo'),
+          ...flowRedirects('generate-invoice', 'journeys/facturacion'),
+          ...flowRedirects('webhook-configuration', 'journeys/webhooks'),
+          ...flowRedirects('ai-agents', 'journeys/agentes'),
+
+          // ── Flows that kept a journey of their own ───────────────────────
+          ...flowRedirects('google-analytics', 'journeys/google-analytics'),
+          ...flowRedirects('google-adsense', 'journeys/google-adsense'),
+
+          // ── Flows withdrawn without a successor → the capability index, ──
+          // which names their tag and links into the reference.
+          ...flowRedirects('activity-logs', 'capacidades'),
+          ...flowRedirects('admin-operations', 'capacidades'),
+          ...flowRedirects('dashboard-overview', 'capacidades'),
+          ...flowRedirects('dashboard-settings', 'capacidades'),
+          ...flowRedirects('domain-management', 'capacidades'),
+          ...flowRedirects('external-integrations', 'capacidades'),
+          ...flowRedirects('manage-websites', 'capacidades'),
+          ...flowRedirects('notifications', 'capacidades'),
+          ...flowRedirects('referrals', 'capacidades'),
+          ...flowRedirects('support', 'capacidades'),
+          ...flowRedirects('tasks', 'capacidades'),
+
+          // ── Webhook pages: three folded into the journey, three moved to
+          // the reference (the "why" the OpenAPI spec cannot carry). ────────
+          ...webhookRedirects('overview', 'journeys/webhooks'),
+          ...webhookRedirects('configuring-urls', 'journeys/webhooks'),
+          ...webhookRedirects('receiving-notifications', 'reference/webhooks-payload'),
+          ...webhookRedirects('security', 'reference/webhooks-security'),
+          ...webhookRedirects('retry-and-delivery', 'reference/retry-and-delivery'),
+          ...webhookRedirects('code-samples', 'reference/webhooks-code-samples'),
+
+          // ── Per-tenant operator docs, withdrawn (D-1) ────────────────────
+          // No equivalent page: the audience is no longer this portal's. The
+          // ecosystem links to none of these; the redirect is for external
+          // readers and search engines.
+          ...PRODUCT_PAGES.map((p) => ({from: `/docs/products/${p}`, to: '/docs/'})),
         ],
-        // Old flat /docs/{flows,reference,webhooks}/* → new /docs/saas/1platform-api/*.
-        createRedirects(existingPath: string) {
-          const m = existingPath.match(
-            /^\/docs\/saas\/1platform-api\/(flows|reference|webhooks)\/(.+)$/,
-          );
-          if (m) {
-            return [`/docs/${m[1]}/${m[2]}`];
-          }
-          return undefined;
-        },
       },
     ],
   ],

@@ -226,6 +226,23 @@
   --scalar-font-code: var(--font-mono);
 }
 
+/* ── The canvas belongs to the design system, not to Scalar ────────────────
+   Scalar ships `body { background-color: var(--scalar-background-1) }`, and that
+   rule applies on EVERY page of the portal, not only the API reference — the
+   stylesheet is global. The effect measured in the browser: `html` painted the
+   warm paper (#f6f5f2) while `body` painted pure white on top of it, so the only
+   surface still showing the design system's canvas was the navbar, which sets it
+   explicitly. Two different backgrounds on one page, with the seam wherever the
+   navbar ended.
+
+   `html body` (0,0,2) outranks Scalar's `body` (0,0,1), so this wins without
+   !important and without depending on which stylesheet loads first — the same
+   discipline as the .light-mode.light-mode mapping above. Scalar's own component
+   surfaces keep using --scalar-background-* and are untouched. */
+html body {
+  background-color: var(--color-bg);
+}
+
 /* NOT mapped here, deliberately: --scalar-color-{blue,green,red,yellow,orange,
    purple}, the HTTP method badge colours. Scalar re-declares them deeper in its
    own component tree, so setting them at this level has no effect — measured,

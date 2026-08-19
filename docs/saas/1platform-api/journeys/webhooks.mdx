@@ -1,0 +1,153 @@
+---
+title: Webhooks
+description: El orden que importa para recibir webhooks salientes con seguridad — registrar el dominio, mapear los eventos, verificar la firma, responder rápido y saber qué pasa si tu backend falla.
+sidebar_position: 5
+---
+
+# Webhooks
+
+1Platform te llama a vos — no al revés — cada vez que una transacción cambia de estado. El orden que
+importa acá no es de llamadas a la API sino de garantías: registrás antes de que se dispare nada,
+verificás antes de confiar, respondés rápido antes de procesar, y sabés qué pasa si tu backend no
+contesta. Saltearse cualquiera de esos pasos deja pasar cosas que no deberían pasar: sin verificación de
+firma, cualquiera puede simularte un pago aprobado con un POST a tu propio endpoint.
+
+Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN` tal como los define
+[Convenciones](../reference/convenciones).
+
+## Paso 1 — Registrar el dominio que va a recibir los webhooks
+
+**Por qué acá:** 1Platform sólo entrega a hosts que vos autorizaste explícitamente — es el primer gate,
+antes de que exista ningún manejador de eventos. No hace falta verificarlo por DNS.
+
+```bash
+curl -X POST "$BASE_URL/webhooks/config/domains" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "hooks.example.com"}'
+```
+
+Guardá `data.webhook_secret` de inmediato — es el secreto inicial y no se vuelve a mostrar en texto plano
+por este endpoint; la única forma de recuperar el acceso si lo perdiste es rotarlo (Paso 7). El dominio
+tiene que ser simple (`hooks.example.com`), sin esquema ni puerto ni path.
+
+| Código | Causa |
+|---|---|
+| 400 | Formato de dominio inválido (esquema incluido, puerto presente, etc.) |
+| 409 | El dominio ya está registrado para esta app — inspeccionalo con `GET /webhooks/config/` en vez de reintentar |
+| 422 | Falta el campo `domain` |
+
+[Webhook Configuration →](/api-reference/1platform-api#tag/webhook-configuration)
+
+## Paso 2 — Mapear los eventos a tus URLs
+
+**Por qué acá:** el dominio registrado todavía no recibe nada — cada uno de los cinco eventos
+(`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`) necesita su propio manejador,
+aunque los cinco apunten a la misma URL y uses el campo `event` del cuerpo para enrutar internamente.
+
+```bash
+curl -X PUT "$BASE_URL/webhooks/config/events" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"on_approved": {"url": "https://hooks.example.com/payments", "method": "POST", "headers": {"X-Api-Key": "clave-de-tu-receptor"}}, "on_denied": {"url": "https://hooks.example.com/payments", "method": "POST"}}'
+```
+
+Enviar `null` en una entrada elimina ese manejador; el endpoint es idempotente, así que llamarlo de nuevo
+con el mismo payload converge al mismo estado. La URL registrada se usa tal cual, query string incluido, y
+contra `allowed_domains` sólo se compara el host — la ruta no se inspecciona ni se normaliza. El objeto
+opcional `headers` viaja en cada intento de entrega (hasta 20 por evento, nombres y valores de header
+válidos) y es la vía para atravesar una protección de acceso delante de tu receptor; nombres reservados
+como `Authorization` o `X-Webhook-*` se rechazan al guardar, con el motivo — nunca se descartan en
+silencio en el momento de la entrega.
+
+| Código | Causa |
+|---|---|
+| 400 | El host de la URL no está en `allowed_domains` — registralo primero (Paso 1) |
+| 422 | `method` inválido, URL malformada, o un header con nombre reservado |
+
+[Webhook Configuration →](/api-reference/1platform-api#tag/webhook-configuration)
+
+## Paso 3 — Recibir la entrega
+
+**Por qué acá:** con dominio y eventos mapeados, tu endpoint empieza a recibir POSTs firmados apenas una
+transacción llega a un estado terminal — nunca en `created`, que es un estado intermedio y no dispara
+notificación. La forma exacta del cuerpo, el enum de `status` y cómo mapearlo a tu propia máquina de
+estados están en [Webhooks — payload saliente](../reference/webhooks-payload); no se repite acá, salvo
+para decir que **no** viene envuelto en el sobre `{ success, data, msg }` del resto de la API — es un
+objeto plano, canónico o con la plantilla que hayas configurado.
+
+Si en el Paso 2 renunciaste al cuerpo canónico con un `body_template`, es lo que recibís acá en su lugar;
+si lo dejaste vacío, es el cuerpo canónico completo.
+
+## Paso 4 — Verificar la firma antes de confiar en el payload
+
+**Por qué acá:** cualquiera puede mandarle un POST a tu endpoint con un `status: approved` inventado. La
+única defensa es el HMAC — verificalo antes de leer un solo campo del cuerpo, y contra los bytes crudos
+que llegaron por el cable, no contra el JSON re-serializado (una diferencia de espacios en blanco ya
+rompe la firma).
+
+El esquema completo (encabezados `X-Webhook-Signature` / `X-Webhook-Timestamp`, material firmado, ventana
+de replay de 5 minutos) y verificadores listos en Python, TypeScript y PHP están en
+[Seguridad de webhooks](../reference/webhooks-security); implementaciones de receptor de punta a punta,
+con deduplicación incluida, en [Ejemplos de código](../reference/webhooks-code-samples).
+
+## Paso 5 — Responder rápido y diferir el trabajo pesado
+
+**Por qué acá:** 1Platform espera un `2xx` dentro de 10 segundos por intento. Cumplir el pedido, mandar un
+recibo o actualizar un CRM adentro de esa ventana es arriesgado — acusá recibo primero con un cuerpo
+mínimo (`200 OK` o `202 Accepted`) y encolá el trabajo real después, en segundo plano.
+
+Un `3xx` no cuenta como entrega aunque tu servidor redirija con éxito — tu manejador no debe redirigir,
+ni siquiera en duplicados — y un `4xx` tampoco: ambos se tratan como falla y se reintentan igual que un
+`5xx`, incluso cuando la culpa es tuya (un `Authorization` mal configurado no debería descartar el evento
+en silencio). Los códigos completos y el comportamiento exacto por status están en
+[Reintentos y entrega](../reference/retry-and-delivery).
+
+## Paso 6 — Qué pasa si tu backend falla
+
+**Por qué acá:** la entrega es **at-least-once**, no exactamente-una-vez. Tu manejador tiene que
+deduplicar por `(transaction_id, event)` — el mismo evento puede llegarte más de una vez por diseño, no
+por bug, y cada reintento recalcula la firma con un timestamp nuevo.
+
+Si tu backend está caído más de unos minutos, vas a perder entregas: hay un techo de reintentos y todavía
+no existe una cola dead-letter automática. Reconciliá periódicamente con `GET /users/transactions` en vez
+de asumir que todo lo que pasó te llegó — es la misma disciplina que ya usás para reconciliar
+transacciones por `merchant_reference` en [Cobros y saldo](./cobros-y-saldo). El calendario completo de
+reintentos, el techo de intentos y qué pasa después de agotarlos están en
+[Reintentos y entrega](../reference/retry-and-delivery).
+
+[Payments →](/api-reference/1platform-api#tag/payments)
+
+## Paso 7 — Rotar el secreto de firma
+
+**Por qué acá:** es mantenimiento continuo, no parte del alta — rotalo si el secreto se filtró o según tu
+calendario de cumplimiento, sin tocar el dominio ni los manejadores ya configurados.
+
+```bash
+curl -X POST "$BASE_URL/webhooks/config/rotate-secret" \
+  -H "Authorization: Bearer $APP_TOKEN"
+```
+
+El secreto anterior se invalida de inmediato — desplegá el nuevo en tu verificador antes de que se
+dispare cualquier evento nuevo, o los payloads legítimos van a fallar la verificación de firma de tu
+lado. No hay endpoint `GET` para recuperar un secreto ya emitido: si perdés la respuesta, tenés que rotar
+de nuevo. Un runbook de rotación seguro, con período de gracia de 24 h en el verificador para absorber
+reintentos en vuelo previos a la rotación, está en
+[Seguridad de webhooks → Rotación del secreto](../reference/webhooks-security#secret-rotation).
+
+| Código | Causa |
+|---|---|
+| 404 | No hay configuración de webhook para rotar — registrá un dominio primero (Paso 1) |
+| 429 | Límite de tasa excedido |
+
+[Webhook Configuration →](/api-reference/1platform-api#tag/webhook-configuration)
+
+## Referencia rápida
+
+| Paso | Método | Endpoint |
+|---|---|---|
+| 1 | `POST` | `/webhooks/config/domains` |
+| 2 | `PUT` | `/webhooks/config/events` |
+| 3–4 | — | tu endpoint recibe y verifica |
+| 5–6 | — | tu endpoint responde y vos reconciliás |
+| 7 | `POST` | `/webhooks/config/rotate-secret` |

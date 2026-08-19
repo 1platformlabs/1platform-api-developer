@@ -6399,7 +6399,8 @@
                   "campaign_id": "abc123"
                 },
                 "merchant_reference": "order_abc123",
-                "return_url": "https://shop.example.com/checkout/result?order={{merchant_reference}}"
+                "return_url": "https://shop.example.com/checkout/result?order={{merchant_reference}}",
+                "customer_email": "ana@example.com"
               }
             }
           }
@@ -6434,7 +6435,7 @@
             }
           },
           "400": {
-            "description": "Invalid request data. Also returned when `return_url`'s host is not registered for this App — register it via `POST /webhooks/config/domains` (DNS verification is not required).",
+            "description": "Invalid request data. Also returned when `return_url`'s host is not registered for this App — register it via `POST /webhooks/config/domains` (DNS verification is not required) — and when `customer_email` is not a well-formed address. Both are checked before the payment provider is contacted, so a rejected request leaves no checkout session behind.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41350,7 +41351,7 @@
           "Tenant Admin"
         ],
         "summary": "Issue a short-lived impersonation token (tenant-scoped)",
-        "description": "Returns a 15-minute JWT (type=impersonation) the admin can use as the target user's `x-user-token`. The original admin id is preserved in the token (`impersonated_by`) so downstream audit logs attribute the action correctly.\n\nSafeguards (all return 4xx): cannot impersonate yourself, cannot impersonate another tenant admin, cannot impersonate the app owner, target must be in the same tenant.\n\n**Auth:** tenant `app_admin` role required.\n**Rate limit:** 5/hour per caller.",
+        "description": "Returns a 15-minute JWT (type=impersonation) the admin can use as the target user's `x-user-token`. The original admin id is preserved in the token (`impersonated_by`) so downstream audit logs attribute the action correctly.\n\nSafeguards (all return 4xx): cannot impersonate yourself, cannot impersonate another tenant admin, cannot impersonate the app owner, target must be in the same tenant.\n\n**Auth:** tenant `app_admin` role, or a platform superadmin. Both are accepted here AND when the resulting token is used — an authority accepted only at issuance mints a token that 401s on every request.\n**Rate limit:** 5/hour per caller.",
         "operationId": "adminImpersonateUser",
         "security": [
           {
@@ -73803,6 +73804,21 @@
             "description": "Where the payer's BROWSER lands once checkout finishes — approved or not. Without it the payer stops on the payment page, on a domain that is not yours, with no way back.\n\nMust be HTTPS and its host must be registered for this App via `POST /webhooks/config/domains` (the same allowlist the outbound webhooks use; DNS verification is NOT required).\n\nTwo variables are substituted into it, URL-encoded: `{{transaction_id}}` and `{{merchant_reference}}` — the transaction id does not exist yet when you send this, so a return page that needs it has no other way to receive it.\n\nIt is a REDIRECT, not a notification: the payer can close the tab before it happens. The webhook remains the only thing that settles an order.",
             "examples": [
               "https://shop.example.com/checkout/result?order={{merchant_reference}}"
+            ]
+          },
+          "customer_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Email",
+            "description": "Your BUYER's email address. When the payment is approved, 1Platform emails them a receipt for it; the payment provider does not send anything to the buyer.\n\nOptional — omit it and nothing changes. It is never echoed back by this or any other endpoint.\n\nThe address must be a well-formed mailbox (RFC 5321 caps it at 254 characters); anything else is refused with `400` before the payment provider is contacted, so a typo costs you nothing.\n\nDo NOT use `metadata.userId` for this: that value is forwarded to the payment provider as the payer identifier and is not a receipt address.\n\nThe receipt is a courtesy to the buyer, not a settlement signal — the webhook remains the only thing that settles an order.",
+            "examples": [
+              "ana@example.com"
             ]
           }
         },

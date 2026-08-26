@@ -2730,13 +2730,151 @@
         }
       }
     },
+    "/api/v1/users/websites/searchconsole/performance": {
+      "get": {
+        "tags": [
+          "Websites"
+        ],
+        "summary": "Get aggregate search performance across every website",
+        "description": "Retrieve one report that sums the search performance of ALL the caller's websites: 4 KPIs (clicks, impressions, CTR, average position) with a delta vs. the immediately preceding period of equal length, plus a daily series of how the total moved.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- **Free** — a read-only report, never charged\n- A site registered twice counts ONCE. `coverage` says how many properties the totals cover, how many documents were folded into another, and how many sites cannot contribute yet\n- Served entirely from the figures 1Platform has stored and refreshes in the background; this endpoint never fetches anything live, so a site that has never synchronised is counted rather than loaded\n- `end_date` is the most recent day that HAS data, which can be yesterday even when the report is requested today",
+        "operationId": "getSearchConsoleAggregatePerformance",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PerformancePeriod",
+              "description": "Report time period",
+              "default": "28d"
+            },
+            "description": "Report time period"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregate performance report retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_SearchConsoleAggregatePerformanceResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "msg": "Aggregate search performance retrieved",
+                  "data": {
+                    "period": "28d",
+                    "start_date": "2026-07-28",
+                    "end_date": "2026-08-24",
+                    "summary": {
+                      "clicks": {
+                        "current": 10070,
+                        "previous": 8534,
+                        "change_percent": 18
+                      },
+                      "impressions": {
+                        "current": 26134,
+                        "previous": 25081,
+                        "change_percent": 4.2
+                      },
+                      "ctr": {
+                        "current": 0.385,
+                        "previous": 0.34,
+                        "change_percent": 13.24
+                      },
+                      "position": {
+                        "current": 12.4,
+                        "previous": 14.3,
+                        "change_percent": -13.29
+                      }
+                    },
+                    "trend": [
+                      {
+                        "date": "2026-07-28",
+                        "clicks": 412,
+                        "impressions": 1033
+                      }
+                    ],
+                    "coverage": {
+                      "sites_total": 37,
+                      "sites_duplicated": 2,
+                      "sites_counted": 26,
+                      "sites_with_data": 26,
+                      "sites_never_synced": 4,
+                      "sites_unverified": 5,
+                      "sites_stale": 4,
+                      "sites_blocked": 4,
+                      "truncated": false
+                    },
+                    "last_synced_at": "2026-08-24T01:06:12Z"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid period",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/websites/{website_id}/searchconsole/performance": {
       "get": {
         "tags": [
           "Websites"
         ],
         "summary": "Get Search Console performance for a website",
-        "description": "Retrieve a Search Console performance report for a verified website: 4 KPIs (clicks, impressions, CTR, average position) with a delta vs. the immediately preceding period of equal length, a daily trend, and the top 25 queries/pages/countries.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- **Free** — unlike add/verify/delete/sitemaps, this is a read-only report and is never charged\n- Served from the figures 1Platform has stored, refreshed periodically in the background; `last_synced_at` says when. A site that has never been synchronised is loaded on this first request and answers a little slower\n- Requires the website to already be verified in Search Console (409 otherwise)",
+        "description": "Retrieve a Search Console performance report for a verified website: 4 KPIs (clicks, impressions, CTR, average position) with a delta vs. the immediately preceding period of equal length, a daily trend, and the first 25 queries/pages/countries by clicks.\n\n- Each breakdown also reports how many distinct keys it HAS for the period (`queries_total`, `pages_total`, `countries_total`), so a table that ends at 25 can be told apart from one that was cut at 25. Rows beyond the first 25, and any other ordering, come from `GET /users/websites/{website_id}/searchconsole/performance/{dimension}`\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- **Free** — unlike add/verify/delete/sitemaps, this is a read-only report and is never charged\n- Served from the figures 1Platform has stored, refreshed periodically in the background; `last_synced_at` says when. A site that has never been synchronised is loaded on this first request and answers a little slower\n- Requires the website to already be verified in Search Console (409 otherwise)",
         "operationId": "getSearchConsolePerformance",
         "security": [
           {
@@ -2829,7 +2967,9 @@
                       {
                         "date": "2026-07-01",
                         "clicks": 120,
-                        "impressions": 340
+                        "impressions": 340,
+                        "ctr": 0.073,
+                        "position": 8.2
                       }
                     ],
                     "queries": [
@@ -2859,6 +2999,9 @@
                         "position": 2.1
                       }
                     ],
+                    "queries_total": 225,
+                    "pages_total": 296,
+                    "countries_total": 98,
                     "last_synced_at": "2026-07-28T04:00:11Z"
                   }
                 }
@@ -2917,6 +3060,222 @@
           },
           "503": {
             "description": "Search Console is temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/websites/{website_id}/searchconsole/performance/{dimension}": {
+      "get": {
+        "tags": [
+          "Websites"
+        ],
+        "summary": "Page through one Search Console breakdown table",
+        "description": "One page of a single performance breakdown — queries, pages or countries — for the same window the performance report covers.\n\nThe report itself already carries the first 25 rows of all three by clicks, so opening the panel still costs one request. This answers the rows beyond those, and every ordering other than clicks descending.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Free** — a read of figures already stored, never charged\n- **`sort` decides which rows the page contains, not just their order.** Ordering the first 25 by clicks and then re-sorting those does not produce the top rows by impressions; asking for `sort=impressions` here does\n- `total` is how many distinct keys 1Platform has STORED for the period. It is not what Google holds: figures are kept per day up to a ceiling, and Search Console never discloses the queries it anonymises, so a breakdown can legitimately account for fewer clicks than the KPI above it\n- Rows are ordered by `sort` and then by their key ascending. The tiebreaker is part of the contract, not an implementation detail: offset paging over an unstable order silently repeats and drops rows, and ties are the normal case here (dozens of keys at one click each)\n- Served entirely from stored figures — paging never calls Search Console, so a site that has never synchronised answers with an empty page rather than spending quota\n- Requires the website to already be verified in Search Console (409 otherwise)",
+        "operationId": "getSearchConsolePerformanceDimension",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "dimension",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PerformanceDimensionName",
+              "description": "Which breakdown to page through"
+            },
+            "description": "Which breakdown to page through"
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PerformancePeriod",
+              "description": "Report time period",
+              "default": "28d"
+            },
+            "description": "Report time period"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Page size (1-100)",
+              "default": 25,
+              "title": "Limit"
+            },
+            "description": "Page size (1-100)"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "description": "Number of rows to skip for pagination",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of rows to skip for pagination"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PerformanceDimensionSort",
+              "description": "Column the rows are ordered by. This decides which rows the page contains.",
+              "default": "clicks"
+            },
+            "description": "Column the rows are ordered by. This decides which rows the page contains."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PerformanceSortOrder",
+              "description": "Direction of the ordering",
+              "default": "desc"
+            },
+            "description": "Direction of the ordering"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of the breakdown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_SearchConsoleDimensionRowsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "msg": "Search Console breakdown retrieved",
+                  "data": {
+                    "dimension": "pages",
+                    "period": "28d",
+                    "start_date": "2026-07-29",
+                    "end_date": "2026-08-25",
+                    "rows": [
+                      {
+                        "key": "https://example.com/catalog",
+                        "clicks": 5,
+                        "impressions": 133,
+                        "ctr": 0.038,
+                        "position": 12.4
+                      }
+                    ],
+                    "total": 296,
+                    "limit": 25,
+                    "skip": 25,
+                    "sort": "impressions",
+                    "order": "desc"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Website not found or does not belong to user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Website is not verified in Search Console yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid dimension, period, sort, order, limit or skip",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error reading the stored figures",
             "content": {
               "application/json": {
                 "schema": {
@@ -6759,6 +7118,146 @@
         }
       }
     },
+    "/api/v1/users/transactions/{transaction_id}/receipt": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Send the Buyer's Receipt Again",
+        "description": "Send the buyer's receipt for an approved transaction again.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min, on top of a per-recipient ceiling the mail engine applies to this template.\n- Uses the `customer_email` supplied when the transaction was created. There is no way to redirect a receipt to a different address: if the address was wrong, the receipt is not the thing to fix.\n- Safe to call on a transaction whose receipt already went out — the usual reason to call it is that the first message never arrived.\n- Returns **409** with `data.code` when the transaction's state prevents it (`not_approved`, `no_recipient`), **429** when the recipient's ceiling is reached, and **503** when the hold is on our side (`platform_configuration`, `delivery_error`).",
+        "operationId": "sendPaymentTransactionReceipt",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Transaction ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Transaction Id"
+            },
+            "description": "Transaction ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Receipt dispatched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TransactionReceiptSendResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "transaction_id": "507f1f77bcf86cd799439011",
+                    "receipt_status": "dispatched",
+                    "receipt_status_at": "2026-04-30T12:05:00Z"
+                  },
+                  "msg": "Receipt sent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The transaction's state prevents sending a receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Receipt held or undelivered for a reason on our side",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/transactions/{transaction_id}/refund": {
       "post": {
         "tags": [
@@ -7993,6 +8492,198 @@
           },
           "404": {
             "description": "No secret configured, or admin does not belong to the App the token identifies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/couriers/{token}": {
+      "post": {
+        "tags": [
+          "Deliveries"
+        ],
+        "summary": "Receive a shipment status notice (server-to-server)",
+        "description": "Inbound notice from the contracted courier reporting that a shipment changed state.\n\n- **Auth:** the shared secret configured for `{token}`, which the courier echoes on every notification. Rejection is a `403` and happens before the body is parsed.\n- **Routing:** `{token}` is the opaque handle minted when the workspace's courier credential was loaded. An unknown handle, a workspace without a courier and a workspace with the courier switched off answer an identical `404`.\n- **Rate limit:** 300 req/min per handle.\n- Always answers `200` once authenticated — including for a duplicate, an unknown waybill or a status that moves nothing. A non-2xx would lose the notice: this sender is not documented to retry.",
+        "operationId": "receiveCourierNotice",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Opaque routing handle of the workspace",
+              "title": "Token"
+            },
+            "description": "Opaque routing handle of the workspace"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notice accepted",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "result": "applied"
+                  },
+                  "msg": "Accepted"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing or invalid secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown handle, or no courier for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "shipmentNumber": "BF123456",
+                "status": "4",
+                "statusDescription": "Entregado",
+                "date": "2026-08-23T08:15:30.000Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deliveries/tracking/{handle}": {
+      "get": {
+        "tags": [
+          "Deliveries"
+        ],
+        "summary": "Track a shipment (public, no credential)",
+        "description": "The state of a shipment for the person waiting for it.\n\n- **Auth:** none. The handle is the capability — it is a signed derivation of the shipment, not its waybill, because waybills are issued in sequence and would be enumerable.\n- **Rate limit:** 30 req/min per IP.\n- Returns strictly less than the shipment carries: no street, no phone, no coordinates, no price, no courier identity. Only the recipient's FIRST name.\n- A bad handle and an unknown shipment answer the same `404`.",
+        "operationId": "getPublicDeliveryTracking",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "Signed public handle of the shipment",
+              "title": "Handle"
+            },
+            "description": "Signed public handle of the shipment"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The shipment as its recipient may see it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTrackingResponse"
+                },
+                "example": {
+                  "waybill": "ENV26/0011681",
+                  "status": "delivered",
+                  "merchant_name": "Aurum Labs",
+                  "recipient_name": "Mauricio",
+                  "package_description": "Caja mediana",
+                  "estimated_arrival_at": "2026-08-25T18:00:00Z",
+                  "dispatched_at": "2026-08-25T14:00:00Z",
+                  "completed_at": "2026-08-25T17:40:00Z",
+                  "events": [
+                    {
+                      "status": "dispatched",
+                      "at": "2026-08-25T14:00:00Z"
+                    },
+                    {
+                      "status": "picked_up",
+                      "at": "2026-08-25T15:20:00Z"
+                    },
+                    {
+                      "status": "delivered",
+                      "at": "2026-08-25T17:40:00Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or invalid handle",
             "content": {
               "application/json": {
                 "schema": {
@@ -15025,7 +15716,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_AgentRunResponse_"
+                  "$ref": "#/components/schemas/SuccessResponse_AgentRunDetailResponse_"
                 },
                 "example": {
                   "success": true,
@@ -15773,13 +16464,659 @@
         }
       }
     },
+    "/api/v1/agents/{agent_id}/memory": {
+      "get": {
+        "tags": [
+          "Agents CRUD"
+        ],
+        "summary": "Read what this agent remembers",
+        "description": "What the agent has learned across its own runs: what it applied and how that went, what it left unfinished, what it is watching, what it deliberately did not do, and the standing instructions its owner left.\n\nThe memory belongs to **this agent** and to nothing wider: two agents installed from the same template by the same person do not see each other's.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 60 req/min",
+        "operationId": "listAgentMemory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent identifier",
+              "title": "Agent Id"
+            },
+            "description": "Agent identifier"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by kind",
+              "title": "Kind"
+            },
+            "description": "Filter by kind"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status",
+              "default": "open",
+              "title": "Status"
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "How many items to skip, for the pager",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "How many items to skip, for the pager"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "How many items to return, at most 100",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "How many items to return, at most 100"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored.",
+              "title": "X-User-Token"
+            },
+            "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Memory retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentMemoryListResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6a8c1f77bcf86cd799439011",
+                        "kind": "applied",
+                        "status": "open",
+                        "origin": "run",
+                        "title": "Completé la sinopsis de «Breve historia de Escocia»",
+                        "detail": "Evidencia: «historia de escocia», posición 57.9.",
+                        "attempts": 1,
+                        "outcome": "measuring",
+                        "follow_up_at": "2026-09-06T15:00:58Z",
+                        "intervention_id": "6a8b1f77bcf86cd799439014",
+                        "run_id": "6a8b0b54bcf86cd799439015",
+                        "revertible": true,
+                        "created_at": "2026-08-23T15:00:58Z",
+                        "updated_at": "2026-08-23T15:00:58Z"
+                      }
+                    ],
+                    "total": 37,
+                    "memory_enabled": true
+                  },
+                  "msg": "Agent memory retrieved successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An impersonation token was presented on a state-changing method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/memory/{item_id}": {
+      "patch": {
+        "tags": [
+          "Agents CRUD"
+        ],
+        "summary": "Close a remembered item, or reopen one",
+        "description": "Marks a pending item resolved — it stops entering the agent's context and the agent sees it as closed BY THE OWNER rather than as vanished.\n\nReopening works only from `resolved`. An item the owner made be forgotten cannot be reopened or re-closed: the panel warns that forgetting does not come back, and honouring that is what keeps the warning true.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 30 req/min",
+        "operationId": "updateAgentMemoryItem",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent identifier",
+              "title": "Agent Id"
+            },
+            "description": "Agent identifier"
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Memory item identifier",
+              "title": "Item Id"
+            },
+            "description": "Memory item identifier"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored.",
+              "title": "X-User-Token"
+            },
+            "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMemoryItemPatchRequest"
+              },
+              "example": {
+                "status": "resolved",
+                "resolution_reason": "Ya subí la sinopsis a mano"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentMemoryItemResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a8c1f77bcf86cd799439011",
+                    "kind": "pending",
+                    "status": "resolved",
+                    "origin": "agent",
+                    "title": "Falta la sinopsis de «Breve historia de Escocia»",
+                    "detail": "",
+                    "attempts": 1,
+                    "run_id": "6a8b0b54bcf86cd799439015",
+                    "revertible": false,
+                    "created_at": "2026-08-23T15:00:58Z",
+                    "updated_at": "2026-08-25T10:00:00Z",
+                    "resolved_at": "2026-08-25T10:00:00Z",
+                    "resolved_by": "owner",
+                    "resolution_reason": "Ya subí la sinopsis a mano"
+                  },
+                  "msg": "Memory item updated successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An impersonation token was presented on a state-changing method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent or item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item was forgotten and cannot be changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Agents CRUD"
+        ],
+        "summary": "Make the agent forget one item, permanently",
+        "description": "The item stops entering the context of **every** future run, and does not come back.\n\nIt is **not deleted**: it is marked forgotten, with who did it and when. A record that decided the behaviour of an agent that spends money is evidence, and the domain's own precedent is the bad one — answering a proposal leaves it intact in the database and unreachable from the product.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 30 req/min",
+        "operationId": "forgetAgentMemoryItem",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent identifier",
+              "title": "Agent Id"
+            },
+            "description": "Agent identifier"
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Memory item identifier",
+              "title": "Item Id"
+            },
+            "description": "Memory item identifier"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored.",
+              "title": "X-User-Token"
+            },
+            "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item forgotten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentMemoryItemResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a8c1f77bcf86cd799439011",
+                    "kind": "fact",
+                    "status": "forgotten",
+                    "origin": "agent",
+                    "title": "El sitio está en inglés",
+                    "detail": "",
+                    "attempts": 1,
+                    "run_id": "6a8b0b54bcf86cd799439015",
+                    "revertible": false,
+                    "created_at": "2026-08-23T15:00:58Z",
+                    "updated_at": "2026-08-25T10:00:00Z",
+                    "resolved_at": "2026-08-25T10:00:00Z",
+                    "resolved_by": "owner",
+                    "resolution_reason": "forgotten by the owner"
+                  },
+                  "msg": "Memory item forgotten"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An impersonation token was presented on a state-changing method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent or item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It was already forgotten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/memory/directives": {
+      "post": {
+        "tags": [
+          "Agents CRUD"
+        ],
+        "summary": "Leave the agent a standing instruction",
+        "description": "A rule the agent reads at the start of **every** run, in a block of its own, presented as an instruction rather than as data — unlike everything the agent wrote itself.\n\nThe agent cannot create, edit or delete one: this is the channel the owner uses to restrain it, and an agent able to write here would be granting itself that faculty.\n\nBounded to ten in force and 600 characters each, because every one of them travels into the prompt of every run and is paid for in tokens.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 30 req/min",
+        "operationId": "createAgentMemoryDirective",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent identifier",
+              "title": "Agent Id"
+            },
+            "description": "Agent identifier"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored.",
+              "title": "X-User-Token"
+            },
+            "description": "Optional user JWT. Verified when present; a token that does not hold up is refused rather than ignored."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMemoryDirectiveRequest"
+              },
+              "example": {
+                "title": "No toques la marca",
+                "detail": "Las variantes del nombre del sitio ya están tratadas en el FAQ del home. No las vuelvas a editar."
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Instruction created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AgentMemoryItemResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a8c1f77bcf86cd799439012",
+                    "kind": "directive",
+                    "status": "open",
+                    "origin": "owner",
+                    "title": "No toques la marca",
+                    "detail": "Las variantes del nombre ya están tratadas en el FAQ del home.",
+                    "attempts": 1,
+                    "revertible": false,
+                    "created_at": "2026-08-25T10:00:00Z",
+                    "updated_at": "2026-08-25T10:00:00Z"
+                  },
+                  "msg": "Standing instruction created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An impersonation token was presented on a state-changing method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Too many instructions, or the text was refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agent-actions": {
       "get": {
         "tags": [
           "Agents Actions"
         ],
         "summary": "List agent actions",
-        "description": "List human-in-the-loop actions for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Filter by type, status, or agent_id",
+        "description": "List human-in-the-loop actions for the authenticated app.\n\n- **Auth:** `Authorization: Bearer <app_token>`\n- **Rate limit:** 30 req/min\n- Filter by type, status, agent_id, or run_id",
         "operationId": "listAgentActions",
         "security": [
           {
@@ -15840,6 +17177,24 @@
               "title": "Agent Id"
             },
             "description": "Filter by agent ID"
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by the run that created the action",
+              "title": "Run Id"
+            },
+            "description": "Filter by the run that created the action"
           },
           {
             "name": "skip",
@@ -26817,6 +28172,121 @@
         }
       }
     },
+    "/api/v1/deliveries/geo/states": {
+      "get": {
+        "tags": [
+          "Deliveries"
+        ],
+        "summary": "States and cities a courier can ship to",
+        "description": "The administrative divisions the configured courier recognises, each city with the coordinates of its centre.\n\nA courier does not accept a state or a city typed by hand: it wants codes. Send the `code` of the chosen city back as `city_code` on the delivery point and the shipment inherits its coordinates, so a checkout never has to ask a buyer for a latitude.\n\n**The codes are opaque.** Do not parse them, do not build them and do not store them as a permanent identity of a place: they belong to the workspace's currently configured courier.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Cached server-side for a day; the answer is the same for every user of the workspace.",
+        "operationId": "listDeliveryGeoStates",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalogue of states with their cities",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "states": [
+                      {
+                        "code": "6f1e0000000000000000aaaa",
+                        "name": "Guatemala",
+                        "cities": [
+                          {
+                            "code": "6f1e0000000000000000bbbb",
+                            "name": "Guatemala",
+                            "lat": 14.6133,
+                            "lng": -90.5353
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "msg": "Catalogue retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No courier is configured for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Feature disabled, or the catalogue could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ads/connection": {
       "get": {
         "tags": [
@@ -29662,6 +31132,230 @@
             "description": "Trading disabled, venue or funding unavailable",
             "content": {
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/whatsapp/send": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Ask the server to send one operations notification",
+        "description": "The caller names an **event** from a closed enum and supplies its typed parameters. The server resolves the template, its language and the recipients from configuration, renders every parameter itself, and asks the provider to accept the message.\n\n**`202` does not mean delivered.** The provider confirms that it validated the request's structure; delivery is only ever reported through a webhook, which this surface does not have. `accept_status` is the provider's own word, verbatim.\n\nThe body carries no recipient, no scope, no template and no free text — each of those is resolved server-side on purpose.\n\nSend the same `idempotency_key` twice and the second call answers `202` with `accept_status: \"duplicate\"` and sends nothing. Derive the key from the caller's **spacing window**, never from the instant.\n\n**Auth:** `Authorization: Bearer ak-svc-…` with capability `whatsapp.send` and platform scope.",
+        "operationId": "sendWhatsAppNotification",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Service credential: `Bearer ak-svc-…`",
+              "title": "Authorization"
+            },
+            "description": "Service credential: `Bearer ak-svc-…`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatsAppSendRequest"
+              },
+              "example": {
+                "event": "disk_alert",
+                "params": {
+                  "host": "dedicado",
+                  "level": "critical",
+                  "usage_pct": 87,
+                  "free": "230G"
+                },
+                "idempotency_key": "dedicado:critico:487350"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The provider accepted the message, or the key was already claimed",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "accept_status": "accepted",
+                    "provider_message_id": "wamid.HBgMNTAy",
+                    "accepted": 2,
+                    "duplicate": 0,
+                    "recipients": 2
+                  },
+                  "msg": "Accepted by provider"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, revoked or EXPIRED service credential",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "msg": "The service credential is not valid",
+                  "code": "service_key_invalid"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing capability or wrong scope",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "capability": {
+                    "summary": "The credential does not carry `whatsapp.send`",
+                    "value": {
+                      "success": false,
+                      "msg": "This credential is not allowed to perform that action",
+                      "code": "service_capability_missing"
+                    }
+                  },
+                  "scope": {
+                    "summary": "Tenant-scoped credential on a platform-scoped route",
+                    "value": {
+                      "success": false,
+                      "msg": "This credential is not valid for this scope",
+                      "code": "service_scope_invalid"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Channel not configured or switched off",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "msg": "The notification channel is not configured",
+                  "code": "whatsapp_channel_not_configured"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown event, or a parameter outside its range",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "event": {
+                    "summary": "The event is not a member of the closed enum",
+                    "value": {
+                      "success": false,
+                      "msg": "Unknown notification event",
+                      "code": "whatsapp_event_unknown"
+                    }
+                  },
+                  "params": {
+                    "summary": "A parameter is missing, unknown or out of range",
+                    "value": {
+                      "success": false,
+                      "msg": "'usage_pct' must be between 0 and 100",
+                      "code": "whatsapp_params_invalid"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit, or the daily cap",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "msg": "The notification channel reached its daily limit",
+                  "code": "whatsapp_daily_cap_reached"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider unavailable, credential rejected, account restricted, template not usable, or recipient unreachable — each with its own `code`",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "credential_rejected": {
+                    "summary": "Rotate the credential — the only actionable one",
+                    "value": {
+                      "success": false,
+                      "msg": "The notification channel credential was rejected",
+                      "code": "whatsapp_credential_rejected"
+                    }
+                  },
+                  "template_not_usable": {
+                    "summary": "The template is missing, unapproved, paused or disabled",
+                    "value": {
+                      "success": false,
+                      "msg": "The notification template is not usable",
+                      "code": "whatsapp_template_not_usable"
+                    }
+                  },
+                  "account_restricted": {
+                    "summary": "The sending account is restricted — permanent, do not retry",
+                    "value": {
+                      "success": false,
+                      "msg": "The notification account is restricted",
+                      "code": "whatsapp_account_restricted"
+                    }
+                  },
+                  "recipient_invalid": {
+                    "summary": "A configured recipient cannot be reached",
+                    "value": {
+                      "success": false,
+                      "msg": "The notification recipient is not reachable",
+                      "code": "whatsapp_recipient_invalid"
+                    }
+                  },
+                  "provider_unavailable": {
+                    "summary": "The provider is down or timed out — retry",
+                    "value": {
+                      "success": false,
+                      "msg": "The notification provider is unavailable",
+                      "code": "whatsapp_provider_unavailable"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
@@ -34614,6 +36308,7 @@
                         "tools": [
                           "update_site_content",
                           "update_site_curation",
+                          "update_site_library",
                           "update_site_presentation",
                           "update_site_seo_copy"
                         ]
@@ -34651,6 +36346,142 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/apps/{app_id}/agent-tools/sync": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Llevar una tool nueva a los agentes ya creados de un inquilino (superadmin)",
+        "description": "`Agent.tools` es un arreglo persistido en el documento del agente, no el registro de tools. El bucle de corrida arma lo que se le ofrece al modelo **y** lo que el despacho permite a partir de ese arreglo, así que una tool nueva es **invisible e inejecutable** para cualquier agente creado antes de que existiera.\n\nEsta operación sólo **agrega**: no quita tools, no reordena y no reescribe definiciones existentes. Es idempotente, y respeta una tool que el dueño haya quitado a propósito. Lo que el plan del inquilino no habilita no se agrega, y cada omisión viene con su motivo — un tope silencioso se leería como que no quedó nada afuera.\n\nUsar `dry_run` primero.",
+        "operationId": "syncAppAgentTools",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Tenant App ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "App Id"
+            },
+            "description": "Tenant App ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentToolSyncRequest"
+              },
+              "example": {
+                "tool_names": [
+                  "create_task"
+                ],
+                "dry_run": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync report, one entry per agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "dry_run": false,
+                    "agents_changed": 1,
+                    "agents": [
+                      {
+                        "agent_id": "6a83aefca4e611a480e81a68",
+                        "agent_name": "Aurora",
+                        "added": [
+                          "create_task"
+                        ],
+                        "skipped": {}
+                      }
+                    ]
+                  },
+                  "msg": "Agent tools synced"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown tool name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -34782,6 +36613,517 @@
             "description": "Rate limit exceeded",
             "content": {
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/apps/{app_id}/keys/whatsapp": {
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Load one tenant's WhatsApp credential, encrypted (superadmin)",
+        "description": "Stores the credential Fernet-encrypted in `App.keys.whatsapp`. When unset, the factory falls back to the platform default, so the common case is one document to rotate rather than N.\n\nThis credential belongs to the **platform**, not to the tenant, so the tenant cannot write it: `whatsapp` is in `_PROTECTED_CONFIG_KEYS`.\n\nIt is **one** opaque long-lived system token, not a pair: the advertising credential is a different kind of token and its scopes do not imply messaging, so reusing it is not an option.\n\nWriting a second time **replaces** the channel and is audited with the actor — the cardinality is one-per-tenant because this is a SUBDOCUMENT of the App, so there is no collection on which a unique index could reject anything.\n\nThe response carries a **boolean**, never the value, and the request body is redacted before it reaches `ApiLog`.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)",
+        "operationId": "setAppWhatsAppKeys",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Tenant App ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "App Id"
+            },
+            "description": "Tenant App ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatsAppKeysUpdateRequest"
+              },
+              "example": {
+                "credential": "•••",
+                "phone_number_id": "123456789012345",
+                "enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credential stored; only whether one exists is returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "configured": true,
+                    "enabled": true,
+                    "phone_number_id": "123456789012345"
+                  },
+                  "msg": "WhatsApp credential updated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "forbidden"
+                  },
+                  "msg": "Superadmin privileges required"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "app_not_found"
+                  },
+                  "msg": "App not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed sending number identifier",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "whatsapp_config_value_invalid"
+                  },
+                  "msg": "phone_number_id must be the numeric identifier of the sending number"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "rate_limit_exceeded"
+                  },
+                  "msg": "Too many requests"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/apps/{app_id}/config/whatsapp": {
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Write one tenant's WhatsApp channel configuration (superadmin)",
+        "description": "Writes `App.config[\"whatsapp\"]` for the tenant named in the path.\n\nKeys outside the allow-list are **422**, not a silent assignment. Values are range-checked and `max_sends_per_day` cannot be raised above the platform ceiling — an override may only reduce what the platform pays for, because this channel bills per message.\n\nPlatform-only keys (the credential, the sending number, the operations recipients, the ceiling) are refused here: they are written by `PATCH /platform/config/whatsapp`.\n\nTakes effect on the **next request** — the tenant's App is re-read per request.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)",
+        "operationId": "setAppWhatsAppConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Tenant App ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "App Id"
+            },
+            "description": "Tenant App ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatsAppConfigPatchRequest"
+              },
+              "example": {
+                "values": {
+                  "enabled": true,
+                  "template_disk_alert": "ops_disk_alert_v1"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Override written; effective configuration returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "keys": {
+                      "enabled": {
+                        "value": true,
+                        "source": "app"
+                      }
+                    }
+                  },
+                  "msg": "WhatsApp configuration updated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "forbidden"
+                  },
+                  "msg": "Superadmin privileges required"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "app_not_found"
+                  },
+                  "msg": "App not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown key (`whatsapp_config_key_unknown`) or invalid value (`whatsapp_config_value_invalid`)",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unknown_key": {
+                    "summary": "The key is not in the per-tenant allow-list",
+                    "value": {
+                      "success": false,
+                      "data": {
+                        "code": "whatsapp_config_key_unknown"
+                      },
+                      "msg": "Unknown configuration key 'zzz'"
+                    }
+                  },
+                  "platform_only": {
+                    "summary": "The key exists but is the platform's, not the tenant's — the message says WHICH, so the operator does not go hunting for a typo in a key that is spelled correctly",
+                    "value": {
+                      "success": false,
+                      "data": {
+                        "code": "whatsapp_config_key_unknown"
+                      },
+                      "msg": "'ops_recipients' is a platform-only key and cannot be set per tenant"
+                    }
+                  },
+                  "value_invalid": {
+                    "summary": "The value is outside its range or above the platform ceiling",
+                    "value": {
+                      "success": false,
+                      "data": {
+                        "code": "whatsapp_config_value_invalid"
+                      },
+                      "msg": "'max_sends_per_day' must be at most 200"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "rate_limit_exceeded"
+                  },
+                  "msg": "Too many requests"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/config/whatsapp": {
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Write the PLATFORM WhatsApp channel configuration (superadmin)",
+        "description": "Writes the platform-level `whatsapp` namespace — the channel the operations alerts use, which belongs to no tenant.\n\nThis is the endpoint that loads the **destination** of those alerts (`ops_recipients`). They live here rather than in a tenant's configuration because they are the operations team's personal phone numbers: a namespace under `App.config` is served verbatim to any tenant admin.\n\nThe credential is **not** writable here — it has its own endpoint, whose field name is what keeps it out of the API log.\n\nTakes effect for this worker immediately and for the others within the configuration cache's refresh window (**up to 60 s**), and in non-production that refresh job does not run at all, so there it needs a restart.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)",
+        "operationId": "setPlatformWhatsAppConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatsAppPlatformConfigPatchRequest"
+              },
+              "example": {
+                "values": {
+                  "phone_number_id": "123456789012345",
+                  "ops_recipients": [
+                    "50255551234"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Platform namespace written; effective configuration returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "keys": {
+                      "phone_number_id": {
+                        "value": "123456789012345",
+                        "source": "platform"
+                      },
+                      "ops_recipients": {
+                        "value": 1,
+                        "source": "platform"
+                      }
+                    }
+                  },
+                  "msg": "Platform WhatsApp configuration updated"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "forbidden"
+                  },
+                  "msg": "Superadmin privileges required"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown key (`whatsapp_config_key_unknown`) or invalid value (`whatsapp_config_value_invalid`)",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unknown_key": {
+                    "summary": "The key is in neither table",
+                    "value": {
+                      "success": false,
+                      "data": {
+                        "code": "whatsapp_config_key_unknown"
+                      },
+                      "msg": "Unknown configuration key 'zzz'"
+                    }
+                  },
+                  "credential_refused": {
+                    "summary": "The credential is never writable through a config patch",
+                    "value": {
+                      "success": false,
+                      "data": {
+                        "code": "whatsapp_config_key_unknown"
+                      },
+                      "msg": "'credentials_encrypted' cannot be written through a configuration patch"
+                    }
+                  },
+                  "value_invalid": {
+                    "summary": "A recipient is not a plain international number",
+                    "value": {
+                      "success": false,
+                      "data": {
+                        "code": "whatsapp_config_value_invalid"
+                      },
+                      "msg": "'ops_recipients' entries must be digits in international form"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "rate_limit_exceeded"
+                  },
+                  "msg": "Too many requests"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Platform settings document missing",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "platform_settings_missing"
+                  },
+                  "msg": "Platform settings are not initialised"
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
@@ -35419,6 +37761,133 @@
           },
           "429": {
             "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/apps/{app_id}/keys/courier": {
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Load one workspace's courier credential, encrypted (superadmin)",
+        "description": "Stores the courier account Fernet-encrypted in `App.keys.courier` and, on the first write, mints the opaque handle that routes the courier's status notices back to this workspace.\n\nThis credential belongs to the **platform**, not to the workspace, so the workspace cannot write it: `delivery` is protected against the tenant's own config patch.\n\nThe response carries **booleans and the notice URL**, never the secrets, and the request body is redacted before it reaches `ApiLog`.\n\nRotating the routing handle takes effect immediately: the courier keeps sending to the old URL until it is re-pointed, and those notices stop resolving. Rotate it only when the handle is believed to be known.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)",
+        "operationId": "setAppCourierKeys",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Tenant App ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "App Id"
+            },
+            "description": "Tenant App ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourierKeysUpdateRequest"
+              },
+              "example": {
+                "account": "ops@example.com",
+                "credential": "•••",
+                "enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credential stored; only whether one exists is returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "configured": true,
+                    "enabled": true,
+                    "webhook_configured": true,
+                    "notice_path": "/api/v1/webhooks/couriers/2f6c1d9e8b4a47c2"
+                  },
+                  "msg": "Courier credential updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "App not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A credential half is missing",
             "content": {
               "application/json": {
                 "schema": {
@@ -36116,6 +38585,188 @@
           },
           "403": {
             "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The data source could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/apps/{app_id}/agents/{agent_id}/memory": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "What one agent of a workspace remembers (superadmin, read only)",
+        "description": "The same memory the owner sees, so support can diagnose an agent that is behaving oddly without asking the tenant to open their own panel.\n\nThe workspace comes from the PATH and never from the caller: an operator whose own account lives in another workspace still sees this.\n\n**Read only, and deliberately so:** correcting the memory is a faculty of the owner. There is no write counterpart under `/platform` — that is a decision, not an omission.\n\nThe text of an item may quote things the agent read from third parties, so the console renders it as external text.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)\n\n**Rate limit:** 60 req/min",
+        "operationId": "getWorkspaceAgentMemory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Workspace identifier, 24 characters.",
+              "examples": [
+                "507f1f77bcf86cd799439012"
+              ],
+              "title": "App Id"
+            },
+            "description": "Workspace identifier, 24 characters."
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent identifier, 24 characters.",
+              "examples": [
+                "6a83aefca4e611a480e81a68"
+              ],
+              "title": "Agent Id"
+            },
+            "description": "Agent identifier, 24 characters."
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset. Capped to keep deep pagination bounded.",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset. Capped to keep deep pagination bounded."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Page size.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The agent's memory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_PlatformAgentMemoryView_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "app_id": "507f1f77bcf86cd799439012",
+                    "app_name": "Acme Co",
+                    "agent_id": "6a83aefca4e611a480e81a68",
+                    "agent_name": "Aurora",
+                    "total": 1,
+                    "items": [
+                      {
+                        "id": "6a8c1f77bcf86cd799439011",
+                        "kind": "applied",
+                        "status": "open",
+                        "origin": "run",
+                        "title": "Completé la sinopsis de «Breve historia de Escocia»",
+                        "detail": "Evidencia: «historia de escocia», posición 57.9.",
+                        "attempts": 1,
+                        "outcome": "measuring",
+                        "follow_up_at": "2026-09-06T15:00:58Z",
+                        "intervention_id": "6a8b1f77bcf86cd799439014",
+                        "run_id": "6a8b0b54bcf86cd799439015",
+                        "revertible": true,
+                        "created_at": "2026-08-23T15:00:58Z",
+                        "updated_at": "2026-08-23T15:00:58Z"
+                      }
+                    ]
+                  },
+                  "msg": "Agent memory retrieved"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace or agent not found, or an identifier is malformed",
             "content": {
               "application/json": {
                 "schema": {
@@ -49859,6 +52510,384 @@
         "title": "AgentListResponse",
         "description": "Paginated list of agents."
       },
+      "AgentMemoryDirectiveRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "description": "The rule, in one line",
+            "examples": [
+              "No toques la marca"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 600,
+            "title": "Detail",
+            "description": "Why, and what to do instead",
+            "default": "",
+            "examples": [
+              "Las variantes del nombre del sitio ya están tratadas en el FAQ del home."
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "AgentMemoryDirectiveRequest",
+        "description": "A standing instruction the OWNER leaves for their agent — AMC-09 CA-3."
+      },
+      "AgentMemoryItemPatchRequest": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "open"
+            ],
+            "title": "Status",
+            "description": "`resolved` to close it, `open` to reopen a resolved one",
+            "examples": [
+              "resolved"
+            ]
+          },
+          "resolution_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Reason",
+            "description": "Why it is closed",
+            "examples": [
+              "Ya subí la sinopsis a mano"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "AgentMemoryItemPatchRequest",
+        "description": "Close a pending item, or reopen one — AMC-09 CA-1 / CA-4."
+      },
+      "AgentMemoryItemResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Memory item ID",
+            "examples": [
+              "6a8c1f77bcf86cd799439011"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentMemoryKind",
+            "description": "What kind of thing this is",
+            "examples": [
+              "applied"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentMemoryStatus",
+            "description": "Whether it still governs anything",
+            "examples": [
+              "open"
+            ]
+          },
+          "origin": {
+            "$ref": "#/components/schemas/AgentMemoryOrigin",
+            "description": "Who wrote it: the run, the agent, or the owner",
+            "examples": [
+              "run"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "One line, in plain words",
+            "default": "",
+            "examples": [
+              "Completé la sinopsis de «Breve historia de Escocia»"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "What the next run needs in order to act",
+            "default": "",
+            "examples": [
+              "Evidencia: «historia de escocia», posición 57.9, CTR 0.0."
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts",
+            "description": "How many times this target has been attempted",
+            "default": 1,
+            "examples": [
+              1
+            ]
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentMemoryOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the applied change turned out",
+            "examples": [
+              "measuring"
+            ]
+          },
+          "follow_up_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up At",
+            "description": "When the agent asked to be reminded",
+            "examples": [
+              "2026-09-06T15:00:58Z"
+            ]
+          },
+          "intervention_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Id",
+            "description": "The applied change this projects, when it projects one",
+            "examples": [
+              "6a8b1f77bcf86cd799439014"
+            ]
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id",
+            "description": "The run that recorded it",
+            "examples": [
+              "6a8b0b54bcf86cd799439015"
+            ]
+          },
+          "revertible": {
+            "type": "boolean",
+            "title": "Revertible",
+            "description": "Whether the change behind this item can be undone in one step",
+            "default": false,
+            "examples": [
+              true
+            ]
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated",
+            "description": "A refusal the guard only simulated, in record-only mode",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "When it was first recorded",
+            "examples": [
+              "2026-08-23T15:00:58Z"
+            ]
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "When it last changed",
+            "examples": [
+              "2026-08-23T15:00:58Z"
+            ]
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At",
+            "description": "When it was closed",
+            "examples": [
+              "2026-08-24T09:12:00Z"
+            ]
+          },
+          "resolved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved By",
+            "description": "Who closed it: the agent, the owner, or the system",
+            "examples": [
+              "owner"
+            ]
+          },
+          "resolution_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Reason",
+            "description": "Why it was closed",
+            "examples": [
+              "Ya subí la sinopsis a mano"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "origin"
+        ],
+        "title": "AgentMemoryItemResponse",
+        "description": "One remembered item, as the owner's panel and the console read it — AMC-08.\n\nEvery field the client draws is declared HERE, because FastAPI discards a key\nthe response model does not name and does so in SILENCE: the value would be\nright in the database, right on the dict the service returns, and absent from\nthe body — with every service-level test green (CA-6).\n\n``subject_key`` is deliberately NOT published. It is internal, the model never\nsees it, and it carries a normalised copy of somebody's search query that this\npayload has no reason to hold."
+      },
+      "AgentMemoryKind": {
+        "type": "string",
+        "enum": [
+          "applied",
+          "pending",
+          "declined",
+          "watch",
+          "fact",
+          "directive"
+        ],
+        "title": "AgentMemoryKind",
+        "description": "WHAT a remembered item is. Closed enum, on purpose (D-3).\n\nWhat gets written here comes back into the opening turn of every following\nrun, so a poisoned memory PERSISTS. A record with a shape can be wrapped,\nlabelled and bounded; a free-form blob cannot."
+      },
+      "AgentMemoryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentMemoryItemResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total matching items, for the pager",
+            "examples": [
+              37
+            ]
+          },
+          "memory_enabled": {
+            "type": "boolean",
+            "title": "Memory Enabled",
+            "description": "Whether the platform is recording memory at all",
+            "default": true,
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AgentMemoryListResponse",
+        "description": "A page of remembered items, and how many there are in total."
+      },
+      "AgentMemoryOrigin": {
+        "type": "string",
+        "enum": [
+          "run",
+          "agent",
+          "owner"
+        ],
+        "title": "AgentMemoryOrigin",
+        "description": "WHO wrote it, which is what decides how much the block trusts it.\n\nThe briefing wraps ``RUN`` and ``AGENT`` as untrusted data and ``OWNER`` as\ninstructions (D-3/D-11/D-14). The agent cannot write ``OWNER``: if it could,\nit would grant itself the very faculty the owner uses to restrain it."
+      },
+      "AgentMemoryOutcome": {
+        "type": "string",
+        "enum": [
+          "improved",
+          "not_improved",
+          "inconclusive",
+          "measuring",
+          "untracked",
+          "unknown"
+        ],
+        "title": "AgentMemoryOutcome",
+        "description": "How the applied thing turned out, in this domain's own words.\n\nA mirror of ``AgentIntervention.measurement_status`` and NOT a copy of its\nvalues: what reaches the model and the panel has to say \"improved\" or \"not\nmeasured\", never ``pending``/``unmeasurable``. ``UNTRACKED`` and\n``MEASURING`` are different states and AMC-04 CA-2 requires distinct labels:\nthe census found one pre-AEM-01 row with ``measurement_status = None`` that\nwill never be measured at all."
+      },
+      "AgentMemoryStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "resolved",
+          "forgotten",
+          "archived"
+        ],
+        "title": "AgentMemoryStatus",
+        "description": "Whether an item still governs anything.\n\n``ARCHIVED`` is not decoration. The cap of AMC-07 CA-4 has to evict, and the\nother two candidate states both lie: ``RESOLVED`` tells the owner that a\npending item which was never applied is done, and ``FORGOTTEN`` applies of\nits own accord the state D-16 reserves for the owner and declares\nirreversible. ``ARCHIVED`` leaves the briefing and **keeps counting for the\nguard** (A-15b): if eviction reset the counter, the agent would go back to\npaying for the very target this epic exists to stop."
+      },
       "AgentMetricsResponse": {
         "properties": {
           "global_running_runs": {
@@ -50499,6 +53528,195 @@
         "title": "AgentResponse",
         "description": "Serialized Agent for API responses."
       },
+      "AgentRunDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Run document ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id",
+            "description": "Parent agent ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentRunStatus",
+            "description": "Current run status",
+            "examples": [
+              "completed"
+            ]
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/AgentRunTrigger",
+            "description": "How the run was triggered",
+            "examples": [
+              "manual"
+            ]
+          },
+          "input_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Message",
+            "description": "User-provided input for this run",
+            "examples": [
+              "Generate content for my website"
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "Final result summary on completion",
+            "examples": [
+              "Successfully generated 3 articles"
+            ]
+          },
+          "platform_incidents": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Platform Incidents",
+            "description": "Platform-side degradations measured during the run",
+            "examples": [
+              [
+                {
+                  "detail": "the owner cannot manage tasks",
+                  "kind": "review_task_not_created"
+                }
+              ]
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if the run failed",
+            "examples": [
+              "Rate limit exceeded"
+            ]
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentRunStopReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the run ended, when the engine recorded it",
+            "examples": [
+              "partial"
+            ]
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens",
+            "description": "Total AI tokens consumed during the run",
+            "default": 0,
+            "examples": [
+              5000
+            ]
+          },
+          "worker_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Id",
+            "description": "Worker process that executed this run",
+            "examples": [
+              "worker-01"
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "When execution began",
+            "examples": [
+              "2024-01-15T10:30:05Z"
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "When execution completed or failed",
+            "examples": [
+              "2024-01-15T10:35:00Z"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the run was created",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
+          },
+          "memory": {
+            "$ref": "#/components/schemas/AgentRunMemoryView",
+            "description": "What the memory did during this run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "status",
+          "trigger",
+          "created_at"
+        ],
+        "title": "AgentRunDetailResponse",
+        "description": "One run, plus what its memory did — AMC-10.\n\nEXTENDS `AgentRunResponse` rather than replacing it, so every field the\npanel already reads is still there and no client breaks: the listing keeps\nserving the narrow DTO and only the detail endpoint serves this one."
+      },
       "AgentRunErrorRow": {
         "properties": {
           "run_id": {
@@ -50609,6 +53827,68 @@
         "title": "AgentRunListResponse",
         "description": "Paginated list of agent runs."
       },
+      "AgentRunMemoryView": {
+        "properties": {
+          "had_memory": {
+            "type": "boolean",
+            "title": "Had Memory",
+            "description": "Whether this run opened with a memory block",
+            "default": false,
+            "examples": [
+              true
+            ]
+          },
+          "opened_with": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Opened With",
+            "description": "Titles of the items that entered the opening block",
+            "examples": [
+              [
+                "Completé la sinopsis de «Breve historia de Escocia»"
+              ]
+            ]
+          },
+          "omitted": {
+            "type": "integer",
+            "title": "Omitted",
+            "description": "How many items did not fit in the block",
+            "default": 0,
+            "examples": [
+              0
+            ]
+          },
+          "noted": {
+            "items": {
+              "$ref": "#/components/schemas/AgentMemoryItemResponse"
+            },
+            "type": "array",
+            "title": "Noted",
+            "description": "What the run recorded"
+          },
+          "closed": {
+            "items": {
+              "$ref": "#/components/schemas/AgentMemoryItemResponse"
+            },
+            "type": "array",
+            "title": "Closed",
+            "description": "What the run closed"
+          },
+          "refusals": {
+            "items": {
+              "$ref": "#/components/schemas/AgentMemoryItemResponse"
+            },
+            "type": "array",
+            "title": "Refusals",
+            "description": "What the repeat guard refused, real and simulated"
+          }
+        },
+        "type": "object",
+        "title": "AgentRunMemoryView",
+        "description": "What the memory did during one run — AMC-10.\n\nA run's detail served `AgentRunResponse`, a closed DTO with a field-by-field\nconstructor, and NO endpoint exposed `AgentIteration` at all. So this HU had\nno contract to travel on: implemented without it, the service tests pass and\nthe panel receives exactly the body it received before (A-45)."
+      },
       "AgentRunResponse": {
         "properties": {
           "id": {
@@ -50671,6 +53951,23 @@
               "Successfully generated 3 articles"
             ]
           },
+          "platform_incidents": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Platform Incidents",
+            "description": "Platform-side degradations measured during the run",
+            "examples": [
+              [
+                {
+                  "detail": "the owner cannot manage tasks",
+                  "kind": "review_task_not_created"
+                }
+              ]
+            ]
+          },
           "error": {
             "anyOf": [
               {
@@ -50684,6 +53981,20 @@
             "description": "Error message if the run failed",
             "examples": [
               "Rate limit exceeded"
+            ]
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentRunStopReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the run ended, when the engine recorded it",
+            "examples": [
+              "partial"
             ]
           },
           "total_tokens": {
@@ -50775,6 +54086,23 @@
         "title": "AgentRunStatus",
         "description": "Lifecycle status of a single agent run."
       },
+      "AgentRunStopReason": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "max_iterations",
+          "budget_exhausted",
+          "insufficient_balance",
+          "stopped_by_user",
+          "timeout",
+          "truncated",
+          "refused",
+          "error",
+          "partial"
+        ],
+        "title": "AgentRunStopReason",
+        "description": "Why a run ended, in the engine's vocabulary (AGT-08 CA-7, AGT-11 CA-6).\n\nDistinct from ``AgentStopReason``, which classifies a single provider TURN.\nThis classifies the whole run, and the two do not have the same members on\npurpose: a turn that stops for tool use is business as usual for the loop,\nwhile a run that stops because the budget ran out is a product event the\nowner has to see."
+      },
       "AgentRunTrigger": {
         "type": "string",
         "enum": [
@@ -50850,6 +54178,38 @@
         "title": "AgentToolConfig",
         "description": "Full configuration for a single agent tool."
       },
+      "AgentToolSyncRequest": {
+        "properties": {
+          "tool_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Tool Names",
+            "description": "Nombres de tools internas del registro a sincronizar"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "description": "Informar qué haría sin escribir nada",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_names"
+        ],
+        "title": "AgentToolSyncRequest",
+        "description": "Qué tools llevar a los agentes que ya existen en un inquilino (ATC-06).",
+        "example": {
+          "dry_run": true,
+          "tool_names": [
+            "create_task"
+          ]
+        }
+      },
       "AgentWebsitesResponse": {
         "properties": {
           "agent_id": {
@@ -50884,6 +54244,102 @@
         ],
         "title": "AgentWebsitesResponse",
         "description": "The sites an agent is in charge of."
+      },
+      "AggregateCoverage": {
+        "properties": {
+          "sites_total": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Sites Total",
+            "description": "Active website documents this user owns",
+            "default": 0,
+            "examples": [
+              37
+            ]
+          },
+          "sites_duplicated": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Sites Duplicated",
+            "description": "Documents folded into another because they share a slug",
+            "default": 0,
+            "examples": [
+              2
+            ]
+          },
+          "sites_counted": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Sites Counted",
+            "description": "Distinct properties the totals are summed over",
+            "default": 0,
+            "examples": [
+              26
+            ]
+          },
+          "sites_with_data": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Sites With Data",
+            "description": "Of those properties, how many have at least one day inside the window",
+            "default": 0,
+            "examples": [
+              26
+            ]
+          },
+          "sites_never_synced": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Sites Never Synced",
+            "description": "Verified and active, but never synchronised yet",
+            "default": 0,
+            "examples": [
+              4
+            ]
+          },
+          "sites_unverified": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Sites Unverified",
+            "description": "Active but not verified, so they can never contribute",
+            "default": 0,
+            "examples": [
+              5
+            ]
+          },
+          "sites_stale": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Sites Stale",
+            "description": "Counted properties whose last sync attempts are failing; they contribute zeros",
+            "default": 0,
+            "examples": [
+              4
+            ]
+          },
+          "sites_blocked": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Sites Blocked",
+            "description": "Of `sites_never_synced`, how many are not merely waiting for their first load but FAILING it repeatedly. A SUBSET of that field, so the partition above still adds up to `sites_total`.",
+            "default": 0,
+            "examples": [
+              4
+            ]
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "True when the ceiling on properties was reached and the totals cover only part of the estate",
+            "default": false,
+            "examples": [
+              false
+            ]
+          }
+        },
+        "type": "object",
+        "title": "AggregateCoverage",
+        "description": "How much of the user's estate the aggregate actually speaks for.\n\nEvery field counts in ONE unit and the four that partition the estate add\nup to it: ``sites_counted + sites_duplicated + sites_never_synced +\nsites_unverified == sites_total``. An earlier draft mixed the units —\n``sites_counted`` counted PROPERTIES while its three siblings counted\nDOCUMENTS — so the numbers came out at 26 + 4 + 5 = 35 over a total of 37\nand nothing said where the missing two had gone. They were the duplicate\ndocuments already folded into a property, which is what\n``sites_duplicated`` now names.\n\n``sites_blocked`` is a SUBSET of ``sites_never_synced`` rather than a fifth\npart, so the partition is unaffected. It exists because the two states read\nidentically in the counter and could not be more different on screen:\nmeasured across production, 23 of 23 sites that have never produced a figure\nare not waiting for a first load at all — every one of them is failing it,\n22-23 attempts deep. A block that counts them together can only say \"still\ngathering, they will show up on their own\", which for those users is a\npromise nothing is going to keep."
       },
       "AnalyticsActions": {
         "properties": {
@@ -51890,6 +55346,28 @@
               }
             ],
             "description": "Advertising provider credential (per-app override, platform-written)"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WhatsAppKeys"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Outbound WhatsApp credential (per-app override, platform-written)"
+          },
+          "courier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CourierKeys"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Third-party courier credential (per-app, platform-written)"
           }
         },
         "type": "object",
@@ -53584,6 +57062,51 @@
             "examples": [
               -90.5069
             ]
+          },
+          "state_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Code",
+            "examples": [
+              "6f1e0000000000000000aaaa"
+            ]
+          },
+          "city_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City Code",
+            "examples": [
+              "6f1e0000000000000000bbbb"
+            ]
+          },
+          "area_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Code",
+            "examples": [
+              "6a04bc5fe664d7777efc3642"
+            ]
           }
         },
         "additionalProperties": false,
@@ -53659,6 +57182,66 @@
             "title": "Lng",
             "examples": [
               -90.5069
+            ]
+          },
+          "state_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Code",
+            "description": "Opaque state code from the courier catalogue. Null means this pickup point cannot be quoted with a courier.",
+            "examples": [
+              "67d9ee5cf6cd88278d0f8c90"
+            ]
+          },
+          "city_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City Code",
+            "description": "Opaque city code from the courier catalogue. Null means this pickup point cannot be quoted with a courier.",
+            "examples": [
+              "67da10a2cb1e282f2fa1fb38"
+            ]
+          },
+          "area_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Code",
+            "description": "Opaque third-level code (poblado/distrito) from the courier catalogue. Null where the country has no third address level.",
+            "examples": [
+              "6a04bc5fe664d7777efc3642"
+            ]
+          },
+          "area_level_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Level Key",
+            "description": "How the courier names this third level (`poblados_gt`, `distrito_cr`). Resolved server-side from the catalogue.",
+            "examples": [
+              "poblados_gt"
             ]
           },
           "updated_at": {
@@ -55525,6 +59108,183 @@
         "title": "CountMetric",
         "description": "A counted figure and its comparison against the previous window."
       },
+      "CourierKeys": {
+        "properties": {
+          "credential_encrypted": {
+            "type": "string",
+            "title": "Credential Encrypted",
+            "description": "Encrypted `account|secret` pair (Fernet)",
+            "default": ""
+          },
+          "webhook_token": {
+            "type": "string",
+            "title": "Webhook Token",
+            "description": "Opaque routing handle in the inbound notice URL (non-secret)",
+            "default": ""
+          },
+          "webhook_secret_encrypted": {
+            "type": "string",
+            "title": "Webhook Secret Encrypted",
+            "description": "Encrypted shared secret the courier echoes back (Fernet)",
+            "default": ""
+          },
+          "notice_url": {
+            "type": "string",
+            "title": "Notice Url",
+            "description": "Absolute URL the shipment status is forwarded to (non-secret)",
+            "default": ""
+          },
+          "notice_credential_encrypted": {
+            "type": "string",
+            "title": "Notice Credential Encrypted",
+            "description": "Encrypted machine credential for the notice endpoint (Fernet)",
+            "default": ""
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Per-tenant courier switch",
+            "default": false
+          },
+          "last_notice_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Notice At",
+            "description": "UTC instant of the last authenticated inbound notice"
+          },
+          "last_notice_result": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Last Notice Result",
+            "description": "Outcome of that notice (applied, duplicate, unknown_shipment, …)",
+            "default": ""
+          },
+          "last_rejected_notice_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Rejected Notice At",
+            "description": "UTC instant of the last notice REJECTED for a bad or missing secret. A value here with `last_notice_at` empty is the signature of a courier that is calling and being turned away."
+          }
+        },
+        "type": "object",
+        "title": "CourierKeys",
+        "description": "Per-App third-party courier credential (delivery-con-mensajeria-real).\n\nClone of :class:`WhatsAppKeys` — an encrypted secret written ONLY by the\nplatform, read back as a boolean — with two fields that mold does not have\nand that are load-bearing (D-17):\n\n* ``webhook_token`` is the opaque, NON-secret handle that appears in the\n  inbound notice URL. It has to be a separate field, in clear text and\n  indexed, because a Fernet ciphertext is not deterministic: \"find the\n  account whose secret is X\" is unimplementable, so the account must be\n  resolvable by something that CAN be looked up — before the body is read.\n* ``webhook_secret_encrypted`` is the shared secret the courier echoes back\n  on every notice. It authenticates; the token only routes.\n\n``credential_encrypted`` holds the composite ``account|secret`` of the\ncourier account, the same shape :class:`AdsKeys` uses, because this\nprovider authenticates with a pair and mints a short-lived bearer from it.\nStoring the pair as one ciphertext keeps the account identifier — which is\nan e-mail address, i.e. personal data — out of any response that returns\nthe non-secret half."
+      },
+      "CourierKeysUpdateRequest": {
+        "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account",
+            "description": "Account identifier at the courier. Stored encrypted with the secret."
+          },
+          "credential": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential",
+            "description": "Plaintext account secret; stored encrypted."
+          },
+          "webhook_secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Secret",
+            "description": "Shared secret the courier echoes on every status notice. Omit to have one generated on first write."
+          },
+          "rotate_webhook_token": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotate Webhook Token",
+            "description": "Mint a NEW routing handle. The courier must then be re-pointed at the new URL; the old one stops resolving."
+          },
+          "notice_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice Url",
+            "description": "Absolute HTTPS URL the shipment status is forwarded to. Empty string clears it and the forwarding stops."
+          },
+          "notice_credential": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice Credential",
+            "description": "Plaintext machine credential for that URL; stored encrypted."
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled",
+            "description": "Per-workspace courier switch."
+          }
+        },
+        "type": "object",
+        "title": "CourierKeysUpdateRequest",
+        "description": "One workspace's courier credential. Superadmin-only.\n\nField names carry weight and are not a style choice: `credential` and\n`webhook_secret` are both in `_REDACTED_KEYS`, which is the only thing\nkeeping this body out of `ApiLog` — where it would sit for 90 days and be\nre-served through `GET /api/v1/logs`. Renaming either one needs the new\nname added there in the SAME commit.\n\n`account` is the identifier half of the pair. It is stored inside the same\nciphertext as the secret, rather than beside it, because it is an e-mail\naddress: keeping it out of every response is cheaper than deciding later\nwhich responses may carry it.\n\nOmitting a field leaves it alone; that is what makes the channel\nswitchable off without re-sending the secret.",
+        "example": {
+          "account": "ops@example.com",
+          "credential": "•••",
+          "enabled": true
+        }
+      },
       "CreateAgentRequest": {
         "properties": {
           "name": {
@@ -55936,13 +59696,19 @@
             ]
           },
           "currency": {
-            "type": "string",
-            "pattern": "^[A-Z]{3}$",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Currency",
-            "description": "ISO 4217 currency code",
-            "default": "USD",
+            "description": "ISO 4217 currency code for the PRIMARY balance. Omit it to get the tenant's own default — the first currency of this app's catalogue.",
             "examples": [
-              "USD"
+              "GTQ"
             ]
           }
         },
@@ -55954,7 +59720,7 @@
         "title": "CreateRegistrationRequest",
         "example": {
           "amount": 10,
-          "currency": "USD",
+          "currency": "GTQ",
           "email": "user@example.com"
         }
       },
@@ -55970,10 +59736,16 @@
             ]
           },
           "currency": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Currency",
-            "description": "Billing currency (e.g. USD, GTQ)",
-            "default": "USD",
+            "description": "Billing currency for the PRIMARY balance (e.g. USD, GTQ). Omit it to get the tenant's own default — the first currency of this app's catalogue — instead of a fixed USD.",
             "examples": [
               "GTQ"
             ]
@@ -56872,6 +60644,57 @@
             "examples": [
               1800
             ]
+          },
+          "length_cm": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 300,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length Cm",
+            "description": "Parcel length in cm. The courier prices the box it is GIVEN: declare the three sides or none — a partial set would be quoted as a box that does not exist.",
+            "examples": [
+              25
+            ]
+          },
+          "width_cm": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 300,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width Cm",
+            "description": "Parcel width in cm. See `length_cm`.",
+            "examples": [
+              20
+            ]
+          },
+          "height_cm": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 300,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Cm",
+            "description": "Parcel height in cm. See `length_cm`.",
+            "examples": [
+              15
+            ]
           }
         },
         "additionalProperties": false,
@@ -56997,7 +60820,7 @@
               }
             ],
             "title": "Lat",
-            "description": "Latitude (WGS84). Optional for own fleet, required to quote a courier.",
+            "description": "Latitude (WGS84). Optional for own fleet, required to quote a courier. Derived from `city_code` when omitted.",
             "examples": [
               14.5991
             ]
@@ -57014,9 +60837,73 @@
               }
             ],
             "title": "Lng",
-            "description": "Longitude (WGS84). Optional for own fleet, required to quote a courier.",
+            "description": "Longitude (WGS84). Optional for own fleet, required to quote a courier. Derived from `city_code` when omitted.",
             "examples": [
               -90.5133
+            ]
+          },
+          "state_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Code",
+            "description": "Opaque state code from `GET /deliveries/geo/states`. Required to quote a courier; do not construct it.",
+            "examples": [
+              "67d9ee5cf6cd88278d0f8c90"
+            ]
+          },
+          "city_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City Code",
+            "description": "Opaque city code from `GET /deliveries/geo/states`. Required to quote a courier; supplies the coordinates when `lat`/`lng` are omitted.",
+            "examples": [
+              "67da13052ad4b82d06fedbee"
+            ]
+          },
+          "area_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Code",
+            "description": "Opaque third-level code (e.g. poblado/distrito) from `GET /deliveries/geo/states`. REQUIRED on the dropoff to ship with a courier in countries that use a third address level; ignored where the catalogue has none.",
+            "examples": [
+              "6a04bc5fe664d7777efc3642"
+            ]
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email",
+            "description": "Optional e-mail the courier may write to. Omit it and the courier is given the workspace's own address instead.",
+            "examples": [
+              "a.p@example.com"
             ]
           }
         },
@@ -62182,6 +66069,16 @@
         "title": "PaymentLinkCreateRequest",
         "description": "Create body. NO ``currency`` — it is server-derived from billing (D-9)."
       },
+      "PerformanceDimensionName": {
+        "type": "string",
+        "enum": [
+          "queries",
+          "pages",
+          "countries"
+        ],
+        "title": "PerformanceDimensionName",
+        "description": "Which breakdown a table is showing.\n\nPlural to match the response keys the panel already reads (`queries` /\n`pages` / `countries`); the stored rows spell the same three in the singular\n(`SearchConsoleDimensionDaily.dimension`), and the service maps between them."
+      },
       "PerformanceDimensionRow": {
         "properties": {
           "key": {
@@ -62230,6 +66127,18 @@
           "key"
         ],
         "title": "PerformanceDimensionRow"
+      },
+      "PerformanceDimensionSort": {
+        "type": "string",
+        "enum": [
+          "key",
+          "clicks",
+          "impressions",
+          "ctr",
+          "position"
+        ],
+        "title": "PerformanceDimensionSort",
+        "description": "Column a breakdown table can be ordered by — the key plus the 4 metrics."
       },
       "PerformanceMetricComparison": {
         "properties": {
@@ -62282,6 +66191,14 @@
         ],
         "title": "PerformancePeriod"
       },
+      "PerformanceSortOrder": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "title": "PerformanceSortOrder"
+      },
       "PerformanceSummary": {
         "properties": {
           "clicks": {
@@ -62331,6 +66248,24 @@
             "default": 0,
             "examples": [
               340
+            ]
+          },
+          "ctr": {
+            "type": "number",
+            "title": "Ctr",
+            "description": "That day's click-through rate as a fraction, not a percentage",
+            "default": 0,
+            "examples": [
+              0.073
+            ]
+          },
+          "position": {
+            "type": "number",
+            "title": "Position",
+            "description": "That day's average search position — lower is better",
+            "default": 0,
+            "examples": [
+              8.2
             ]
           }
         },
@@ -62771,6 +66706,69 @@
           "price": 0,
           "type": "basic"
         }
+      },
+      "PlatformAgentMemoryView": {
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "title": "App Id",
+            "description": "Workspace the agent belongs to",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
+          },
+          "app_name": {
+            "type": "string",
+            "title": "App Name",
+            "description": "Workspace name",
+            "examples": [
+              "Acme Co"
+            ]
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id",
+            "description": "Agent identifier",
+            "examples": [
+              "6a83aefca4e611a480e81a68"
+            ]
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name",
+            "description": "Agent name",
+            "examples": [
+              "Aurora"
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentMemoryItemResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of remembered items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total remembered items for this agent",
+            "examples": [
+              37
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_id",
+          "app_name",
+          "agent_id",
+          "agent_name",
+          "items",
+          "total"
+        ],
+        "title": "PlatformAgentMemoryView",
+        "description": "A page of one agent's memory, for the console.\n\nDeclared as a model rather than served as a loose dict because a key the\nresponse model does not name is discarded in silence, and the console's\ncontract is generated from this document."
       },
       "PlatformAgentPatchRequest": {
         "properties": {
@@ -64563,6 +68561,129 @@
         "title": "ProvisioningCreateRequest",
         "description": "The create body.\n\n``extra=\"forbid\"`` is load-bearing, not tidiness — TBC-04/RT-06. Pydantic's\ndefault is ``ignore``: a caller who misspells a key, or who sends a field\nthis model has not grown yet, gets a 202 for a site built without it, with\nno 422 and no log line. That is how a theme chosen in the wizard could\nreach this endpoint and never reach the store. Mirrors ``WordPressSpec``,\nwhich has declared it since WPS-01."
       },
+      "PublicTrackingEvent": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/DeliveryStatus"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "at"
+        ],
+        "title": "PublicTrackingEvent",
+        "description": "One milestone on the public timeline.\n\n``source`` is NOT here: whether a milestone came from the courier's notice\nor from the merchant advancing it by hand is an operational detail of ours,\nand the buyer reading the page cannot act on it."
+      },
+      "PublicTrackingResponse": {
+        "properties": {
+          "waybill": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waybill",
+            "description": "The courier's shipment number, so the buyer can reference it. Absent until the shipment is dispatched."
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeliveryStatus"
+          },
+          "merchant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Name",
+            "description": "Who is sending the parcel."
+          },
+          "recipient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient Name",
+            "description": "First name only: enough to confirm the parcel is theirs, not enough to identify them to someone the link was forwarded to."
+          },
+          "package_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Description"
+          },
+          "estimated_arrival_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Arrival At",
+            "description": "DERIVED from the quote (quoted_at + eta_minutes). Absent when the shipment was never quoted, e.g. an own-fleet delivery."
+          },
+          "dispatched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatched At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/PublicTrackingEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "PublicTrackingResponse",
+        "description": "What a buyer holding a tracking link may see.\n\nStrictly LESS than the shipment itself carries. Absent by design and not\nby omission: the street, the phone, the coordinates, the price, the\ncourier's identity and every internal id. The destination is not here\neither — resolving a city code to its name means asking the courier, and a\npublic page must not go dark because a third party is down. The list is short enough to\nstate — if a field is not here, the page cannot leak it."
+      },
       "PublisuitesActionRequest": {
         "properties": {
           "action": {
@@ -65654,6 +69775,145 @@
         "type": "object",
         "title": "SearchConsoleActions"
       },
+      "SearchConsoleAggregatePerformanceResponse": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PerformancePeriod"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date",
+            "description": "First day of the reported window, derived from end_date",
+            "examples": [
+              "2026-07-28"
+            ]
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date",
+            "description": "Last day that HAS data, which can be earlier than today",
+            "examples": [
+              "2026-08-24"
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PerformanceSummary"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/PerformanceTrendPoint"
+            },
+            "type": "array",
+            "title": "Trend",
+            "description": "One point per calendar day of the window, oldest first; a day with no activity is a zero, never a gap"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/AggregateCoverage"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At",
+            "description": "The OLDEST successful sync among the healthy counted properties — 'everything that works is current at least up to here'. Null when no counted property has ever synchronised successfully.",
+            "examples": [
+              "2026-08-15T00:23:35Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "start_date",
+          "end_date",
+          "summary",
+          "coverage"
+        ],
+        "title": "SearchConsoleAggregatePerformanceResponse",
+        "description": "The four metrics summed over every property, plus its daily evolution.\n\n``end_date`` is the last day that HAS DATA, not the server's clock (D-14).\nThe container runs in UTC and this team operates six hours behind it, so for\nsix hours of every day `date.today()` names a day the user has not lived —\nand because that empty day lands in `current` while `previous` is complete,\na perfectly flat site reports a double-digit drop."
+      },
+      "SearchConsoleDimensionRowsResponse": {
+        "properties": {
+          "dimension": {
+            "$ref": "#/components/schemas/PerformanceDimensionName"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PerformancePeriod"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PerformanceDimensionRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Total",
+            "description": "Distinct keys stored for this dimension and period",
+            "default": 0,
+            "examples": [
+              296
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Rows requested per page",
+            "examples": [
+              25
+            ]
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip",
+            "description": "Rows skipped before this page",
+            "examples": [
+              25
+            ]
+          },
+          "sort": {
+            "$ref": "#/components/schemas/PerformanceDimensionSort",
+            "description": "Column the rows are ordered by"
+          },
+          "order": {
+            "$ref": "#/components/schemas/PerformanceSortOrder",
+            "description": "Direction of the ordering"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "period",
+          "start_date",
+          "end_date",
+          "limit",
+          "skip",
+          "sort",
+          "order"
+        ],
+        "title": "SearchConsoleDimensionRowsResponse",
+        "description": "One page of a breakdown table, ordered by the column the reader chose.\n\nThe performance report still carries the FIRST page of all three breakdowns,\nso opening the panel costs one request as it always did. This answers the\nsecond page onward, and every ordering other than the default — the report\nwould otherwise have to re-send the summary, the trend and the two tables\nnobody is looking at to move one table forward by 25 rows."
+      },
       "SearchConsoleKeys": {
         "properties": {
           "service_account_json_encrypted": {
@@ -65738,6 +69998,36 @@
             },
             "type": "array",
             "title": "Countries"
+          },
+          "queries_total": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Queries Total",
+            "description": "Distinct queries stored for the period",
+            "default": 0,
+            "examples": [
+              225
+            ]
+          },
+          "pages_total": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Pages Total",
+            "description": "Distinct pages stored for the period",
+            "default": 0,
+            "examples": [
+              296
+            ]
+          },
+          "countries_total": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Countries Total",
+            "description": "Distinct countries stored for the period",
+            "default": 0,
+            "examples": [
+              98
+            ]
           },
           "last_synced_at": {
             "anyOf": [
@@ -65891,13 +70181,13 @@
             "type": "integer",
             "minimum": 0,
             "title": "Notice Count",
-            "description": "'We could not verify your domain' emails actually DELIVERED (JVD D-16) — a suppressed, deduplicated or rate-limited send does not count. This is the counter the manual review threshold reads, so counting attempts here would open review tickets about emails nobody received.",
+            "description": "'We could not verify your domain' emails actually DELIVERED (JVD D-16) — a suppressed, deduplicated or rate-limited send does not count. This is the counter the manual review threshold reads, so counting attempts here would open review tasks about emails nobody received.",
             "default": 0,
             "examples": [
               1
             ]
           },
-          "review_ticket_id": {
+          "review_task_id": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PydanticObjectId"
@@ -65906,9 +70196,9 @@
                 "type": "null"
               }
             ],
-            "description": "The manual-review Ticket opened for this site, once it exists (JVD D-18)"
+            "description": "The manual-review Task opened for this site, once it exists (JVD D-18)"
           },
-          "review_ticket_state": {
+          "review_task_state": {
             "anyOf": [
               {
                 "type": "string",
@@ -65921,8 +70211,8 @@
                 "type": "null"
               }
             ],
-            "title": "Review Ticket State",
-            "description": "Reservation for the review ticket (JVD D-20). `creating` means a pod claimed the turn and has not finished; `open` means the ticket exists. Creating first would leave two tickets when two pods tie; reserving with no recovery window would mark a site 'has a ticket' for ever without having one."
+            "title": "Review Task State",
+            "description": "Reservation for the review task (JVD D-20). `creating` means a pod claimed the turn and has not finished; `open` means the task exists. Creating first would leave two tasks when two pods tie; reserving with no recovery window would mark a site 'has a task' for ever without having one."
           },
           "review_claimed_at": {
             "anyOf": [
@@ -65935,7 +70225,7 @@
               }
             ],
             "title": "Review Claimed At",
-            "description": "When `review_ticket_state` was set to `creating`, so a dead claim can be retaken"
+            "description": "When `review_task_state` was set to `creating`, so a dead claim can be retaken"
           }
         },
         "type": "object",
@@ -66871,6 +71161,66 @@
         ],
         "title": "SpendPoint"
       },
+      "StoreChromeSpec": {
+        "properties": {
+          "nav": {
+            "items": {
+              "$ref": "#/components/schemas/StoreNavLinkSpec"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Nav"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nav"
+        ],
+        "title": "StoreChromeSpec",
+        "description": "The navigation block. An object, not a bare list, because the\nstore's own schema has room for more chrome than the menu."
+      },
+      "StoreLegalDocumentSpec": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Body"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "body"
+        ],
+        "title": "StoreLegalDocumentSpec"
+      },
+      "StoreLegalPagesSpec": {
+        "properties": {
+          "terms": {
+            "$ref": "#/components/schemas/StoreLegalDocumentSpec"
+          },
+          "privacy": {
+            "$ref": "#/components/schemas/StoreLegalDocumentSpec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "terms",
+          "privacy"
+        ],
+        "title": "StoreLegalPagesSpec",
+        "description": "Both documents or neither: a shop that publishes terms and no\nprivacy policy is a worse state than one that publishes neither, and\nthe store fills in a branded default for whatever is absent."
+      },
       "StoreLogoSpec": {
         "properties": {
           "wordmarkUrl": {
@@ -66906,6 +71256,30 @@
         "type": "object",
         "title": "StoreLogoSpec",
         "description": "The two marks a store shows instead of its plain name — TAL-11.\n\nIndependent halves: a brand may have a full wordmark and no\nstandalone mark. Only what is given travels, so a store with one of\nthe two is not treated as a store with none.\n\nPer the user's decision of 2026-08-17 these are URLs, not uploads:\nat provisioning time the tenant does not exist yet, so it has no\nstorage of its own to receive a file. Which hosts are acceptable is\nthe facade's call — it is the only side that knows its own storage —\nso this side checks the scheme and stops there rather than keeping a\nsecond host list that would drift from the first."
+      },
+      "StoreNavLinkSpec": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "href": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Href"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "href"
+        ],
+        "title": "StoreNavLinkSpec",
+        "description": "One entry of the store's menu, as the dashboard sends it.\n\n``href`` is checked against the same two shapes the store itself\naccepts — a path on the store, or an absolute ``https`` URL — and\neverything else is refused rather than corrected. A\nprotocol-relative ``//host`` is rejected EXPLICITLY: it starts with a\nslash, so a check that only asked \"is this a path\" would wave through\na link to somebody else's origin."
       },
       "StorePaletteSpec": {
         "properties": {
@@ -67036,6 +71410,28 @@
               }
             ],
             "description": "Logotipo y monograma de la tienda. Omitido, el encabezado muestra el nombre en texto, como hoy."
+          },
+          "chrome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoreChromeSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Menú de navegación de la tienda. Omitido, la tienda se sirve sin menú propio, como hoy."
+          },
+          "legalPages": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoreLegalPagesSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Términos y política de privacidad de la tienda. Omitidos, la tienda sirve el borrador por defecto con su propia marca."
           }
         },
         "additionalProperties": false,
@@ -68088,6 +72484,70 @@
         ],
         "title": "SuccessResponse[AgentListResponse]"
       },
+      "SuccessResponse_AgentMemoryItemResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentMemoryItemResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentMemoryItemResponse]"
+      },
+      "SuccessResponse_AgentMemoryListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentMemoryListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentMemoryListResponse]"
+      },
       "SuccessResponse_AgentMetricsResponse_": {
         "properties": {
           "success": {
@@ -68183,6 +72643,38 @@
           "msg"
         ],
         "title": "SuccessResponse[AgentResponse]"
+      },
+      "SuccessResponse_AgentRunDetailResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentRunDetailResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AgentRunDetailResponse]"
       },
       "SuccessResponse_AgentRunListResponse_": {
         "properties": {
@@ -69944,6 +74436,38 @@
         ],
         "title": "SuccessResponse[PersonData]"
       },
+      "SuccessResponse_PlatformAgentMemoryView_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlatformAgentMemoryView",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[PlatformAgentMemoryView]"
+      },
       "SuccessResponse_PlatformAgentRow_": {
         "properties": {
           "success": {
@@ -70552,6 +75076,70 @@
         ],
         "title": "SuccessResponse[SatActivationResponse]"
       },
+      "SuccessResponse_SearchConsoleAggregatePerformanceResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/SearchConsoleAggregatePerformanceResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[SearchConsoleAggregatePerformanceResponse]"
+      },
+      "SuccessResponse_SearchConsoleDimensionRowsResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/SearchConsoleDimensionRowsResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[SearchConsoleDimensionRowsResponse]"
+      },
       "SuccessResponse_SearchConsolePerformanceResponse_": {
         "properties": {
           "success": {
@@ -70999,6 +75587,38 @@
           "msg"
         ],
         "title": "SuccessResponse[TransactionHistoryResponse]"
+      },
+      "SuccessResponse_TransactionReceiptSendResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/TransactionReceiptSendResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[TransactionReceiptSendResponse]"
       },
       "SuccessResponse_TransactionResponse_": {
         "properties": {
@@ -72215,8 +76835,44 @@
           "created_by_agent": {
             "type": "boolean",
             "title": "Created By Agent",
-            "description": "True when created by a ServiceKey, not a human (TSK-08)",
+            "description": "True when created by an agent or a ServiceKey, not a human (TSK-08, ATC-03)",
             "default": false
+          },
+          "created_by_agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Agent Id",
+            "description": "Agent that opened this task, when an agent did (ATC-03)"
+          },
+          "created_by_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Run Id",
+            "description": "Agent run that opened this task (ATC-03)"
+          },
+          "source_action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Action Id",
+            "description": "Proposal this task asks a human to review (ATC-05 CA-4)"
           }
         },
         "type": "object",
@@ -73884,6 +78540,69 @@
           ]
         }
       },
+      "TransactionReceiptSendResponse": {
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "title": "Transaction Id",
+            "description": "Transaction the receipt belongs to",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "receipt_status": {
+            "type": "string",
+            "title": "Receipt Status",
+            "description": "Outcome of this attempt: `dispatched`, `deduplicated`, `suppressed` or `failed`.",
+            "examples": [
+              "dispatched"
+            ]
+          },
+          "receipt_status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Status Reason",
+            "description": "Why, for any outcome that is not `dispatched`.",
+            "examples": [
+              "platform_configuration"
+            ]
+          },
+          "receipt_status_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Status At",
+            "description": "When this attempt was evaluated.",
+            "examples": [
+              "2024-01-15T10:35:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "transaction_id",
+          "receipt_status"
+        ],
+        "title": "TransactionReceiptSendResponse",
+        "description": "Result of asking us to send a transaction's receipt again.",
+        "example": {
+          "receipt_status": "dispatched",
+          "receipt_status_at": "2024-01-15T10:35:00Z",
+          "transaction_id": "507f1f77bcf86cd799439011"
+        }
+      },
       "TransactionResponse": {
         "properties": {
           "id": {
@@ -74025,6 +78744,52 @@
             "description": "Transaction last update timestamp",
             "examples": [
               "2024-01-15T10:30:00Z"
+            ]
+          },
+          "receipt_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Status",
+            "description": "Outcome of the last receipt attempt for this transaction: `dispatched`, `deduplicated`, `suppressed` or `failed`. Null when no `customer_email` was supplied or no attempt has been made yet.",
+            "examples": [
+              "dispatched"
+            ]
+          },
+          "receipt_status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Status Reason",
+            "description": "Why, for any outcome that is not `dispatched`. `no_recipient`, `not_approved`, `already_sent` and `rate_limited` are yours to act on; `platform_configuration` means the hold is on our side and support can lift it; `delivery_error` means the message was attempted and did not get through.",
+            "examples": [
+              "platform_configuration"
+            ]
+          },
+          "receipt_status_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Status At",
+            "description": "When the last receipt attempt was evaluated.",
+            "examples": [
+              "2024-01-15T10:35:00Z"
             ]
           }
         },
@@ -76312,6 +81077,177 @@
           "sent"
         ],
         "title": "WelcomeEmailRetryResponse"
+      },
+      "WhatsAppConfigPatchRequest": {
+        "properties": {
+          "values": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Values",
+            "description": "Sparse map of allow-listed keys to values. A `null` deletes that override so the key falls back to the platform level."
+          }
+        },
+        "type": "object",
+        "title": "WhatsAppConfigPatchRequest",
+        "description": "Sparse patch over one tenant's `App.config[\"whatsapp\"]`.\n\n`values` is an open dict because the allow-list lives in one place\n(`whatsapp_config.WRITABLE_KEYS`) and is enforced there together with the\nranges and the platform ceiling — duplicating it as Pydantic fields would\ngive two lists that drift.\n\nA `null` value DELETES that override so the key falls back to the level\nabove. Absent is not null: absent means \"leave it alone\".",
+        "example": {
+          "values": {
+            "enabled": true,
+            "template_disk_alert": "ops_disk_alert_v1"
+          }
+        }
+      },
+      "WhatsAppEvent": {
+        "type": "string",
+        "enum": [
+          "disk_alert",
+          "cleanup_not_running",
+          "disk_still_high",
+          "cleanup_failed"
+        ],
+        "title": "WhatsAppEvent",
+        "description": "The four notification sites of the dedicated host (D-14).\n\nFour, not one: the previous shape sized the enum for the disk threshold and\nleft the other three sites talking only to the old channel. ``disk_alert``\ncovers both severity levels — the level is a parameter, not an event,\nbecause the spacing window is per level and lives in the caller."
+      },
+      "WhatsAppKeys": {
+        "properties": {
+          "credential_encrypted": {
+            "type": "string",
+            "title": "Credential Encrypted",
+            "description": "Encrypted provider credential (Fernet)",
+            "default": ""
+          },
+          "phone_number_id": {
+            "type": "string",
+            "title": "Phone Number Id",
+            "description": "Sending number asset id (non-secret)",
+            "default": ""
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Per-tenant channel switch",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "WhatsAppKeys",
+        "description": "Per-App outbound WhatsApp credential (Fernet-encrypted).\n\nClone of :class:`AdsKeys`, and the credential CHAIN is the same: this\nper-tenant override first, the platform default\n(``PlatformSettings.whatsapp.credentials_encrypted``) second — so rotating\nthe common credential is one document, not N.\n\nWhat is deliberately NOT cloned is the *shape* of the ads secret.\n``AdsKeys.credential_encrypted`` holds a composite ``app_id|app_secret``\nbecause that provider's OAuth dance needs a confidential client. This one\nholds **a single opaque long-lived system token**: the advertising\ncredential is a different kind of token and its scopes\n(``ads_management``, ``pages_show_list``, ``business_management``) do not\nimply messaging, so reusing it was never a design option — it does not\nwork.\n\nWritten ONLY by the platform\n(``PATCH /platform/apps/{app_id}/keys/whatsapp``), never by the tenant:\n``whatsapp`` is in ``_PROTECTED_CONFIG_KEYS``, because the beneficiary of a\nsafeguard cannot be the one who writes it.\n\n``phone_number_id`` is the provider's numeric ASSET id for the sending\nnumber — not the number in readable form. It is not a secret, which is why\nit sits beside the credential rather than inside it and is safe to return\nin the boolean-plus-metadata response."
+      },
+      "WhatsAppKeysUpdateRequest": {
+        "properties": {
+          "credential": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential",
+            "description": "Plaintext credential; stored encrypted. `null` clears."
+          },
+          "phone_number_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number Id",
+            "description": "Sending number asset id (non-secret, numeric)."
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled",
+            "description": "Per-tenant channel switch."
+          }
+        },
+        "type": "object",
+        "title": "WhatsAppKeysUpdateRequest",
+        "description": "The tenant's messaging credential. `null` clears it (falls back to platform).\n\nThe field is named **`credential`** and that is load-bearing, not a style\nchoice: `\"credential\"` is in `_REDACTED_KEYS`, which is the only thing that\nkeeps this body out of `ApiLog` — where it would sit for 90 days and be\nre-served through `GET /api/v1/logs`. Renaming it to `api_token` or `wa_token`\nsilently removes that redaction, so any rename needs the new line in\n`_REDACTED_KEYS` in the SAME commit.\n\nBeing able to OMIT it is what makes the channel switchable off without\nre-sending the secret.",
+        "example": {
+          "credential": "•••",
+          "enabled": true,
+          "phone_number_id": "123456789012345"
+        }
+      },
+      "WhatsAppPlatformConfigPatchRequest": {
+        "properties": {
+          "values": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Values",
+            "description": "Sparse map of allow-listed platform keys to values, including `ops_recipients`. A `null` deletes that leaf. The credential is refused."
+          }
+        },
+        "type": "object",
+        "title": "WhatsAppPlatformConfigPatchRequest",
+        "description": "Sparse patch over the PLATFORM `whatsapp` namespace.\n\nThis is the endpoint that loads the DESTINATION of the operations alerts.\nWithout it, `ops_recipients` could only be set by committing the team's phone\nnumbers to the repository or editing the database by hand.\n\n`credentials_encrypted` is refused here even though it lives in this\nnamespace: the credential has its own endpoint whose field name is what\nredacts it from the API log, and nested under `values` that redaction does\nnot apply.",
+        "example": {
+          "values": {
+            "ops_recipients": [
+              "50255551234"
+            ],
+            "phone_number_id": "123456789012345"
+          }
+        }
+      },
+      "WhatsAppSendRequest": {
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/WhatsAppEvent",
+            "description": "Which notification this is. Closed enum; the server resolves the template."
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params",
+            "description": "Typed parameters for this event's template. Every key and every range is fixed per event; unknown or missing keys are rejected."
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "Derived from the caller's SPACING WINDOW, not from the instant — a key that changes every second de-duplicates nothing. Omitting it means a repeat may send (and bill) a second message. The empty string is rejected rather than treated as absent."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event"
+        ],
+        "title": "WhatsAppSendRequest",
+        "description": "One notification request from a machine.",
+        "example": {
+          "event": "disk_alert",
+          "idempotency_key": "dedicado:critico:487350",
+          "params": {
+            "free": "230G",
+            "host": "dedicado",
+            "level": "critical",
+            "usage_pct": 87
+          }
+        }
       },
       "WizardMessage": {
         "properties": {

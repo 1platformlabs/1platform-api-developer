@@ -32,10 +32,21 @@
           "health"
         ],
         "summary": "Ready",
+        "description": "Readiness: PROBE the dependencies, do not describe them.\n\nUntil this landed the endpoint answered ``200`` with\n``{\"db\":\"unknown\",\"mongo\":\"unknown\",\"cache\":\"unknown\"}`` — the comment it\nreplaced deferred the real pings to a stream that never landed. It cost a\ntotal PROD outage (#236): for ~25 min EVERY route with a database\nreturned 500 on EVERY tenant while this endpoint kept answering 200, so\nthe deploy verdict and anything watching it stayed green throughout. A\nreadiness probe that does not touch its dependencies is not a gate; it is\na decoration that certifies whatever it is pointed at.\n\n``status`` is the readiness VERDICT (can this process serve?), computed\nfrom the dependencies that are REQUIRED to serve; the per-dependency\nfields carry the detail. The cache is deliberately not one of them:\n:class:`app.services.cache.Cache` documents that a cache hiccup must\nnever take a request down, so a Valkey blip is reported and does not\nunready the process — otherwise this fix would trade a blind gate for a\ngate that fails deploys over a dependency the code is built to survive.",
         "operationId": "ready_api_v1_health_ready_get",
         "responses": {
           "200": {
             "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReady"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unreachable",
             "content": {
               "application/json": {
                 "schema": {
@@ -417,7 +428,7 @@
           "auth"
         ],
         "summary": "Sign Out",
-        "description": "No-op on the server side — the dashboard clears the cookie.\n\nA future iteration can persist a token-revocation list for hard\nlogout semantics; for now the 24h sliding access TTL acts as the\nbound on credential lifetime.",
+        "description": "No-op on the server side — the dashboard clears the cookie.\n\nStill a no-op after ABD-05, deliberately (plan D-2). Denying the\npresented ``jti`` was considered and retired: this handler receives\nneither the token nor any dependency that could read it, and the only\nstore with a TTL degrades to a silent no-op when Valkey is down — so\nthe \"hard logout\" would fail open without a sound. The member-wide\nwatermark (``members.sessions_revoked_at``) is what actually revokes,\nand it is written by the ban path, not by sign-out.",
         "operationId": "sign_out_api_v1_auth_sign_out_post",
         "responses": {
           "200": {
@@ -590,7 +601,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -721,7 +740,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/tenants/{tenant_id}": {
@@ -884,7 +911,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items": {
@@ -1036,7 +1071,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -1236,7 +1279,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/by-slug/{slug}": {
@@ -1355,7 +1406,16 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}": {
@@ -1507,7 +1567,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -1679,7 +1747,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -1822,7 +1898,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}/publish": {
@@ -1986,7 +2070,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}/assets": {
@@ -2206,7 +2298,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}/audio": {
@@ -2368,7 +2468,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}/cover-image": {
@@ -2578,7 +2686,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -2733,7 +2849,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}/assets/{fmt}": {
@@ -2911,7 +3035,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}/reviews": {
@@ -3155,7 +3287,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}/archive": {
@@ -3307,7 +3447,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/entitlements": {
@@ -3459,7 +3607,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/entitlements/check": {
@@ -3615,7 +3771,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/entitlements/refresh": {
@@ -3751,7 +3915,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/entitlements/checkout": {
@@ -3887,7 +4059,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/entitlements/guest-checkout": {
@@ -4091,7 +4271,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/entitlements/by-member/{member_id}": {
@@ -4218,7 +4406,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/entitlements/{entitlement_id}": {
@@ -4362,7 +4558,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/delivery/items/{content_id}/playback": {
@@ -4567,7 +4771,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/events": {
@@ -4675,7 +4887,16 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/webhooks/entitlement": {
@@ -4696,7 +4917,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "entitlementWebhookSignature": []
+          }
+        ]
       }
     },
     "/api/v1/webhooks/media": {
@@ -4724,7 +4950,12 @@
           "401": {
             "description": "No configured tenant secret verified the signature (WEBHOOK_SIGNATURE_INVALID)."
           }
-        }
+        },
+        "security": [
+          {
+            "mediaWebhookSignature": []
+          }
+        ]
       }
     },
     "/api/v1/admin/settings": {
@@ -4854,7 +5085,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -4992,7 +5231,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/settings/branding/favicon": {
@@ -5169,7 +5416,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/tenants": {
@@ -5273,7 +5528,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -5405,7 +5668,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/tenants/{tenant_id}": {
@@ -5569,7 +5840,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -5755,7 +6034,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -5910,7 +6197,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/tenants/{tenant_id}/url-routing": {
@@ -6085,7 +6380,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/audit-log": {
@@ -6334,7 +6637,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/audit-log/recent": {
@@ -6481,7 +6792,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/content/bulk": {
@@ -6622,7 +6941,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/content/items": {
@@ -6844,7 +7171,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/content/items/{item_id}": {
@@ -6985,7 +7320,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -7150,7 +7493,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/content/email-templates": {
@@ -7232,7 +7583,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/content/email-templates/{template_key}/{locale}": {
@@ -7380,7 +7739,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -7536,7 +7903,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/content/email-templates/{template_key}/{locale}/preview": {
@@ -7694,7 +8069,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/media": {
@@ -7870,7 +8253,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/media/integration": {
@@ -8001,7 +8392,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -8143,7 +8542,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/media/subscriptions": {
@@ -8278,7 +8685,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -8418,7 +8833,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/media/subscriptions/{subscription_id}": {
@@ -8570,7 +8993,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -8701,7 +9132,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/media/{key}": {
@@ -8858,7 +9297,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/analytics/kpis": {
@@ -8989,7 +9436,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/analytics/top-items": {
@@ -9143,7 +9598,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/analytics/timeseries": {
@@ -9297,7 +9760,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/app-analytics": {
@@ -9472,7 +9943,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/publishers": {
@@ -9626,7 +10105,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -9764,7 +10251,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/publishers/{publisher_id}": {
@@ -9914,7 +10409,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -10045,7 +10548,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/redirects": {
@@ -10219,7 +10730,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -10357,7 +10876,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -10487,7 +11014,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/redirects/bulk": {
@@ -10627,7 +11162,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/revalidate": {
@@ -10767,7 +11310,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/seo-health": {
@@ -10920,7 +11471,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/seo-health/invalidate-cache": {
@@ -11044,7 +11603,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/libraries": {
@@ -11136,7 +11703,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -11243,7 +11818,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/libraries/{library_id}/items:import": {
@@ -11345,7 +11928,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/tenants/{tenant_id}/library-subscriptions": {
@@ -11512,7 +12103,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -11660,7 +12259,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/tenants/{tenant_id}/library-subscriptions/{subscription_id}": {
@@ -11820,7 +12427,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/tenants/{tenant_id}/library-subscriptions/{subscription_id}:resync": {
@@ -11970,7 +12585,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/tenants/{tenant_id}/library-subscriptions/{subscription_id}/status": {
@@ -12120,7 +12743,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/sync-jobs/{job_id}:retry": {
@@ -12216,7 +12847,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/autopublish/settings": {
@@ -12358,7 +12997,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -12510,7 +13157,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/autopublish/catalog": {
@@ -12652,7 +13307,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/autopublish/costs": {
@@ -12803,7 +13466,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/autopublish/charges": {
@@ -12978,7 +13649,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/autopublish/charges.csv": {
@@ -13135,7 +13814,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/autopublish/jobs:requeue": {
@@ -13276,7 +13963,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/autopublish/platform/metrics": {
@@ -13388,7 +14083,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/rails": {
@@ -13522,7 +14225,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -13660,7 +14371,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/rails/order": {
@@ -13807,7 +14526,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/rails/{rail_id}": {
@@ -13968,7 +14695,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -14110,7 +14845,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/plans": {
@@ -14244,7 +14987,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -14382,7 +15133,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/plans/{plan_id}": {
@@ -14543,7 +15302,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -14685,7 +15452,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/notifications": {
@@ -14819,7 +15594,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/members": {
@@ -14989,7 +15772,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -15139,7 +15930,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/members/{member_id}": {
@@ -15301,7 +16100,1095 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/abuse/flagged": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-abuse"
+        ],
+        "summary": "List Flagged",
+        "description": "Flagged accounts of the EFFECTIVE tenant, paginated.\n\n``total`` comes from the server so the client never has to fetch the\nwhole set to know how big it is (ABD-07 CA \"el listado está paginado y\nacotado\").",
+        "operationId": "admin.abuse.flagged",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "flagged",
+                "open_reviews",
+                "all"
+              ],
+              "type": "string",
+              "default": "flagged",
+              "title": "State"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbuseFlaggedPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/abuse/sanctions": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-abuse"
+        ],
+        "summary": "Sanctions Batch",
+        "description": "Sanction state for up to 100 members in ONE call.\n\nThis exists so ``/admin/users`` can paint its status column without\nfiring one request per row (ABD-07 CA). Unparseable ids are dropped\nrather than 422-ing the whole batch: a badly-formed id in a list of\nfifty must not blank the column for the other forty-nine.",
+        "operationId": "admin.abuse.sanctions_batch",
+        "parameters": [
+          {
+            "name": "member_ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated member ids",
+              "title": "Member Ids"
+            },
+            "description": "Comma-separated member ids"
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbuseSanctionBatch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/abuse/members/{member_id}": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-abuse"
+        ],
+        "summary": "Member Detail",
+        "description": "One account's anomaly detail plus its chronological history.\n\n404 when the member is not of the effective tenant — a foreign id is\nindistinguishable from a missing one, so this is not a cross-tenant\nexistence oracle.",
+        "operationId": "admin.abuse.member_detail",
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbuseMemberDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/abuse/members/{member_id}/ban": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin-abuse"
+        ],
+        "summary": "Ban Member",
+        "description": "Ban an account. The ONLY path that ever writes ``kind='banned'``.\n\nRequires ``members.write`` and a non-empty ``note``: an irreversible\naction has to carry the reason of the person who took it (CA-6, and\nABD-06's \"la acción del admin también se registra\").\n\nBoth halves of the ban happen here (D-2): the ``banned`` sanction\ncloses re-entry through the four token issuers, and the\n``sessions_revoked_at`` watermark kills whatever sessions are already\nlive.",
+        "operationId": "admin.abuse.ban",
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AbuseActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbuseActionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/abuse/members/{member_id}/clear": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin-abuse"
+        ],
+        "summary": "Clear Member",
+        "description": "Lift the active sanction and close the review.\n\nDeliberately does NOT reset ``sessions_revoked_at`` (RF-10): clearing\nthe watermark would revalidate every token issued BEFORE the ban,\nincluding 30-day refresh tokens that may be in a third party's hands.\nThe cleared member gets back in with a fresh sign-in, which is now\npossible again because the ``banned`` sanction is gone.",
+        "operationId": "admin.abuse.clear",
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AbuseActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbuseActionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/abuse/policy": {
+      "get": {
+        "tags": [
+          "admin",
+          "admin-abuse"
+        ],
+        "summary": "Get Policy",
+        "description": "The tenant's thresholds. A tenant with none gets the defaults, OFF.",
+        "operationId": "admin.abuse.policy_get",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbusePolicy"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin",
+          "admin-abuse"
+        ],
+        "summary": "Put Policy",
+        "description": "Replace the tenant's abuse policy.\n\nThe tenant row is locked FOR UPDATE **before** ``config`` is read,\nbecause everything below is one read-modify-write. Without the lock a\nconcurrent save from another admin tab writes back the document it\nloaded earlier and DELETES this policy — and by D-6 a missing policy\nturns the whole control OFF, silently. ``admin_settings.py`` documents\nthe identical bug it had to fix.\n\nWritten as a first-level key of ``config`` so the \"App / Móvil\" form,\nwhich replaces ``config[\"app\"]`` wholesale, cannot erase it.",
+        "operationId": "admin.abuse.policy_put",
+        "parameters": [
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AbusePolicy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbusePolicy"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/plan-grants": {
@@ -15454,7 +17341,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -15631,7 +17526,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/admin/plan-grants/{grant_id}": {
@@ -15777,7 +17680,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/notifications": {
@@ -15903,7 +17814,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/notifications/mark-all-read": {
@@ -16009,7 +17928,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/notifications/{notification_id}/read": {
@@ -16138,7 +18065,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/ads/decision/{content_id}": {
@@ -16308,7 +18243,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/live/streams/{stream_id}": {
@@ -16535,7 +18478,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -16657,7 +18608,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/sessions": {
@@ -16790,7 +18749,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -16914,7 +18881,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/sessions/{session_id}": {
@@ -17041,7 +19016,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/progress": {
@@ -17184,7 +19167,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/downloads": {
@@ -17327,7 +19318,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/lists": {
@@ -17441,7 +19440,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -17574,7 +19581,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/progress/{content_id}": {
@@ -17708,7 +19723,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/reviews": {
@@ -17832,7 +19855,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/notifications/subscribe": {
@@ -17968,7 +19999,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/subscription": {
@@ -18082,7 +20121,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/freemium": {
@@ -18196,7 +20243,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/achievements/recent": {
@@ -18322,7 +20377,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/achievements": {
@@ -18436,7 +20499,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/push-tokens": {
@@ -18560,7 +20631,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/push-tokens/{token}": {
@@ -18687,7 +20766,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/payments": {
@@ -18824,7 +20911,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/app/download": {
@@ -18965,7 +21060,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/lists/{list_id}": {
@@ -19099,7 +21202,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -19242,7 +21353,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -19367,7 +21486,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/lists/{list_id}/items": {
@@ -19512,7 +21639,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/lists/{list_id}/items/{content_id}": {
@@ -19649,7 +21784,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/lists/{list_id}/items/order": {
@@ -19794,7 +21937,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/lists/{list_id}/save": {
@@ -19929,7 +22080,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -20054,7 +22213,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/watchlist": {
@@ -20203,7 +22370,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/watchlist/{content_id}": {
@@ -20356,7 +22531,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -20500,7 +22683,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/follows": {
@@ -20618,7 +22809,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/follows/{author}": {
@@ -20753,7 +22952,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -20879,7 +23086,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/devices": {
@@ -21009,7 +23224,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/devices/register": {
@@ -21183,7 +23406,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/devices/revoke/{device_id}": {
@@ -21311,7 +23542,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/parental": {
@@ -21437,7 +23676,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -21571,7 +23818,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/parental/verify-pin": {
@@ -21722,7 +23977,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/me/rails": {
@@ -21807,7 +24070,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/public/rails": {
@@ -21928,7 +24199,16 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/people": {
@@ -22079,7 +24359,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -22406,7 +24694,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -22742,7 +25038,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -23012,7 +25316,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -23480,6 +25792,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Catalog is momentarily at capacity; retry after the ``Retry-After`` interval. Shed deliberately so a bulk walker cannot drain the connection pool other routes need (atlas-api#234).",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "CATALOG_BUSY"
+                  }
                 }
               }
             }
@@ -25062,6 +27386,116 @@
         }
       }
     },
+    "/api/v1/public/libraries/{slug}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Library Detail",
+        "description": "AEM-05 CA-1/CA-2: name, THIS tenant's description, its published fichas.\n\nFichas come from ``content_items`` filtered by ``tenant_id`` AND joined to\nthe library through ``library_item_id`` — the isolation invariant this\nmodule's own docstring (``app/models/sql/library.py``) states is never\nrelaxed for reading, even though ``libraries``/``library_items`` are\nshared rows.",
+        "operationId": "public.library_detail",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLibraryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown library, or this tenant carries no subscription to it.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "LIBRARY_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/search/suggest": {
       "get": {
         "tags": [
@@ -25217,7 +27651,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/integrations/bower/v1/members/{member_id}/issue-magic-link": {
@@ -25286,7 +27725,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants": {
@@ -25357,7 +27801,12 @@
           "422": {
             "description": "Invalid slug/archetype/domain or config presets"
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants/{slug}/site-verification": {
@@ -25437,7 +27886,109 @@
           "422": {
             "description": "Token does not match the accepted format"
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/operator-credential": {
+      "post": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Mint or rotate a tenant's operator credential (service-to-service)",
+        "description": "Hand the control plane a working operator login for an existing tenant.\n\nWhy this route exists: minting used to be welded to creation. ``POST\n/tenants`` generates the operator password inside the same transaction\nthat inserts the tenant, so a re-provision — which answers 409 — produced\nno credential at all. The control plane's only remaining move was to mail\n\"your tenant is ready\" with no way in and a footnote telling the owner to\nreset the password \"from the tenant panel\", which is (a) the panel those\ncredentials open and (b) a flow that does not exist: this product has no\nforgot-password path for an ``AdminCredential``, and the magic link mints\nmember roles, never ``_ADMIN_ROLES``. The tenant was unadministrable for\ngood. Separating \"mint\" from \"create\" is what closes that.\n\n🔴 THE GATE is the *domain*, not the slug — see the request model. The\ncaller must name the host, and the host must resolve (primary domain or\nconfigured alias) to the very tenant the slug names. The capability alone\nis not authority to pick a victim by name.\n\nA second refusal, fail-closed: an account holding ``allowed_tenants`` is a\ncross-tenant staff grant, not a site operator. Rotating its password would\nhand the caller every tenant that account can act for, so this route\ndeclines and says so rather than quietly widening the blast radius.\nProvisioning a fresh site is unaffected — those accounts are born empty.",
+        "operationId": "mint_operator_credential_api_v1_platform_tenants__slug__operator_credential_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformOperatorCredentialRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorCredentialResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.provision capability"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The tenant with that slug is not the one serving that domain.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_DOMAIN_MISMATCH"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid email or domain"
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants/{slug}/settings": {
@@ -25514,7 +28065,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -25613,7 +28169,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants/{slug}/settings/revert": {
@@ -25700,7 +28261,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants/{slug}/content/items": {
@@ -25709,7 +28275,7 @@
           "platform-agent-arm"
         ],
         "summary": "List a tenant's content items (service-to-service)",
-        "description": "A page of the catalogue: enough to choose an item, never the whole thing.\n\nEach row carries its ``version`` so the caller can hand it back on a patch\nwithout a second round trip — that is what keeps the optimistic lock cheap\nenough to actually be used.",
+        "description": "A page of the catalogue, or the single item with a given slug.\n\nEach row carries its ``version`` so the caller can hand it back on a patch\nwithout a second round trip — that is what keeps the optimistic lock cheap\nenough to actually be used.",
         "operationId": "list_items_api_v1_platform_tenants__slug__content_items_get",
         "parameters": [
           {
@@ -25743,6 +28309,25 @@
               "default": 0,
               "title": "Offset"
             }
+          },
+          {
+            "name": "item_slug",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only the item with this slug. Exact match, at most one row.",
+              "title": "Item Slug"
+            },
+            "description": "Return only the item with this slug. Exact match, at most one row."
           },
           {
             "name": "authorization",
@@ -25797,7 +28382,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants/{slug}/content/items/{item_id}": {
@@ -25905,7 +28495,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants/{slug}/rails/order": {
@@ -25991,7 +28586,111 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/libraries/{library_id}": {
+      "patch": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Set a tenant's own presentation text for a library it subscribes to",
+        "description": "Write the tenant's own description of a library it is subscribed to.\n\nBrand-filtered before it leaves Core, not here: this route trusts the\ncaller the same way ``update_site_content`` does — the tool that calls it\n(``update_site_library``) refuses a text naming a provider BEFORE it ever\nreaches this endpoint, so a call that gets here has already passed that\ngate. This route's own job is the invariant the tool cannot see from the\noutside: that the write lands on THIS tenant's row and no other's.",
+        "operationId": "patch_library_api_v1_platform_tenants__slug__libraries__library_id__patch",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "library_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Library Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibraryDescriptionPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryDescriptionPatchResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Integration key lacks tenants.content.write"
+          },
+          "404": {
+            "description": "Unknown tenant slug (`TENANT_NOT_ENROLLED`), or unknown library / a library this tenant carries no subscription to (`LIBRARY_NOT_FOUND` — the same body for both, so a leaked key cannot tell which libraries exist).",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_ENROLLED"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/tenants": {
@@ -26069,7 +28768,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/tenants/{tenant_id}/items": {
@@ -26189,7 +28893,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/tenants/{tenant_id}/candidates": {
@@ -26313,7 +29022,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/jobs:claim": {
@@ -26377,7 +29091,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/jobs/{job_id}:release": {
@@ -26442,7 +29161,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/charges/usage": {
@@ -26512,7 +29236,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/source:sign": {
@@ -26610,7 +29339,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/charges": {
@@ -26687,7 +29421,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/autopublish/charges:settle": {
@@ -26749,7 +29488,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants/{tenant_id}/autopublish": {
@@ -26855,7 +29599,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     }
   },
@@ -26925,6 +29674,532 @@
           "title_template"
         ],
         "title": "AboutPage"
+      },
+      "AbuseActionRequest": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "AbuseActionRequest"
+      },
+      "AbuseActionResult": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "sanction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AbuseSanctionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sessions_revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessions Revoked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "member_id"
+        ],
+        "title": "AbuseActionResult"
+      },
+      "AbuseBaseline": {
+        "properties": {
+          "p95_observed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Observed"
+          },
+          "max_observed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Observed"
+          },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days",
+            "default": 30
+          },
+          "source": {
+            "type": "string",
+            "const": "abuse_counter",
+            "title": "Source",
+            "default": "abuse_counter"
+          }
+        },
+        "type": "object",
+        "title": "AbuseBaseline",
+        "description": "Observed percentile of the tenant, in the COUNTER's unit.\n\nNever derived from ``member_downloads``: that table counts distinct\n(title × format) per day, which is a different unit and would make an\noperator calibrate the ceiling against a number that cannot reach it.\n``null`` until the counter has accumulated data — the UI says so."
+      },
+      "AbuseEventView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "observed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Count"
+          },
+          "window_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Hours"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "observed_baseline": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Baseline"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "occurred_at",
+          "level",
+          "action",
+          "actor"
+        ],
+        "title": "AbuseEventView"
+      },
+      "AbuseFlaggedItem": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "email_masked": {
+            "type": "string",
+            "title": "Email Masked"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "observed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Count"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "window_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Hours"
+          },
+          "sanction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AbuseSanctionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "review_open": {
+            "type": "boolean",
+            "title": "Review Open",
+            "default": false
+          },
+          "last_event_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Event At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "member_id",
+          "email_masked"
+        ],
+        "title": "AbuseFlaggedItem"
+      },
+      "AbuseFlaggedPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AbuseFlaggedItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/AbuseBaseline"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "baseline"
+        ],
+        "title": "AbuseFlaggedPage"
+      },
+      "AbuseMemberDetail": {
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/AbuseFlaggedItem"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/AbuseEventView"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "member",
+          "history"
+        ],
+        "title": "AbuseMemberDetail"
+      },
+      "AbusePolicy": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "window_hours": {
+            "type": "integer",
+            "maximum": 24,
+            "minimum": 6,
+            "title": "Window Hours",
+            "default": 24
+          },
+          "level1_threshold": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Level1 Threshold",
+            "default": 50
+          },
+          "level2_threshold": {
+            "type": "integer",
+            "minimum": 2,
+            "title": "Level2 Threshold",
+            "default": 100
+          },
+          "min_interval_seconds": {
+            "type": "integer",
+            "maximum": 600,
+            "minimum": 0,
+            "title": "Min Interval Seconds",
+            "default": 20
+          },
+          "block_duration_hours": {
+            "type": "integer",
+            "maximum": 168,
+            "minimum": 1,
+            "title": "Block Duration Hours",
+            "default": 48
+          },
+          "repeat_l1_count": {
+            "type": "integer",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Repeat L1 Count",
+            "default": 3
+          },
+          "repeat_l1_window_days": {
+            "type": "integer",
+            "maximum": 90,
+            "minimum": 1,
+            "title": "Repeat L1 Window Days",
+            "default": 7
+          },
+          "review_block_count": {
+            "type": "integer",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Review Block Count",
+            "default": 2
+          },
+          "review_window_days": {
+            "type": "integer",
+            "maximum": 365,
+            "minimum": 1,
+            "title": "Review Window Days",
+            "default": 30
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AbusePolicy",
+        "description": "Per-tenant thresholds, stored at ``tenants.config.abuse_policy``.\n\nAbsent or malformed ⇒ the detector is OFF for that tenant and its\nmembers see byte-for-byte today's behaviour (plan D-6)."
+      },
+      "AbuseSanctionBatch": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AbuseSanctionSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "AbuseSanctionBatch"
+      },
+      "AbuseSanctionSummary": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "throttled",
+                  "blocked",
+                  "banned"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "review_open": {
+            "type": "boolean",
+            "title": "Review Open",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "member_id"
+        ],
+        "title": "AbuseSanctionSummary",
+        "description": "One row of the batch lookup that feeds the /admin/users badge."
+      },
+      "AbuseSanctionView": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "throttled",
+              "blocked",
+              "banned"
+            ],
+            "title": "Kind"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired",
+              "lifted"
+            ],
+            "title": "State"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Effective From"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "state",
+          "reason_code",
+          "effective_from"
+        ],
+        "title": "AbuseSanctionView"
       },
       "AccessFlagsSchema": {
         "properties": {
@@ -27742,7 +31017,14 @@
             "$ref": "#/components/schemas/IntegrationsSettings"
           },
           "delivery": {
-            "$ref": "#/components/schemas/DeliverySettings"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliverySettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "features": {
             "$ref": "#/components/schemas/FeatureFlags"
@@ -34190,6 +37472,50 @@
         ],
         "title": "LibraryCreate"
       },
+      "LibraryDescriptionPatchRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "description"
+        ],
+        "title": "LibraryDescriptionPatchRequest"
+      },
+      "LibraryDescriptionPatchResponse": {
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "title": "Library Id"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "library_id",
+          "changed_fields"
+        ],
+        "title": "LibraryDescriptionPatchResponse"
+      },
       "LibraryItemImportRequest": {
         "properties": {
           "source_tenant_id": {
@@ -35355,6 +38681,11 @@
       },
       "MediaSupplyPreset": {
         "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
           "mask_delivery": {
             "type": "boolean",
             "title": "Mask Delivery",
@@ -35363,7 +38694,7 @@
         },
         "type": "object",
         "title": "MediaSupplyPreset",
-        "description": "Covers-CDN masking opt-in (``config.media_supply``)."
+        "description": "The tenant's Media integration (``config.media_supply``).\n\n``enabled`` defaults to on because the shared, content-addressed store\nis where a tenant's bytes go unless it says otherwise, and a tenant\nwith it off serves a catalog of placeholder covers over artwork it\nalready owns. It is a switch, not a credential: the credential is the\nplatform's and is sealed server-side — see\n:func:`seal_platform_media_supply`."
       },
       "MemberInvite": {
         "properties": {
@@ -36758,6 +40089,64 @@
         ],
         "title": "PlatformMetricsView"
       },
+      "PlatformOperatorCredentialRequest": {
+        "properties": {
+          "operator_email": {
+            "type": "string",
+            "format": "email",
+            "title": "Operator Email"
+          },
+          "primary_domain": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Primary Domain"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operator_email",
+          "primary_domain"
+        ],
+        "title": "PlatformOperatorCredentialRequest",
+        "description": "Who to mint for, and the domain that proves which tenant is meant.\n\n``primary_domain`` is NOT redundant with the path slug, and dropping it\nwould reopen the exact hole #331 closed on the other side of this call:\nslugs are derived from the second-level label, so ``epublibre.cc`` and\n``epublibre.app`` derive the *same* slug. A route that rotated a password\non the strength of a slug alone would let whoever can guess a name mint a\nworking admin login for somebody else's live site. The host is the\nidentity that the public resolver actually serves, so it is the one that\nhas to agree."
+      },
+      "PlatformOperatorCredentialResponse": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "operator_email": {
+            "type": "string",
+            "format": "email",
+            "title": "Operator Email"
+          },
+          "operator_password": {
+            "type": "string",
+            "title": "Operator Password"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "slug",
+          "operator_email",
+          "operator_password",
+          "created"
+        ],
+        "title": "PlatformOperatorCredentialResponse"
+      },
       "PlatformTenantProvisionRequest": {
         "properties": {
           "slug": {
@@ -36823,7 +40212,14 @@
             "$ref": "#/components/schemas/IntegrationsSettings"
           },
           "delivery": {
-            "$ref": "#/components/schemas/DeliverySettings"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliverySettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "features": {
             "$ref": "#/components/schemas/FeatureFlags"
@@ -37346,6 +40742,85 @@
         ],
         "title": "PublicKindCount",
         "description": "One kind's published-item total for the tenant (per-kind home counts)."
+      },
+      "PublicLibraryItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "kind"
+        ],
+        "title": "PublicLibraryItem"
+      },
+      "PublicLibraryResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicLibraryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 50
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "PublicLibraryResponse"
       },
       "PublicList": {
         "properties": {
@@ -40592,6 +44067,39 @@
           "text": {
             "type": "string",
             "title": "Text"
+          },
+          "from_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Name"
+          },
+          "from_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Address"
+          },
+          "reply_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply To"
           }
         },
         "type": "object",
@@ -41822,6 +45330,38 @@
           "event_id"
         ],
         "title": "WebhookAck"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Member / operator session token issued by `POST /api/v1/auth/magic-link/verify` (members) or `POST /api/v1/auth/admin/sign-in` (tenant admins). Sent as `Authorization: Bearer <jwt>`. The token carries its own tenant, so it is reconciled against the `X-Tenant-Slug` header rather than trusting it."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "atlas_session",
+        "description": "The same JWT as `bearerAuth`, delivered as the HttpOnly cookie the dashboard sign-in flow sets. Browser callers use this; server-to-server callers use `bearerAuth`. Either satisfies an endpoint that lists both."
+      },
+      "integrationKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "ak-int-",
+        "description": "Long-lived integration key for the service-to-service surface (`/platform/*`, `/integrations/*`), sent as `Authorization: Bearer ak-int-<prefix><secret>`. A key is scoped to one tenant or to the platform and carries an explicit capability list; the endpoint checks both."
+      },
+      "entitlementWebhookSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-bowerbird-signature",
+        "description": "HMAC-SHA256 of the raw request body, keyed by the tenant's entitlement-provider webhook secret, sent alongside `x-bowerbird-timestamp`. Inbound only — this endpoint is called by the entitlement provider, not by API consumers. The header name is the deployment default and is configurable."
+      },
+      "mediaWebhookSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-media-signature",
+        "description": "HMAC-SHA256 of the raw request body, keyed by the tenant's `media_supply.webhook_secret`, sent alongside `x-media-timestamp`. Inbound only — this endpoint is called by 1Platform Media, not by API consumers."
       }
     }
   },

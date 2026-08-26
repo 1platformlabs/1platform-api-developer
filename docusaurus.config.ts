@@ -365,6 +365,8 @@ const config: Config = {
             {href: 'https://1platform.pro/solutions/online-store/', label: 'Tienda online', target: '_self'},
             {href: 'https://1platform.pro/solutions/website/', label: 'Creador de sitios web', target: '_self'},
             {href: 'https://1platform.pro/solutions/content/', label: 'Contenido con IA', target: '_self'},
+            {href: 'https://1platform.pro/solutions/deliveries/', label: 'Envíos', target: '_self'},
+            {href: 'https://1platform.pro/solutions/ads/', label: 'Publicidad', target: '_self'},
             {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Panel white-label', target: '_self'},
             {href: 'https://1platform.pro/payments-invoicing/', label: 'Pagos y facturación', target: '_self'},
             // The site separates the five solutions from the catch-all link

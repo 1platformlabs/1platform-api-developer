@@ -240,8 +240,17 @@ report "no third-party font requests" \
 # guard someone deletes. This rule covers the CHROME (src/, config); docs/**
 # prose may name a provider where it is technically necessary — see the note at
 # the top of this file about the retired check-provider-leak.mjs.
+#
+# The advertising family was added with the epic that brought an Advertising row
+# to the capability table. Say plainly what that does and does not buy: the row
+# itself lives under docs/**, which this rule deliberately does not scan, so this
+# extension does NOT cover the content that motivated it. It covers the chrome,
+# which is worth having and keeps this list identical to the site's, and the
+# narrow spelling of `meta` is not a preference — the bare word matches `<meta>`
+# elements and the ordinary Spanish noun. Measured on this repo's chrome before
+# being written: 0 findings.
 # shellcheck disable=SC2086
-m=$(scan '(?i)(?<![-\w])(?:openai|anthropic|migo|tributax|pixabay|pexels|valueserp|publisuites|nicho\.ai|stripe|resend)(?![-\w])' \
+m=$(scan '(?i)(?<![-\w])(?:openai|anthropic|migo|tributax|pixabay|pexels|valueserp|publisuites|nicho\.ai|stripe|resend|meta[ -](?:ads|business|platforms)|facebook|instagram)(?![-\w])' \
   $SRC_FILES $CONFIG_FILES)
 report "no external provider names in the chrome" \
        "capabilities are presented as native product features" "$m"

@@ -146,6 +146,10 @@ expect_caught "external provider names" \
   "a provider named in the chrome" \
   "printf 'export const paymentProvider = \"Stripe\";\n' >> src/components/Icon/icons.ts"
 
+expect_caught "external provider names" \
+  "an ad network named in the chrome" \
+  "printf 'export const adNetwork = \"Meta Ads\";\n' >> src/components/Icon/icons.ts"
+
 # ── Control: the guard must be sensitive to comments in the RIGHT direction ──
 # Documentation that names a retired pattern must NOT be a finding, or the guard
 # becomes something people silence instead of fix.

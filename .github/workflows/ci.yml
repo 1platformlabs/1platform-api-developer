@@ -90,6 +90,23 @@ jobs:
           set -euo pipefail
           pnpm check:contract
 
+      # The capability table is nothing but anchors into the API reference, and
+      # onBrokenAnchors cannot police them: the reference renders client-side,
+      # so at build time none of its ids exist and 'throw' fails on all of them
+      # (measured: 21 of 21 on an untouched tree). This reads the same spec the
+      # reference renders and checks that every slug names a tag that is in it.
+      - name: API-anchor guard — self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:anchors:self-test
+
+      - name: API-anchor guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:anchors
+
       # onBrokenLinks:'throw' — a bad internal link fails here.
       - name: Build
         shell: bash

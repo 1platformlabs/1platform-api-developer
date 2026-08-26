@@ -336,14 +336,19 @@ not about the literal strings.
   Here: Soluciones · Funciones · Precios · Documentación · Blog · "Comenzar gratis".
 - Cross-subdomain links point at `https://1platform.pro/<page>/` with
   `target: '_self'`; the auto-appended external-link icon is hidden.
-- **Solutions dropdown** — five items, a rule, then the catch-all, in this order:
+- **Solutions dropdown** — seven items, a rule, then the catch-all, in this order.
+  The first five are merchant capabilities and the last two are platform ones,
+  which is why Deliveries and Advertising sit *before* Whitelabel rather than at
+  the end:
   1. Online Store → `/solutions/online-store/`
   2. Website Builder → `/solutions/website/`
   3. AI Content → `/solutions/content/`
-  4. Whitelabel Dashboard → `/solutions/whitelabel/`
-  5. Payments & Invoicing → `/payments-invoicing/`
-  6. *(divider)*
-  7. View all solutions → `/solutions/`
+  4. Deliveries → `/solutions/deliveries/`
+  5. Advertising → `/solutions/ads/`
+  6. Whitelabel Dashboard → `/solutions/whitelabel/`
+  7. Payments & Invoicing → `/payments-invoicing/`
+  8. *(divider)*
+  9. View all solutions → `/solutions/`
 - **Docs entry:** single link, no dropdown. Here it points to `/`.
 - **CTA:** → `https://app.1platform.pro`, accent button, `min-height: 44px`.
 - **Logo:** the "1" is a cobalt rounded-square node (1.32em, 0.26em radius),

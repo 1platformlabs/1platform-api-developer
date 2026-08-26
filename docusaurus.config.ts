@@ -130,6 +130,19 @@ const config: Config = {
   baseUrl: '/',
 
   onBrokenLinks: 'throw',
+  // Deliberately NOT 'throw', and this is the measurement rather than a
+  // preference. The API reference is a Scalar plugin that renders CLIENT-SIDE
+  // from static/openapi/<id>.json, so its `tag/...` ids do not exist in the
+  // HTML Docusaurus inspects at build time. Turning this to 'throw' on an
+  // otherwise untouched tree failed the build reporting ALL 21 existing
+  // anchors as broken — including rows that demonstrably work on the live
+  // site. It cannot tell a good anchor from a bad one here, so as a gate it
+  // would only teach someone to switch it off.
+  //
+  // The half that does break — a slug that names no tag, because of a typo or
+  // an upstream rename — is checked by scripts/check-api-anchors.mjs, which
+  // reads the same spec the reference renders and ships with its own self-test.
+  onBrokenAnchors: 'warn',
 
   // ─── Typography ───────────────────────────────────────────────────────────
   // The @font-face rules live HERE rather than in src/css/custom.css, and the
@@ -352,6 +365,8 @@ const config: Config = {
             {href: 'https://1platform.pro/solutions/online-store/', label: 'Tienda online', target: '_self'},
             {href: 'https://1platform.pro/solutions/website/', label: 'Creador de sitios web', target: '_self'},
             {href: 'https://1platform.pro/solutions/content/', label: 'Contenido con IA', target: '_self'},
+            {href: 'https://1platform.pro/solutions/deliveries/', label: 'Envíos', target: '_self'},
+            {href: 'https://1platform.pro/solutions/ads/', label: 'Publicidad', target: '_self'},
             {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Panel white-label', target: '_self'},
             {href: 'https://1platform.pro/payments-invoicing/', label: 'Pagos y facturación', target: '_self'},
             // The site separates the five solutions from the catch-all link

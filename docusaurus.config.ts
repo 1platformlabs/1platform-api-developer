@@ -170,6 +170,9 @@ const config: Config = {
         "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-500-normal.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}",
         "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-600-normal.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}",
         "@font-face{font-family:'JetBrains Mono';src:url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
+        // Fourth family, ported from the marketing site with its home redesign:
+        // the shared footer's heading is set in it on every page of this portal.
+        "@font-face{font-family:'Instrument Serif';src:url('/fonts/instrument-serif-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
       ].join(''),
     },
     // The portal is light-only (see colorMode below). Declaring it means the
@@ -194,6 +197,16 @@ const config: Config = {
       attributes: {
         rel: 'preload',
         href: '/fonts/inter-latin-400-normal.woff2',
+        as: 'font',
+        type: 'font/woff2',
+        crossorigin: 'anonymous',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preload',
+        href: '/fonts/instrument-serif-latin-400-normal.woff2',
         as: 'font',
         type: 'font/woff2',
         crossorigin: 'anonymous',
@@ -355,6 +368,13 @@ const config: Config = {
     navbar: {
       // Mirrors the marketing website navbar (1platform.pro) — keep item order
       // and labels in sync with 1platform-website/src/components/Header.astro.
+      //
+      // Since the site's home redesign (epic home-landing-redesign, D-3/D-4)
+      // none of the left items is VISIBLE in the bar: they live in the panel
+      // the menu button opens, at every width (see src/css/custom.css and the
+      // Navbar/MobileSidebar swizzle). The bar shows the brand pill and two
+      // calls to action, like the site. The item list itself is unchanged —
+      // it IS the panel's content.
       items: [
         {
           type: 'dropdown',
@@ -384,7 +404,8 @@ const config: Config = {
           activeBaseRegex: '^/(docs|api-reference)?/?$|^/(docs|api-reference)/.*',
         },
         {href: 'https://1platform.pro/blog/', label: 'Blog', position: 'left', target: '_self'},
-        {href: 'https://app.1platform.pro', label: 'Comenzar gratis', position: 'right', className: 'navbar__cta'},
+        {href: 'https://app.1platform.pro/app/', label: 'Iniciar sesión', position: 'right', className: 'navbar__signin'},
+        {href: 'https://app.1platform.pro/app/', label: 'Comenzar gratis', position: 'right', className: 'navbar__cta'},
       ],
     },
     // Footer content is rendered by the custom swizzle at src/theme/Footer/index.tsx.

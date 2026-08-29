@@ -2,6 +2,21 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Chrome espejo del rediseño de la home del sitio
+
+- Navbar: píldora 230 × 42 con la marca y el botón de menú, dos CTAs de 44 px
+  («Iniciar sesión» amarillo · «Comenzar gratis» naranja AA); los ítems viven
+  en el panel a TODO ancho (swizzle wrap de `Navbar/MobileSidebar`, con Escape
+  añadido); el buscador se queda en la barra.
+- Footer: la tarjeta del sitio — marca de agua SVG, alta por `mailto:`, tres
+  columnas (PRODUCTO con las 7 soluciones, EMPRESA con Precios, RECURSOS),
+  fila legal — sin CTA de cierre y sin el conteo fabricado que el contrato
+  viejo arrastraba.
+- Cuarta familia autohospedada: Instrument Serif (OFL) con su licencia,
+  `@font-face` + preload en `headTags`; umbrales del guard 7/7/4/3.
+- Tokens `--ref-*` en el layer de `custom.css`, con las dos tintas AA; gate
+  nuevo `check:chrome-contrast` (+ self-test) cableado al CI.
+
 ## [Unreleased]
 
 ### Added

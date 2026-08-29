@@ -69,6 +69,22 @@ jobs:
           set -euo pipefail
           pnpm check:tells
 
+      # The chrome ported from the marketing site draws with the --ref-* tokens;
+      # this pins every text/surface pair to AA (site epic home-landing-redesign,
+      # LMW-12 CA-7). Self-test first: a checker nobody has watched fail is not
+      # a gate.
+      - name: Chrome contrast — self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:chrome-contrast:self-test
+
+      - name: Chrome contrast
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:chrome-contrast
+
       # Same discipline for the contract-drift gate: watch it fail on every one
       # of its tells — and pass on legitimate content — before trusting a green.
       # Its false-positive cases are as load-bearing as its false-negative ones:

@@ -109,10 +109,19 @@ export default function Footer(): ReactNode {
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>
-        <div className={styles.watermark} aria-hidden="true">
-          <span className={styles.watermarkMark}>1</span>
-          <span className={styles.watermarkText}>Platform</span>
-        </div>
+        {/* SVG, not HTML text (mirrors the site): sighted readers see the
+            watermark however hidden from AT, so axe's color-contrast applies
+            to HTML glyphs — a 20 % watermark is a drawing, and as SVG it is
+            one. */}
+        <svg className={styles.watermark} viewBox="0 0 1037 186" aria-hidden="true" focusable="false">
+          <rect x="0" y="0" width="186" height="186" rx="34" className={styles.watermarkNode} />
+          <text x="93" y="100" textAnchor="middle" dominantBaseline="central" className={styles.watermarkOne}>
+            1
+          </text>
+          <text x="210" y="100" dominantBaseline="central" className={styles.watermarkWord}>
+            Platform
+          </text>
+        </svg>
 
         <div className={styles.card}>
           <div className={styles.top}>

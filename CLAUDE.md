@@ -68,9 +68,10 @@ pnpm clear            # Clear Docusaurus cache
 │   │   └── HomeCards/                # Landing card grids
 │   ├── css/custom.css                # Token layer + all theming
 │   ├── pages/index.tsx               # Redirect: / → /docs/
-│   └── theme/                        # Exactly three swizzles
+│   └── theme/                        # Exactly four swizzles
 │       ├── Logo/
 │       ├── Footer/
+│       ├── Navbar/MobileSidebar/     #   wrap: the panel renders at EVERY width
 │       └── DocSidebarItem/Category/
 ├── static/
 │   ├── fonts/                        # 6 woff2 + 3 OFL licences (self-hosted)
@@ -125,9 +126,27 @@ hardcode the document list here.
 ## Design System
 
 The portal shares **one** design system with `1platform.pro`. It is not a
-sibling palette or a "docs variant" — the same tokens, the same three
-typefaces, the same logo. A visitor clicking "Docs" on the marketing site should
-not be able to tell they changed origin.
+sibling palette or a "docs variant" — the same tokens, the same FOUR
+typefaces (Instrument Serif joined with the site's home redesign), the same
+logo. A visitor clicking "Docs" on the marketing site should not be able to
+tell they changed origin.
+
+### The shared chrome (site epic home-landing-redesign)
+
+The navbar and footer mirror the site's redesigned chrome and draw with the
+`--ref-*` tokens (copied verbatim from the site's `global.css` — the site is
+upstream): a 74 px transparent bar with a 230 × 42 dark pill (brand + menu
+button) and two 44 px CTAs («Iniciar sesión» on yellow, «Comenzar gratis» on
+the AA orange); **no navigation link is visible in the bar at any width** —
+the items live in the panel the button opens. That panel is the theme's own
+mobile sidebar, rendered at every width by the wrap swizzle in
+`src/theme/Navbar/MobileSidebar/` (measured: `useNavbarMobileSidebar()` only
+renders it on mobile, so CSS alone cannot do this), with Escape added. The
+search box stays in the bar — a docs portal without search is not a portal.
+The footer is the site's card: SVG watermark, `mailto:` sign-up, PRODUCTO /
+EMPRESA / RECURSOS, legal row — and no closing CTA. Every text/surface pair of
+this chrome is pinned to AA by `scripts/check-chrome-contrast.mjs`, which runs
+in CI next to the design guard.
 
 ### Where a decision lives
 

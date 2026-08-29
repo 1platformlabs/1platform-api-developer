@@ -170,6 +170,9 @@ const config: Config = {
         "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-500-normal.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}",
         "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-600-normal.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}",
         "@font-face{font-family:'JetBrains Mono';src:url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
+        // Fourth family, ported from the marketing site with its home redesign:
+        // the shared footer's heading is set in it on every page of this portal.
+        "@font-face{font-family:'Instrument Serif';src:url('/fonts/instrument-serif-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
       ].join(''),
     },
     // The portal is light-only (see colorMode below). Declaring it means the
@@ -194,6 +197,16 @@ const config: Config = {
       attributes: {
         rel: 'preload',
         href: '/fonts/inter-latin-400-normal.woff2',
+        as: 'font',
+        type: 'font/woff2',
+        crossorigin: 'anonymous',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preload',
+        href: '/fonts/instrument-serif-latin-400-normal.woff2',
         as: 'font',
         type: 'font/woff2',
         crossorigin: 'anonymous',

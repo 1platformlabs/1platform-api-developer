@@ -214,10 +214,12 @@ m=$({
   woff_count=$(find static/fonts -name '*.woff2' 2>/dev/null | wc -l | tr -d ' ')
   licence_count=$(find static/fonts -name 'LICENSE-*.txt' 2>/dev/null | wc -l | tr -d ' ')
   preload_count=$(grep -c "rel: 'preload'" docusaurus.config.ts || true)
-  [ "${face_count:-0}" -ge 6 ] || echo "only ${face_count:-0} @font-face rules in docusaurus.config.ts (expected 6)"
-  [ "${woff_count:-0}" -ge 6 ] || echo "only ${woff_count:-0} .woff2 files in static/fonts/ (expected 6)"
-  [ "${licence_count:-0}" -ge 3 ] || echo "only ${licence_count:-0} LICENSE-*.txt in static/fonts/ (the OFL travels with the files)"
-  [ "${preload_count:-0}" -ge 2 ] || echo "only ${preload_count:-0} font preloads in docusaurus.config.ts headTags (expected 2)"
+  # 7/7/4/3 since the home redesign of the marketing site added a fourth family
+  # (Instrument Serif) that the shared footer draws with on every page here.
+  [ "${face_count:-0}" -ge 7 ] || echo "only ${face_count:-0} @font-face rules in docusaurus.config.ts (expected 7)"
+  [ "${woff_count:-0}" -ge 7 ] || echo "only ${woff_count:-0} .woff2 files in static/fonts/ (expected 7)"
+  [ "${licence_count:-0}" -ge 4 ] || echo "only ${licence_count:-0} LICENSE-*.txt in static/fonts/ (the OFL travels with the files)"
+  [ "${preload_count:-0}" -ge 3 ] || echo "only ${preload_count:-0} font preloads in docusaurus.config.ts headTags (expected 3)"
 
   # Every preloaded file must actually exist under static/fonts/. A preload
   # pointing at a path the build does not serve is a silent 24 KB of nothing.

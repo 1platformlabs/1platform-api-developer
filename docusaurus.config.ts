@@ -368,6 +368,13 @@ const config: Config = {
     navbar: {
       // Mirrors the marketing website navbar (1platform.pro) — keep item order
       // and labels in sync with 1platform-website/src/components/Header.astro.
+      //
+      // Since the site's home redesign (epic home-landing-redesign, D-3/D-4)
+      // none of the left items is VISIBLE in the bar: they live in the panel
+      // the menu button opens, at every width (see src/css/custom.css and the
+      // Navbar/MobileSidebar swizzle). The bar shows the brand pill and two
+      // calls to action, like the site. The item list itself is unchanged —
+      // it IS the panel's content.
       items: [
         {
           type: 'dropdown',
@@ -397,7 +404,8 @@ const config: Config = {
           activeBaseRegex: '^/(docs|api-reference)?/?$|^/(docs|api-reference)/.*',
         },
         {href: 'https://1platform.pro/blog/', label: 'Blog', position: 'left', target: '_self'},
-        {href: 'https://app.1platform.pro', label: 'Comenzar gratis', position: 'right', className: 'navbar__cta'},
+        {href: 'https://app.1platform.pro/app/', label: 'Iniciar sesión', position: 'right', className: 'navbar__signin'},
+        {href: 'https://app.1platform.pro/app/', label: 'Comenzar gratis', position: 'right', className: 'navbar__cta'},
       ],
     },
     // Footer content is rendered by the custom swizzle at src/theme/Footer/index.tsx.

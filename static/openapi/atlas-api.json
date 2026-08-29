@@ -27739,7 +27739,7 @@
           "platform:provisioning"
         ],
         "summary": "Provision a new Atlas tenant + operator (service-to-service)",
-        "description": "Create the tenant + config presets + operator in one transaction.\n\nIdempotency is the caller's job: a duplicate ``slug`` returns 409\n``TENANT_SLUG_TAKEN`` (the 1platform-api job then re-reads the tenant\nby slug and continues). The service key's own ``tenant_id`` is not\nconsulted for authorization — this route mints a *new* tenant.",
+        "description": "Create the tenant + config presets + operator in one transaction.\n\nIdempotency is the caller's job: a duplicate ``slug`` returns 409\n``TENANT_SLUG_TAKEN`` (the 1platform-api job then re-reads the tenant\nby slug and continues). The service key's own ``tenant_id`` is not\nconsulted for authorization — this route mints a *new* tenant. That is\nalso what makes accepting a platform-scoped key here safe: the hazard the\nscope guard exists for is a tenant-scoped surface receiving\n``tenant_id=None``, and no line below reads it.",
         "operationId": "provision_tenant_api_v1_platform_tenants_post",
         "parameters": [
           {
@@ -27787,12 +27787,12 @@
             "description": "Integration key lacks tenants.provision capability"
           },
           "409": {
-            "description": "Slug already in use by another tenant.",
+            "description": "Slug already in use by another tenant. (TENANT_SLUG_TAKEN) The requested primary_domain already resolves to another tenant. (HOST_ALIAS_CONFLICT)",
             "content": {
               "application/json": {
                 "example": {
                   "detail": {
-                    "code": "TENANT_SLUG_TAKEN"
+                    "code": "HOST_ALIAS_CONFLICT"
                   }
                 }
               }
@@ -27982,6 +27982,204 @@
           },
           "422": {
             "description": "Invalid email or domain"
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/integration-keys": {
+      "post": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Mint (or rotate) a tenant-scoped integration key and return its contract",
+        "description": "Issue the credential, or rotate the live one, and return the contract.\n\n201 when created, 200 when an existing live key was rotated. Rotation is an\n``UPDATE`` of the same row, not a revoke-and-insert: the unique index is\npartial on ``status = 'active'`` and revocation keeps the row, so inserting\nalongside would either duplicate a live key (before the index) or 500\nagainst it (after).",
+        "operationId": "platform.tenants.integrationKeys.issue",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformIntegrationKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A live key existed and was rotated in place",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformIntegrationKeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.integration_keys.issue, or is not platform-scoped"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "This service cannot produce the full webhook contract.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INTEGRATION_CONTRACT_UNAVAILABLE"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/plans": {
+      "post": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Replace a tenant's paid catalog (service-to-service)",
+        "description": "Validate the whole catalog, then replace it under a row lock.",
+        "operationId": "platform.tenants.plans.replace",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformPlansRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformPlansResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.plans.write, or is not platform-scoped"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A plan failed validation; nothing was written.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "INVALID_PLAN"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -40019,6 +40217,87 @@
         ],
         "title": "PlansResponse"
       },
+      "PlatformIntegrationKeyRequest": {
+        "properties": {
+          "vendor": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9_-]+$",
+            "title": "Vendor",
+            "description": "Integrator this key is issued to.",
+            "default": "bower"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PlatformIntegrationKeyRequest",
+        "description": "What the control plane may choose: the vendor. That is all.\n\n``extra=\"forbid\"`` so a caller that still sends the retired\n``idempotency_key`` (or a ``capabilities`` list it hopes will be honoured)\ngets a loud 422 instead of having it silently dropped."
+      },
+      "PlatformIntegrationKeyResponse": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "title": "Api Key"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "tenant_slug": {
+            "type": "string",
+            "title": "Tenant Slug"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "admin_base_url": {
+            "type": "string",
+            "title": "Admin Base Url"
+          },
+          "webhook_target_url": {
+            "type": "string",
+            "title": "Webhook Target Url"
+          },
+          "webhook_secret": {
+            "type": "string",
+            "title": "Webhook Secret"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "rotated": {
+            "type": "boolean",
+            "title": "Rotated",
+            "description": "True when an existing live key was rotated in place rather than a new one created. The previous secret stops working immediately."
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key",
+          "prefix",
+          "scope",
+          "tenant_slug",
+          "capabilities",
+          "admin_base_url",
+          "webhook_target_url",
+          "webhook_secret",
+          "expires_at",
+          "rotated"
+        ],
+        "title": "PlatformIntegrationKeyResponse",
+        "description": "The complete webhook contract. The secret and the key appear ONCE."
+      },
       "PlatformMetricRow": {
         "properties": {
           "tenant_id": {
@@ -40146,6 +40425,53 @@
           "created"
         ],
         "title": "PlatformOperatorCredentialResponse"
+      },
+      "PlatformPlansRequest": {
+        "properties": {
+          "plans": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Plans",
+            "description": "Full replacement catalog for this tenant."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plans"
+        ],
+        "title": "PlatformPlansRequest",
+        "description": "The COMPLETE catalog, not a patch.\n\nReplacement rather than merge because the caller (the provisioning step and\nthe backfill) knows the catalog it wants and a merge would make \"remove the\njunk plan\" — an explicit requirement for one tenant — inexpressible.\n\n⚠️ The corollary is on the caller: replacing means a tenant with a catalog\nit curated by hand loses whatever this request omits. Callers that do not\nintend that must send the existing entries back along with the new one."
+      },
+      "PlatformPlansResponse": {
+        "properties": {
+          "tenant_slug": {
+            "type": "string",
+            "title": "Tenant Slug"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/AdminPlanView"
+            },
+            "type": "array",
+            "title": "Plans"
+          },
+          "replaced": {
+            "type": "integer",
+            "title": "Replaced"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_slug",
+          "plans",
+          "replaced"
+        ],
+        "title": "PlatformPlansResponse"
       },
       "PlatformTenantProvisionRequest": {
         "properties": {

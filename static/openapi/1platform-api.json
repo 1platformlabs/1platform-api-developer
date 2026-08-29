@@ -5281,8 +5281,8 @@
         "tags": [
           "API Developer"
         ],
-        "summary": "Reveal an approved app token, once",
-        "description": "Generates the secret of a token an administrator approved and returns it. It exists nowhere before this call — which is how the administrator who granted it is unable to see it — and only its hash exists afterwards.\n\nOnly the assigned user can call this. A second call is a 409.\n\n**Auth:** app token + user token.",
+        "summary": "Show one of my tokens, once",
+        "description": "Shows the secret of one of the caller's own credentials for the only time it can be shown. The two kinds reach that promise by opposite routes, and the endpoint is the same:\n\n- **App token** (`ak-`): the secret is GENERATED here. It exists nowhere before this call, which is how the administrator who approved the grant is unable to have seen it, and only its hash exists after.\n- **User token** (`sk-`): the secret already exists and nothing is rotated — integrations presenting it keep working. Only available while nobody has looked yet AND the value is still recoverable, which is what `secret_recoverable` on the listing reports. A token minted through the panel handed its secret back at creation and kept only a SHA-256; it answers `credential_secret_unrecoverable` (409), and the way to get a usable one is to create a new token.\n\nOnly the owner can call this, and a second call is a 409.\n\n**Auth:** app token + user token.",
         "operationId": "revealMyApiCredential",
         "security": [
           {
@@ -5356,7 +5356,7 @@
             }
           },
           "409": {
-            "description": "Already revealed",
+            "description": "Already revealed (`credential_already_revealed`), never stored (`credential_secret_unrecoverable`) or revoked (`credential_revoked`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6716,7 +6716,7 @@
           "Payments"
         ],
         "summary": "Create Payment Transaction",
-        "description": "Create a new payment transaction and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Payment is processed via the integrated payment service\n- Returns a `payment_url` where the user completes checkout\n- Transaction starts with status `CREATED`; status updates arrive via webhook\n- Optional `return_url`: where the payer's browser lands after checkout. HTTPS, and its host must be registered via `POST /webhooks/config/domains`. Two variables are substituted into it, URL-encoded: `{{transaction_id}}` and `{{merchant_reference}}`. It is a redirect, not a notification — the webhook is still the only thing that settles an order\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 25.00, \"currency\": \"USD\", \"description\": \"Credit purchase\"}'\n```",
+        "description": "Create a new payment transaction and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Payment is processed via the integrated payment service\n- Returns a `payment_url` where the user completes checkout\n- Transaction starts with status `CREATED`; status updates arrive via webhook\n- Optional `return_url`: where the payer's browser lands after checkout. HTTPS, and its host must be registered via `POST /webhooks/config/domains`. Two variables are substituted into it, URL-encoded: `{{transaction_id}}` and `{{merchant_reference}}`. It is a redirect, not a notification — the webhook is still the only thing that settles an order\n- Optional `branch_id`: charge on behalf of a commerce's BRANCH, in **that commerce's currency**. A branch and not a commerce because the branch is the unit the invoicing API already speaks — an invoice certifies under ITS establishment code — so an integration that emits invoices already holds one. Without it the currency comes from your primary balance, which misprices every commerce that trades in another one\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 25.00, \"currency\": \"USD\", \"description\": \"Credit purchase\"}'\n```\n\n**Charging in a commerce's currency (naming its branch):**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/transactions \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"amount\": 449.99, \"branch_id\": \"6a5f8e7d93f925bfb527997a\", \"description\": \"Subscription INV-2026-10\"}'\n```",
         "operationId": "createPaymentTransaction",
         "security": [
           {
@@ -6758,6 +6758,7 @@
                   "campaign_id": "abc123"
                 },
                 "merchant_reference": "order_abc123",
+                "branch_id": "6a5f8e7d93f925bfb527997a",
                 "return_url": "https://shop.example.com/checkout/result?order={{merchant_reference}}",
                 "customer_email": "ana@example.com"
               }
@@ -6813,8 +6814,28 @@
               }
             }
           },
+          "403": {
+            "description": "Your role on the commerce that owns the branch named by `branch_id` does not allow taking payments (a viewer cannot charge).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "Billing record not found for user",
+            "description": "Billing record not found for user. Also returned when `branch_id` is malformed, names no branch, or belongs to a commerce that is not yours — deliberately the same status, so the response cannot be used to confirm a branch or commerce exists — and when you hold no balance in the commerce's currency (the message names it).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The commerce that owns the branch named by `branch_id` is archived, so it can no longer take new charges. `data.code` = `business_archived`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31365,6 +31386,148 @@
         }
       }
     },
+    "/api/v1/heatmap/t/{public_id}.js": {
+      "get": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Load the heatmap collector for a site (public)",
+        "description": "Serves the JavaScript collector for one site. This is what a site installs by pasting a single async script tag into its page head; everything else — sampling, listeners, route changes, batching and sending — happens inside the returned script.\n\n- **Auth:** none. The path carries a stable, non-guessable ADDRESS, not a credential.\n- **Always `200`, never `404`.** An unknown address, a site switched off and a site over its monthly ceiling all return an inert body: a 404 in a customer's console is a support ticket, and it would confirm which addresses exist.\n- **Cached privately** for 5 minutes with an `ETag`, so a repeat visit revalidates instead of re-reading configuration. `private` and not `public`: the body embeds this site's capture credential, and a shared cache holding it would also keep serving it after a rotation.\n- **Rate limit:** per site address and client network.",
+        "operationId": "getHeatmapCollector",
+        "parameters": [
+          {
+            "name": "public_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The site's stable public address.",
+              "title": "Public Id"
+            },
+            "description": "The site's stable public address."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The collector, or an inert body when there is nothing to capture",
+            "content": {
+              "application/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The cached collector is still current"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/heatmap/{token}/samples": {
+      "post": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Send a batch of heatmap samples (public)",
+        "description": "Anonymous ingest of one page view's worth of samples, sent by the collector with `navigator.sendBeacon`.\n\n- **Auth:** none. The capture token in the path is the capability.\n- **Content type: `text/plain`**, deliberately. That keeps the request SIMPLE so the browser sends no preflight; the server reads the raw body and parses it itself.\n- Answers `202` whenever the token exists — including when the site is switched off or over its ceiling, which the browser cannot act on and which distinguishing would turn into an oracle.\n- A path that matches none of the site's declared route patterns is counted as discarded and never stored.",
+        "operationId": "ingestHeatmapSamples",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The site's capture token.",
+              "title": "Token"
+            },
+            "description": "The site's capture token."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Batch processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "accepted": 3,
+                    "discarded": 0
+                  },
+                  "msg": "Accepted"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown capture token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unparseable or invalid batch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              },
+              "example": "{\"path\": \"/books/el-quijote\", \"viewport\": \"desktop\", \"clicks\": [{\"rx\": 0.23, \"ry\": 0.38, \"n\": 2}], \"scroll\": {\"depth\": 0.66}}"
+            }
+          }
+        }
+      }
+    },
     "/api/v1/pay/{token}": {
       "get": {
         "tags": [
@@ -33825,6 +33988,1138 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/heatmap/sites": {
+      "post": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Register a site to measure",
+        "description": "Creates a heatmap site and returns its capture token and the exact script tag to paste.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 20 req/min\n- `page_keys` is a list of route PATTERNS. An empty list captures NOTHING — it is not a wildcard.",
+        "operationId": "createHeatmapSite",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeatmapSiteCreateRequest"
+              },
+              "example": {
+                "host": "shop.example",
+                "enabled": true,
+                "page_keys": [
+                  "/",
+                  "/catalog",
+                  "/books/[slug]"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Site registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6690aaaa000000000000b001",
+                    "host": "shop.example",
+                    "public_id": "Qk1sT3ZlbHkxMjM0NTY3OA",
+                    "token": "EXAMPLE-capture-token-not-a-real-one",
+                    "script_url": "https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js",
+                    "tag_snippet": "<script async src=\"https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js\"></script>",
+                    "enabled": true,
+                    "page_keys": [
+                      "/",
+                      "/catalog",
+                      "/books/[slug]"
+                    ],
+                    "samples_this_month": 18432,
+                    "monthly_sample_cap": 1000000,
+                    "discarded_this_month": 120,
+                    "discarded_paths": {
+                      "/library/*": 120
+                    },
+                    "last_sample_at": "2026-08-27T11:04:00Z",
+                    "created_at": "2026-08-01T09:00:00Z",
+                    "updated_at": "2026-08-27T11:04:00Z"
+                  },
+                  "msg": "Heatmap site created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Host already measured, or site limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "List the caller's heatmap sites",
+        "description": "Paginated, newest first.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 50 req/min",
+        "operationId": "listHeatmapSites",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Sites per page (max 100).",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Sites per page (max 100)."
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Sites to skip.",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Sites to skip."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated sites",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6690aaaa000000000000b001",
+                        "host": "shop.example",
+                        "public_id": "Qk1sT3ZlbHkxMjM0NTY3OA",
+                        "token": "EXAMPLE-capture-token-not-a-real-one",
+                        "script_url": "https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js",
+                        "tag_snippet": "<script async src=\"https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js\"></script>",
+                        "enabled": true,
+                        "page_keys": [
+                          "/",
+                          "/catalog",
+                          "/books/[slug]"
+                        ],
+                        "samples_this_month": 18432,
+                        "monthly_sample_cap": 1000000,
+                        "discarded_this_month": 120,
+                        "discarded_paths": {
+                          "/library/*": 120
+                        },
+                        "last_sample_at": "2026-08-27T11:04:00Z",
+                        "created_at": "2026-08-01T09:00:00Z",
+                        "updated_at": "2026-08-27T11:04:00Z"
+                      }
+                    ],
+                    "total": 1,
+                    "limit": 20,
+                    "skip": 0
+                  },
+                  "msg": "Heatmap sites retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/heatmap/sites/{site_id}": {
+      "get": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Get one heatmap site",
+        "description": "Returns the site, its capture token and the tag to paste.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 50 req/min\n- A site that belongs to another workspace or another owner answers `404`, never `403`: a 403 confirms it exists.",
+        "operationId": "getHeatmapSite",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Heatmap site id.",
+              "title": "Site Id"
+            },
+            "description": "Heatmap site id."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The site",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6690aaaa000000000000b001",
+                    "host": "shop.example",
+                    "public_id": "Qk1sT3ZlbHkxMjM0NTY3OA",
+                    "token": "EXAMPLE-capture-token-not-a-real-one",
+                    "script_url": "https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js",
+                    "tag_snippet": "<script async src=\"https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js\"></script>",
+                    "enabled": true,
+                    "page_keys": [
+                      "/",
+                      "/catalog",
+                      "/books/[slug]"
+                    ],
+                    "samples_this_month": 18432,
+                    "monthly_sample_cap": 1000000,
+                    "discarded_this_month": 120,
+                    "discarded_paths": {
+                      "/library/*": 120
+                    },
+                    "last_sample_at": "2026-08-27T11:04:00Z",
+                    "created_at": "2026-08-01T09:00:00Z",
+                    "updated_at": "2026-08-27T11:04:00Z"
+                  },
+                  "msg": "Heatmap site retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Update a heatmap site",
+        "description": "Partial update of the capture switch, the sampling rate and the route patterns. An omitted field is left alone; an explicit `null` on `sample_rate` returns it to the platform default.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 20 req/min",
+        "operationId": "updateHeatmapSite",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Heatmap site id.",
+              "title": "Site Id"
+            },
+            "description": "Heatmap site id."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeatmapSiteUpdateRequest"
+              },
+              "example": {
+                "enabled": true,
+                "page_keys": [
+                  "/",
+                  "/catalog",
+                  "/books/[slug]"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated site",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6690aaaa000000000000b001",
+                    "host": "shop.example",
+                    "public_id": "Qk1sT3ZlbHkxMjM0NTY3OA",
+                    "token": "EXAMPLE-capture-token-not-a-real-one",
+                    "script_url": "https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js",
+                    "tag_snippet": "<script async src=\"https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js\"></script>",
+                    "enabled": true,
+                    "page_keys": [
+                      "/",
+                      "/catalog",
+                      "/books/[slug]"
+                    ],
+                    "samples_this_month": 18432,
+                    "monthly_sample_cap": 1000000,
+                    "discarded_this_month": 120,
+                    "discarded_paths": {
+                      "/library/*": 120
+                    },
+                    "last_sample_at": "2026-08-27T11:04:00Z",
+                    "created_at": "2026-08-01T09:00:00Z",
+                    "updated_at": "2026-08-27T11:04:00Z"
+                  },
+                  "msg": "Heatmap site updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Delete a heatmap site and its data",
+        "description": "Removes the site and every aggregate derived from it — grid cells and scroll bands alike. Mongo has no foreign keys, so the cascade is explicit; retention would not reach them, because it filters by age.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 20 req/min",
+        "operationId": "deleteHeatmapSite",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Heatmap site id.",
+              "title": "Site Id"
+            },
+            "description": "Heatmap site id."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6690aaaa000000000000b001"
+                  },
+                  "msg": "Heatmap site deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/heatmap/sites/{site_id}/rotate-token": {
+      "post": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Rotate a site's capture token",
+        "description": "Mints a new capture token. The site's public ADDRESS does not change, so the tag already installed on the customer's page keeps working and picks up the new token when it next revalidates.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 20 req/min\n- For up to the 5-minute cache lifetime, browsers still holding the previous script send the old token and those batches answer `404`.",
+        "operationId": "rotateHeatmapSiteToken",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Heatmap site id.",
+              "title": "Site Id"
+            },
+            "description": "Heatmap site id."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6690aaaa000000000000b001",
+                    "token": "EXAMPLE-rotated-token-not-a-real-one",
+                    "public_id": "Qk1sT3ZlbHkxMjM0NTY3OA",
+                    "script_url": "https://api.1platform.pro/api/v1/heatmap/t/Qk1sT3ZlbHkxMjM0NTY3OA.js"
+                  },
+                  "msg": "Capture token rotated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/heatmap/sites/{site_id}/pages": {
+      "get": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "List the routes of a site that have data",
+        "description": "Routes with at least one stored sample in the window, busiest first. The window is anchored to the last day WITH DATA, not to today: the service runs in UTC and the reader does not.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 50 req/min",
+        "operationId": "listHeatmapPages",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Heatmap site id.",
+              "title": "Site Id"
+            },
+            "description": "Heatmap site id."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Window length in days.",
+              "default": 28,
+              "title": "Days"
+            },
+            "description": "Window length in days."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Routes with data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "page_key": "/books/[slug]",
+                        "total": 980
+                      }
+                    ],
+                    "range": {
+                      "from": "2026-07-31",
+                      "to": "2026-08-27"
+                    }
+                  },
+                  "msg": "Heatmap pages retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/heatmap/sites/{site_id}/maps/{kind}": {
+      "get": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Read one heatmap of a page",
+        "description": "One map in the envelope every map kind shares. `shape` says how to read `series` — `grid` for cells, `bands` for scroll depth — so a client branches on one field instead of memorising which kind is which.\n\n- **Kinds available:** clicks, scroll. A kind this version does not serve answers `422`.\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 50 req/min\n- `total` comes from the aggregation over the whole filtered set, never from the length of the returned page.",
+        "operationId": "getHeatmapMap",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Heatmap site id.",
+              "title": "Site Id"
+            },
+            "description": "Heatmap site id."
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Map kind: `clicks` or `scroll`.",
+              "title": "Kind"
+            },
+            "description": "Map kind: `clicks` or `scroll`."
+          },
+          {
+            "name": "page_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The route pattern to read.",
+              "default": "/",
+              "title": "Page Key"
+            },
+            "description": "The route pattern to read."
+          },
+          {
+            "name": "viewport",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Screen-width bucket: mobile, tablet or desktop.",
+              "default": "desktop",
+              "title": "Viewport"
+            },
+            "description": "Screen-width bucket: mobile, tablet or desktop."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Window length in days.",
+              "default": 28,
+              "title": "Days"
+            },
+            "description": "Window length in days."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The map",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "kind": "clicks",
+                    "shape": "grid",
+                    "grid": {
+                      "cols": 20,
+                      "rows": 30
+                    },
+                    "series": [
+                      {
+                        "gx": 4,
+                        "gy": 11,
+                        "count": 87
+                      },
+                      {
+                        "gx": 9,
+                        "gy": 2,
+                        "count": 41
+                      }
+                    ],
+                    "total": 1432,
+                    "range": {
+                      "from": "2026-07-31",
+                      "to": "2026-08-27"
+                    },
+                    "viewport": "desktop"
+                  },
+                  "msg": "Heatmap retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unsupported map kind",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -45708,6 +47003,260 @@
         }
       }
     },
+    "/api/v1/admin/api-credentials/{credential_id}/reveal": {
+      "post": {
+        "tags": [
+          "API Developer (admin)"
+        ],
+        "summary": "Show a user token once (superadmin)",
+        "description": "Returns the secret of one **user token** for the only time it can be returned, so an integration can start using it without its owner having to mint a new one.\n\nOnly works where the secret still exists: the tokens the 2026-08-01 migration adopted, whose clear value remains on the owning user document. Everything minted through the panel handed its secret back at creation and kept only a SHA-256, and answers `credential_secret_unrecoverable` (409) — for those, re-issue.\n\nNothing is generated and nothing is rotated: whatever presents this token keeps working. What the call spends is the look, and a second call is a 409.\n\n**Auth:** app token + user token, and the user must be a platform superadmin — a tenant `app_admin` is refused. Scoped to the caller's own workspace.",
+        "operationId": "adminRevealUserCredential",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Credential id (24-char ObjectId)",
+              "title": "Credential Id"
+            },
+            "description": "Credential id (24-char ObjectId)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revealed — the secret is in this response and nowhere else",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_CredentialSecretOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "66b2f1a2c3d4e5f60718293b",
+                    "kind": "user",
+                    "name": "App token",
+                    "masked": "sk-…9A1C",
+                    "status": "active",
+                    "is_bootstrap": false,
+                    "owner": {
+                      "user_id": "66aa0000000000000000000a",
+                      "email": "maria@acme.gt"
+                    },
+                    "created_at": "2026-08-01T18:04:55Z",
+                    "secret_recoverable": false,
+                    "secret": "sk-SHOWN-ONCE-…"
+                  },
+                  "msg": "Credential revealed"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not a user token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already revealed (`credential_already_revealed`), never stored (`credential_secret_unrecoverable`) or revoked (`credential_revoked`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/api-credentials/{credential_id}/reissue": {
+      "post": {
+        "tags": [
+          "API Developer (admin)"
+        ],
+        "summary": "Issue a new secret for a user token (superadmin)",
+        "description": "Mints a **new** secret for an existing user token and returns it once. The row keeps its id, name, owner and ceiling slot — only the secret changes — so nothing that references the credential has to be re-wired.\n\n**The previous secret stops authenticating as this returns.** Anything still presenting it is rejected on its next request. This is the answer for a token whose value was never stored, not a routine operation: warn the owner first, and check `last_used_at` before calling it on a token that is clearly in use.\n\nThe new value appears in this response and nowhere else. A value that was not captured is replaced by re-issuing again.\n\n**Auth:** app token + user token, and the user must be a platform superadmin. Scoped to the caller's own workspace.",
+        "operationId": "adminReissueUserCredential",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Credential id (24-char ObjectId)",
+              "title": "Credential Id"
+            },
+            "description": "Credential id (24-char ObjectId)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Re-issued — the value below is not retrievable again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_CredentialSecretOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "66b2f1a2c3d4e5f60718293b",
+                    "kind": "user",
+                    "name": "App token",
+                    "masked": "sk-…7dK3",
+                    "status": "active",
+                    "is_bootstrap": false,
+                    "owner": {
+                      "user_id": "66aa0000000000000000000a",
+                      "email": "maria@acme.gt"
+                    },
+                    "created_at": "2026-08-01T18:04:55Z",
+                    "secret_recoverable": false,
+                    "secret": "sk-NEW-SHOWN-ONCE-…"
+                  },
+                  "msg": "Credential re-issued"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a superadmin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not a user token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revoked (`credential_revoked`) or the workspace credential (`credential_bootstrap_protected`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/api-access/requests": {
       "get": {
         "tags": [
@@ -50823,6 +52372,28 @@
               false
             ]
           },
+          "secret_recoverable": {
+            "type": "boolean",
+            "title": "Secret Recoverable",
+            "description": "Whether the secret can still be shown, once. True only for a user token the 2026-08-01 migration adopted and that nobody has looked at yet: its clear value survives on the owning user document, which is that migration's rollback. False for every token minted through the panel — those were handed back at creation and only their hash was kept — and false once it has been revealed.",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "revealed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revealed At",
+            "description": "When the secret was shown, if it ever was. Explains why it cannot be again."
+          },
           "last_used_at": {
             "anyOf": [
               {
@@ -55039,6 +56610,28 @@
             "examples": [
               false
             ]
+          },
+          "secret_recoverable": {
+            "type": "boolean",
+            "title": "Secret Recoverable",
+            "description": "Whether the secret can still be shown, once. True only for a user token the 2026-08-01 migration adopted and that nobody has looked at yet: its clear value survives on the owning user document, which is that migration's rollback. False for every token minted through the panel — those were handed back at creation and only their hash was kept — and false once it has been revealed.",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "revealed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revealed At",
+            "description": "When the secret was shown, if it ever was. Explains why it cannot be again."
           },
           "last_used_at": {
             "anyOf": [
@@ -59811,6 +61404,28 @@
               false
             ]
           },
+          "secret_recoverable": {
+            "type": "boolean",
+            "title": "Secret Recoverable",
+            "description": "Whether the secret can still be shown, once. True only for a user token the 2026-08-01 migration adopted and that nobody has looked at yet: its clear value survives on the owning user document, which is that migration's rollback. False for every token minted through the panel — those were handed back at creation and only their hash was kept — and false once it has been revealed.",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "revealed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revealed At",
+            "description": "When the secret was shown, if it ever was. Explains why it cannot be again."
+          },
           "last_used_at": {
             "anyOf": [
               {
@@ -63073,6 +64688,123 @@
           "environment": "production",
           "service": "ok"
         }
+      },
+      "HeatmapSiteCreateRequest": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Host",
+            "description": "Hostname of the site, without scheme or path (`shop.example`)."
+          },
+          "website_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website Id",
+            "description": "Optional id of the 1Platform site this belongs to."
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether capture starts on.",
+            "default": false
+          },
+          "sample_rate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate",
+            "description": "Fraction of page views that report. Omit to use the platform default."
+          },
+          "page_keys": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^/[^\\s?#]*$",
+              "description": "A route PATTERN, not a concrete path: `/books/[slug]`, `/catalog`, `/`."
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Page Keys",
+            "description": "Route patterns to capture. An EMPTY list captures NOTHING — it is not a wildcard."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "host"
+        ],
+        "title": "HeatmapSiteCreateRequest",
+        "description": "Register a site to measure."
+      },
+      "HeatmapSiteUpdateRequest": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled",
+            "description": "Turn capture on or off."
+          },
+          "sample_rate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate",
+            "description": "Fraction of page views that report."
+          },
+          "page_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "pattern": "^/[^\\s?#]*$",
+                  "description": "A route PATTERN, not a concrete path: `/books/[slug]`, `/catalog`, `/`."
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Keys",
+            "description": "Replace the route patterns."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HeatmapSiteUpdateRequest",
+        "description": "Partial update. An omitted field is left as it is.\n\n``None`` means \"not supplied\" for every field here, which is why\n``sample_rate`` cannot be cleared through this route: the service reads\n``model_fields_set`` so an explicitly-sent ``null`` clears it and an omitted\none does not. Without that distinction a field can be set and never unset."
       },
       "I18nBundleResponse": {
         "properties": {
@@ -78397,9 +80129,24 @@
               }
             ],
             "title": "Currency",
-            "description": "Which of YOUR OWN balances to top up (MCB-08). Omit to use your primary billing — the previous behaviour. The server resolves the billing from (your user, this currency), so this names a currency and never a billing id: you cannot address someone else's balance even by guessing an id, because none is accepted here.",
+            "description": "Which of YOUR OWN balances to top up (MCB-08). Omit to use your primary billing — the previous behaviour — or send `branch_id` instead to charge in a commerce's own currency. The server resolves the billing from (your user, this currency), so this names a currency and never a billing id: you cannot address someone else's balance even by guessing an id, because none is accepted here.",
             "examples": [
               "GTQ"
+            ]
+          },
+          "branch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id",
+            "description": "The BRANCH this charge belongs to. Send it whenever the money being collected is a commerce's — a subscription, an invoice, an order — and the charge is issued in **that commerce's currency**, not in the payer's primary one.\n\nA branch, not a commerce, because the branch is the unit the rest of this API already speaks: an invoice certifies under ITS establishment code (`CreateInvoiceRequest.branchId`), and a commerce with more than one coded branch REFUSES to guess which one issued — so an integration that emits invoices is already holding a branch id. The commerce, and therefore the currency, is derived from it server-side.\n\nWithout it the currency comes from your primary balance, which is wrong as soon as one account owns commerces in different currencies: a commerce trading in quetzales was charged in dollars because its owner's primary balance happened to be USD.\n\nYou must be authorised for the branch's commerce (404 if the branch is unknown or its commerce is not yours, 403 if your role cannot take payments) and hold a balance in that commerce's currency (404 naming the currency otherwise). The settlement balance is derived server-side — it is never named by this request, because where the money lands is not the caller's decision.\n\nSending `currency` alongside this is allowed only when the two agree; a disagreement is refused with `400` instead of one of them being silently dropped.",
+            "examples": [
+              "6a5f8e7d93f925bfb527997a"
             ]
           },
           "description": {
@@ -82442,6 +84189,10 @@
     {
       "name": "Trading Agent",
       "description": "The surface a 1Trade monitor uses. Authenticated with a service credential alone (`Authorization: Bearer ak-svc-…`) carrying the `trade.execute` capability and platform scope — no app token and no user token.\n\nThe monitor decides **when** to look at a cycle. The server decides what, how much and whether: it derives the action from the cycle's own state, re-reads the price itself, and re-checks the trigger. The request body carries no action, no reason and no amount."
+    },
+    {
+      "name": "Heatmaps",
+      "description": "Measure how visitors use a site: where they click and how far they scroll. A site installs capture by pasting one `<script>` tag; the collector is served by this API and does the rest. Samples are aggregated on write, so nothing raw is ever stored."
     },
     {
       "name": "Activation",

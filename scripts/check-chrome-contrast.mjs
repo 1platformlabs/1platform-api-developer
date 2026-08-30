@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /**
- * check-chrome-contrast.mjs — the AA arithmetic behind the ported chrome
- * (site epic home-landing-redesign, LMW-12 CA-7): every text/surface pair the
- * navbar, the panel and the footer draw with the `--ref-*` tokens must clear
- * WCAG AA, pinned to the exact hexes in src/css/custom.css.
+ * check-chrome-contrast.mjs — the AA arithmetic behind the shared editorial
+ * chrome. Every text/surface pair the floating rail and footer draw must clear
+ * WCAG AA, pinned to the exact tokens in src/css/custom.css.
  *
  * Mirrors the site's tests/contrast.spec.ts; this portal has no test runner,
  * so it is a plain Node script wired into CI next to the design guard.
@@ -33,17 +32,17 @@ function ratio(a, b) {
 }
 
 const PAIRS = [
-  ['--ref-white', '--ref-orange-cta', 4.5, 'CTA text on the AA orange'],
-  ['--ref-ink', '--ref-yellow', 4.5, 'ink on the yellow sign-in'],
-  ['--ref-white', '--ref-pill', 4.5, 'brand and toggle on the pill'],
-  ['--ref-fg-dim', '--ref-pill', 4.5, 'dim items in the panel'],
-  ['--ref-fg-dim', '--ref-card-dark', 4.5, 'footer links on the card'],
-  ['--ref-white', '--ref-dark', 4.5, 'light text on the footer band'],
+  ['--ink', '--surface', 4.5, 'navigation text on the floating rail'],
+  ['--cobalt', '--surface', 4.5, 'navigation link on the floating rail'],
+  ['--surface', '--cobalt', 4.5, 'CTA text on cobalt'],
+  ['--ink', '--cobalt-bright', 4.5, 'footer CTA text on bright cobalt'],
+  ['--color-footer-muted', '--color-footer', 4.5, 'footer secondary text'],
+  ['--color-footer-text', '--color-footer', 4.5, 'footer primary text'],
 ];
 
 if (process.argv.includes('--self-test')) {
   // The instrument must be able to report red: a pair known to fail AA.
-  const bad = ratio(tokenValue('--ref-fg-dim'), tokenValue('--ref-white'));
+  const bad = ratio(tokenValue('--cobalt-bright'), tokenValue('--surface'));
   if (bad >= 4.5) {
     console.error(`self-test: expected a failing pair, got ${bad.toFixed(2)} — the math went quiet`);
     process.exit(1);

@@ -1,19 +1,9 @@
 import {useEffect, useRef, useState, type FormEvent, type ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 import Icon from '@site/src/components/Icon';
+import Logo from '@theme/Logo';
 
 import styles from './styles.module.css';
-
-// MUST stay in sync with 1platform-website/src/components/Footer.astro.
-// If you add, remove, or reorder an item here, mirror it on the website.
-//
-// Redrawn with the site's home redesign (epic home-landing-redesign, LMW-10):
-// a dark band, the brand as a watermark, one card with an e-mail sign-up on the
-// left, three link columns on the right and a legal row under a hairline. The
-// closing CTA is gone on both sides — the reference has none. The link SET is
-// the site's, redistributed: PRODUCT = the seven solutions + the catch-all,
-// COMPANY = company pages, pricing and blog, RESOURCES = the developer surface
-// and the changelog, and the legal three in the bottom row.
 
 type FooterLink = {label: string; href: string};
 type FooterColumn = {key: string; title: string; links: FooterLink[]};
@@ -21,6 +11,7 @@ type FooterColumn = {key: string; title: string; links: FooterLink[]};
 const WEBSITE = 'https://1platform.pro';
 const DEVELOPER = 'https://developer.1platform.pro';
 
+// Keep this set and order aligned with 1platform-website/src/components/Footer.astro.
 const columns: FooterColumn[] = [
   {
     key: 'product',
@@ -31,7 +22,7 @@ const columns: FooterColumn[] = [
       {label: 'Contenido con IA', href: `${WEBSITE}/solutions/content/`},
       {label: 'Envíos', href: `${WEBSITE}/solutions/deliveries/`},
       {label: 'Publicidad', href: `${WEBSITE}/solutions/ads/`},
-      {label: 'Panel white-label', href: `${WEBSITE}/solutions/whitelabel/`},
+      {label: 'Panel de marca blanca', href: `${WEBSITE}/solutions/whitelabel/`},
       {label: 'Pagos y facturación', href: `${WEBSITE}/payments-invoicing/`},
       {label: 'Todas las soluciones', href: `${WEBSITE}/solutions/`},
     ],
@@ -65,21 +56,14 @@ const legal: FooterLink[] = [
   {label: 'Preferencias de cookies', href: `${WEBSITE}/cookies/`},
 ];
 
-// Assembled at submit time, like the site's contact page, so the address is
-// not a scrapeable literal in the HTML.
 const MAIL_USER = 'sales';
 const MAIL_DOMAIN = '1platform.pro';
 const MAIL_SUBJECT = 'Quiero recibir las novedades de 1Platform';
 
-/**
- * The columns fold into tappable headings on phones (the reference does); they
- * render OPEN so a browser without JavaScript shows every link, and only close
- * below 769 px once the script runs.
- */
 function useFoldedOnPhones(): boolean {
   const [folded, setFolded] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 768px)');
+    const mq = window.matchMedia('(max-width: 720px)');
     const update = () => setFolded(mq.matches);
     update();
     mq.addEventListener('change', update);
@@ -94,96 +78,56 @@ export default function Footer(): ReactNode {
   const [status, setStatus] = useState('');
   const emailRef = useRef<HTMLInputElement>(null);
 
-  // No list backend on either domain (site D-14): the sign-up composes a
-  // mailto: in the browser. Without JavaScript the form takes the reader to
-  // the site's contact page instead.
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const from = emailRef.current?.value ?? '';
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const email = emailRef.current?.value ?? '';
     setStatus('Abriendo tu aplicación de correo…');
-    window.location.href = `mailto:${MAIL_USER}@${MAIL_DOMAIN}?subject=${encodeURIComponent(
-      MAIL_SUBJECT,
-    )}&body=${encodeURIComponent(from)}`;
+    window.location.href = `mailto:${MAIL_USER}@${MAIL_DOMAIN}?subject=${encodeURIComponent(MAIL_SUBJECT)}&body=${encodeURIComponent(email)}`;
   };
 
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>
-        {/* SVG, not HTML text (mirrors the site): sighted readers see the
-            watermark however hidden from AT, so axe's color-contrast applies
-            to HTML glyphs — a 20 % watermark is a drawing, and as SVG it is
-            one. */}
-        <svg className={styles.watermark} viewBox="0 0 1037 186" aria-hidden="true" focusable="false">
-          <rect x="0" y="0" width="186" height="186" rx="34" className={styles.watermarkNode} />
-          <text x="93" y="100" textAnchor="middle" dominantBaseline="central" className={styles.watermarkOne}>
-            1
-          </text>
-          <text x="210" y="100" dominantBaseline="central" className={styles.watermarkWord}>
-            Platform
-          </text>
-        </svg>
+        <div className={styles.intro}>
+          <Logo className={styles.brandLogo} />
+          <p>Una plataforma. Todas las soluciones.</p>
+          <Link className={styles.footerCta} to="https://app.1platform.pro/app/">
+            Comenzar gratis
+          </Link>
+        </div>
 
-        <div className={styles.card}>
-          <div className={styles.top}>
-            <div className={styles.signup}>
-              <h3 className={styles.signupTitle}>No te lo pierdas</h3>
-              <p className={styles.signupBody}>Deja tu correo para recibir novedades</p>
-              <form className={styles.form} method="get" action={`${WEBSITE}/contact/`} onSubmit={onSubmit}>
-                <label htmlFor="footer-email" className={styles.srOnly}>
-                  Correo electrónico
-                </label>
-                <input
-                  id="footer-email"
-                  ref={emailRef}
-                  className={styles.input}
-                  type="email"
-                  name="email"
-                  required
-                  autoComplete="email"
-                  placeholder="Escribe tu correo"
-                />
-                <button type="submit" className={styles.submit} aria-label="Enviar">
-                  <Icon name="arrow-right" size={20} />
-                </button>
-              </form>
-              <p className={styles.status} aria-live="polite">
-                {status}
-              </p>
-            </div>
-
-            <div className={styles.cols}>
-              {columns.map((col) => (
-                <details key={col.key} className={styles.col} open={!folded}>
-                  <summary className={styles.colTitle}>
-                    <span>{col.title}</span>
-                    <span className={styles.colPlus} aria-hidden="true" />
-                  </summary>
-                  <ul className={styles.colList}>
-                    {col.links.map((link) => (
-                      <li key={link.label}>
-                        <Link to={link.href} className={styles.colLink}>
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ))}
-            </div>
+        <div className={styles.content}>
+          <div className={styles.signup}>
+            <p className={styles.eyebrow}>Mantente al día</p>
+            <h2>Recibe novedades de 1Platform.</h2>
+            <form className={styles.form} method="get" action={`${WEBSITE}/contact/`} onSubmit={onSubmit}>
+              <label htmlFor="footer-email" className={styles.srOnly}>Correo electrónico</label>
+              <input id="footer-email" ref={emailRef} type="email" name="email" required autoComplete="email" placeholder="Escribe tu correo" />
+              <button type="submit" aria-label="Enviar"><Icon name="arrow-right" size={18} /></button>
+            </form>
+            <p className={styles.status} aria-live="polite">{status}</p>
           </div>
 
-          <div className={styles.bottom}>
-            <p className={styles.copyright}>&copy; {year} 1Platform Labs. Todos los derechos reservados.</p>
-            <ul className={styles.legal}>
-              {legal.map((link) => (
-                <li key={link.label}>
-                  <Link to={link.href} className={styles.colLink}>
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          <div className={styles.columns}>
+            {columns.map((column) => (
+              <details key={column.key} className={styles.column} open={!folded}>
+                <summary>
+                  <span>{column.title}</span>
+                  <span className={styles.columnPlus} aria-hidden="true" />
+                </summary>
+                <ul>
+                  {column.links.map((link) => (
+                    <li key={link.label}><Link to={link.href}>{link.label}</Link></li>
+                  ))}
+                </ul>
+              </details>
+            ))}
           </div>
+        </div>
+
+        <div className={styles.bottom}>
+          <p>&copy; {year} 1Platform Labs. Todos los derechos reservados.</p>
+          <ul>{legal.map((link) => <li key={link.label}><Link to={link.href}>{link.label}</Link></li>)}</ul>
         </div>
       </div>
     </footer>

@@ -40,44 +40,29 @@
    sit on today. */
 :root {
   /* Primitives */
-  --ink:         #14161B;
-  --paper:       #F6F5F2;
-  --surface:     #FFFFFF;
-  --recessed:    #EFEEEA;
-  --cobalt:      #1F4FE0;
-  --cobalt-deep: #1A44C4;
-  --cobalt-wash: #ECF0FD;
+  --ink:         #13151A;
+  --paper:       #F5F1E8;
+  --surface:     #FFFDF8;
+  --recessed:    #ECE5D8;
+  --cobalt:      #1748A7;
+  --cobalt-deep: #10377F;
+  --cobalt-bright: #78A6FF;
+  --cobalt-wash: #E5EDFC;
   /* Reserved for graphics. Never text — 1.87:1 on paper. */
   --signal:      #F5A524;
-  --muted:       #5B5F6B;
+  --muted:       #555A64;
   /* Checked against every surface it can land on, not just --paper: the
      earlier #696D79 cleared paper (4.74) and surface (5.17) but fell to 4.45
      on --recessed, which is where code-block headers sit. */
-  --subtle:      #656974;
+  --subtle:      #626873;
   --hairline:        rgba(20, 22, 27, 0.10);
   --hairline-strong: rgba(20, 22, 27, 0.16);
 
-  /* ─── Chrome system — ported from the site's home redesign ──────────────────
-     The header and footer of both domains now share a second palette measured
-     on a reference landing (site epic home-landing-redesign, D-2/D-6). Values
-     are copied verbatim from 1platform-website/src/styles/global.css; the two
-     AA corrections (--ref-orange-cta, --ref-fg-dim) are part of the contract,
-     not local taste. The docs body keeps ink & signal. */
-  --ref-ink:        #0E0E0E;
-  --ref-dark:       #1A1616;
-  --ref-dark-2:     #0E0E0E;
-  --ref-pill:       #202020;
-  --ref-card-dark:  #2A2A2A;
-  --ref-canvas:     #E3E3E3;
-  --ref-white:      #FAFAFA;
-  --ref-gray:       #D9D9D9;
-  --ref-orange:     #F04E23;
-  --ref-orange-cta: #C63A12;
-  --ref-yellow:     #FFF78B;
-  --ref-fg-dim:     #9A9A9A;
-  --ref-hairline-dark: rgba(250, 250, 250, 0.12);
-  --ref-radius-s:   6px;
-  --ref-radius-m:   8px;
+  /* Shared editorial chrome. The public site is upstream for these values. */
+  --color-footer:       #111720;
+  --color-footer-text:  #F8F4EC;
+  --color-footer-muted: #B3B5BB;
+  --color-footer-line:  rgba(248, 244, 236, 0.17);
   --font-serif:     'Instrument Serif', Georgia, 'Times New Roman', serif;
 
   /* Semantic surfaces */
@@ -148,8 +133,7 @@
   --text-3xl: 1.875rem;
 
   /* Layout */
-  /* 74 since the shared header redesign (site epic home-landing-redesign, D-20). */
-  --header-height: 74px;
+  --header-height: 90px;
   --border-radius:      6px;
   --border-radius-lg:  10px;
   --border-radius-xl:  14px;
@@ -321,84 +305,60 @@ textarea {
   color: var(--color-text-tertiary);
 }
 
-/* ─── Navbar — the site's pill and two calls to action ────────────────────────
-   Mirrors 1platform-website/src/components/Header.astro after its redesign
-   (epic home-landing-redesign, LMW-03 / D-3 / D-4). The bar is 74 px, padded
-   16, transparent: a 230 × 42 dark pill on the left holds the brand and the
-   menu button; two CTAs sit on the right. NO navigation link is visible in the
-   bar at any width — the items live in the panel the menu button opens. That
-   panel is Docusaurus's own mobile sidebar, rendered at every width by the
-   swizzle in src/theme/Navbar/MobileSidebar/ (see the note there for why CSS
-   alone could not do it). The link list in docusaurus.config.ts is unchanged:
-   it IS the panel's content, and the harmony contract is about that list. */
+/* ─── Navbar — floating editorial rail ───────────────────────────────────────
+   The docs use the same public destinations and visual rhythm as the website.
+   Search remains in this rail because it is a primary documentation task. */
 .navbar {
-  --navbar-brand-ink: var(--ref-white);
   height: var(--header-height);
-  padding: 16px;
+  padding: 16px clamp(16px, 3vw, 40px);
   background: transparent;
   border-bottom: 0;
   box-shadow: none;
 }
 
 .navbar__inner {
-  max-width: none;
-  margin: 0;
-  align-items: center;
-  justify-content: space-between;
+  width: min(1280px, 100%);
+  min-height: 58px;
+  margin: 0 auto;
+  padding: 7px 8px 7px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-pill);
+  box-shadow: var(--shadow-sm);
 }
 
-/* The pill. The toggle comes first in Infima's DOM and the brand second;
-   row-reverse puts the brand on the left and the button flush right, as on the
-   site, without touching the markup. */
 .navbar__items:not(.navbar__items--right) {
-  flex: 0 0 auto;
-  flex-direction: row-reverse;
-  justify-content: space-between;
-  width: 230px;
-  height: 42px;
   min-width: 0;
-  padding: 1px;
-  background: var(--ref-pill);
-  border: 1px solid var(--ref-hairline-dark);
-  border-radius: var(--ref-radius-s);
-}
-
-/* The links are in the panel, never in the bar. */
-.navbar__items:not(.navbar__items--right) > .navbar__item {
-  display: none;
-}
-
-.navbar__toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin: 0;
-  color: var(--ref-white);
-  border-radius: var(--ref-radius-s);
-}
-
-.navbar__toggle svg {
-  width: 16px;
-  height: 16px;
+  gap: 4px;
 }
 
 .navbar__brand {
-  height: 38px;
-  margin: 0;
-  padding: 0 12px;
-  font-size: 1.125rem;
+  height: 42px;
+  margin: 0 14px 0 0;
+  padding: 0;
+  font-size: var(--text-xl);
+}
+
+.navbar__item,
+.navbar__link {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.navbar__link:hover,
+.navbar__link--active,
+.dropdown__link:hover,
+.dropdown__link--active {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
 .navbar__items--right {
   flex: 0 0 auto;
-  column-gap: 16px;
+  gap: 8px;
 }
 
-/* Hide the external-link arrow icon Docusaurus auto-appends to absolute URLs.
-   The bar's links go to 1platform.pro and the app, which the reader should
-   perceive as in-product navigation, not "leaving the site" affordances. */
 .navbar__items svg[class*='iconExternalLink'],
 .navbar__cta svg[class*='iconExternalLink'],
 .navbar__signin svg[class*='iconExternalLink'],
@@ -406,131 +366,52 @@ textarea {
   display: none;
 }
 
-/* The two calls to action: r6, 12.8/15.36, 44 px tall (the target-size floor
-   this design system mandates; the reference draws 40). Tints are the site's
-   AA-safe ones: yellow with ink, and the deeper CTA orange under light text. */
 .navbar__signin,
 .navbar__cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 42px;
   margin: 0;
   padding: 0 14px;
-  font-size: 12.8px;
-  line-height: 15.36px;
-  letter-spacing: -0.384px;
-  font-weight: 400;
-  border-radius: var(--ref-radius-s);
+  border-radius: var(--border-radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 600;
   white-space: nowrap;
 }
 
-.navbar__signin {
-  color: var(--ref-ink) !important;
-  background: var(--ref-yellow);
-}
+.navbar__signin { color: var(--color-text) !important; }
+.navbar__cta { color: var(--color-text-inverse) !important; background: var(--color-accent); }
+.navbar__cta:hover { background: var(--color-accent-hover); text-decoration: none; }
+.navbar__signin:hover { color: var(--color-accent) !important; text-decoration: none; }
 
-.navbar__cta {
-  color: var(--ref-white) !important;
-  background: var(--ref-orange-cta);
-}
-
-.navbar__signin:hover,
-.navbar__cta:hover {
-  filter: brightness(0.94);
-  text-decoration: none;
-}
+.navbar__search { margin-right: 2px; }
 
 @media (prefers-reduced-motion: no-preference) {
+  .navbar__link,
   .navbar__signin,
-  .navbar__cta {
-    transition: filter var(--duration-fast) ease;
-  }
+  .navbar__cta { transition: color var(--duration-fast) ease, background-color var(--duration-fast) ease; }
 }
 
-/* The search box stays: a documentation portal without search is not a
-   documentation portal. It is the one thing the bar carries that the site's
-   header does not. */
-.navbar__search {
-  margin-right: 0;
-}
-
-/* Phones (measured on the reference at 390 px): the pill shrinks to brand +
-   button and only the primary CTA stays. Infima hides EVERY `.navbar__item`
-   below 997 px — that is what used to make "Comenzar gratis" vanish on a
-   phone — so the CTA is re-shown explicitly. */
-@media (max-width: 996px) {
-  .navbar__items--right > .navbar__cta {
-    display: inline-flex;
-  }
-}
-
-@media (max-width: 768px) {
-  .navbar__items:not(.navbar__items--right) {
-    width: auto;
-  }
-
-  .navbar__signin {
-    display: none;
-  }
-}
-
-/* ─── The menu panel ───────────────────────────────────────────────────────────
-   Infima's `.navbar-sidebar` drawer, restyled as the pill's dark panel and
-   allowed at desktop widths (the swizzle renders it; Infima never hid it by
-   CSS, only the toggle). 360 px wide on desktop, the theme's 83vw on phones. */
-@media (min-width: 997px) {
-  :root {
-    --ifm-navbar-sidebar-width: 360px;
-  }
-}
-
-.navbar-sidebar {
-  background: var(--ref-pill);
-  color: var(--ref-white);
-  border-right: 1px solid var(--ref-hairline-dark);
-}
-
-.navbar-sidebar__brand {
-  --navbar-brand-ink: var(--ref-white);
-  height: var(--header-height);
-  padding: 16px;
-  box-shadow: none;
-  border-bottom: 1px solid var(--ref-hairline-dark);
-}
-
-.navbar-sidebar__close {
-  color: var(--ref-white);
-}
-
+/* The native Docusaurus drawer owns focus and keyboard handling on compact
+   screens; this layer only gives it the shared paper-and-ink finish. */
+.navbar-sidebar { background: var(--color-surface); color: var(--color-text); border-right: 1px solid var(--color-border); }
+.navbar-sidebar__brand { height: var(--header-height); padding: 16px; box-shadow: none; border-bottom: 1px solid var(--color-border); }
+.navbar-sidebar__close { color: var(--color-text); }
 .navbar-sidebar .menu__link,
 .navbar-sidebar .menu__list-item-collapsible,
-.navbar-sidebar .navbar-sidebar__back {
-  color: var(--ref-white);
-}
-
+.navbar-sidebar .navbar-sidebar__back { color: var(--color-text); }
 .navbar-sidebar .menu__link:hover,
 .navbar-sidebar .menu__link--active,
 .navbar-sidebar .menu__list-item-collapsible:hover,
-.navbar-sidebar .menu__list-item-collapsible--active {
-  background: var(--ref-card-dark);
-  color: var(--ref-white) !important;
-}
+.navbar-sidebar .menu__list-item-collapsible--active { background: var(--color-accent-soft); color: var(--color-accent) !important; }
+.navbar-sidebar .menu__link { display: flex; align-items: center; min-height: 44px; }
 
-.navbar-sidebar .menu__link--sublist-caret::after,
-.navbar-sidebar .menu__caret::before {
-  filter: invert(1);
-}
-
-.navbar-sidebar .menu__link {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-}
-
-.navbar-sidebar .navbar__signin,
-.navbar-sidebar .navbar__cta {
-  margin: 8px 12px;
+@media (max-width: 996px) {
+  .navbar { height: 78px; padding: 10px 16px; }
+  .navbar__inner { min-height: 56px; }
+  .navbar__items--right > .navbar__cta { display: inline-flex; }
+  .navbar__signin, .navbar__search { display: none; }
 }
 
 /* ─── Sidebar ──────────────────────────────────────────────────────────────── */
@@ -854,19 +735,17 @@ blockquote {
 }
 
 /* ─── Footer ─────────────────────────────────────────────────────────────────
-   The footer is rendered by the swizzle at src/theme/Footer/, which carries its
-   own module CSS and mirrors the site's footer-card (epic home-landing-redesign,
-   LMW-10). Infima's own footer classes are not used by that swizzle; the rules
-   below keep them on the dark surface in case a theme upgrade re-emits them. */
+   The swizzle mirrors the website's dark editorial footer. These fallback
+   selectors protect that surface if a theme update emits Infima's own footer. */
 .footer {
   border-top: 0;
-  background: var(--ref-dark);
-  color: var(--ref-white);
+  background: var(--color-footer);
+  color: var(--color-footer-text);
 }
 
 .footer__link-item,
 .footer__copyright {
-  color: var(--ref-fg-dim);
+  color: var(--color-footer-muted);
 }
 
 /* ─── Pagination ───────────────────────────────────────────────────────────── */

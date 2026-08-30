@@ -8,27 +8,14 @@ import NavbarMobileSidebarSecondaryMenu from '@theme/Navbar/MobileSidebar/Second
 /**
  * Swizzled (wrap) Navbar/MobileSidebar — the panel the menu button opens.
  *
- * The site's header redesign hides the navigation links at EVERY width and
- * puts them behind the menu button (1platform-website, epic
- * home-landing-redesign, D-3/D-4). Mirroring that here with CSS alone is not
- * enough, and this file exists because that was measured rather than assumed:
- * Infima only HIDES `.navbar__toggle` above 996 px, which CSS can undo, but
- * `useNavbarMobileSidebar()` computes
+ * The floating desktop rail leaves this component to compact viewports. It is a
+ * narrow wrap of the theme's drawer so the native layout, focus management,
+ * scroll lock, close button and menus stay intact. `Navbar` itself is never
+ * swizzled: its landmarks and focus order are part of the accessibility
+ * contract.
  *
- *     shouldRender = !disabled && windowSize === 'mobile'
- *
- * so on a desktop viewport the stock component returns `null` and the forced
- * toggle would open nothing. The only line changed against the theme's own
- * `Navbar/MobileSidebar/index.js` is that gate: the panel renders whenever the
- * navbar has items, at any width. Everything else — the layout, the header
- * with its close button, the primary and secondary menus, the body scroll lock,
- * the Escape/back-button handling in the provider — is the theme's own code,
- * untouched. `Navbar` itself is NOT swizzled (the site's L-48c: that loses
- * landmarks and focus order).
- *
- * One addition the theme lacks and the site's panel has: Escape closes it.
- * Measured on the built portal — the stock sidebar stays open on Escape, and a
- * menu that a keyboard user can open but not dismiss is a trap.
+ * One addition: Escape returns focus to the menu toggle. A keyboard user can
+ * therefore dismiss the drawer without tabbing through its whole contents.
  */
 export default function NavbarMobileSidebar(): ReactNode {
   const mobileSidebar = useNavbarMobileSidebar();
@@ -46,7 +33,7 @@ export default function NavbarMobileSidebar(): ReactNode {
     return () => document.removeEventListener('keydown', onKey);
   }, [mobileSidebar.shown, mobileSidebar.toggle]);
 
-  if (mobileSidebar.disabled) {
+  if (!mobileSidebar.shouldRender) {
     return null;
   }
   return (

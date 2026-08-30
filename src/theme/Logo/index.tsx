@@ -17,7 +17,7 @@ import styles from './styles.module.css';
 export default function Logo({className = ''}: {className?: string}): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
-    <Link to="/" className={`navbar__brand ${styles.logo} ${className}`} aria-label={siteConfig.title}>
+    <Link to="/docs/" className={`navbar__brand ${styles.logo} ${className}`} aria-label={siteConfig.title}>
       <span className={styles.logoMark} aria-hidden="true">
         1
       </span>

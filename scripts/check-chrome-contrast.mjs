@@ -34,7 +34,8 @@ function ratio(a, b) {
 const PAIRS = [
   ['--ink', '--surface', 4.5, 'navigation text on the floating rail'],
   ['--cobalt', '--surface', 4.5, 'navigation link on the floating rail'],
-  ['--surface', '--cobalt', 4.5, 'CTA text on cobalt'],
+  ['--surface', '--ink', 4.5, 'CTA text on ink'],
+  ['--ink', '--recessed', 4.5, 'search text on the recessed control'],
   ['--ink', '--cobalt-bright', 4.5, 'footer CTA text on bright cobalt'],
   ['--color-footer-muted', '--color-footer', 4.5, 'footer secondary text'],
   ['--color-footer-text', '--color-footer', 4.5, 'footer primary text'],

@@ -69,7 +69,7 @@ jobs:
           set -euo pipefail
           pnpm check:tells
 
-      # The chrome ported from the marketing site draws with the --ref-* tokens;
+      # The chrome ported from the marketing site draws with the shared tokens;
       # this pins every text/surface pair to AA (site epic home-landing-redesign,
       # LMW-12 CA-7). Self-test first: a checker nobody has watched fail is not
       # a gate.
@@ -129,3 +129,19 @@ jobs:
         run: |
           set -euo pipefail
           pnpm build
+
+      # Reads the generated pages, not the source approximation: canonical and
+      # hreflang, real CTA hrefs, search/keyboard controls, reduced motion,
+      # focus visibility, review snapshots and first-party asset budgets all live
+      # here.
+      - name: Public UI contract — self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:public-ui:self-test
+
+      - name: Public UI contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm check:public-ui

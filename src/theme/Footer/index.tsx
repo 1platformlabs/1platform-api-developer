@@ -42,9 +42,9 @@ const columns: FooterColumn[] = [
     key: 'resources',
     title: 'Recursos',
     links: [
-      {label: 'Documentación', href: `${DEVELOPER}/`},
-      {label: 'Referencia de la API', href: `${DEVELOPER}/api-docs`},
-      {label: 'Ejemplos de código', href: `${DEVELOPER}/`},
+      {label: 'Documentación', href: `${DEVELOPER}/docs/`},
+      {label: 'Referencia de la API', href: `${DEVELOPER}/api-reference/1platform-api`},
+      {label: 'Ejemplos de código', href: `${DEVELOPER}/docs/saas/1platform-api/getting-started`},
       {label: 'Changelog', href: `${WEBSITE}/changelog/`},
     ],
   },

@@ -151,13 +151,12 @@ const config: Config = {
   // declared in the stylesheet, every file shipped twice — the static
   // passthrough and the hashed copy — and the preloads below pointed at the
   // static path while the page actually fetched the hashed one. The browser made
-  // seven woff2 requests for six faces, and the "preload" was 24 KB that nothing
-  // used. Declared here, the URL never passes through webpack, so the preload
-  // and the @font-face agree by construction.
+  // redundant woff2 requests, and the "preload" downloaded bytes that nothing
+  // used. Declared here, the URL never passes through webpack, so each preload
+  // and its @font-face agree by construction.
   //
-  // The two preloaded faces are the ones that render above the fold on every
-  // page: the display face that draws the h1 and the text face that draws the
-  // body. `crossorigin` is required even same-origin, because a font fetch is
+  // The three preloaded faces draw the shared display, text and editorial
+  // chrome. `crossorigin` is required even same-origin, because a font fetch is
   // always CORS-mode and omitting it downloads the file a second time.
   headTags: [
     {
@@ -176,11 +175,11 @@ const config: Config = {
       ].join(''),
     },
     // The portal is light-only (see colorMode below). Declaring it means the
-    // browser chrome and form controls match the paper surface instead of
+    // browser chrome and form controls match the white canvas instead of
     // guessing from the OS preference.
     {
       tagName: 'meta',
-      attributes: {name: 'theme-color', content: '#F5F1E8'},
+      attributes: {name: 'theme-color', content: '#FFFFFF'},
     },
     {
       tagName: 'link',
@@ -377,6 +376,7 @@ const config: Config = {
           label: 'Soluciones',
           position: 'left',
           href: 'https://1platform.pro/solutions/',
+          target: '_self',
           items: [
             {href: 'https://1platform.pro/solutions/online-store/', label: 'Tienda online', target: '_self'},
             {href: 'https://1platform.pro/solutions/website/', label: 'Creador de sitios web', target: '_self'},
@@ -394,14 +394,14 @@ const config: Config = {
         {href: 'https://1platform.pro/features/', label: 'Funciones', position: 'left', target: '_self'},
         {href: 'https://1platform.pro/pricing/', label: 'Precios', position: 'left', target: '_self'},
         {
-          to: '/',
+          to: '/docs/',
           label: 'Documentación',
           position: 'left',
           activeBaseRegex: '^/(docs|api-reference)?/?$|^/(docs|api-reference)/.*',
         },
         {href: 'https://1platform.pro/blog/', label: 'Blog', position: 'left', target: '_self'},
-        {href: 'https://app.1platform.pro/app/', label: 'Iniciar sesión', position: 'right', className: 'navbar__signin'},
-        {href: 'https://app.1platform.pro/app/', label: 'Comenzar gratis', position: 'right', className: 'navbar__cta'},
+        {href: 'https://app.1platform.pro/app/', label: 'Iniciar sesión', position: 'right', target: '_self', className: 'navbar__signin'},
+        {href: 'https://app.1platform.pro/app/', label: 'Comenzar gratis', position: 'right', target: '_self', className: 'navbar__cta'},
       ],
     },
     // Footer content is rendered by the custom swizzle at src/theme/Footer/index.tsx.

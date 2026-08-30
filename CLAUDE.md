@@ -134,7 +134,7 @@ tell they changed origin.
 ### The shared editorial chrome
 
 The navbar and footer mirror the site's current public system. The navigation
-is a floating, paper-coloured rail: desktop keeps the public destinations
+is a floating, white editorial rail: desktop keeps the public destinations
 visible, compact viewports use Docusaurus's native drawer, and the local search
 stays in the rail because it is a primary documentation task. The footer is a
 dark editorial band with the brand, a practical CTA, a `mailto:` sign-up, three
@@ -151,8 +151,8 @@ Docusaurus upgrade that adds a variable keeps working.
 
 ### Tokens
 
-- **Primitives:** `--ink #13151A`, `--paper #F5F1E8`, `--surface #FFFDF8`,
-  `--recessed #ECE5D8`, `--cobalt #1748A7`, `--cobalt-deep #10377F`,
+- **Primitives:** `--ink #13151A`, `--paper #FFFFFF`, `--surface #FFFFFF`,
+  `--recessed #F3F5F7`, `--cobalt #1748A7`, `--cobalt-deep #10377F`,
   `--cobalt-bright #78A6FF`, `--cobalt-wash #E5EDFC`, `--signal #F5A524`,
   `--muted #555A64`, `--subtle #626873`, `--hairline`, `--hairline-strong`.
 - **One accent** (cobalt). **One signal** (amber), reserved for graphics —
@@ -166,10 +166,11 @@ Docusaurus upgrade that adds a variable keeps working.
 
 ### Typography
 
-Three self-hosted families, latin subsets, in `static/fonts/` with their OFL
+Four self-hosted families, latin subsets, in `static/fonts/` with their OFL
 licences: **Space Grotesk** (display/headings, 500/700), **Inter** (text,
-400/500/600), **JetBrains Mono** (code and the eyebrow label, 400). Declared as
-six `@font-face` rules; the two above-the-fold faces are preloaded via
+400/500/600), **JetBrains Mono** (code and the eyebrow label, 400) and
+**Instrument Serif** (footer editorial display, 400). Declared as seven
+`@font-face` rules; the three above-the-fold faces are preloaded via
 `headTags`. There is no CDN font request anywhere in the repo — verifying "the
 font loaded" means counting woff2 responses, not calling `document.fonts.check()`,
 which returns true against a fallback.
@@ -329,7 +330,7 @@ written here.
 The developer docs **navbar AND footer** **MUST mirror the marketing website** so
 users experience a seamless transition between subdomains. Both chromes must
 feel identical across domains — and since the design-system port, that now
-includes the tokens, the three typefaces and the logo, not just the link lists.
+includes the tokens, the four typefaces and the logo, not just the link lists.
 
 **Source of truth on each side:**
 - Website — `1platform-website/src/components/Header.astro` (navbar),
@@ -345,7 +346,7 @@ not about the literal strings.
 **Navbar contract:**
 - Item order: Solutions · Features · Pricing · Docs · Blog, then the CTA right-aligned.
   Here: Soluciones · Funciones · Precios · Documentación · Blog · "Comenzar gratis".
-- **Composition:** a floating, paper-coloured rail on desktop; the native
+- **Composition:** a floating, white editorial rail on desktop; the native
   compact drawer carries those same destinations below the desktop breakpoint.
   Keep local search in the rail.
 - Cross-subdomain links point at `https://1platform.pro/<page>/` with
@@ -363,8 +364,9 @@ not about the literal strings.
   7. Payments & Invoicing → `/payments-invoicing/`
   8. *(divider)*
   9. View all solutions → `/solutions/`
-- **Docs entry:** single link, no dropdown. Here it points to `/`.
-- **CTA:** → `https://app.1platform.pro`, accent button, `min-height: 44px`.
+- **Docs entry:** single link, no dropdown. Here it points to `/docs/`.
+- **CTA:** → `https://app.1platform.pro/app/`, ink button, 56 px on desktop
+  and 44 px on compact viewports.
 - **Logo:** the "1" is a cobalt rounded-square node (1.32em, 0.26em radius),
   not blue text. Identical geometry on both sites.
 
@@ -398,9 +400,9 @@ pnpm typecheck        # zero errors
 pnpm build            # zero errors; provider-leak gate and broken links pass
 pnpm check:tells      # every category ok
 pnpm serve            # then review in a browser:
-# - both Scalar routes render on paper with the cobalt accent, no console errors
+# - both Scalar routes render on the white canvas with the cobalt accent, no console errors
 # - the header matches 1platform.pro side by side (background, height, logo, family)
-# - six /fonts/*.woff2 responses return 200, and an h1 measures DIFFERENTLY
+# - seven /fonts/*.woff2 responses return 200, and an h1 measures DIFFERENTLY
 #   than the same h1 forced to system-ui (a font can be "declared" and absent)
 # - no horizontal overflow from 320px to 2560px
 # - with prefers-reduced-motion emulated, nothing animates and all content is visible

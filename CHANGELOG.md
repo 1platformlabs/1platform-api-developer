@@ -2,20 +2,20 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
-## [Unreleased] — Chrome espejo del rediseño de la home del sitio
+## [Unreleased] — Composición de producto compartida
 
-- Navbar: píldora 230 × 42 con la marca y el botón de menú, dos CTAs de 44 px
-  («Iniciar sesión» amarillo · «Comenzar gratis» naranja AA); los ítems viven
-  en el panel a TODO ancho (swizzle wrap de `Navbar/MobileSidebar`, con Escape
-  añadido); el buscador se queda en la barra.
-- Footer: la tarjeta del sitio — marca de agua SVG, alta por `mailto:`, tres
-  columnas (PRODUCTO con las 7 soluciones, EMPRESA con Precios, RECURSOS),
-  fila legal — sin CTA de cierre y sin el conteo fabricado que el contrato
-  viejo arrastraba.
-- Cuarta familia autohospedada: Instrument Serif (OFL) con su licencia,
-  `@font-face` + preload en `headTags`; umbrales del guard 7/7/4/3.
-- Tokens `--ref-*` en el layer de `custom.css`, con las dos tintas AA; gate
-  nuevo `check:chrome-contrast` (+ self-test) cableado al CI.
+- Chrome blanco con el mismo rail flotante de 78 px del sitio, a 32 px del
+  borde; CTA de tinta, destinos en la misma pestaña y buscador local intacto.
+- `/docs/` deja de abrir como un artículo: hero editorial centrado, dos CTAs
+  reales y tarjetas de entrada a 1Platform API, Atlas API, recorridos y webhooks.
+- Scalar conserva toda su navegación y cliente interactivo sobre las mismas
+  superficies, bordes, tipografías y offsets del portal.
+- Contrato de contraste actualizado para el CTA de tinta y el control de
+  búsqueda; ambos superan WCAG AA con margen.
+- Nuevo contrato sobre el build para canonical/hreflang, CTAs, buscador,
+  controles de teclado, foco, movimiento reducido y presupuestos de JS/CSS.
+- Snapshots revisables de Docs y API Reference a 1440 px y 390 px; el contrato
+  del build exige que los cuatro permanezcan presentes en su viewport declarado.
 
 ## [Unreleased]
 

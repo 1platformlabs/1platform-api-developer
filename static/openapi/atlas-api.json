@@ -592,11 +592,13 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Biblioteca Viva requires the tenant's primary library archetype.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                "example": {
+                  "detail": {
+                    "code": "TEMPLATE_NOT_ALLOWED_FOR_ARCHETYPE"
+                  }
                 }
               }
             }
@@ -3296,6 +3298,141 @@
             "sessionCookie": []
           }
         ]
+      },
+      "delete": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Delete the authenticated member's review",
+        "description": "Delete only the server-resolved member's review for this tenant.",
+        "operationId": "delete_item_review_api_v1_content_items__item_id__reviews_delete",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Token"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Content item not found for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "CONTENT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/v1/content/items/{item_id}/archive": {
@@ -5222,11 +5359,13 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "Biblioteca Viva requires the tenant's primary library archetype.",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                "example": {
+                  "detail": {
+                    "code": "TEMPLATE_NOT_ALLOWED_FOR_ARCHETYPE"
+                  }
                 }
               }
             }
@@ -14362,11 +14501,56 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "The selected works are invalid for this rail.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "detail"
+                      ],
+                      "properties": {
+                        "detail": {
+                          "type": "object",
+                          "required": [
+                            "code"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "RAIL_ITEM_NOT_AVAILABLE",
+                                "RAIL_ITEMS_ONLY_FOR_CUSTOM"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "unavailable": {
+                    "summary": "A work is unpublished, missing, or belongs to another tenant",
+                    "value": {
+                      "detail": {
+                        "code": "RAIL_ITEM_NOT_AVAILABLE"
+                      }
+                    }
+                  },
+                  "non_custom": {
+                    "summary": "Explicit works are supported only by custom rails",
+                    "value": {
+                      "detail": {
+                        "code": "RAIL_ITEMS_ONLY_FOR_CUSTOM"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -14686,11 +14870,56 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "The selected works are invalid for this rail.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "detail"
+                      ],
+                      "properties": {
+                        "detail": {
+                          "type": "object",
+                          "required": [
+                            "code"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "RAIL_ITEM_NOT_AVAILABLE",
+                                "RAIL_ITEMS_ONLY_FOR_CUSTOM"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "unavailable": {
+                    "summary": "A work is unpublished, missing, or belongs to another tenant",
+                    "value": {
+                      "detail": {
+                        "code": "RAIL_ITEM_NOT_AVAILABLE"
+                      }
+                    }
+                  },
+                  "non_custom": {
+                    "summary": "Explicit works are supported only by custom rails",
+                    "value": {
+                      "detail": {
+                        "code": "RAIL_ITEMS_ONLY_FOR_CUSTOM"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -19841,6 +20070,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ReviewOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published content not found.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "CONTENT_NOT_FOUND"
+                  }
                 }
               }
             }
@@ -26537,7 +26778,7 @@
           "public"
         ],
         "summary": "Author Profile",
-        "description": "Public author profile: typed bio/born/country + published works.\n\nTenant-scoped ``by_slug`` resolution (404 ``PERSON_NOT_FOUND``). Works\nare matched by ``metadata.people`` slug or the ``metadata.author``\nbyline — NOT ``cast_crew`` — so a library author's books actually\nsurface. Distinct from ``/people/{slug}/credits`` (cast_crew, grouped),\nwhich is left untouched for backward compatibility.",
+        "description": "Public author profile: typed bio/born/country + published works.\n\nTenant-scoped ``by_slug`` resolution (404 ``PERSON_NOT_FOUND``). Biblioteca\nViva also treats a person with no published works as not found; classic\nretains the historical empty profile. Works\nare matched by ``metadata.people`` slug or the ``metadata.author``\nbyline — NOT ``cast_crew`` — so a library author's books actually\nsurface. Distinct from ``/people/{slug}/credits`` (cast_crew, grouped),\nwhich is left untouched for backward compatibility.",
         "operationId": "public.author_profile",
         "parameters": [
           {
@@ -31120,6 +31361,30 @@
         ],
         "title": "AdminPlanView"
       },
+      "AdminRailItemSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "slug"
+        ],
+        "title": "AdminRailItemSummary"
+      },
       "AdminSignInRequest": {
         "properties": {
           "email": {
@@ -34059,6 +34324,30 @@
         "title": "ContentAssetOut",
         "description": "Response shape for ``POST /content/items/{id}/assets``.\n\nThe DOWNLOAD delivery strategy reads from ``key`` directly; the\ndashboard surfaces ``size_bytes`` + ``uploaded_at`` so operators can\nconfirm the upload landed."
       },
+      "ContentFaqEntrySchema": {
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 1,
+            "title": "Q"
+          },
+          "a": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "A"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "q",
+          "a"
+        ],
+        "title": "ContentFaqEntrySchema",
+        "description": "One operator-authored FAQ entry stored in ``metadata.faq``."
+      },
       "ContentItemCreate": {
         "properties": {
           "slug": {
@@ -34541,6 +34830,14 @@
             "type": "array",
             "maxItems": 80,
             "title": "People"
+          },
+          "faq": {
+            "items": {
+              "$ref": "#/components/schemas/ContentFaqEntrySchema"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Faq"
           },
           "tags": {
             "items": {
@@ -36139,6 +36436,18 @@
               }
             ],
             "title": "Background Color"
+          },
+          "biblioteca_viva_pitch": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Biblioteca Viva Pitch"
           }
         },
         "type": "object",
@@ -37145,6 +37454,16 @@
             },
             "type": "array",
             "title": "Related"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeriesGroup"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "has_audio": {
             "type": "boolean",
@@ -39696,9 +40015,23 @@
             ],
             "title": "Id"
           },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
           "name": {
             "type": "string",
-            "maxLength": 200,
+            "maxLength": 255,
             "minLength": 1,
             "title": "Name"
           },
@@ -41299,6 +41632,17 @@
             ],
             "title": "Title"
           },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle"
+          },
           "type": {
             "anyOf": [
               {
@@ -41821,6 +42165,27 @@
               "custom"
             ],
             "title": "Type"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle"
+          },
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Item Ids"
           }
         },
         "type": "object",
@@ -41918,6 +42283,34 @@
               }
             ],
             "title": "Enabled"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle"
+          },
+          "item_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Ids"
           }
         },
         "type": "object",
@@ -41951,6 +42344,34 @@
           "position": {
             "type": "integer",
             "title": "Position"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle"
+          },
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Item Ids"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminRailItemSummary"
+            },
+            "type": "array",
+            "title": "Items"
           }
         },
         "type": "object",
@@ -42293,6 +42714,22 @@
               }
             ],
             "title": "Body"
+          },
+          "tags": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "moving",
+                "hopeful",
+                "funny",
+                "intense",
+                "relaxing",
+                "thought_provoking"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Tags"
           }
         },
         "type": "object",
@@ -42332,6 +42769,21 @@
             "type": "string",
             "title": "Body"
           },
+          "tags": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "moving",
+                "hopeful",
+                "funny",
+                "intense",
+                "relaxing",
+                "thought_provoking"
+              ]
+            },
+            "type": "array",
+            "title": "Tags"
+          },
           "created_at": {
             "type": "string",
             "title": "Created At"
@@ -42368,6 +42820,21 @@
               }
             ],
             "title": "Body"
+          },
+          "tags": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "moving",
+                "hopeful",
+                "funny",
+                "intense",
+                "relaxing",
+                "thought_provoking"
+              ]
+            },
+            "type": "array",
+            "title": "Tags"
           },
           "created_at": {
             "type": "string",
@@ -42440,6 +42907,21 @@
             ],
             "title": "Body"
           },
+          "tags": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "moving",
+                "hopeful",
+                "funny",
+                "intense",
+                "relaxing",
+                "thought_provoking"
+              ]
+            },
+            "type": "array",
+            "title": "Tags"
+          },
           "created_at": {
             "type": "string",
             "title": "Created At"
@@ -42463,9 +42945,33 @@
             "title": "Rating"
           },
           "body": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Body",
             "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "moving",
+                "hopeful",
+                "funny",
+                "intense",
+                "relaxing",
+                "thought_provoking"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Tags"
           }
         },
         "type": "object",
@@ -43414,6 +43920,113 @@
         },
         "type": "object",
         "title": "SeoSitemapChangefreq"
+      },
+      "SeriesGroup": {
+        "properties": {
+          "collection": {
+            "type": "string",
+            "title": "Collection"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "collection"
+        ],
+        "title": "SeriesGroup"
+      },
+      "SeriesItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "cover_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image Url"
+          },
+          "rating_avg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Avg"
+          },
+          "rating_count": {
+            "type": "integer",
+            "title": "Rating Count",
+            "default": 0
+          },
+          "coming_soon": {
+            "type": "boolean",
+            "title": "Coming Soon",
+            "default": false
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio",
+            "default": false
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "series_index": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Index"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "kind",
+          "title"
+        ],
+        "title": "SeriesItem"
       },
       "SessionItem": {
         "properties": {
@@ -44602,6 +45215,15 @@
             "title": "Appearance",
             "default": "dark"
           },
+          "site_template": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "biblioteca_viva"
+            ],
+            "title": "Site Template",
+            "default": "classic"
+          },
           "typeface": {
             "anyOf": [
               {
@@ -44903,6 +45525,19 @@
             "format": "uuid",
             "title": "Tenant Id"
           },
+          "archetype": {
+            "type": "string",
+            "title": "Archetype"
+          },
+          "site_template": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "biblioteca_viva"
+            ],
+            "title": "Site Template",
+            "default": "classic"
+          },
           "branding": {
             "$ref": "#/components/schemas/BrandingSettings"
           },
@@ -44981,6 +45616,7 @@
         "type": "object",
         "required": [
           "tenant_id",
+          "archetype",
           "branding",
           "integrations",
           "delivery",
@@ -44990,6 +45626,21 @@
       },
       "TenantSettingsPatch": {
         "properties": {
+          "site_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "classic",
+                  "biblioteca_viva"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Template"
+          },
           "branding": {
             "anyOf": [
               {

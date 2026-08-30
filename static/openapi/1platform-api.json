@@ -35137,6 +35137,102 @@
         }
       }
     },
+    "/api/v1/dashboard/runtime-config": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Fetch effective dashboard runtime configuration",
+        "description": "Returns the authenticated user's effective UI profile and tenant module overlay. The app token and user token are both required; the tenant is resolved only from the live user identity.",
+        "operationId": "getDashboardRuntimeConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runtime configuration retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DashboardRuntimeConfigResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "scope_app_id": "507f1f77bcf86cd799439011",
+                    "ui_profile": "restado-v1",
+                    "modules": []
+                  },
+                  "msg": "Dashboard runtime configuration retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Runtime resolution failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dashboard/bootstrap": {
       "get": {
         "tags": [
@@ -35468,7 +35564,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
+                  "$ref": "#/components/schemas/SuccessResponse_DashboardModulesResponse_"
                 },
                 "example": {
                   "success": true,
@@ -36553,7 +36649,7 @@
           "Platform Admin"
         ],
         "summary": "Update a tenant App (superadmin)",
-        "description": "Updates a tenant's display name, its status, and the business namespaces of its configuration.\n\n`config_patch` is a **two-level** patch addressed to the leaf: `{\"pricing\": {\"content_generation\": 0.15}}` rewrites that one setting and leaves the rest of `pricing` untouched. A `null` in place of a namespace removes the namespace; a `null` in place of a setting removes that setting. Five namespaces are writable — `billing`, `pricing`, `limits`, `features` and `dashboard` — and of `billing` and `dashboard` only `enabled`. Everything else is rejected.\n\nDeactivating the tenant you are authenticated with is refused, and so is deactivating an administrative tenant. There is **no delete**: the logical removal of a tenant is `status: inactive`.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)\n\n**Rate limit:** 60 req/min",
+        "description": "Updates a tenant's display name, its status, and the business namespaces of its configuration.\n\n`config_patch` is a **two-level** patch addressed to the leaf: `{\"pricing\": {\"content_generation\": 0.15}}` rewrites that one setting and leaves the rest of `pricing` untouched. A `null` in place of a namespace removes the namespace; a `null` in place of a setting removes that setting. Five namespaces are writable — `billing`, `pricing`, `limits`, `features` and `dashboard` — and of `billing` only `enabled`; Dashboard accepts only `enabled` and the closed `ui_profile` catalogue. Everything else is rejected.\n\nDeactivating the tenant you are authenticated with is refused, and so is deactivating an administrative tenant. There is **no delete**: the logical removal of a tenant is `status: inactive`.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (superadmin)\n\n**Rate limit:** 60 req/min",
         "operationId": "updatePlatformApp",
         "security": [
           {
@@ -36602,8 +36698,8 @@
                 "name": "Acme Corporation",
                 "status": "active",
                 "config_patch": {
-                  "pricing": {
-                    "content_generation": 0.15
+                  "dashboard": {
+                    "ui_profile": "restado-v1"
                   }
                 }
               }
@@ -36652,12 +36748,22 @@
               }
             }
           },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Not a superadmin, or an impersonation token",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/HTTPDetailErrorResponse"
                 }
               }
             }
@@ -36686,8 +36792,37 @@
             "description": "Field, setting name or value not accepted",
             "content": {
               "application/json": {
+                "examples": {
+                  "validation": {
+                    "value": {
+                      "detail": [
+                        {
+                          "type": "enum",
+                          "loc": [
+                            "body",
+                            "config_patch",
+                            "dashboard",
+                            "ui_profile"
+                          ],
+                          "msg": "Input should be 'restado-v1'",
+                          "input": "[REDACTED]"
+                        }
+                      ],
+                      "message": "Validation error in request data"
+                    }
+                  },
+                  "domain": {
+                    "value": {
+                      "success": false,
+                      "data": {
+                        "code": "platform_app_config_value_invalid"
+                      },
+                      "msg": "That configuration value is not valid"
+                    }
+                  }
+                },
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/PlatformAppPatch422Response"
                 }
               }
             }
@@ -57496,6 +57631,27 @@
         "title": "AttentionItem",
         "description": "One thing waiting for the user.\n\nThe server sends a fact — a closed ``kind``, a count and a severity — and\nthe client supplies every word. Two reasons, and the second is the hard one:\nthe panel is bilingual and the copy lives in the seeds, AND any string the\nserver authors can name an external provider, which is the defect\n``providerSafeText`` exists to catch. A server-authored sentence here would\nwalk straight past it."
       },
+      "AuthHTTPErrorResponse": {
+        "properties": {
+          "detail": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/CredentialRevokedDetail"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "AuthHTTPErrorResponse",
+        "description": "Document both live 401 shapes without changing their runtime handler."
+      },
       "AutopublishPriceResponse": {
         "properties": {
           "website_id": {
@@ -61355,6 +61511,26 @@
           "email": "user@example.com"
         }
       },
+      "CredentialRevokedDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "credential_revoked",
+            "title": "Code"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "msg"
+        ],
+        "title": "CredentialRevokedDetail",
+        "description": "The existing structured form of a revoked credential error."
+      },
       "CredentialSecretOut": {
         "properties": {
           "id": {
@@ -61790,6 +61966,20 @@
         "title": "DashboardConfigResponse",
         "description": "Public response shape served by ``GET /dashboard/bootstrap``.\n\n``app_id`` is stringified for JSON fidelity. Audit fields are excluded —\nthey are observable only via the audit collection."
       },
+      "DashboardModulesResponse": {
+        "properties": {
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/ModuleConfig"
+            },
+            "type": "array",
+            "title": "Modules"
+          }
+        },
+        "type": "object",
+        "title": "DashboardModulesResponse",
+        "description": "Compatibility projection retained by ``GET /dashboard/modules``."
+      },
       "DashboardPalette": {
         "properties": {
           "mode": {
@@ -61863,6 +62053,67 @@
         "type": "object",
         "title": "DashboardPalette",
         "description": "MUI-compatible palette slots. Each slot is a dict to tolerate custom keys."
+      },
+      "DashboardPlatformConfigPatch": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "ui_profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardUIProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DashboardPlatformConfigPatch",
+        "description": "The closed Dashboard leaves writable through the superadmin patch."
+      },
+      "DashboardRuntimeConfigResponse": {
+        "properties": {
+          "scope_app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope App Id"
+          },
+          "ui_profile": {
+            "$ref": "#/components/schemas/DashboardUIProfile"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/ModuleConfig"
+            },
+            "type": "array",
+            "title": "Modules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scope_app_id",
+          "ui_profile"
+        ],
+        "title": "DashboardRuntimeConfigResponse",
+        "description": "Effective runtime configuration bound to the authenticated user scope."
       },
       "DashboardSettingResponse": {
         "properties": {
@@ -62103,6 +62354,14 @@
         },
         "type": "object",
         "title": "DashboardTypography"
+      },
+      "DashboardUIProfile": {
+        "type": "string",
+        "enum": [
+          "restado-v1"
+        ],
+        "title": "DashboardUIProfile",
+        "description": "Closed visual profile catalogue for authenticated dashboard surfaces."
       },
       "DeliveryAssigneeInput": {
         "properties": {
@@ -64600,6 +64859,20 @@
         ],
         "title": "GeneratedImageItem",
         "description": "A single generated image in the response."
+      },
+      "HTTPDetailErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "HTTPDetailErrorResponse",
+        "description": "Documentary model for live HTTP errors with a string ``detail``."
       },
       "HTTPValidationError": {
         "properties": {
@@ -67728,6 +68001,88 @@
         ],
         "title": "PaginationResponse"
       },
+      "PatchValidationErrorItem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "[REDACTED]"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          },
+          "ctx": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ctx"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "loc",
+          "msg"
+        ],
+        "title": "PatchValidationErrorItem",
+        "description": "Redacted Pydantic validation item exposed by the Platform app patch."
+      },
+      "PatchValidationErrorResponse": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/PatchValidationErrorItem"
+            },
+            "type": "array",
+            "title": "Detail"
+          },
+          "message": {
+            "type": "string",
+            "const": "Validation error in request data",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "message"
+        ],
+        "title": "PatchValidationErrorResponse"
+      },
       "PaymentLinkCreateRequest": {
         "properties": {
           "amount": {
@@ -68920,6 +69275,18 @@
         "title": "PlatformAgentsView",
         "description": "The agents of one workspace, with the bounds and the caveats."
       },
+      "PlatformAppPatch422Response": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PatchValidationErrorResponse"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        ],
+        "title": "PlatformAppPatch422Response",
+        "description": "OpenAPI-only union for Pydantic and domain validation 422 responses."
+      },
       "PlatformAppUpdateRequest": {
         "properties": {
           "name": {
@@ -68953,15 +69320,13 @@
           "config_patch": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/PlatformConfigPatch"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Config Patch",
-            "description": "Two-level patch of the tenant configuration. The first level is the namespace and only billing, pricing, limits, features and dashboard are writable here; the second level is the setting. Inside billing only 'enabled' is writable, and inside dashboard only 'enabled'. A null setting removes that setting; a namespace holding settings that are not writable here cannot be removed as a whole. Everything else is rejected."
+            "description": "Two-level patch of the tenant configuration. The first level is the namespace and only billing, pricing, limits, features and dashboard are writable here; the second level is the setting. Inside billing only 'enabled' is writable, and inside dashboard only 'enabled' or the closed 'ui_profile' catalogue. A null setting removes that setting; a namespace holding settings that are not writable here cannot be removed as a whole. Everything else is rejected."
           }
         },
         "additionalProperties": false,
@@ -69218,6 +69583,17 @@
         ],
         "title": "PlatformAuditRetentionOut",
         "description": "How far back the archive goes, stated rather than implied (PAD-22 CA-3).\n\nWithout this the console cannot tell \"nothing happened in that window\" apart\nfrom \"the archive does not reach that far\", and both render as an empty\ntable."
+      },
+      "PlatformConfigPatch": {
+        "properties": {
+          "dashboard": {
+            "$ref": "#/components/schemas/DashboardPlatformConfigPatch"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "PlatformConfigPatch",
+        "description": "Open legacy namespaces plus the closed Dashboard sub-schema."
       },
       "PlatformConsumptionReport": {
         "properties": {
@@ -75399,6 +75775,70 @@
           "msg"
         ],
         "title": "SuccessResponse[DashboardConfigResponse]"
+      },
+      "SuccessResponse_DashboardModulesResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardModulesResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[DashboardModulesResponse]"
+      },
+      "SuccessResponse_DashboardRuntimeConfigResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardRuntimeConfigResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[DashboardRuntimeConfigResponse]"
       },
       "SuccessResponse_DashboardSettingResponse_": {
         "properties": {

@@ -131,22 +131,16 @@ typefaces (Instrument Serif joined with the site's home redesign), the same
 logo. A visitor clicking "Docs" on the marketing site should not be able to
 tell they changed origin.
 
-### The shared chrome (site epic home-landing-redesign)
+### The shared editorial chrome
 
-The navbar and footer mirror the site's redesigned chrome and draw with the
-`--ref-*` tokens (copied verbatim from the site's `global.css` — the site is
-upstream): a 74 px transparent bar with a 230 × 42 dark pill (brand + menu
-button) and two 44 px CTAs («Iniciar sesión» on yellow, «Comenzar gratis» on
-the AA orange); **no navigation link is visible in the bar at any width** —
-the items live in the panel the button opens. That panel is the theme's own
-mobile sidebar, rendered at every width by the wrap swizzle in
-`src/theme/Navbar/MobileSidebar/` (measured: `useNavbarMobileSidebar()` only
-renders it on mobile, so CSS alone cannot do this), with Escape added. The
-search box stays in the bar — a docs portal without search is not a portal.
-The footer is the site's card: SVG watermark, `mailto:` sign-up, PRODUCTO /
-EMPRESA / RECURSOS, legal row — and no closing CTA. Every text/surface pair of
-this chrome is pinned to AA by `scripts/check-chrome-contrast.mjs`, which runs
-in CI next to the design guard.
+The navbar and footer mirror the site's current public system. The navigation
+is a floating, paper-coloured rail: desktop keeps the public destinations
+visible, compact viewports use Docusaurus's native drawer, and the local search
+stays in the rail because it is a primary documentation task. The footer is a
+dark editorial band with the brand, a practical CTA, a `mailto:` sign-up, three
+link columns and the legal row. Every text/surface pair in this chrome is
+pinned to AA by `scripts/check-chrome-contrast.mjs`, which runs in CI next to
+the design guard.
 
 ### Where a decision lives
 
@@ -157,19 +151,17 @@ Docusaurus upgrade that adds a variable keeps working.
 
 ### Tokens
 
-- **Primitives:** `--ink #14161B`, `--paper #F6F5F2`, `--surface #FFFFFF`,
-  `--recessed #EFEEEA`, `--cobalt #1F4FE0`, `--cobalt-deep #1A44C4`,
-  `--cobalt-wash #ECF0FD`, `--signal #F5A524`, `--muted #5B5F6B`,
-  `--subtle #656974`, `--hairline`, `--hairline-strong`.
+- **Primitives:** `--ink #13151A`, `--paper #F5F1E8`, `--surface #FFFDF8`,
+  `--recessed #ECE5D8`, `--cobalt #1748A7`, `--cobalt-deep #10377F`,
+  `--cobalt-bright #78A6FF`, `--cobalt-wash #E5EDFC`, `--signal #F5A524`,
+  `--muted #555A64`, `--subtle #626873`, `--hairline`, `--hairline-strong`.
 - **One accent** (cobalt). **One signal** (amber), reserved for graphics —
   `--signal` measures 1.87:1 on paper and must NEVER carry text.
 - **Status colours are functional only** (success / danger / warning). There is
   no decorative hue; the purple/cyan/green/orange ramp was removed.
 - **Contrast is verified on the WORST surface a token can land on**, not the one
-  it happens to sit on. Current worst-case ratios: ink 15.59, muted 5.49,
-  subtle 4.73, cobalt 5.56 — all on `--recessed`. `--subtle` is `#656974`
-  precisely because the earlier `#696D79` cleared paper and surface but fell to
-  4.45 on `--recessed`, which is where code-block headers sit.
+  it happens to sit on. The chrome pairs are pinned by
+  `scripts/check-chrome-contrast.mjs`; re-run it whenever a shared token moves.
 - **Radius:** 6px standard, 10px large, 14px xl. **Easing:** `ease-out-expo`.
 
 ### Typography
@@ -353,6 +345,9 @@ not about the literal strings.
 **Navbar contract:**
 - Item order: Solutions · Features · Pricing · Docs · Blog, then the CTA right-aligned.
   Here: Soluciones · Funciones · Precios · Documentación · Blog · "Comenzar gratis".
+- **Composition:** a floating, paper-coloured rail on desktop; the native
+  compact drawer carries those same destinations below the desktop breakpoint.
+  Keep local search in the rail.
 - Cross-subdomain links point at `https://1platform.pro/<page>/` with
   `target: '_self'`; the auto-appended external-link icon is hidden.
 - **Solutions dropdown** — seven items, a rule, then the catch-all, in this order.
@@ -374,17 +369,15 @@ not about the literal strings.
   not blue text. Identical geometry on both sites.
 
 **Footer contract:**
-- **CTA banner:** headline + lead + two buttons. The headline carries **no
-  count of tools replaced** — the site contradicted itself across 4/5/6/19+ and
-  the agreed phrasing is unnumbered. Do not reintroduce a number.
-- **Link grid:** brand column (logo + "One platform. Every solution." tagline)
-  plus four columns in order — **Soluciones** (8 items), **Recursos** (5),
-  **Empresa** (3), **Legal** (3).
+- **Opening:** logo, the "Una plataforma. Todas las soluciones." line and one
+  CTA, followed by a `mailto:` sign-up.
+- **Link grid:** three columns in order — **Producto** (8 items), **Empresa**
+  (5), **Recursos** (4) — plus the legal row.
 - **Column titles** use the eyebrow voice: mono, uppercase, `0.14em` tracking.
 - **Bottom row:** `© {year} 1Platform Labs. Todos los derechos reservados.`,
   rendered by the swizzle from the current year.
-- **Grid:** `1.5fr repeat(4, 1fr)`, collapsing to 2 columns with the brand
-  spanning the full row at ≤768px.
+- **Grid:** intro then two content columns, collapsing to one column; the link
+  columns fold into native `details` controls on small screens.
 
 **If you add, remove, rename, or reorder a navbar item or footer column/link on
 either site, you MUST update the other in the same commit.**

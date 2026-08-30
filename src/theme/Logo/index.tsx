@@ -14,10 +14,10 @@ import styles from './styles.module.css';
  * JSX collapses the whitespace between the two spans (it contains a newline),
  * so the only separation is the 0.36em gap set in CSS — same as the site.
  */
-export default function Logo(): ReactNode {
+export default function Logo({className = ''}: {className?: string}): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
-    <Link to="/" className={`navbar__brand ${styles.logo}`} aria-label={siteConfig.title}>
+    <Link to="/" className={`navbar__brand ${styles.logo} ${className}`} aria-label={siteConfig.title}>
       <span className={styles.logoMark} aria-hidden="true">
         1
       </span>

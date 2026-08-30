@@ -180,7 +180,7 @@ const config: Config = {
     // guessing from the OS preference.
     {
       tagName: 'meta',
-      attributes: {name: 'theme-color', content: '#F6F5F2'},
+      attributes: {name: 'theme-color', content: '#F5F1E8'},
     },
     {
       tagName: 'link',
@@ -369,12 +369,8 @@ const config: Config = {
       // Mirrors the marketing website navbar (1platform.pro) — keep item order
       // and labels in sync with 1platform-website/src/components/Header.astro.
       //
-      // Since the site's home redesign (epic home-landing-redesign, D-3/D-4)
-      // none of the left items is VISIBLE in the bar: they live in the panel
-      // the menu button opens, at every width (see src/css/custom.css and the
-      // Navbar/MobileSidebar swizzle). The bar shows the brand pill and two
-      // calls to action, like the site. The item list itself is unchanged —
-      // it IS the panel's content.
+      // The shared floating rail keeps these public destinations visible on
+      // desktop. The native compact drawer owns the same list on mobile.
       items: [
         {
           type: 'dropdown',
@@ -387,7 +383,7 @@ const config: Config = {
             {href: 'https://1platform.pro/solutions/content/', label: 'Contenido con IA', target: '_self'},
             {href: 'https://1platform.pro/solutions/deliveries/', label: 'Envíos', target: '_self'},
             {href: 'https://1platform.pro/solutions/ads/', label: 'Publicidad', target: '_self'},
-            {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Panel white-label', target: '_self'},
+            {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Panel de marca blanca', target: '_self'},
             {href: 'https://1platform.pro/payments-invoicing/', label: 'Pagos y facturación', target: '_self'},
             // The site separates the five solutions from the catch-all link
             // with a rule; mirror it so the two menus read identically.

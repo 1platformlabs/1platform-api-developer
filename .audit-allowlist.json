@@ -1,0 +1,38 @@
+{
+  "_comentario": [
+    "Excepciones de la compuerta de dependencias (scripts/audit-critical.mjs).",
+    "",
+    "Una excepción NO es 'ignorar el advisory': es afirmar, con evidencia y con fecha",
+    "de vencimiento, que ese código no se ejecuta en el artefacto que se publica.",
+    "Vencida deja de suprimir y la compuerta vuelve a bloquear — a propósito: una",
+    "excepción de seguridad sin vencimiento es permanente por accidente.",
+    "",
+    "Las dos de abajo se midieron el 2026-09-04 con `pnpm audit --prod --json`",
+    "(pnpm 10.34.5): son las UNICAS criticas del arbol, las dos transitivas de",
+    "`webpack-dev-server`, que sale de `@docusaurus/core`. `webpack-dev-server` corre",
+    "en `docusaurus start` (desarrollo local) y NO participa de `docusaurus build`.",
+    "La imagen de produccion lo confirma: el `Dockerfile` publica `nginx:1.27-alpine`",
+    "sirviendo el `build/` estatico — en el runtime no hay Node.",
+    "",
+    "El arreglo real, cuando toque: `pnpm.overrides` forzando shell-quote >=1.8.4 y",
+    "websocket-driver >=0.7.5, que es donde estan los parches. No se hace en el PR",
+    "que instala esta compuerta para no mezclar plomeria de CI con un cambio en el",
+    "arbol de dependencias."
+  ],
+  "excepciones": [
+    {
+      "id": "GHSA-w7jw-789q-3m8p",
+      "paquete": "shell-quote",
+      "ruta": ".>@docusaurus/core>webpack-dev-server>launch-editor>shell-quote",
+      "motivo": "CVE-2026-9277 (CVSS 8.1). Sólo alcanzable desde el servidor de desarrollo (`docusaurus start`); no entra en `docusaurus build` ni en la imagen nginx que se publica. Parche en >=1.8.4.",
+      "vence": "2026-12-03"
+    },
+    {
+      "id": "GHSA-xv26-6w52-cph6",
+      "paquete": "websocket-driver",
+      "ruta": ".>@docusaurus/core>webpack-dev-server>sockjs>websocket-driver",
+      "motivo": "CVE-2026-54466. El websocket es el del hot-reload de `docusaurus start`; el sitio publicado es HTML estático servido por nginx. Parche en >=0.7.5.",
+      "vence": "2026-12-03"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+# Configuración de gitleaks para 1platform-api-developer.
+# Documenta los ÚNICOS falsos-positivos permitidos: ejemplos ilustrativos en la documentación
+# de la API. Este repositorio ES el portal de desarrolladores público, así que el corpus de
+# ejemplos `ak-…`/`sk-…` del modelo dos-token vive acá por diseño y daría falso positivo en
+# cada PR sin este allowlist.
+#
+# IMPORTANTE (seguridad): los regexes del allowlist son **anclados/acotados** para que
+# NO silencien credenciales REALES. Validado empíricamente con gitleaks: una OpenAI
+# `sk-…T3BlbkFJ…`, un JWT firmado completo, y llaves AWS/GitHub siguen BLOQUEANDO el merge; solo pasan
+# los shapes de EJEMPLO del corpus (JWT truncados con `...`, tokens cortos `ak-`/`sk-`, UUID placeholder).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ejemplos de documentación (placeholders ilustrativos) + artefactos de build"
+
+paths = [
+  '''node_modules/.*''',
+  '''build/.*''',
+  '''\.docusaurus/.*''',
+  '''\.gitleaks\.toml''',
+]
+
+regexes = [
+  # JWT de ejemplo: SOLO truncados con `...` (los del corpus). Un JWT firmado real NO contiene `...`.
+  '''eyJ[A-Za-z0-9_-]+\.\.\.''',
+  # Tokens placeholder del modelo two-token (ak-/sk-): ANCLADOS (^…$) y acotados a <=28 chars, así
+  # cubren los ejemplos del corpus (`ak-your-app-token`, `sk-the-user-token`, `sk-user-…-2026`, etc.)
+  # pero NO una OpenAI `sk-proj-…`/`sk-…`(~51) ni una Anthropic `sk-ant-api03-…` (largas) — esas bloquean.
+  '''^(?:ak|sk)-[A-Za-z0-9_<>-]{2,28}$''',
+  # UUID placeholder de ejemplo (authorization_number FEL en respuestas de muestra): secuencia hex obvia.
+  '''A1B2C3D4(?:-[0-9A-Fa-f]+)+''',
+  # ── Valores de EJEMPLO del OpenAPI publicado en `static/openapi/*.json` ────
+  # Ese archivo se regenera con `pnpm fetch-openapi` desde el OpenAPI PÚBLICO de
+  # la API y trae bloques `"example"` con credenciales de mentira que imitan la
+  # forma real. NO se pueden cubrir por FORMA, y esto es lo importante: medido en
+  # `1platform-api/app/services/auth/auth_user_service.py:428`, un token real es
+  # `sk-{secrets.token_urlsafe(24)}` — 35 caracteres, exactamente el largo del
+  # ejemplo. Aflojar de 28 a 35 el patrón de arriba dejaría pasar un token REAL
+  # filtrado, así que van los literales, uno por uno.
+  #
+  # Consecuencia asumida: si un `fetch-openapi` cambia estos ejemplos, el check se
+  # pone rojo hasta que una persona mire y actualice la lista. Para un archivo que
+  # llega de un servicio en vivo, ése es el comportamiento correcto.
+  '''^sk-QK2fV8x1nZ0rT7wPq4LsE6hJdC3bY9A1C$''',
+  '''^ak-QK2fV8x1nZ0rT7wPq4LsE6hJdC3bX4F2$''',
+  '''^1p_whv_3f8Ka9Qb2Lm7Rz0Xt4Cy$''',
+  '''^1p_whv_Qw5Er7Ty9Ui1Op3As6Df$''',
+  '''^whsec_2c7b9a8e1f4d3c5a6b8e9d0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b$''',
+  '''^whsec_4f8e7a9c2b1d0e3f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f$''',
+  '''^5f1c0f2e-2a6d-4c3b-9f10-2b7c8d9e0a11$''',
+  # Placeholders textuales: el `client-supplied-uuid-v4` de un ejemplo `curl` de
+  # `docs/`, y las rutas de redirección `journeys/…` de `docusaurus.config.ts`,
+  # que `generic-api-key` confunde con una clave por estar al lado de la palabra
+  # "key". Anclados: una credencial no tiene ninguna de esas dos formas.
+  '''^client-supplied-uuid-v4$''',
+  '''^journeys/[a-z-]+$''',
+]

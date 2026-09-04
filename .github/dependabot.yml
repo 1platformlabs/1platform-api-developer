@@ -1,0 +1,52 @@
+# Dependabot — actualizaciones agrupadas y SEMANALES.
+#
+# Agrupado a propósito: la lluvia de PRs sueltos entrena al equipo a ignorarlos,
+# que es exactamente el fallo que este archivo tiene que evitar. Las alertas de
+# seguridad (`vulnerability-alerts`) llegan igual y por su propio canal: esto es
+# el mantenimiento rutinario, no la respuesta a incidentes.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      acciones:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"
+
+  # Dependabot maneja pnpm bajo el ecosistema `npm`: lee `pnpm-lock.yaml` y
+  # abre el PR con el lockfile ya regenerado.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      produccion:
+        dependency-type: "production"
+        update-types: ["minor", "patch"]
+      desarrollo:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Las dos imágenes base del `Dockerfile` (`node:20-alpine` para construir y
+  # `nginx:1.27-alpine` para servir): un CVE del runtime no lo ve la auditoría de
+  # dependencias, que sólo mira el árbol de node.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      imagenes:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(docker)"

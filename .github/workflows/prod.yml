@@ -19,17 +19,45 @@ env:
 
 jobs:
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 1: Fetch latest OpenAPI spec (runs on every pipeline execution)
-# If spec changed, commits to main. Build always continues after this.
+# JOB 1: Descargar la especificación del API — y NO ESCRIBIRLA EN `main`
+#
+# Hasta el 2026-09-11 este job commiteaba la especificación descargada y la
+# empujaba directo a `main`. Desde que `main` exige checks (`Build (QA)` y
+# `Build, types and design system`) ese push está condenado — un push directo
+# no tiene check run propio — y con `set -euo pipefail` su rechazo mataba el
+# pipeline ENTERO: build, bump, release y deploy salteados. Medido en la
+# corrida 34560507686:
+#
+#   [main b753d06] chore: update OpenAPI specs from Production APIs
+#    2 files changed, 19333 insertions(+), 13877 deletions(-)
+#   remote: error: GH006: Protected branch update failed for refs/heads/main.
+#   remote: - 2 of 2 required status checks are expected.
+#
+# Mientras la especificación del API difiera de la versionada, TODO merge moría
+# ahí (issue #45).
+#
+# El arreglo sigue el principio que `1platform-dashboard` escribió en su
+# `design-system-lockfile.yml`: «NO commitea nada: un workflow que se escribe a
+# sí mismo en la rama es una superficie de escritura que esto no necesita». La
+# especificación nueva se publica como ARTEFACTO de la corrida, para commitearla
+# por un PR normal —con sus checks—, y el pipeline sigue.
+#
+# ⚠️ Lo que esto NO resuelve, y a propósito: producción construye EN EL HOST
+# desde el árbol de git (`deploy.sh prod build` → `COPY . .`), así que sigue
+# sirviendo la especificación VERSIONADA hasta que ese PR se mergee. Que el
+# sitio sirva la especificación en vivo sin pasar por git es otra decisión —
+# repo y producción dejarían de coincidir — y está planteada en el issue #45.
 # ─────────────────────────────────────────────────────────────────────────────
 
   update_spec:
     name: Fetch & Update OpenAPI Spec
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: PROD
+    # Sólo lectura: este job ya no tiene con qué escribir en la rama aunque
+    # alguien le vuelva a agregar un `git push`. Tampoco declara `environment`:
+    # la descarga usa URLs públicas y no necesita ningún secreto de `PROD`.
     permissions:
-      contents: write
+      contents: read
     outputs:
       has_changes: ${{ steps.check_diff.outputs.has_changes }}
 
@@ -37,8 +65,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: Setup pnpm
         # Version comes from `packageManager` in package.json, so CI, prod and a
@@ -72,25 +99,43 @@ jobs:
           set -euo pipefail
           if git diff --quiet static/openapi/; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "OpenAPI spec unchanged — stopping pipeline."
+            # «stopping pipeline» era falso: `build` no depende de este output.
+            echo "La especificación del API coincide con la versionada."
           else
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
-            echo "OpenAPI spec changed — committing to main and continuing."
+            echo "La especificación del API difiere de la versionada — se publica como artefacto."
           fi
 
-      - name: Commit updated spec to main
+      - name: Publicar la especificación nueva como artefacto
+        if: steps.check_diff.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec-${{ github.run_id }}
+          path: static/openapi/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Avisar que la especificación versionada quedó atrás
         if: steps.check_diff.outputs.has_changes == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add static/openapi/
-          git commit -m "chore: update OpenAPI specs from Production APIs"
-          git push origin main
+          STAT=$(git diff --shortstat -- static/openapi/)
+          echo "::warning::La especificación del API difiere de la versionada (${STAT}). Producción sirve la VERSIONADA hasta que se mergee un PR con el artefacto openapi-spec-${{ github.run_id }}."
+          {
+            echo "### La especificación versionada quedó atrás del API"
+            echo ""
+            echo "\`${STAT}\` en \`static/openapi/\`."
+            echo ""
+            echo "Este pipeline **no escribe en \`main\`** (su rama está protegida y un push directo se rechaza)."
+            echo "El sitio se despliega igual, con la especificación **versionada**."
+            echo ""
+            echo "Para publicar la nueva: bajar el artefacto \`openapi-spec-${{ github.run_id }}\`,"
+            echo "copiarlo sobre \`static/openapi/\` y abrir un PR."
+          } >> "$GITHUB_STEP_SUMMARY"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 2+: Build & Deploy (runs after spec is fetched and committed if needed)
+# JOB 2+: Build & Deploy
 # ─────────────────────────────────────────────────────────────────────────────
 
   build:
@@ -451,8 +496,14 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           DEPLOY_GH_TOKEN: ${{ github.token }}
-          # `v` + la versión: este repo expone `new_version` SIN la `v`.
-          VERSION: v${{ needs.version_bump.outputs.new_version }}
+          # El commit del merge, NO el tag. Este job ya no cuelga del RESULTADO
+          # de `release` (#44), así que no puede asumir que el tag exista: si
+          # `release` no llegó a crearlo, `v<version>` no es una ref y
+          # `git reset --hard` revienta — y si `version_bump` se salteó,
+          # `v` a secas tampoco lo es. El SHA siempre existe y es exactamente
+          # el árbol que se quiere servir. Mismo patrón que `1platform-website`
+          # y `1platform-console`.
+          VERSION: ${{ github.sha }}
         with:
           host: ${{ secrets.HETZNER_SSH_HOST }}
           username: ${{ secrets.HETZNER_SSH_USER }}
@@ -483,7 +534,25 @@ jobs:
             cd "$APP_DIR"/
             git remote set-url origin "https://x-access-token:${DEPLOY_GH_TOKEN}@github.com/1platformlabs/1platform-api-developer.git"
             chmod 600 .git/config
-            git fetch --prune --force --all --tags
+            # El dedicado corre git 1.8.3.1, donde `--tags` REEMPLAZA la refspec
+            # configurada en vez de sumarse: `fetch --all --tags` trae los tags
+            # y NO actualiza ningún `refs/remotes/origin/*`. Medido en ESTE
+            # checkout el 2026-09-11: HEAD en v1.3.9 (570acff) con
+            # `origin/main` local congelado en 659c7dd. Con reset a un TAG el
+            # agujero quedaba tapado; con reset a un SHA sería
+            # `fatal: Could not parse object` — el incidente #88 de
+            # `1platform-website`. Refspecs explícitas: git 1.8 sí las honra.
+            git fetch --prune --force origin \
+              "+refs/heads/*:refs/remotes/origin/*" \
+              "+refs/tags/*:refs/tags/*"
+
+            # Guarda: verificar ANTES de tocar el árbol convierte «desplegó una
+            # versión vieja en silencio» en «el deploy falla y se ve».
+            if ! git cat-file -e "${VERSION}^{commit}" 2>/dev/null; then
+              echo "::error::${VERSION} no llegó al fetch — origin/main no avanzó"
+              exit 1
+            fi
+
             git reset --hard "${VERSION}"
 
             # `deploy.sh` aborta si falta `.env.prod`, antes de construir. El

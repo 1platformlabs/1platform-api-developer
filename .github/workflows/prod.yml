@@ -140,18 +140,47 @@ jobs:
           path: build/
           retention-days: 7
 
+  # LA FUENTE DE VERDAD ES EL TAG, no `package.json`.
+  #
+  # Este job no escribe nada. Antes commiteaba la versión en `package.json` y
+  # empujaba el commit directo a `main`. Desde que `main` exige checks
+  # (`Build (QA)` y `Build, types and design system`) ese push está condenado:
+  # un push directo no tiene check run propio, así que GitHub lo rechaza con
+  # `GH006 ... Required status check ... is expected`, y el reintento no puede
+  # ayudar porque el contexto requerido se publica sobre un commit que ya tiene
+  # que estar en el remoto.
+  #
+  # Acá todavía no se manifestó sólo porque no hubo un merge a `main` desde el
+  # 2026-08-30 — el último tag es de ese día. En los repos hermanos ya pasó y
+  # está medido: `1platform-console` (corrida 34549973287), `1platform-website`
+  # (cinco corridas desde el 2026-09-07) y `bower-dashboard` (2026-09-11).
+  #
+  # El arreglo es el que ya corre en `1platform-dashboard` (su issue #304) y
+  # que se portó a esos tres: NO COMMITEAR NADA. El número sale del último tag
+  # y `release` crea el siguiente — lo único que se empuja, y un tag no lo
+  # bloquea la protección de rama.
+  #
+  # `package.json:version` deja de ser autoritativo, y se comprobó que puede
+  # serlo: no lo lee nadie (ninguna referencia en `src/` ni en
+  # `docusaurus.config.ts`).
   version_bump:
     name: Auto Version Bump
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment: PROD
+    # Sólo lectura, y es la mitad del punto: este job ya no tiene con qué
+    # escribir aunque alguien le agregue un `git push` por descuido. Tampoco
+    # declara `environment`, que sólo servía para alcanzar secretos que ya no
+    # necesita.
     permissions:
-      contents: write
+      contents: read
     outputs:
       new_version: ${{ steps.bump.outputs.new_version }}
       bump_type: ${{ steps.bump.outputs.bump_type }}
-      push_sha: ${{ steps.push.outputs.push_sha }}
+      # Reemplaza a `push_sha` (ya no hay push que pueda fracasar): dice si la
+      # versión calculada YA tiene tag —dos merges encimados, o un re-run—, y
+      # entonces no hay nada nuevo que publicar.
+      already_tagged: ${{ steps.bump.outputs.already_tagged }}
 
     steps:
       - name: Checkout repository
@@ -197,125 +226,45 @@ jobs:
           echo "::notice::Bump type: ${BUMP_TYPE} (derivado del mensaje del merge)"
           export BUMP_TYPE
 
-          python3 << 'PYEOF'
-          import json, os
-          from pathlib import Path
-
-          bump_type = os.environ["BUMP_TYPE"]
-
-          # Read current version from package.json
-          pkg     = json.loads(Path("package.json").read_text(encoding="utf-8"))
-          current = pkg.get("version", "")
-          if not current:
-              raise SystemExit("Could not find version in package.json")
-
-          parts = current.split(".")
-          if len(parts) != 3 or not all(p.isdigit() for p in parts):
-              raise SystemExit(f"Invalid version format: {current}")
-
-          major, minor, patch_v = [int(x) for x in parts]
-
-          if bump_type == "major":
-              new_version = f"{major + 1}.0.0"
-          elif bump_type == "minor":
-              new_version = f"{major}.{minor + 1}.0"
-          else:
-              new_version = f"{major}.{minor}.{patch_v + 1}"
-
-          print(f"Current: {current} → New: {new_version} (bump: {bump_type})")
-
-          # Update only the version field in package.json
-          pkg["version"] = new_version
-          Path("package.json").write_text(
-              json.dumps(pkg, indent=2, ensure_ascii=False) + "\n",
-              encoding="utf-8",
-          )
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-              f.write(f"new_version={new_version}\n")
-              f.write(f"bump_type={bump_type}\n")
-          PYEOF
-
-      - name: Validate version bump diff
-        id: validate
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # Only package.json should be modified
-          CHANGED_FILES=$(git diff --name-only)
-          if [ "$CHANGED_FILES" != "package.json" ]; then
-            echo "::error::Unexpected files modified: ${CHANGED_FILES}"
+          # LA VERSIÓN ANTERIOR SALE DEL ÚLTIMO TAG, no de `package.json`.
+          PREV_TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -1 || true)
+          if [ -n "$PREV_TAG" ]; then
+            PREV_VERSION="${PREV_TAG#v}"
+          else
+            PREV_VERSION="0.0.0"
+          fi
+          if ! echo "$PREV_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::El último tag no tiene forma vX.Y.Z: ${PREV_TAG}"
             exit 1
           fi
 
-          STATS=$(git diff --stat package.json | tail -1)
-          INSERTIONS=$(echo "$STATS" | grep -oP '\d+ insertion' | grep -oP '\d+' || echo "0")
-          DELETIONS=$(echo "$STATS"  | grep -oP '\d+ deletion'  | grep -oP '\d+' || echo "0")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$PREV_VERSION"
+          case "$BUMP_TYPE" in
+            major) NEW_VERSION="$((MAJOR + 1)).0.0" ;;
+            minor) NEW_VERSION="${MAJOR}.$((MINOR + 1)).0" ;;
+            *)     NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+          esac
 
-          if [ "$INSERTIONS" != "1" ] || [ "$DELETIONS" != "1" ]; then
-            echo "::error::package.json should change exactly 1 line (got +${INSERTIONS} -${DELETIONS})"
-            git diff package.json
-            exit 1
+          if git rev-parse "v${NEW_VERSION}" >/dev/null 2>&1; then
+            echo "::warning::v${NEW_VERSION} ya existe — no hay nada nuevo para publicar."
+            echo "already_tagged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_tagged=false" >> "$GITHUB_OUTPUT"
           fi
 
-          ADDED_LINE=$(git diff package.json | grep '^+' | grep -v '^+++' | head -1)
-          if ! echo "$ADDED_LINE" | grep -qP '^\+\s+"version":\s*"\d+\.\d+\.\d+"'; then
-            echo "::error::Changed line does not match expected version pattern"
-            echo "::error::Got: ${ADDED_LINE}"
-            exit 1
-          fi
-
-          echo "validated=true" >> "$GITHUB_OUTPUT"
-          echo "Version bump diff validated successfully"
-
-      - name: Commit and push version bump
-        if: steps.validate.outputs.validated == 'true'
-        id: push
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="${{ steps.bump.outputs.new_version }}"
-          BUMP="${{ steps.bump.outputs.bump_type }}"
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json
-
-          if git diff --cached --quiet; then
-            echo "::warning::No version change detected"
-            exit 0
-          fi
-
-          git commit -m "chore: bump version to ${VERSION} (${BUMP})"
-
-          PUSH_SUCCESS=false
-          for attempt in 1 2; do
-            if git push origin main; then
-              PUSH_SUCCESS=true
-              echo "push_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-              break
-            fi
-            if [ "$attempt" -eq 1 ]; then
-              echo "::warning::Push failed (attempt $attempt), pulling and retrying"
-              git pull --rebase origin main
-            fi
-          done
-
-          if [ "$PUSH_SUCCESS" != "true" ]; then
-            echo "::error::Failed to push version bump after 2 attempts"
-            exit 1
-          fi
-
-      - name: Cleanup
-        if: always()
-        shell: bash
-        run: rm -f "${RUNNER_TEMP}/bump_metadata.txt" || true
+          echo "Anterior: ${PREV_TAG:-<sin tags>} · bump: ${BUMP_TYPE} · nueva: ${NEW_VERSION}"
+          {
+            echo "new_version=${NEW_VERSION}"
+            echo "bump_type=${BUMP_TYPE}"
+          } >> "$GITHUB_OUTPUT"
 
   release:
     name: Tag & Release
     needs: [build, version_bump]
-    if: needs.version_bump.result == 'success'
+    # `version_bump` ya no empuja nada, así que su `result` no puede salir verde
+    # con una escritura rechazada. Lo que decide si HAY algo nuevo que publicar
+    # es el guard `already_tagged` de abajo.
+    if: ${{ !cancelled() && needs.version_bump.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: PROD
@@ -326,6 +275,20 @@ jobs:
       version: ${{ needs.version_bump.outputs.new_version }}
 
     steps:
+      # Un control que FALLA si este merge no tiene una versión nueva que
+      # publicar, en vez de saltearse en silencio.
+      - name: Este merge tiene que traer una versión sin tag todavía
+        env:
+          NEW_VERSION: ${{ needs.version_bump.outputs.new_version }}
+          ALREADY_TAGGED: ${{ needs.version_bump.outputs.already_tagged }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$ALREADY_TAGGED" = "true" ]; then
+            echo "::error::No hay versión nueva para publicar: v${NEW_VERSION} ya tiene tag. O dos merges corrieron encima y el anterior ya lo creó, o este workflow se re-corrió."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
@@ -425,31 +388,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: v${{ needs.version_bump.outputs.new_version }}
-          BUMP_SHA: ${{ needs.version_bump.outputs.push_sha }}
         shell: bash
         run: |
           set -euo pipefail
           echo "::error::Release job failed — rolling back"
 
+          # El tag es lo ÚNICO que este pipeline escribe en el repositorio, así
+          # que borrarlo es la reversión completa. Ya no hay commit de bump que
+          # revertir —`version_bump` no commitea nada— y con él se va la mitad
+          # frágil de este paso: revertir un commit en `main` exigía otro push a
+          # `main`, o sea el mismo push que la protección de rama rechaza.
           git push origin --delete "$VERSION" 2>/dev/null || echo "Tag not found or already deleted"
-
-          if [ -z "${BUMP_SHA}" ]; then
-            echo "::error::No bump SHA available — cannot safely revert"
-            exit 1
-          fi
-
-          BUMP_MSG=$(git log -1 --pretty=%s "$BUMP_SHA" 2>/dev/null || true)
-          if ! echo "$BUMP_MSG" | grep -q "^chore: bump version to"; then
-            echo "::error::SHA ${BUMP_SHA} does not match a version bump commit (msg: ${BUMP_MSG})"
-            exit 1
-          fi
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull origin main
-          git revert --no-edit "$BUMP_SHA"
-          git push origin main
-          echo "::warning::Version bump ${BUMP_SHA} reverted. Next merge will re-trigger the pipeline."
+          echo "::warning::Tag borrado. El próximo merge vuelve a calcular la versión desde el último tag."
 
       - name: Cleanup
         if: always()
@@ -472,8 +422,21 @@ jobs:
 
   deploy_hetzner:
     name: Deploy al dedicado (PROD)
+    # SIN depender del RESULTADO de `release`, y con `!cancelled()`. Desplegar
+    # el código mergeado es el propósito de este workflow; el tag es
+    # contabilidad alrededor. Encadenar producción detrás de la contabilidad
+    # detiene los despliegues en silencio, y no es hipotético — está medido en
+    # los repos hermanos:
+    #
+    #   website run 29644272240 · build ✅ · Auto Version Bump ❌ · deploy SKIPPED
+    #   console run 32815934311 · build ✅ · Auto Version Bump ❌ · deploy SKIPPED
+    #
+    # Los dos siguen en `needs` porque este job consume sus outputs, y un job
+    # que no está en `needs` no expone los suyos. Lo que cambia es que un
+    # `failure` de ellos ya no arrastra al despliegue: `!cancelled()` es lo
+    # único que sobrescribe el salteo automático de un `needs` en rojo.
     needs: [build, version_bump, release]
-    if: needs.release.result == 'success'
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # El environment es el de ESTE repo (`PROD`), no el del molde (`prod`). Los

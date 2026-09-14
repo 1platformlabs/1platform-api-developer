@@ -829,7 +829,15 @@ jobs:
 
   notify:
     name: Slack Notification
-    needs: [build, version_bump, release, deploy_hetzner, deploy]
+    # `update_spec` va en la lista aunque ningún paso lo tuviera antes: sin
+    # declararlo acá, `needs.update_spec.result` NO existe y se evalúa a la
+    # cadena vacía — un `if:` escrito sobre él sería falso siempre y el aviso
+    # nuevo no se dispararía nunca. Es la primera compuerta del pipeline y la
+    # única que hasta ahora no se nombraba en ningún aviso.
+    needs: [update_spec, build, version_bump, release, deploy_hetzner, deploy]
+    # Sigue siendo `always()`: este job tiene que correr pase lo que pase
+    # aguas arriba, y son los PASOS los que deciden qué se manda. Cambiar esto
+    # por una lista de condiciones de fallo apagaría el aviso de éxito.
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -843,12 +851,90 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Notify Slack — Spec update failed
+        # La PRIMERA compuerta del pipeline, y la que no se nombraba en ningún
+        # aviso. Si `update_spec` no termina bien, la especificación del API no
+        # se descarga: `build` queda `skipped` y producción se queda sirviendo
+        # la especificación versionada — la documentación no se actualiza.
+        #
+        # Medido, y por eso este paso existe: en las dos corridas en que
+        # `update_spec` falló de verdad, nadie recibió el motivo real.
+        #
+        #   run 29666450578 (2026-07-19) — antes del arreglo a `!= 'success'`:
+        #     update_spec failure · build skipped · los TRES avisos `skipped`.
+        #     Silencio completo.
+        #   run 34560507686 (2026-09-11) — ya con `!= 'success'`:
+        #     update_spec failure · build skipped · se dispararon «Build Failed»
+        #     y «Deploy Failed». Dos avisos, y ninguno nombra la compuerta que
+        #     realmente falló: culpan a dos jobs que NUNCA CORRIERON.
+        #
+        # `!= 'success'` y no `== 'failure'`, por la misma razón que ya documenta
+        # el paso de abajo: una corrida cancelada deja `cancelled`, que no es la
+        # cadena 'failure'. Además este `!=` y el `== 'success'` con que se
+        # guardan los dos avisos siguientes son COMPLEMENTARIOS: cubren todos
+        # los desenlaces sin dejar hueco y sin avisar dos veces por lo mismo.
+        if: needs.update_spec.result != 'success'
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ALERTS }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          SPEC_RESULT: ${{ needs.update_spec.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 << 'PYEOF'
+          import json, os
+
+          def s(text: str) -> str:
+              return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+          sha         = os.environ.get("GITHUB_SHA", "")[:7]
+          commit_msg  = s(os.environ.get("COMMIT_MSG", "")[:200])
+          author      = s(os.environ.get("COMMIT_AUTHOR", "unknown"))
+          resultado   = s(os.environ.get("SPEC_RESULT", "unknown"))
+          run_url     = f"{os.environ.get('GITHUB_SERVER_URL','')}/{os.environ.get('GITHUB_REPOSITORY','')}/actions/runs/{os.environ.get('GITHUB_RUN_ID','')}"
+
+          payload = {
+              "blocks": [
+                  {"type": "header", "text": {"type": "plain_text", "text": "📚 Docs | Spec Update Failed", "emoji": True}},
+                  {"type": "section", "text": {"type": "mrkdwn", "text":
+                      "*`Fetch & Update OpenAPI Spec` terminó en "
+                      f"`{resultado}`.*\nLa especificación del API no se descargó: "
+                      "el build quedó salteado y *la documentación en producción "
+                      "sigue sirviendo la especificación anterior*."}},
+                  {"type": "section", "fields": [
+                      {"type": "mrkdwn", "text": f"*Commit:*\n`{sha}`"},
+                      {"type": "mrkdwn", "text": f"*Author:*\n{author}"},
+                      {"type": "mrkdwn", "text": f"*Message:*\n{commit_msg}"},
+                  ]},
+                  {"type": "actions", "elements": [
+                      {"type": "button", "text": {"type": "plain_text", "text": "Ver Pipeline"}, "url": run_url, "style": "danger"},
+                  ]},
+              ]
+          }
+          with open("slack_payload.json", "w", encoding="utf-8") as f:
+              json.dump(payload, f)
+          PYEOF
+
+          if [ -n "${SLACK_WEBHOOK}" ]; then
+            curl -fsSL -X POST -H "Content-Type: application/json" \
+              -d @slack_payload.json "${SLACK_WEBHOOK}"
+          fi
+
       - name: Notify Slack — Build failed
         # `!= 'success'`, not `== 'failure'`: a job that never ran is `skipped`,
         # not `failure`. Merging #25 aborted `update_spec`, which left build and
         # deploy `skipped` — so prod silently stayed on the old build and no
         # alert fired, because neither result was ever the string 'failure'.
-        if: needs.build.result != 'success'
+        #
+        # El `&& needs.update_spec.result == 'success'` NO afloja este aviso:
+        # acota su ALCANCE a lo que dice su título. Con `update_spec` caído,
+        # `build` sale `skipped` y este aviso se disparaba igual, anunciando un
+        # build fallido que nunca corrió (medido en la corrida 34560507686).
+        # Ese caso ahora lo cubre —y lo nombra bien— el paso de arriba, así que
+        # no se pierde ninguna alerta: se reemplazan dos equivocadas por una
+        # correcta.
+        if: needs.build.result != 'success' && needs.update_spec.result == 'success'
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ALERTS }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
@@ -895,7 +981,12 @@ jobs:
         # Apunta a `deploy_hetzner`: con el canal de cPanel gateado su `result`
         # es SIEMPRE `skipped`, y `skipped != 'success'` es VERDADERO ⇒ esta
         # alerta se dispararía en CADA corrida exitosa, para siempre.
-        if: needs.deploy_hetzner.result != 'success'
+        #
+        # Mismo acotamiento que el paso anterior: con `update_spec` caído este
+        # aviso también se disparaba (medido en la 34560507686), culpando a un
+        # deploy que nunca llegó a intentarse. Ese desenlace lo nombra el aviso
+        # de `Spec Update Failed`.
+        if: needs.deploy_hetzner.result != 'success' && needs.update_spec.result == 'success'
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ALERTS }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}

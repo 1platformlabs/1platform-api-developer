@@ -1,0 +1,167 @@
+---
+title: Telemetría
+description: Dar de alta un proyecto, pegar la etiqueta, comprobar que reporta, leer los errores por tu propia API y definir cuándo te avisan — el orden importa porque cada paso responde una pregunta que el siguiente da por contestada.
+sidebar_position: 9
+---
+
+# Telemetría
+
+Telemetría responde cuatro preguntas sobre lo que corre en producción: **qué falla**, **cuánto tarda**,
+**si está arriba** y **qué se registró**. Este recorrido las toma en el orden en que se pueden contestar:
+sin proyecto no hay credencial, sin credencial no hay etiqueta, sin etiqueta no llega nada — y hasta que
+llega algo, todas las lecturas devuelven vacío y ese vacío se parece demasiado a «tu sitio no falló».
+
+Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN` tal como los define
+[Convenciones](../reference/convenciones), que es también donde vive el modelo de dos tokens.
+
+## Las dos credenciales, y por qué son dos
+
+Un proyecto nace con dos, y **no** son la misma con distinto alcance:
+
+- La **pública** viaja dentro de la etiqueta que sirve tu sitio. Cualquiera que abra tu página la ve; eso
+  no es una filtración, es su naturaleza. Sólo sirve para mandar eventos de navegador.
+- La **de servidor** es secreta y va en tu proceso. Nunca en el navegador, nunca en un repositorio
+  público.
+
+La de servidor **se muestra una sola vez**, en la respuesta del alta. Ninguna lectura la devuelve después:
+si la perdés, se rota, y la anterior deja de funcionar en el acto.
+
+## Paso 1 — Crear el proyecto
+
+**Por qué acá:** todo lo demás cuelga de su id, y las dos credenciales sólo salen de esta respuesta.
+
+```bash
+curl -X POST "$BASE_URL/users/telemetry/projects" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Tienda", "hosts": ["tienda.example"]}'
+```
+
+Guardá `data.id` como `$PROJECT_ID`, y las dos credenciales donde corresponda.
+
+`hosts` es opcional y **acota desde dónde se acepta ingesta**. Sin declararlo, el proyecto acepta de
+cualquier origen — cómodo el primer día, y algo que conviene cerrar antes de que el sitio esté público.
+
+| Código | Causa |
+|---|---|
+| 403 | La vertical está apagada para tu espacio de trabajo |
+| 409 | Llegaste al tope de proyectos de tu espacio |
+| 422 | Un valor fuera de rango: revisá el mensaje, que nombra el campo |
+
+[Telemetry →](/api-reference/1platform-api#tag/telemetry)
+
+## Paso 2 — Pegar la etiqueta
+
+La respuesta del alta y la lectura del proyecto traen `tag_snippet`: **la línea exacta**, armada por el
+servidor. No la compongas vos — el origen de ingesta cambia por entorno, y una URL escrita a mano se
+desincroniza el día que cambie.
+
+Va dentro del `<head>`. El atributo `crossorigin` que trae **no es opcional**: sin él, el navegador
+entrega `Script error.` sin mensaje ni traza para cualquier archivo servido desde otro dominio, que suele
+ser justo donde está tu código.
+
+## Paso 3 — Comprobar que de verdad está reportando
+
+**Por qué acá:** es el único paso que distingue «tu sitio no falló» de «no nos está llegando nada», y los
+dos se ven idénticos en todas las lecturas que siguen.
+
+```bash
+curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/install-status" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.verdict` es una de siete palabras, y cada una tiene un paso siguiente distinto:
+
+| Veredicto | Qué pasó | Qué hacer |
+|---|---|---|
+| `receiving` | Está llegando | Nada |
+| `waiting_first_event` | Pedimos la etiqueta y todavía no llegó ningún evento | Si tu sitio no falló, es lo esperable |
+| `never_requested` | Nadie pidió la etiqueta | Puede no estar pegada, tener mal la dirección, o estar bloqueada por una política de seguridad de tu sitio |
+| `rejecting` | La etiqueta corre y rechazamos todo lo que manda | Revisá que el dominio que sirve tu sitio esté declarado en `hosts` |
+| `throttled` | Te estamos limitando | Estás perdiendo parte de lo que mandás **y desde tu sitio es invisible**: un script limitado no llega a ejecutarse |
+| `blocked` | Pasaste tu cuota o tu tope de gasto | Sólo entra una muestra reservada hasta el mes que viene, o subí el tope |
+| `disabled` | Lo apagaste vos | Nada |
+
+## Paso 4 — Leer tus errores
+
+```bash
+curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/issues" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Tres cosas que conviene saber antes de escribir el cliente:
+
+- **El id del issue es nuestro** (`tlm_…`) y no el del motor que lo almacena. Un enlace que guardes hoy lo
+  vamos a poder honrar después de cambiar de motor por debajo.
+- **El cursor es opaco y va firmado**, atado a tu proyecto. Se devuelve tal cual vino en `next_cursor`; uno
+  editado, o uno de otro proyecto tuyo, se rechaza con `422`.
+- **Nada de la respuesta viene del motor.** Ni sus ids, ni sus nombres de campo, ni sus códigos de error.
+
+El detalle de un issue y su último evento salen de `GET /users/telemetry/projects/{project_id}/issues/{issue_id}`
+y de `GET /users/telemetry/projects/{project_id}/issues/{issue_id}/events/latest`. Ese último trae un
+booleano `opaque`: cuando está en `true`, el navegador se negó a describir el error porque tus archivos se
+sirven desde otro origen sin `crossorigin` — es lo único de esa pantalla sobre lo que se puede actuar sin
+leer un stack.
+
+## Paso 5 — Rendimiento y registros, con sus ventanas
+
+Las dos lecturas piden **días**, no fechas, y sus techos son distintos a propósito:
+
+| Lectura | Ventana máxima | Por qué |
+|---|---|---|
+| `GET /users/telemetry/projects/{project_id}/performance` | 30 días | Lo que el almacenamiento garantiza en caliente para eventos |
+| `GET /users/telemetry/projects/{project_id}/logs` | 6 días | Un día por debajo del caliente de registros: una consulta más ancha se escanea entera |
+
+Pedir más días de los que acepta es un `422`, no una consulta lenta. Es deliberado: el costo de una
+ventana ancha no lo paga quien la pide.
+
+## Paso 6 — Que te avisen
+
+Una regla de alerta son tres cosas que se editan por separado: **qué** vigila, **sobre qué** proyecto, y
+**a quién** se avisa. Cambiar el destinatario no obliga a redefinir la condición.
+
+```bash
+curl -X POST "$BASE_URL/users/telemetry/projects/$PROJECT_ID/alert-rules" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "El checkout se cayó", "condition": "monitor_down", "cooldown_minutes": 60}'
+```
+
+Las condiciones de esta versión son tres: `new_issue`, `event_burst` (N eventos en M minutos) y
+`monitor_down`. El `cooldown_minutes` no es un adorno: sin él, una condición que se sostiene manda un
+aviso por evaluación y entrena a quien lo recibe a ignorarlo.
+
+**Los destinatarios son vos y las direcciones que ACEPTARON.** Nunca «los usuarios de tu espacio»: en este
+Core el espacio agrupa clientes independientes, así que resolver por ahí le mandaría tus trazas a otro.
+Una dirección nueva se agrega con `POST /users/telemetry/recipients`, recibe un correo y **no recibe nada**
+hasta que confirme.
+
+### Lo que un aviso nunca dice
+
+Ni el cuerpo del evento, ni su URL, ni su traza. El producto ingiere cuerpos arbitrarios, así que
+cualquiera de los tres es texto que controla quien manda el evento — y un aviso hecho con eso sería un
+mensaje que escribe un tercero y firma nuestro dominio. Lo que viaja son conteos, etiquetas que decidimos
+nosotros, y el título del issue ya recortado.
+
+### Cuando la recepción está degradada, no se declara recuperado
+
+Si tu proyecto está limitado, bloqueado o con un hueco de recepción abierto, la tasa que medimos **baja
+sola**. Un incidente en esa situación queda en un estado intermedio: no vuelve a avisar y **tampoco** se
+declara recuperado, y sale de ahí con dos evaluaciones seguidas de recepción sana. Sin eso, recibirías
+«volvió a la normalidad» justo mientras estás ciego.
+
+## Paso 7 — Uso y límites
+
+```bash
+curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/usage" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Además del consumo del mes y el gasto contra tu tope, trae `gaps`: los períodos en los que **no pudimos
+recibir** tus eventos. Es la única forma de distinguir un rango sin errores de un rango sin recepción, y
+por eso está en la respuesta y no sólo en un tablero.

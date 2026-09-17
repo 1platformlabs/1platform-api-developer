@@ -422,6 +422,186 @@
         }
       }
     },
+    "/api/v1/auth/admin/forgot-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Admin Forgot Password",
+        "description": "Request a password-reset link for an operator account.\n\nAnti-enumeration (#408): the response is the SAME generic ack whether\nor not ``payload.email`` has an ``AdminCredential`` in this tenant, and\nwhether or not the email actually sends — a caller who wants to know\nwhich operator addresses exist for a tenant must not learn that from\nthis endpoint's status code or body. Unlike ``/auth/magic-link``,\nwhich always upserts a Member and so has nothing to hide, this route\nsilently no-ops for an unknown address rather than minting a token\nnobody can use and mailing nothing.",
+        "operationId": "admin_forgot_password_api_v1_auth_admin_forgot_password_post",
+        "parameters": [
+          {
+            "name": "accept-language",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminForgotPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminForgotPasswordAck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/admin/reset-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Admin Reset Password",
+        "description": "Redeem a password-reset token and set a new password.\n\nDoes NOT mint a session — the operator signs in with the new password\nafterwards through ``/auth/admin/sign-in``, same as before, including\nTOTP if the account has one enrolled. Auto-signing-in here would mean\neither skipping that second factor or reimplementing its prompt on a\nsecond endpoint; neither is worth it for a flow used once per\nincident.",
+        "operationId": "admin_reset_password_api_v1_auth_admin_reset_password_post",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminResetPasswordAck"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Magic-link / JWT invalid, expired or consumed.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TOKEN_INVALID"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/sign-out": {
       "post": {
         "tags": [
@@ -592,7 +772,7 @@
             }
           },
           "422": {
-            "description": "Biblioteca Viva requires the tenant's primary library archetype.",
+            "description": "Biblioteca Viva requires the tenant's primary library archetype; Immersive Media requires a primary library, audio, or streaming archetype.",
             "content": {
               "application/json": {
                 "example": {
@@ -5359,7 +5539,7 @@
             }
           },
           "422": {
-            "description": "Biblioteca Viva requires the tenant's primary library archetype.",
+            "description": "Biblioteca Viva requires the tenant's primary library archetype; Immersive Media requires a primary library, audio, or streaming archetype.",
             "content": {
               "application/json": {
                 "example": {
@@ -13971,7 +14151,7 @@
           "admin-autopublish"
         ],
         "summary": "Return transiently-failed jobs to the queue",
-        "description": "Only jobs whose failure was TRANSIENT are re-offered.\n\nRequeuing a job that failed on a quality refusal would regenerate the same\ntext and be refused again, forever — burning a generation each round while\nthe operator watches a counter that never moves.",
+        "description": "By default, only jobs whose failure was TRANSIENT are re-offered.\n\nRequeuing a job that failed on a quality refusal would regenerate the same\ntext and be refused again, forever — burning a generation each round while\nthe operator watches a counter that never moves.\n\n``outcome_reason`` is the one way past that default, and it is a NAMED act:\nthe operator says which verdict no longer holds because its premise was\ncorrected. The case it was built for is ``LANGUAGE_MISMATCH`` — terminal, so\na tenant whose ``default_locale`` was wrong rejected its own catalogue\npermanently, and correcting the locale did nothing for the jobs already\nblocked. ``blocked`` jobs are therefore in scope for a named reason and only\nfor a named reason: the default query is unchanged, down to the status.",
         "operationId": "adminAutopublishRequeueJobs",
         "parameters": [
           {
@@ -28048,6 +28228,95 @@
             "integrationKey": []
           }
         ]
+      },
+      "get": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "List active tenants, optionally by archetype (service-to-service)",
+        "description": "Active tenants, for a caller that needs its own scope rather than one row.\n\nBuilt on the same ``TenantRepository.list_active`` the admin-JWT listing\nroute in ``tenants.py`` uses (that one is scoped to the caller's own\ntenant post-#187; this one is not, because a platform key is not\n*somebody's* tenant to begin with). ``archetype`` filters in Python\nrather than pushing a second predicate onto the repository method,\nsince every other caller of ``list_active`` wants the unfiltered set.",
+        "operationId": "list_tenants_api_v1_platform_tenants_get",
+        "parameters": [
+          {
+            "name": "archetype",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "library",
+                    "streaming",
+                    "live",
+                    "tv",
+                    "education",
+                    "podcast",
+                    "events",
+                    "audio"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Archetype"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformTenantSummary"
+                  },
+                  "title": "Response List Tenants Api V1 Platform Tenants Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.provision capability, or is tenant-scoped"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
       }
     },
     "/api/v1/platform/tenants/{slug}/site-verification": {
@@ -28141,7 +28410,7 @@
           "platform:provisioning"
         ],
         "summary": "Mint or rotate a tenant's operator credential (service-to-service)",
-        "description": "Hand the control plane a working operator login for an existing tenant.\n\nWhy this route exists: minting used to be welded to creation. ``POST\n/tenants`` generates the operator password inside the same transaction\nthat inserts the tenant, so a re-provision — which answers 409 — produced\nno credential at all. The control plane's only remaining move was to mail\n\"your tenant is ready\" with no way in and a footnote telling the owner to\nreset the password \"from the tenant panel\", which is (a) the panel those\ncredentials open and (b) a flow that does not exist: this product has no\nforgot-password path for an ``AdminCredential``, and the magic link mints\nmember roles, never ``_ADMIN_ROLES``. The tenant was unadministrable for\ngood. Separating \"mint\" from \"create\" is what closes that.\n\n🔴 THE GATE is the *domain*, not the slug — see the request model. The\ncaller must name the host, and the host must resolve (primary domain or\nconfigured alias) to the very tenant the slug names. The capability alone\nis not authority to pick a victim by name.\n\nA second refusal, fail-closed: an account holding ``allowed_tenants`` is a\ncross-tenant staff grant, not a site operator. Rotating its password would\nhand the caller every tenant that account can act for, so this route\ndeclines and says so rather than quietly widening the blast radius.\nProvisioning a fresh site is unaffected — those accounts are born empty.",
+        "description": "Hand the control plane a working operator login for an existing tenant.\n\nWhy this route exists: minting used to be welded to creation. ``POST\n/tenants`` generates the operator password inside the same transaction\nthat inserts the tenant, so a re-provision — which answers 409 — produced\nno credential at all. Before 2026-09-02 the control plane's only\nremaining move was to mail \"your tenant is ready\" with no way in and a\nfootnote telling the owner to reset the password \"from the tenant\npanel\", which is (a) the panel those credentials open and (b) a flow\nthat, at the time, did not exist. Separating \"mint\" from \"create\" is\nwhat closed that.\n\nRecovery exists now (since 2026-09-02): ``POST /auth/admin/forgot-password``\n(``app/api/v1/auth.py:480``) issues a reset token and\n``/auth/admin/reset-password`` (``:539``) redeems it. It does not replace\nthis route — it can only reset the password on an ``AdminCredential`` row\nthat already exists, never create one, and the magic link still mints\nonly member roles, never ``_ADMIN_ROLES`` (``_FAN_ROLES`` at ``:376``/\n``:441`` vs. ``_ADMIN_ROLES`` at ``:475``). So a re-provisioned or\nnever-minted tenant is still unadministrable without this route.\n\n🔴 THE GATE is the *domain*, not the slug — see the request model. The\ncaller must name the host, and the host must resolve (primary domain or\nconfigured alias) to the very tenant the slug names. The capability alone\nis not authority to pick a victim by name.\n\nA second refusal, fail-closed: an account holding ``allowed_tenants`` is a\ncross-tenant staff grant, not a site operator. Rotating its password would\nhand the caller every tenant that account can act for, so this route\ndeclines and says so rather than quietly widening the blast radius.\nProvisioning a fresh site is unaffected — those accounts are born empty.",
         "operationId": "mint_operator_credential_api_v1_platform_tenants__slug__operator_credential_post",
         "parameters": [
           {
@@ -28418,6 +28687,258 @@
                   "detail": {
                     "code": "INVALID_PLAN"
                   }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/agent-arm": {
+      "get": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Whether a tenant is enrolled in the agent executor arm",
+        "description": "The state, so diagnosing a blocked site does not require the database.\n\nWithout it, the only symptom of a missing row was every arm route answering\n``TENANT_NOT_ENROLLED`` with the text \"No tenant with that slug\" — correct\nfor the client, and the reason a real diagnosis started by re-verifying the\nslug mapping of nine sites that were mapped perfectly.",
+        "operationId": "platformTenantAgentArmState",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentArmState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.agent_arm.write"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Enrol a tenant in the agent executor arm (idempotent)",
+        "description": "``PUT``, so enrolling twice is enrolling once.\n\nIdempotent in the strict sense: a second call does NOT re-stamp\n``enabled_at``/``enabled_by``. The first enrolment is the fact worth keeping\n— \"since when has this site accepted automatic editing\" — and a provisioning\nscript that runs on every deploy would otherwise rewrite that date to today\nforever, erasing the only record of when the arm was switched on. The audit\nrow still records every call, so a repeated attempt is not invisible.",
+        "operationId": "platformTenantAgentArmEnrol",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentArmEnrolRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentArmState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.agent_arm.write"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "platform-agent-arm"
+        ],
+        "summary": "Withdraw a tenant from the agent executor arm (idempotent)",
+        "description": "The documented rollback, without a hand-written ``DELETE`` in production.\n\nIt removes the enrolment row and NOTHING else. In particular it does not and\nmust not reach ``…/settings/revert``: D-29 requires the undo to stay\nreachable exactly when the arm has been switched off, which is the case where\nsomeone is switching it off BECAUSE a write was bad.",
+        "operationId": "platformTenantAgentArmWithdraw",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentArmState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.agent_arm.write"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -31210,6 +31731,32 @@
         "title": "AdminContentItemsResponse",
         "description": "Paginated container for ``GET /admin/content/items``."
       },
+      "AdminForgotPasswordAck": {
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "title": "Sent",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "AdminForgotPasswordAck",
+        "description": "Always ``True`` — see ``admin_forgot_password`` docstring."
+      },
+      "AdminForgotPasswordRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "AdminForgotPasswordRequest"
+      },
       "AdminNotification": {
         "properties": {
           "id": {
@@ -31384,6 +31931,37 @@
           "slug"
         ],
         "title": "AdminRailItemSummary"
+      },
+      "AdminResetPasswordAck": {
+        "properties": {
+          "reset": {
+            "type": "boolean",
+            "title": "Reset",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "AdminResetPasswordAck"
+      },
+      "AdminResetPasswordRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 10,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "AdminResetPasswordRequest"
       },
       "AdminSignInRequest": {
         "properties": {
@@ -31810,6 +32388,81 @@
         },
         "type": "object",
         "title": "AdminTenantPatch"
+      },
+      "AgentArmEnrolRequest": {
+        "properties": {
+          "enabled_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled By"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentArmEnrolRequest"
+      },
+      "AgentArmState": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "enrolled": {
+            "type": "boolean",
+            "title": "Enrolled"
+          },
+          "enabled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled At"
+          },
+          "enabled_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "enrolled"
+        ],
+        "title": "AgentArmState",
+        "description": "Whether this site accepts being driven by the arm, and since when."
       },
       "AnalyticsTopItem": {
         "properties": {
@@ -34324,6 +34977,50 @@
         "title": "ContentAssetOut",
         "description": "Response shape for ``POST /content/items/{id}/assets``.\n\nThe DOWNLOAD delivery strategy reads from ``key`` directly; the\ndashboard surfaces ``size_bytes`` + ``uploaded_at`` so operators can\nconfirm the upload landed."
       },
+      "ContentEditorial": {
+        "properties": {
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "people": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "People"
+          }
+        },
+        "type": "object",
+        "title": "ContentEditorial",
+        "description": "Lo que la ficha YA dice en los campos que el brazo puede reescribir.\n\nEspeja `_WRITABLE_METADATA` uno a uno, y eso es la propiedad, no una\ncoincidencia: `test_editorial_mirrors_the_writable_metadata` falla si las\ndos listas se separan. Leer un campo que no se puede escribir seria contexto\nque el modelo no puede usar; poder escribir uno que no se puede leer es\nexactamente el defecto que esto arregla.\n\nTodos opcionales y SIN default materializado: `None` significa \"la ficha no\ntiene ese campo\", que es distinto de \"esta vacio\". Un `[]` inventado le diria\nal que llama que las etiquetas se borraron alguna vez."
+      },
       "ContentFaqEntrySchema": {
         "properties": {
           "q": {
@@ -34952,6 +35649,11 @@
             },
             "type": "array",
             "title": "Pinned Fields"
+          },
+          "backup_id": {
+            "type": "string",
+            "title": "Backup Id",
+            "default": ""
           }
         },
         "type": "object",
@@ -35061,6 +35763,16 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "editorial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentEditorial"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -35663,6 +36375,17 @@
           "archetype": {
             "type": "string",
             "title": "Archetype"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
           },
           "kinds": {
             "items": {
@@ -40976,6 +41699,53 @@
         ],
         "title": "PlatformTenantProvisionResponse"
       },
+      "PlatformTenantSummary": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "archetype": {
+            "type": "string",
+            "enum": [
+              "library",
+              "streaming",
+              "live",
+              "tv",
+              "education",
+              "podcast",
+              "events",
+              "audio"
+            ],
+            "title": "Archetype"
+          },
+          "primary_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Domain"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "slug",
+          "archetype",
+          "primary_domain"
+        ],
+        "title": "PlatformTenantSummary",
+        "description": "Just enough to name a tenant and decide whether it belongs in a run.\n\nNo config, no secrets: a caller with ``tenants.provision`` can already\nlearn a tenant's existence and slug one host at a time through\n``find_tenant_by_host`` (the client every ``1platform-api`` caller of\nthis facade already uses); this only saves it from having to guess\nhosts to enumerate what it could already confirm one by one."
+      },
       "PlatformTenantVerificationRequest": {
         "properties": {
           "google": {
@@ -42636,6 +43406,18 @@
             "minimum": 1,
             "title": "Limit",
             "default": 100
+          },
+          "outcome_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Reason"
           }
         },
         "additionalProperties": false,
@@ -43827,6 +44609,28 @@
               }
             ],
             "title": "Catalog Title Template"
+          },
+          "app_title_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Title Template"
+          },
+          "app_description_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Description Template"
           },
           "organization": {
             "$ref": "#/components/schemas/SeoOrganization"
@@ -45219,7 +46023,8 @@
             "type": "string",
             "enum": [
               "classic",
-              "biblioteca_viva"
+              "biblioteca_viva",
+              "immersive_media"
             ],
             "title": "Site Template",
             "default": "classic"
@@ -45533,7 +46338,8 @@
             "type": "string",
             "enum": [
               "classic",
-              "biblioteca_viva"
+              "biblioteca_viva",
+              "immersive_media"
             ],
             "title": "Site Template",
             "default": "classic"
@@ -45632,7 +46438,8 @@
                 "type": "string",
                 "enum": [
                   "classic",
-                  "biblioteca_viva"
+                  "biblioteca_viva",
+                  "immersive_media"
                 ]
               },
               {

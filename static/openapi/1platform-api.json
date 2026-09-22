@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"ak-your-app-api-key\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.39.0"
+    "version": "PRODv5.46.1"
   },
   "servers": [
     {
@@ -6246,6 +6246,245 @@
         }
       }
     },
+    "/api/v1/users/consumption/{consumption_id}": {
+      "get": {
+        "tags": [
+          "Billing & Consumption"
+        ],
+        "summary": "Get a Single Consumption Entry",
+        "description": "Retrieve one ledger movement owned by the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- `balance_effect` is what the movement did to your balance, derived on the server. Do not read `status` as the outcome: `refunded` means *reversed* on a charge and *settled* on a credit.\n- `operation` is the raw key; the API is monolingual, so rendering it is the client's job.\n- Returns 404 if the entry does not exist or belongs to another user.",
+        "operationId": "getConsumptionEntryById",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consumption_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Consumption log ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Consumption Id"
+            },
+            "description": "Consumption log ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumption entry retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ConsumptionDetailResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "operation": "domain_register",
+                    "cost": "12.99",
+                    "currency": "USD",
+                    "status": "charged",
+                    "balance_effect": "charged",
+                    "balance_before": "50.00",
+                    "balance_after": "37.01",
+                    "reference": "example.com",
+                    "occurred_at": "2026-01-15T10:30:00Z"
+                  },
+                  "msg": "Consumption entry retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Consumption entry not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/consumption/{consumption_id}/receipt.pdf": {
+      "get": {
+        "tags": [
+          "Billing & Consumption"
+        ],
+        "summary": "Download the Consumption Receipt (PDF)",
+        "description": "Download 1Platform's own document for one ledger movement, in the workspace's brand.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Language:** `Accept-Language` (`es`/`en`), falling back to the workspace's own.\n- Same layout and same brand as a collection's receipt, with a ledger movement's content. It never reads as a payment receipt: a credit usage is not a payment, in any outcome.\n- It is NOT a tax document.\n- Returns 404 — with the usual JSON envelope, not a PDF — if the entry does not exist or belongs to another user.",
+        "operationId": "downloadConsumptionReceipt",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consumption_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Consumption log ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Consumption Id"
+            },
+            "description": "Consumption log ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The receipt, as a PDF attachment",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Consumption entry not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/holds": {
       "get": {
         "tags": [
@@ -7011,13 +7250,152 @@
         }
       }
     },
+    "/api/v1/users/balance/topups": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Top Up Your Own Balance",
+        "description": "Buy credit for YOUR OWN account and receive a checkout URL.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Returns a `payment_url` where you complete checkout\n- Transaction starts with status `CREATED`; the outcome arrives via webhook\n- Optional `currency`: which of YOUR OWN balances to credit. Omit it for your primary billing\n\n**Use this whenever the money is your own account buying credit**, and `POST /users/transactions` whenever you are collecting from a buyer. The route is what records the difference: a charge created here always lands in your prepaid balance, and one created there is recorded as a collection from a third party. Which balance the money lands in is decided server-side from the route and is never read from the request body.\n\nIt accepts no `customer_email`, `merchant_reference`, `return_url` or `branch_id`: a top-up has no buyer and no order. If you need any of those, the charge is a collection and belongs on `POST /users/transactions`.",
+        "operationId": "createBalanceTopup",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BalanceTopupRequest"
+              },
+              "example": {
+                "amount": 10,
+                "currency": "GTQ",
+                "description": "Account top-up"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Top-up created — complete payment at the checkout URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TransactionResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "user_id": "507f1f77bcf86cd799439012",
+                    "usd_amount": 10,
+                    "amount": 78,
+                    "currency": "GTQ",
+                    "currency_provider": "GTQ",
+                    "status": "created",
+                    "payment_url": "https://checkout.example.com/pay/abc123",
+                    "description": "Account top-up",
+                    "created_at": "2026-09-20T12:00:00Z",
+                    "updated_at": "2026-09-20T12:00:00Z"
+                  },
+                  "msg": "Top-up created successfully. Please complete payment at the provided URL."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "You hold no balance in the requested `currency` — the message names it — or this account has no billing record at all.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "This account has no payment gateway configured. `data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Payment service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/transactions/{transaction_id}": {
       "get": {
         "tags": [
           "Payments"
         ],
         "summary": "Get Transaction by ID",
-        "description": "Retrieve a single transaction owned by the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Intended for status polling after creating a payment — clients can hit this endpoint until the transaction reaches a terminal state (`approved`, `denied`, `cancelled`, `expired`, `dismiss`).\n- Returns 404 if the transaction does not exist or belongs to another user.",
+        "description": "Retrieve a single transaction owned by the authenticated user.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- Intended for status polling after creating a payment — clients can hit this endpoint until the transaction reaches a terminal state (`approved`, `denied`, `cancelled`, `expired`, `dismiss`).\n- Also the reconciliation view: `balance_effect` says what the collection did to your balance, `completed_at` when it settled, `external_reference` the order identifier carried in its metadata, and `bank_authorization` the number the bank reported, when one was reported and is well-formed.\n- Returns 404 if the transaction does not exist or belongs to another user.",
         "operationId": "getPaymentTransactionById",
         "security": [
           {
@@ -7064,7 +7442,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_TransactionResponse_"
+                  "$ref": "#/components/schemas/SuccessResponse_TransactionDetailResponse_"
                 },
                 "example": {
                   "success": true,
@@ -7079,9 +7457,127 @@
                     "reference": "GT123456",
                     "description": "Credit purchase",
                     "created_at": "2026-04-30T12:00:00Z",
-                    "updated_at": "2026-04-30T12:05:00Z"
+                    "updated_at": "2026-04-30T12:05:00Z",
+                    "completed_at": "2026-04-30T12:05:00Z",
+                    "merchant_reference": "bower_order_abc123",
+                    "external_reference": "01a0b06f-a579-78ca-af87-818b0080cdf6",
+                    "balance_effect": "credited",
+                    "credited_at": "2026-04-30T12:05:30Z",
+                    "bank_authorization": "974490"
                   },
                   "msg": "Transaction retrieved successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/transactions/{transaction_id}/receipt.pdf": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Download the Transaction Receipt (PDF)",
+        "description": "Download 1Platform's own document for one collection, in the workspace's brand.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 50 req/min\n- **Language:** `Accept-Language` (`es`/`en`), falling back to the workspace's own.\n- The document states the OUTCOME. It reads as a payment receipt only for a collection that was approved and credited; every other outcome produces a record that says what happened and cannot be read as proof of money received.\n- It is NOT a tax document (see the invoicing endpoints for FEL).\n- Returns 404 — with the usual JSON envelope, not a PDF — if the transaction does not exist or belongs to another user.",
+        "operationId": "downloadPaymentTransactionReceipt",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Transaction ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Transaction Id"
+            },
+            "description": "Transaction ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The receipt, as a PDF attachment",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -8674,31 +9170,35 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PublicTrackingResponse"
+                  "$ref": "#/components/schemas/SuccessResponse_PublicTrackingResponse_"
                 },
                 "example": {
-                  "waybill": "ENV26/0011681",
-                  "status": "delivered",
-                  "merchant_name": "Aurum Labs",
-                  "recipient_name": "Mauricio",
-                  "package_description": "Caja mediana",
-                  "estimated_arrival_at": "2026-08-25T18:00:00Z",
-                  "dispatched_at": "2026-08-25T14:00:00Z",
-                  "completed_at": "2026-08-25T17:40:00Z",
-                  "events": [
-                    {
-                      "status": "dispatched",
-                      "at": "2026-08-25T14:00:00Z"
-                    },
-                    {
-                      "status": "picked_up",
-                      "at": "2026-08-25T15:20:00Z"
-                    },
-                    {
-                      "status": "delivered",
-                      "at": "2026-08-25T17:40:00Z"
-                    }
-                  ]
+                  "success": true,
+                  "data": {
+                    "waybill": "ENV26/0011681",
+                    "status": "delivered",
+                    "merchant_name": "Aurum Labs",
+                    "recipient_name": "Mauricio",
+                    "package_description": "Caja mediana",
+                    "estimated_arrival_at": "2026-08-25T18:00:00Z",
+                    "dispatched_at": "2026-08-25T14:00:00Z",
+                    "completed_at": "2026-08-25T17:40:00Z",
+                    "events": [
+                      {
+                        "status": "dispatched",
+                        "at": "2026-08-25T14:00:00Z"
+                      },
+                      {
+                        "status": "picked_up",
+                        "at": "2026-08-25T15:20:00Z"
+                      },
+                      {
+                        "status": "delivered",
+                        "at": "2026-08-25T17:40:00Z"
+                      }
+                    ]
+                  },
+                  "msg": "OK"
                 }
               }
             }
@@ -38512,7 +39012,7 @@
           "Cash Out"
         ],
         "summary": "Cash Out Summary",
-        "description": "Withdrawable balance per currency, the effective payout period, and whether a default payout method is ready to receive money. Repairs a pending ledger entry before reading, so a balance is never shown one movement behind.",
+        "description": "Withdrawable balance per currency, the effective payout period, and whether a default payout method is ready to receive money. Repairs a pending ledger entry before reading, so a balance is never shown one movement behind. `writes_require_sign_in` says whether this session can change anything here: when it is true every write answers 403 `CASH_OUT_SESSION_REQUIRED` until the merchant signs in again.",
         "operationId": "getCashOutSummary",
         "security": [
           {
@@ -38562,7 +39062,8 @@
                     "effective_period": "month",
                     "has_default_method": true,
                     "default_method_available_at": "2026-09-14T18:02:11Z",
-                    "pending_payouts": 1
+                    "pending_payouts": 1,
+                    "writes_require_sign_in": false
                   }
                 }
               }
@@ -39645,7 +40146,7 @@
           "Cash Out"
         ],
         "summary": "Withdrawable Balance Statement",
-        "description": "Every movement of the withdrawable balance, newest first. Each line carries the balance AFTER it, so a statement reads without replaying the whole book.",
+        "description": "Every movement of the withdrawable balance, newest first. Each line carries the balance AFTER it, so a statement reads without replaying the whole book.\n\n`kind` says what moved the balance: `link_credit` (a payment-link collection), `api_credit` (a charge collected through the merchant's own integration, when the platform keeps that book), `payout_debit`, `payout_debit_void` (a zero-amount tombstone: that payout will never be debited), `payout_refund` or `adjustment`. Render an unknown value generically — the list can grow, and it is deliberately not a closed enum in this contract.",
         "operationId": "listCashOutMovements",
         "security": [
           {
@@ -39731,6 +40232,13 @@
                   "data": {
                     "items": [
                       {
+                        "seq": 8,
+                        "kind": "api_credit",
+                        "delta": "251.00",
+                        "balance_after": "371.00",
+                        "created_at": "2026-09-17T09:14:02Z"
+                      },
+                      {
                         "seq": 7,
                         "kind": "link_credit",
                         "delta": "120.00",
@@ -39739,7 +40247,7 @@
                         "payment_link_id": "66e1c0ffee0000000000cd01"
                       }
                     ],
-                    "total": 1,
+                    "total": 2,
                     "limit": 50,
                     "skip": 0
                   }
@@ -41681,6 +42189,71 @@
         }
       }
     },
+    "/api/v1/heatmap/p/{public_id}.html": {
+      "get": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Load the stored page a heatmap is drawn on (public)",
+        "description": "Serves the stored copy of one measured page, so the dashboard can draw the heat ON the page instead of on a blank rectangle.\n\n- **Auth:** none, and it cannot have any — an `<iframe src>` sends no headers of ours. The path carries a non-guessable address that is REGENERATED on every capture.\n- **Scripts are stripped at capture** and the response is served sandboxed, in an opaque origin, with a `script-src` that names only the one inline script the capture injects to report the page height.\n- **Never cached by a shared cache:** the address is a capability.\n- **Rate limit:** per address and client network.",
+        "operationId": "getHeatmapPageSnapshot",
+        "parameters": [
+          {
+            "name": "public_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The snapshot's address.",
+              "title": "Public Id"
+            },
+            "description": "The snapshot's address."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No page stored at that address — an EMPTY document, not an error envelope: the only caller is an `<iframe>` and it renders whatever comes back",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/pay/{token}": {
       "get": {
         "tags": [
@@ -42002,6 +42575,8 @@
             "description": "The domain or slug already belongs to another site, or a service-lead publication is missing `/` or its HTTPS support action",
             "x-error-codes": [
               "site_host_already_claimed",
+              "site_custom_domain_already_set",
+              "site_custom_domain_pending",
               "site_publish_action_required",
               "site_slug_already_exists",
               "site_provisioning_not_applicable",
@@ -42019,6 +42594,9 @@
           "422": {
             "description": "Refused at the border: theme contrast below AA for its role (the message carries the measured ratio and the threshold), content naming an external provider, an invalid brand lockup/home template, or a locale the site declares with no content",
             "x-error-codes": [
+              "site_host_reserved",
+              "site_platform_label_invalid",
+              "site_custom_domain_invalid",
               "site_theme_contrast_below_aa",
               "site_brand_lockup_invalid",
               "site_home_template_invalid",
@@ -42345,6 +42923,8 @@
             "description": "The domain or slug already belongs to another site, or a service-lead publication is missing `/` or its HTTPS support action",
             "x-error-codes": [
               "site_host_already_claimed",
+              "site_custom_domain_already_set",
+              "site_custom_domain_pending",
               "site_publish_action_required",
               "site_slug_already_exists",
               "site_provisioning_not_applicable",
@@ -42362,6 +42942,9 @@
           "422": {
             "description": "Refused at the border: theme contrast below AA for its role (the message carries the measured ratio and the threshold), content naming an external provider, an invalid brand lockup/home template, or a locale the site declares with no content",
             "x-error-codes": [
+              "site_host_reserved",
+              "site_platform_label_invalid",
+              "site_custom_domain_invalid",
               "site_theme_contrast_below_aa",
               "site_brand_lockup_invalid",
               "site_home_template_invalid",
@@ -42372,6 +42955,349 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/sites/{slug}/custom-domain": {
+      "put": {
+        "tags": [
+          "Sites"
+        ],
+        "summary": "Connect a site's own domain (staff)",
+        "description": "Start connecting a domain of the site's own. The site keeps serving at its platform address throughout; the domain becomes the primary one **on its own**, once a probe confirms it serves this site.\n\n- **Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`\n- **Rate limit:** 60 req/min\n- The domain must be **registrable** — `medipago.gt` and `medipago.com.gt` are, `www.medipago.gt` is not — because connecting is done by delegating nameservers, and nameservers are delegated for a whole domain.\n- ⚠️ **Delegating moves the domain's ENTIRE DNS.** Records the domain already has, mail included, stop resolving unless they are recreated in the new zone first. This version does not import them.\n- The domain and its `www.` are claimed from this moment, so no other site can take either while the delegation completes.\n- One domain per site: a site that already has its own, or is already connecting one, is a 409.",
+        "operationId": "setPlatformSiteCustomDomain",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 62,
+              "pattern": "^[a-z0-9][a-z0-9-]{0,60}[a-z0-9]$",
+              "description": "The site's public identifier (the Mongo `_id` never leaves this API).",
+              "examples": [
+                "clinicas"
+              ],
+              "title": "Slug"
+            },
+            "description": "The site's public identifier (the Mongo `_id` never leaves this API)."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteCustomDomainRequest"
+              },
+              "example": {
+                "domain": "medipago.gt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The domain is now connecting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_SiteTenantAdmin_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "slug": "clinicas",
+                    "brand_name": "Clínica Delta",
+                    "brand_mark": "C",
+                    "brand_wordmark": "Clínica Delta",
+                    "domain": "ejemplo-clinicas.com",
+                    "host_aliases": [
+                      "www.ejemplo-clinicas.com"
+                    ],
+                    "locales": [
+                      "es"
+                    ],
+                    "default_locale": "es",
+                    "home_template": "service-lead",
+                    "theme": {
+                      "accent": "#0f766e",
+                      "accent_contrast": "#ffffff",
+                      "display_font": "instrument-serif"
+                    },
+                    "destinations": {
+                      "support": "https://contacto-controlado-por-el-tenant.example/"
+                    },
+                    "pages": [
+                      "/"
+                    ],
+                    "domain_is_final": true,
+                    "status": "published",
+                    "created_at": "2026-09-08T14:05:00+00:00",
+                    "updated_at": "2026-09-08T14:05:00+00:00"
+                  },
+                  "msg": "Custom domain pending"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No site is published for that address (`site_unresolved`)",
+            "x-error-codes": [
+              "site_unresolved"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The domain or slug already belongs to another site, or a service-lead publication is missing `/` or its HTTPS support action",
+            "x-error-codes": [
+              "site_host_already_claimed",
+              "site_custom_domain_already_set",
+              "site_custom_domain_pending",
+              "site_publish_action_required",
+              "site_slug_already_exists",
+              "site_provisioning_not_applicable",
+              "site_provisioning_in_progress",
+              "site_provisioning_unreachable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused at the border: theme contrast below AA for its role (the message carries the measured ratio and the threshold), content naming an external provider, an invalid brand lockup/home template, or a locale the site declares with no content",
+            "x-error-codes": [
+              "site_host_reserved",
+              "site_platform_label_invalid",
+              "site_custom_domain_invalid",
+              "site_theme_contrast_below_aa",
+              "site_brand_lockup_invalid",
+              "site_home_template_invalid",
+              "site_content_provider_leak",
+              "site_content_parity"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sites"
+        ],
+        "summary": "Cancel a site's domain connection (staff)",
+        "description": "Cancel a connection in flight. The site keeps serving at its platform address, which it never stopped doing.\n\n- **Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`\n- **Rate limit:** 60 req/min\n- **Idempotent.** A site with nothing pending answers 200 with its current manifest and writes nothing.\n- It does **not** tear down DNS records or the vhost that were already written. They point at the sites container rather than at a site, and which site is served is decided on every request — so a cancelled host answers this product's own 404, never another customer's content.",
+        "operationId": "clearPlatformSiteCustomDomain",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 62,
+              "pattern": "^[a-z0-9][a-z0-9-]{0,60}[a-z0-9]$",
+              "description": "The site's public identifier (the Mongo `_id` never leaves this API).",
+              "examples": [
+                "clinicas"
+              ],
+              "title": "Slug"
+            },
+            "description": "The site's public identifier (the Mongo `_id` never leaves this API)."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "No domain is being connected any more",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_SiteTenantAdmin_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "slug": "clinicas",
+                    "brand_name": "Clínica Delta",
+                    "brand_mark": "C",
+                    "brand_wordmark": "Clínica Delta",
+                    "domain": "ejemplo-clinicas.com",
+                    "host_aliases": [
+                      "www.ejemplo-clinicas.com"
+                    ],
+                    "locales": [
+                      "es"
+                    ],
+                    "default_locale": "es",
+                    "home_template": "service-lead",
+                    "theme": {
+                      "accent": "#0f766e",
+                      "accent_contrast": "#ffffff",
+                      "display_font": "instrument-serif"
+                    },
+                    "destinations": {
+                      "support": "https://contacto-controlado-por-el-tenant.example/"
+                    },
+                    "pages": [
+                      "/"
+                    ],
+                    "domain_is_final": true,
+                    "status": "published",
+                    "created_at": "2026-09-08T14:05:00+00:00",
+                    "updated_at": "2026-09-08T14:05:00+00:00"
+                  },
+                  "msg": "Custom domain cleared"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No site is published for that address (`site_unresolved`)",
+            "x-error-codes": [
+              "site_unresolved"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The domain or slug already belongs to another site, or a service-lead publication is missing `/` or its HTTPS support action",
+            "x-error-codes": [
+              "site_host_already_claimed",
+              "site_custom_domain_already_set",
+              "site_custom_domain_pending",
+              "site_publish_action_required",
+              "site_slug_already_exists",
+              "site_provisioning_not_applicable",
+              "site_provisioning_in_progress",
+              "site_provisioning_unreachable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -42512,6 +43438,8 @@
             "description": "The domain or slug already belongs to another site, or a service-lead publication is missing `/` or its HTTPS support action",
             "x-error-codes": [
               "site_host_already_claimed",
+              "site_custom_domain_already_set",
+              "site_custom_domain_pending",
               "site_publish_action_required",
               "site_slug_already_exists",
               "site_provisioning_not_applicable",
@@ -43245,7 +44173,7 @@
           "Sites"
         ],
         "summary": "Resolve a site by its host (public)",
-        "description": "Resolve the published site manifest that answers for a `Host`, for the renderer that serves it. The host is matched normalised (lowercased, port and trailing root dot removed) against the primary domain and every alias, so `Ejemplo.com`, `ejemplo.com.` and `ejemplo.com:443` all resolve to the same site.\n\n- **Auth:** none. The caller is a server rendering a page for an anonymous visitor.\n- **Rate limit:** 60 req/min per client IP.\n- Only the projected manifest is returned — never the stored document. An unpublished site answers exactly like an unknown one: a 404 that distinguished them would tell a stranger which domains are registered but unlaunched.",
+        "description": "Resolve the published site manifest that answers for a `Host`, for the renderer that serves it. The host is matched normalised (lowercased, port and trailing root dot removed) against the primary domain and every alias, so `Ejemplo.com`, `ejemplo.com.` and `ejemplo.com:443` all resolve to the same site.\n\n- **Auth:** none. The caller is a server rendering a page for an anonymous visitor.\n- **Rate limit:** 600 req/min per client IP.\n- Only the projected manifest is returned — never the stored document. An unpublished site answers exactly like an unknown one: a 404 that distinguished them would tell a stranger which domains are registered but unlaunched.",
         "operationId": "resolveSiteByHost",
         "parameters": [
           {
@@ -46984,6 +47912,274 @@
           },
           "422": {
             "description": "Unsupported map kind",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/heatmap/sites/{site_id}/snapshot": {
+      "get": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Is there a stored page behind this route's map",
+        "description": "Says whether this route has a stored page, when it was taken and where to load it from.\n\nThree states and not two: `addressable` is `false` for a route PATTERN such as `/books/[slug]`, which names many pages and no address — there is nothing to capture, which is different from nothing captured yet.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 50 req/min",
+        "operationId": "getHeatmapSnapshotState",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Heatmap site id.",
+              "title": "Site Id"
+            },
+            "description": "Heatmap site id."
+          },
+          {
+            "name": "page_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The route pattern to look up.",
+              "default": "/",
+              "title": "Page Key"
+            },
+            "description": "The route pattern to look up."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored page, if any",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "page_key": "/",
+                    "available": true,
+                    "addressable": true,
+                    "url": "https://api.1platform.pro/api/v1/heatmap/p/Qk1sT3ZlbHkxMjM0NTY3OA.html",
+                    "source_url": "https://shop.example/",
+                    "captured_at": "2026-09-20T08:12:00Z",
+                    "bytes": 24265
+                  },
+                  "msg": "Heatmap snapshot retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Heatmaps"
+        ],
+        "summary": "Take the picture of a measured page",
+        "description": "Fetches the route's public address from this service, strips every script out of the document and stores what is left, so the map can be drawn on the page.\n\n- Nothing a visitor typed is involved: the page is fetched **by this service, anonymously, from its public address** — never collected from a visitor's browser.\n- Replaces the previous picture of that route and **invalidates its address**.\n- `422` when the route is a pattern rather than an address, and when the site did not answer with a page.\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 20 req/min",
+        "operationId": "captureHeatmapSnapshot",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Heatmap site id.",
+              "title": "Site Id"
+            },
+            "description": "Heatmap site id."
+          },
+          {
+            "name": "page_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The route pattern to capture.",
+              "default": "/",
+              "title": "Page Key"
+            },
+            "description": "The route pattern to capture."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "page_key": "/",
+                    "available": true,
+                    "addressable": true,
+                    "url": "https://api.1platform.pro/api/v1/heatmap/p/Qk1sT3ZlbHkxMjM0NTY3OA.html",
+                    "source_url": "https://shop.example/",
+                    "captured_at": "2026-09-20T08:12:00Z",
+                    "bytes": 24265
+                  },
+                  "msg": "Heatmap snapshot captured"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Heatmaps are off for this workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The route has no single address, or the page could not be read",
+            "x-error-codes": [
+              "heatmap_snapshot_not_addressable",
+              "heatmap_snapshot_unavailable"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -53593,6 +54789,23 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The link is valid but the account was deactivated by a workspace admin. `data.code` is `account_inactive`; the link is NOT consumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "account_inactive"
+                  },
+                  "msg": "This account has been deactivated. Contact your workspace administrator."
                 }
               }
             }
@@ -61057,7 +62270,7 @@
           "Cash Out"
         ],
         "summary": "Write one tenant's cash out configuration (staff)",
-        "description": "Writes `App.config[\"cash_out\"]` for the tenant named in the path: the payout period, the per-currency floor and ceiling, the fee rates and the cooling-off window.\n\nKeys outside the allow-list are **422**, not a silent assignment — including `platform_operated_app_ids`, which decides who releases whose money and is written by `PATCH /platform/config/cash_out`, and `enabled`, which belongs to the feature switchboard.\n\nThe namespace is closed to tenant writes, so this endpoint and the seed are its only pen.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "description": "Writes `App.config[\"cash_out\"]` for the tenant named in the path: the payout period, the per-currency floor and ceiling, the fee rates, the cooling-off window, and `platform_books_api_charges` — whether the platform keeps the book of the charges this workspace collects through its own integration and forwards to its own webhook. With it `true` (and the vertical enabled), such a charge, once its approval is proven, is credited to the merchant's withdrawable balance; `false` is the default and credits nothing, as before.\n\nKeys outside the allow-list are **422**, not a silent assignment — including `platform_operated_app_ids`, which decides who releases whose money and is written by `PATCH /platform/config/cash_out`, and `enabled`, which belongs to the feature switchboard.\n\nThe namespace is closed to tenant writes, so this endpoint and the seed are its only pen.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
         "operationId": "setAppCashOutConfig",
         "security": [
           {
@@ -61112,7 +62325,8 @@
                   "min_payout_amount": {
                     "USD": 10,
                     "GTQ": 75
-                  }
+                  },
+                  "platform_books_api_charges": true
                 }
               }
             }
@@ -81679,6 +82893,17 @@
         "title": "BalanceDirectionFilter",
         "description": "`direction` query parameter, which additionally accepts `all`."
       },
+      "BalanceEffect": {
+        "type": "string",
+        "enum": [
+          "credited",
+          "not_credited",
+          "refunded",
+          "no_movement"
+        ],
+        "title": "BalanceEffect",
+        "description": "What a collection actually DID to the owner's balance.\n\nDerived in the service (D-13), never echoed from `status`, and never left\nto the client: the same value governs the detail screen AND the PDF, and\nthe PDF is the one that gets archived. Two renderers deriving it\nindependently is how a screen and a document end up disagreeing about\nwhether money arrived.\n\n`NOT_CREDITED` deliberately carries NO reason. An approved collection with\nno `credited_at` can be a subscription charge that settles into the\nmerchant's own gateway account (`credit_skipped_at`), a credit still\ndeferred for want of proof (`credit_deferred_at`), or one whose\nverification window closed (`credit_unproven_expired_at`) — three different\nstories the owner is not owed a guess about. Saying \"approved, and it did\nnot credit your balance\" is true in all three; inventing which one is not."
+      },
       "BalanceHistoryItemResponse": {
         "properties": {
           "id": {
@@ -81989,6 +83214,63 @@
         ],
         "title": "BalanceHoldStatus",
         "description": "Lifecycle of a `BalanceHold` document.\n\nState machine (idempotent terminal transitions):\n    ACTIVE → CAPTURED   (success: balance debited, reserved_balance freed)\n    ACTIVE → RELEASED   (failure: reserved_balance freed, balance untouched)\n    ACTIVE → EXPIRED    (TTL worker reaped a stale hold)"
+      },
+      "BalanceTopupRequest": {
+        "properties": {
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "title": "Amount",
+            "description": "Amount to add, in the balance's own currency (must be positive).",
+            "examples": [
+              10
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Which of YOUR OWN balances to top up (MCB-08). Omit to use your primary billing. The server resolves the billing from (your user, this currency), so this names a currency and never a billing id.",
+            "examples": [
+              "GTQ"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Free-form label for your own statement.",
+            "examples": [
+              "Account top-up"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount"
+        ],
+        "title": "BalanceTopupRequest",
+        "description": "Request model for `POST /api/v1/users/balance/topups` — buying credit for\nyour OWN account.\n\nDeliberately narrower than `TransactionCreateRequest`, and that is the whole\npoint of it existing (#612). A top-up has no buyer, no order and no return\njourney, so it accepts no `customer_email`, no `merchant_reference`, no\n`return_url`, no `branch_id` and no `metadata`: the fields that describe a\nsale to a third party are absent STRUCTURALLY rather than validated away,\nwhich is what makes \"this charge was not a sale\" a fact about the route\ninstead of a claim about the body.\n\nThe intent this route carries (`Transaction.balance_topup`) is added by the\nENDPOINT, never read from here — a caller able to set it would be choosing\nwhich of its own balances the money lands in.",
+        "example": {
+          "amount": 10,
+          "currency": "GTQ",
+          "description": "Account top-up"
+        }
       },
       "BillingCreditRequest": {
         "properties": {
@@ -84735,6 +86017,133 @@
         ],
         "title": "ConsumptionCurrencyAmount",
         "description": "An amount together with the currency that actually denominates it."
+      },
+      "ConsumptionDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Ledger entry ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "description": "Operation key, to be rendered by the client's own catalogue. Raw on purpose: the API is monolingual and a server-side fallback would put an internal key on a customer's screen.",
+            "examples": [
+              "domain_register"
+            ]
+          },
+          "cost": {
+            "type": "string",
+            "title": "Cost",
+            "description": "What it cost, as a decimal string in `currency`.",
+            "examples": [
+              "12.99"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "ISO 4217 code of the balance that was debited",
+            "examples": [
+              "USD"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConsumptionStatus",
+            "description": "The stored status, for traceability. Do NOT read it as the outcome: `refunded` means opposite things on a charge and on a credit. `balance_effect` is the field that answers what happened.",
+            "examples": [
+              "charged"
+            ]
+          },
+          "balance_effect": {
+            "$ref": "#/components/schemas/ConsumptionEffect",
+            "description": "What this movement did to your balance: `charged`, `reverted`, `settled` or `failed`. Derived on the server so the screen and the receipt cannot disagree.",
+            "examples": [
+              "charged"
+            ]
+          },
+          "balance_before": {
+            "type": "string",
+            "title": "Balance Before",
+            "description": "Balance before the movement (decimal string)",
+            "examples": [
+              "50.00"
+            ]
+          },
+          "balance_after": {
+            "type": "string",
+            "title": "Balance After",
+            "description": "Balance after the movement (decimal string)",
+            "examples": [
+              "37.01"
+            ]
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference",
+            "description": "What the movement was FOR — the domain, the campaign, the trade.",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At",
+            "description": "When it happened",
+            "examples": [
+              "2026-01-15T10:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "operation",
+          "cost",
+          "currency",
+          "status",
+          "balance_effect",
+          "balance_before",
+          "balance_after",
+          "occurred_at"
+        ],
+        "title": "ConsumptionDetailResponse",
+        "description": "One ledger movement, for the owner who clicked it in their statement.\n\nA DTO of its own rather than a reuse of `ConsumptionItemResponse` (D-6):\nthat one declares `endpoint` — real API routes like\n`POST /api/v1/posts/content/` — plus `hold_id` and the whole\n`ConsumptionMetadata`, `image_provider` included. Publishing internal\nsurface and a vendor field on a client screen is not a thing to fix later\nwith a redactor; the narrow model cannot do it at all.\n\n`operation` travels as the RAW KEY on purpose. The API is English-only by\nconvention and the dashboard is bilingual, so the client translates — and\nthe fallback for a key the catalogue does not know belongs to the client\ntoo. The API's own fallback (`_describe_charge`) renders the internal key\nwith underscores turned into spaces, which is how an internal product name\nreached a screen once already; its own comment records the incident.",
+        "example": {
+          "balance_after": "37.01",
+          "balance_before": "50.00",
+          "balance_effect": "charged",
+          "cost": "12.99",
+          "currency": "USD",
+          "id": "507f1f77bcf86cd799439011",
+          "occurred_at": "2026-01-15T10:30:00Z",
+          "operation": "domain_register",
+          "reference": "example.com",
+          "status": "charged"
+        }
+      },
+      "ConsumptionEffect": {
+        "type": "string",
+        "enum": [
+          "charged",
+          "reverted",
+          "settled",
+          "failed"
+        ],
+        "title": "ConsumptionEffect",
+        "description": "What a ledger entry DID to the balance — derived, never the stored status.\n\n`ConsumptionStatus.REFUNDED` is OVERLOADED and means opposite things\ndepending on the operation. On a CHARGE it means what it says: the charge\nwas reversed, net zero. On a CREDIT row (`CONSUMPTION_CREDIT_OPERATIONS` —\nan advertising budget coming back, a 1Trade settlement) the same value is\nwhat `mark_trade_credit_applied` writes to mean the settlement LANDED. The\nbalance history already remaps it for exactly that reason, and a detail\nscreen that echoed the stored status would tell the owner a successful\nsettlement had been undone, while the row they clicked said \"paid\" — which\nis the contradiction this epic exists to close."
       },
       "ConsumptionHistoryResponse": {
         "properties": {
@@ -99782,6 +101191,22 @@
         "title": "SiteBrandAssetsPublic",
         "description": "Renderer-safe declared assets, or ``null`` when they are derived."
       },
+      "SiteCustomDomainRequest": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "maxLength": 253,
+            "title": "Domain",
+            "description": "A registrable domain of your own. Not a name inside one — nameservers are delegated for a whole domain, so `www.example.com` and `blog.example.com` are refused."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "domain"
+        ],
+        "title": "SiteCustomDomainRequest"
+      },
       "SiteDestinations": {
         "properties": {
           "docs": {
@@ -100313,6 +101738,26 @@
             "title": "In Progress",
             "description": "Whether a provisioning run currently holds this site."
           },
+          "target_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Host",
+            "description": "The host the three layers above were computed FOR. It is the domain being connected when there is one, and the primary domain otherwise — so while a connection is in flight the layers are about the new domain, not the one the site currently serves."
+          },
+          "nameservers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Nameservers",
+            "description": "The nameservers the domain's owner has to delegate to, as the DNS provider assigned them for this zone. Empty until the zone exists. Staff-only: the public manifest never carries them."
+          },
           "updated_at": {
             "anyOf": [
               {
@@ -100536,6 +101981,42 @@
             "title": "Domain Is Final",
             "description": "Whether the canonical domain is final and may become indexable."
           },
+          "platform_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform Host",
+            "description": "The site's address on the platform, `<slug>.<platform apex>`. Derived from the slug rather than stored, so it cannot drift from it. `null` when the slug cannot have one — a reserved name or an internationalised one."
+          },
+          "pending_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Domain",
+            "description": "A domain of the site's own being connected, or `null`. It becomes `domain` on its own once it is verified to serve this site."
+          },
+          "pending_domain_connected_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Domain Connected At",
+            "description": "When the connection was requested, ISO-8601, or `null`."
+          },
           "status": {
             "$ref": "#/components/schemas/SiteTenantStatus",
             "description": "Current tenant publication lifecycle."
@@ -100630,9 +102111,29 @@
             "description": "Visible wordmark beside brand_mark; falls back to brand_name when no mark exists."
           },
           "domain": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Domain",
-            "description": "Primary domain. Normalised before it is stored."
+            "description": "Primary domain, normalised before it is stored. **Optional.** Omit it and the site is created at its platform address `<slug>.<platform apex>`; pass `custom_domain` instead to be given that address AND start connecting a domain of your own. Passing both is a 422."
+          },
+          "custom_domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 253
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Domain",
+            "description": "A registrable domain of your own to start connecting. The site is created at its platform address and serves there immediately; this domain becomes the primary one on its own, once it is verified to serve this site."
           },
           "host_aliases": {
             "items": {
@@ -100709,7 +102210,6 @@
         "required": [
           "slug",
           "brand_name",
-          "domain",
           "theme",
           "home_template"
         ],
@@ -101007,6 +102507,18 @@
             "type": "boolean",
             "title": "Indexable",
             "description": "Whether crawlers are welcome. Derived from domain_is_final, so a provisional domain cannot be indexed by forgetting a flag."
+          },
+          "redirect_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect To",
+            "description": "Host the caller should be redirected to, or `null` to serve here. Only set when the request arrived on this site's platform address while its confirmed primary domain is another one."
           }
         },
         "additionalProperties": false,
@@ -104351,6 +105863,38 @@
         ],
         "title": "SuccessResponse[CommentGenerationResponse]"
       },
+      "SuccessResponse_ConsumptionDetailResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConsumptionDetailResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[ConsumptionDetailResponse]"
+      },
       "SuccessResponse_ConsumptionHistoryResponse_": {
         "properties": {
           "success": {
@@ -105791,6 +107335,38 @@
         ],
         "title": "SuccessResponse[ProfileGenerationResponse]"
       },
+      "SuccessResponse_PublicTrackingResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/PublicTrackingResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[PublicTrackingResponse]"
+      },
       "SuccessResponse_ReferralResolutionResponse_": {
         "properties": {
           "success": {
@@ -106782,6 +108358,38 @@
           "msg"
         ],
         "title": "SuccessResponse[ToolCatalogResponse]"
+      },
+      "SuccessResponse_TransactionDetailResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/TransactionDetailResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[TransactionDetailResponse]"
       },
       "SuccessResponse_TransactionHistoryResponse_": {
         "properties": {
@@ -110515,6 +112123,314 @@
             "source": "web"
           },
           "return_url": "https://shop.example.com/checkout/result?order={{merchant_reference}}"
+        }
+      },
+      "TransactionDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Internal transaction ID",
+            "examples": [
+              "507f1f77bcf86cd799439011"
+            ]
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User ID",
+            "examples": [
+              "507f1f77bcf86cd799439012"
+            ]
+          },
+          "usd_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Amount",
+            "description": "Original amount in merchant currency",
+            "examples": [
+              10
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "Amount sent to payment provider",
+            "examples": [
+              78
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Merchant currency (ISO 4217)",
+            "examples": [
+              "USD"
+            ]
+          },
+          "currency_provider": {
+            "type": "string",
+            "title": "Currency Provider",
+            "description": "Payment provider currency (ISO 4217)",
+            "default": "GTQ",
+            "examples": [
+              "GTQ"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/TransactionStatus",
+            "description": "Current transaction status",
+            "examples": [
+              "created"
+            ]
+          },
+          "payment_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Url",
+            "description": "Payment URL where user completes checkout",
+            "examples": [
+              "https://checkout.example.com/pay/abc123"
+            ]
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference",
+            "description": "Payment service internal reference",
+            "examples": [
+              "GT123456"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Transaction description",
+            "examples": [
+              "Account top-up"
+            ]
+          },
+          "return_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Url",
+            "description": "The post-checkout redirect actually registered with the payment page, with its placeholders already substituted. Echoed back so a silent typo in the allowlist is visible at creation time instead of after the first real payment.",
+            "examples": [
+              "https://shop.example.com/checkout/result?order=order_abc123"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "Transaction creation timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Transaction last update timestamp",
+            "examples": [
+              "2024-01-15T10:30:00Z"
+            ]
+          },
+          "receipt_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Status",
+            "description": "Outcome of the last receipt attempt for this transaction: `dispatched`, `deduplicated`, `suppressed` or `failed`. Null when no `customer_email` was supplied or no attempt has been made yet.",
+            "examples": [
+              "dispatched"
+            ]
+          },
+          "receipt_status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Status Reason",
+            "description": "Why, for any outcome that is not `dispatched`. `no_recipient`, `not_approved`, `already_sent` and `rate_limited` are yours to act on; `platform_configuration` means the hold is on our side and support can lift it; `delivery_error` means the message was attempted and did not get through.",
+            "examples": [
+              "platform_configuration"
+            ]
+          },
+          "receipt_status_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Status At",
+            "description": "When the last receipt attempt was evaluated.",
+            "examples": [
+              "2024-01-15T10:35:00Z"
+            ]
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "When the transaction reached its final state. Null while it is still open.",
+            "examples": [
+              "2026-04-30T12:05:00Z"
+            ]
+          },
+          "merchant_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant Reference",
+            "description": "The identifier the merchant attached when creating the collection, echoed back so it can be matched against their own system.",
+            "examples": [
+              "bower_order_abc123"
+            ]
+          },
+          "external_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Reference",
+            "description": "The order identifier carried in the collection's own metadata, when one is present and well-formed. Resolved from a fixed, explicit list of keys — never a dump of the metadata dictionary, which is free-form and written by the integrator.",
+            "examples": [
+              "01a0b06f-a579-78ca-af87-818b0080cdf6"
+            ]
+          },
+          "balance_effect": {
+            "$ref": "#/components/schemas/BalanceEffect",
+            "description": "What this collection did to your balance: `credited`, `not_credited`, `refunded` or `no_movement`. Derived from the outcome and the credit markers, so it cannot disagree with the receipt.",
+            "examples": [
+              "credited"
+            ]
+          },
+          "credited_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credited At",
+            "description": "When the money reached the balance. Null unless `balance_effect` says it did.",
+            "examples": [
+              "2026-04-30T12:05:30Z"
+            ]
+          },
+          "bank_authorization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Authorization",
+            "description": "Authorisation number as REPORTED BY THE BANK in the payment notification. Null when none was reported or when what arrived did not look like an authorisation number — the notification endpoint is public and its callbacks are unsigned, so the value is shown only when it passes both a shape and a content check.",
+            "examples": [
+              "974490"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "amount",
+          "currency",
+          "status",
+          "created_at",
+          "updated_at",
+          "balance_effect"
+        ],
+        "title": "TransactionDetailResponse",
+        "description": "One collection, with what it takes to reconcile it against a bank.\n\nEXTENDS `TransactionResponse` rather than replacing it (D-3): that model is\nalso what `POST /users/transactions` and the list endpoint return, so\nwidening it in place would change a contract integrators already consume.\nOnly the single-transaction GET answers this subclass.\n\nWhat it deliberately does NOT add: `provider`, the provider's own voucher\nURL, `customer_email`, or `webhook_attempts`. `payment_url` is INHERITED and\nstays (D-15) because it is the only way a pending top-up can be resumed —\nthe screen and the document never render it.",
+        "example": {
+          "amount": 78,
+          "balance_effect": "credited",
+          "bank_authorization": "974490",
+          "completed_at": "2024-01-01T12:05:00Z",
+          "created_at": "2024-01-01T12:00:00Z",
+          "credited_at": "2024-01-01T12:05:30Z",
+          "currency": "USD",
+          "currency_provider": "GTQ",
+          "description": "Account top-up",
+          "external_reference": "01a0b06f-a579-78ca-af87-818b0080cdf6",
+          "id": "65a1b2c3d4e5f6789abcdef0",
+          "merchant_reference": "bower_order_abc123",
+          "reference": "GT123456",
+          "return_url": "https://shop.example.com/checkout/result?order=order_abc123",
+          "status": "approved",
+          "updated_at": "2024-01-01T12:05:00Z",
+          "usd_amount": 10,
+          "user_id": "65a1b2c3d4e5f6789abcdef1"
         }
       },
       "TransactionHistoryResponse": {

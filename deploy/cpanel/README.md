@@ -55,8 +55,9 @@ nuevo del viejo**: habría dado verde sirviendo todavía la versión anterior.
 y el log del activador a temporales privados del runner, sin publicarlos como
 artifacts ni imprimir sus contenidos. `health_config.py` sólo permite migrar
 el docroot de `developer-qa.1platform.pro` cuando confirma la raíz configurada,
-el HTTP 301 hacia la guía y un rollback 301 de la versión en cuarentena en su
-log. Cambia la salud a `/index.html`, preservando el marker si todavía figura
+la regla HTTP 301 hacia la guía en el bundle y un rollback 301 de la versión en
+cuarentena en su log. No exige que la raíz revertida conserve el redirect de la
+versión fallida. Cambia la salud a `/index.html`, preservando el marker si todavía figura
 en el build; si el título anterior quedó obsoleto, utiliza el canonical exacto
 del portal. Conserva la exigencia de HTTP 200 + marker del activador.
 

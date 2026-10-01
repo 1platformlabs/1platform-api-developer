@@ -26,9 +26,8 @@ then
   exit 0
 fi
 
-# No redirect following: a 301 is the exact health failure being diagnosed.
-curl -sS --max-time 20 -D "$PRIVATE/root.headers" -o /dev/null \
-  -w '%{http_code}' https://developer-qa.1platform.pro/ > "$PRIVATE/root.status" 2>/dev/null || true
+# A rolled-back root is normally 200 again. Diagnose the exact failed release
+# in the activator log, and require the new bundle's explicit root-301 rule.
 python3 deploy/cpanel/health_config.py "$PRIVATE" cpanel-dist/public/index.html
 if [[ ! -f "$PRIVATE/planned_url" ]]; then exit 0; fi
 

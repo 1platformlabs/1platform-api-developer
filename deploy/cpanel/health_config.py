@@ -7,15 +7,16 @@ import sys
 QA_ORIGIN = "https://developer-qa.1platform.pro"
 GUIDE = "/docs/saas/1platform-api/getting-started"
 CANONICAL = 'href="https://developer.1platform.pro' + GUIDE + '"'
+ROOT_RULE = 'RewriteRule ^$ ' + GUIDE + ' [R=301,L]'
 
 
-def plan(health_url, marker, failed_version, log, status, location, index_html):
+def plan(health_url, marker, failed_version, log, index_html, server_rules):
     if health_url == QA_ORIGIN + "/index.html":
         return "already_migrated", None
     if health_url not in (QA_ORIGIN, QA_ORIGIN + "/"):
         return "health_url_not_qa_root", None
-    if status != "301" or location.rstrip("/") != QA_ORIGIN + GUIDE:
-        return "root_redirect_not_confirmed", None
+    if ROOT_RULE not in server_rules:
+        return "bundle_root_redirect_not_confirmed", None
     if not re.fullmatch(r"qa-[0-9]+\.[0-9]+", failed_version):
         return "quarantined_version_not_confirmed", None
     start = log.rfind("activating version " + failed_version + " ")
@@ -43,7 +44,7 @@ def self_test():
     log = ("activating version " + version + " → release\n"
            "health FAILED (final status 301, marker not matched) — rolling back\n"
            "version " + version + " quarantined in .failed_version\n")
-    args = [QA_ORIGIN + "/", "old title", version, log, "301", QA_ORIGIN + GUIDE, CANONICAL]
+    args = [QA_ORIGIN + "/", "old title", version, log, CANONICAL, ROOT_RULE]
     reason, update = plan(*args)
     assert reason == "root_301_rollback_confirmed" and update == (QA_ORIGIN + "/index.html", CANONICAL)
     preserved = args.copy()
@@ -53,7 +54,7 @@ def self_test():
                  (0, "https://user:password@developer-qa.1platform.pro/"), (0, ""),
                  (2, "untrusted-version"), (3, log.replace("301", "500")),
                  (3, log.replace("quarantined", "kept")), (3, ""),
-                 (4, "200"), (5, "https://example.org" + GUIDE), (6, "<html>other site</html>")]
+                 (4, "<html>other site</html>"), (5, "RewriteRule ^$ /other [R=301,L]")]
     for index, value in negatives:
         case = args.copy()
         case[index] = value
@@ -64,7 +65,7 @@ def self_test():
     migrated = args.copy()
     migrated[0] = QA_ORIGIN + "/index.html"
     assert plan(*migrated) == ("already_migrated", None)
-    print("health config: 15 positive/negative/idempotency cases passed; no network")
+    print("health config: 14 positive/negative/idempotency cases passed; no network")
 
 
 if __name__ == "__main__":
@@ -75,10 +76,10 @@ if __name__ == "__main__":
         def read(name):
             path = folder / name
             return path.read_text(errors="replace").strip() if path.is_file() else ""
-        headers = read("root.headers").splitlines()
-        location = next((line.split(":", 1)[1].strip() for line in headers if line.lower().startswith("location:")), "")
+        index_html = build_index.read_text()
+        server_rules = (build_index.parent / ".htaccess").read_text()
         reason, update = plan(read("health_url"), read("health_marker"), read("failed_version"),
-                              read("activate.log"), read("root.status"), location, build_index.read_text())
+                              read("activate.log"), index_html, server_rules)
         print("QA health diagnostic: " + reason)
         if update:
             (folder / "planned_url").write_text(update[0] + "\n")

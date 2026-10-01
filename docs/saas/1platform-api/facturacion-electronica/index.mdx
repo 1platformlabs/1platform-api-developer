@@ -1,0 +1,55 @@
+---
+title: Facturación electrónica
+description: Emite, consulta y anula facturas electrónicas FEL (Guatemala) a nombre de tu comercio.
+sidebar_position: 1
+---
+
+# Facturación electrónica
+
+<p className="lead">Emite facturas electrónicas FEL de Guatemala a nombre de tu comercio, con su NIT. Para eso activas una vez la facturación electrónica del comercio. Después emites, consultas, descargas y anulas facturas por la API.</p>
+
+## Cómo funciona
+
+1. **Comercio.** El emisor es un comercio con su NIT (`documentNumber`). Nace con su primera sucursal, y quien lo crea queda como administrador de esa sucursal.
+2. **Activación.** Hay dos caminos:
+   - Con las credenciales del portal tributario. El certificado de firma se obtiene y se registra solo.
+   - Subiendo un certificado `.pfx`/`.p12`.
+
+   En los dos casos llega un código por WhatsApp. Al verificarlo, el comercio pasa a `activating`. Queda listo para facturar cuando `display_status` es `active` y `ready` es `true`.
+3. **Sucursales y establecimientos.** La factura se certifica bajo el código de establecimiento de una sucursal. Sincronizar trae los establecimientos del registro tributario y crea o actualiza las sucursales. Si el comercio queda con varias sucursales con establecimiento, cada factura tiene que decir de cuál sale: envía `branchId` o designa una sucursal por defecto con `defaultBranchId` en `PATCH /businesses/{businessId}`.
+4. **Factura.** Por defecto se emite en la misma llamada que la crea (`emitOnCreate` vale `true`). Puedes consultarla, descargar su PDF o XML y anularla. Anular una factura certificada la anula también ante el ente tributario.
+
+## Qué necesitas
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Los módulos de Comercios y de Facturación electrónica encendidos para tu espacio de trabajo y asignados a tu cuenta. Si falta alguno, recibes `403` con `data.code` = `module_disabled`.
+- Un rol en la sucursal que permita la operación. Activar con credenciales del portal exige ser **administrador de la sucursal**, el rol con el que nace quien crea el comercio. Es un rol del comercio, no del espacio de trabajo. Si tu rol no alcanza, recibes `403`.
+- El NIT del comercio y, para activar, las credenciales de su portal tributario o su certificado de firma.
+
+La facturación electrónica **no** es requisito para cobrar con [Links de pago](/docs/saas/1platform-api/links-de-pago), [Suscripciones](/docs/saas/1platform-api/suscripciones) ni [Terminal de tarjetas](/docs/saas/1platform-api/terminal-de-tarjetas).
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `POST /businesses` | Crear el comercio emisor con su primera sucursal |
+| `GET /businesses/{businessId}/branches` | Listar las sucursales y obtener el id de la que emite |
+| `POST /businesses/{businessId}/invoicing/activation/sat` | Activar con las credenciales del portal tributario |
+| `POST /businesses/{businessId}/invoicing/activation` | Activar subiendo el certificado de firma |
+| `POST /businesses/{businessId}/invoicing/activation/verify` | Confirmar la activación con el código recibido |
+| `GET /businesses/{businessId}/invoicing/activation` | Consultar si el comercio ya puede facturar |
+| `POST /businesses/{businessId}/invoicing/establishments/sync` | Sincronizar sucursales con el registro de establecimientos |
+| `POST /businesses/{businessId}/invoices` | Emitir una factura |
+| `GET /businesses/{businessId}/invoices/{invoiceId}` | Consultar una factura |
+| `GET /businesses/{businessId}/invoices/{invoiceId}/pdf` | Descargar el PDF certificado |
+| `GET /businesses/{businessId}/invoices/{invoiceId}/xml` | Descargar el XML firmado |
+| `DELETE /businesses/{businessId}/invoices/{invoiceId}` | Anular una factura |
+| `GET /invoices` | Facturas recientes de todos tus comercios |
+| `GET /fel/report` | Totales mensuales de todos tus comercios |
+| `POST /identify` | Buscar los datos de una **persona** por su CUI/DPI, para precargar el receptor. No emite nada |
+
+Todas las operaciones: [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel) y [Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches).
+
+## Guías
+
+- [Emitir una factura](/docs/saas/1platform-api/facturacion-electronica/emitir-una-factura): del comercio nuevo a la factura certificada, en orden.

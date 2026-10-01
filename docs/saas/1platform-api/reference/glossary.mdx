@@ -1,52 +1,60 @@
 ---
-title: Glosario de identificadores
-description: Nombres canónicos de cada ID en la 1Platform API — quién es dueño de cada uno y qué alias existen.
+title: Glosario
+description: Los términos canónicos de la 1Platform API — espacio de trabajo, claves, tokens, comercio, sucursal — y los identificadores que viajan en cada cobro.
 sidebar_position: 2
 ---
 
 # Glosario
 
-Varios IDs fluyen a lo largo del ciclo de vida del pago. Se parecen pero significan
-cosas distintas. Esta página es el mapeo canónico.
+Esta documentación usa cada término siempre con el mismo sentido. Si una página dice otra cosa, la página está mal.
 
-| Término | Dueño | Definición | Alias |
-|---|---|---|---|
-| `transaction_id` | 1Platform | ID interno de la transacción. Se devuelve como `data.id` en `POST /users/transactions` y como `transaction_id` en el webhook saliente. | `id` (en el cuerpo de la respuesta) |
-| `external_transaction_id` | proveedor upstream | El ID de transacción propio del proveedor (p. ej. Migo). Se devuelve en las cargas útiles del webhook como `external_transaction_id`. Lo usa el soporte del operador para localizar el cargo en el dashboard del proveedor. | `externalId` (alias obsoleto en cargas útiles de webhook heredadas) |
-| `merchant_reference` | comercio | Cadena de texto libre que el comercio adjunta al crear. **Se devuelve sin cambios** en el webhook saliente. La clave de correlación determinista de tu lado. | (ninguno) |
-| `metadata` | comercio | Objeto JSON de texto libre que se devuelve sin cambios en el webhook saliente. Úsalo para contexto que no necesita ser una sola cadena. | (ninguno) |
-| `payment_gateway_id` | 1Platform | ObjectId de un documento `PaymentGateway`. Lo configura el operador, no quien llama a la API. | (ninguno) |
-| `app_token` | 1Platform | JWT de corta duración (30 min). Emitido por `POST /auth/token`. | `access_token` (en el cuerpo de la respuesta) |
-| `user_token` | 1Platform | JWT de corta duración (30 min). Emitido por `POST /users/token`. | `access_token` (en el cuerpo de la respuesta) |
-| `webhook_secret` | 1Platform | Clave de firma HMAC para webhooks salientes. Se devuelve **una sola vez** al registrar o rotar. No hay un endpoint `GET` para recuperarla después. | (ninguno) |
+## Términos
 
-## Cuál usar para correlacionar
+| Término | Definición |
+|---|---|
+| **Espacio de trabajo** | Tu cuenta de integración en 1Platform. Agrupa usuarios, configuración, módulos y credenciales. En la Referencia de API aparece como `App` |
+| **Administrador del espacio de trabajo** | Usuario con el rol que gestiona el espacio de trabajo: usuarios, módulos, webhooks y solicitudes de acceso |
+| **Panel** | La interfaz web de tu espacio de trabajo, con tu marca |
+| **Módulo** | Una capacidad que se habilita por espacio de trabajo y por usuario. Si está apagada, la operación responde `403` con `module_disabled` |
+| **Clave de aplicación** (`ak-…`) | Credencial de larga vida del espacio de trabajo. No va en ningún header: se canjea por un token de aplicación |
+| **Clave de usuario** (`sk-…`) | Credencial de larga vida de un usuario. Se canjea por un token de usuario. En la Referencia de API aparece como *user token* o `api_key` |
+| **Token de aplicación** | JWT de corta duración que devuelve `POST /auth/token`. Va en `Authorization: Bearer $APP_TOKEN` |
+| **Token de usuario** | JWT de corta duración que devuelve `POST /users/token` (o el `access_token` del enlace mágico). Va en `x-user-token: $USER_TOKEN` |
+| **Comercio** | La entidad que cobra, factura y despacha. En la Referencia de API, *Business* |
+| **Sucursal** | Un punto de operación de un comercio, con sus propios usuarios y roles. En la Referencia de API, *Branch* |
+| **Saldo** | El dinero del usuario con el que se pagan las operaciones con costo |
+| **Referencia de API** | La referencia interactiva del contrato: [/api-reference/1platform-api](/api-reference/1platform-api) |
 
-Cuando llega un webhook, tienes tres IDs con los que potencialmente hacer coincidencia:
+## Identificadores de un cobro
 
-1. **`merchant_reference`** — el tuyo, determinista. La mejor clave de correlación
-   cuando lo estableces al crear.
-2. **`transaction_id`** — interno de 1Platform. Siempre presente, siempre único.
-   El mejor respaldo cuando `merchant_reference` es null.
-3. **`external_transaction_id`** — útil para tickets de soporte pero **no**
-   garantizado que esté presente en la carga útil entrante del proveedor upstream.
-   Evita depender de él para la correlación.
+Varios identificadores viajan a lo largo de la vida de un pago. Se parecen, pero significan cosas distintas.
 
-:::caution[`externalId` es ambiguo]
-El campo de webhook heredado `externalId` se describe como "ID de transacción local
-(enviado durante la creación de la transacción)" — pero el cuerpo de la solicitud de
-creación de transacción **no acepta** un campo `externalId`. El valor del webhook es
-lo que el proveedor upstream le estampa, no algo que tú controles. En su lugar, haz
-coincidencia con `transaction_id` (o `merchant_reference`).
-:::
-
-## Referencia de formato de IDs
-
-| Campo | Formato | Ejemplo |
+| Identificador | Lo asigna | Definición |
 |---|---|---|
-| `transaction_id` / `id` | ObjectId de MongoDB hex de 24 caracteres | `65a1b2c3d4e5f6789abcdef0` |
-| `external_transaction_id` | específico del proveedor | `MIGOGT123456` |
-| `app_token` / `user_token` | JWT | `eyJhbGciOiJIUzI1NiIs...` |
-| Clave de API de aplicación | `ak-` + 64 caracteres hex | `ak-a1b2c3...` |
-| Clave de API de usuario | `sk-` + 64 caracteres hex | `sk-d4e5f6...` |
-| `webhook_secret` | `whsec_` + cadena opaca | `whsec_demo_abc123` |
+| `transaction_id` | 1Platform | Identificador de la transacción. Es `data.id` al crearla con `POST /users/transactions` y `transaction_id` en el webhook |
+| `external_transaction_id` | La pasarela de cobro | El identificador que la pasarela le dio al cargo. Sirve para soporte; puede venir vacío |
+| `merchant_reference` | Tú | Texto libre que envías al crear la transacción. Vuelve sin cambios en el webhook |
+| `metadata` | Tú | Objeto JSON libre que envías al crear la transacción. Vuelve sin cambios en el webhook |
+| `webhook_secret` | 1Platform | Secreto de firma de los webhooks, uno por espacio de trabajo. Se muestra una sola vez: al registrar el primer dominio o al rotarlo |
+
+### Cuál usar para encontrar tu pedido
+
+1. **`merchant_reference`**: el tuyo. La mejor forma de encontrar tu pedido si lo envías al crear.
+2. **`transaction_id`**: siempre presente y único. El respaldo cuando no enviaste `merchant_reference`.
+3. **`external_transaction_id`**: útil para un ticket de soporte, pero no garantizado. No dependas de él.
+
+Para deduplicar entregas de webhooks usa siempre `(transaction_id, event)`.
+
+## Formato de los identificadores
+
+| Identificador | Formato | Ejemplo |
+|---|---|---|
+| `transaction_id` y demás `id` | Hexadecimal de 24 caracteres | `65a1b2c3d4e5f6789abcdef0` |
+| `external_transaction_id` | Cadena opaca, propia de la pasarela | `PGT123456` |
+| Token de aplicación y de usuario | JWT | `eyJhbGciOiJIUzI1NiIs...` |
+| Clave de aplicación | `ak-` seguido de una cadena opaca | `ak-…` |
+| Clave de usuario | `sk-` seguido de una cadena opaca | `sk-…` |
+| `webhook_secret` | Cadena hexadecimal opaca | `9f2c…` |
+
+No valides la longitud ni el alfabeto de las claves y del secreto: trátalos como cadenas opacas. Algunas claves
+antiguas no llevan prefijo y siguen funcionando.

@@ -1,14 +1,13 @@
 ---
 title: Seguridad de webhooks
-description: Esquema de firma HMAC-SHA256 para webhooks salientes — encabezados, material firmado y ejemplos de verificación.
+description: Firma HMAC-SHA256 de los webhooks — headers, material firmado, verificadores en tres lenguajes y rotación del secreto.
 sidebar_position: 2
 ---
 
 # Seguridad de webhooks
 
-Cada webhook saliente se firma con HMAC-SHA256 usando el `webhook_secret`
-compartido que se devuelve al momento del registro del dominio (o de la
-rotación). Verifica la firma **antes** de confiar en el payload.
+Cada webhook se firma con HMAC-SHA256 usando el `webhook_secret` de tu espacio de
+trabajo, que se entrega una sola vez: al registrar el primer dominio o al rotarlo. Verifica la firma **antes** de confiar en el contenido.
 
 ## Esquema de firma
 
@@ -18,18 +17,17 @@ rotación). Verifica la firma **antes** de confiar en el payload.
 | Formato de la firma | `sha256=<hex>` |
 | Encabezado complementario | `X-Webhook-Timestamp` (segundos epoch unix, string) |
 | Algoritmo | `HMAC-SHA256` |
-| Material firmado | `f"{timestamp}.".encode() + payload_bytes` |
-| Canonicalización del cuerpo (emisor) | `json.dumps(body, sort_keys=True, separators=(",",":"))` |
-| Ventana de replay | 5 minutos (skew de `X-Webhook-Timestamp`) |
+| Material firmado | `"{X-Webhook-Timestamp}." + cuerpo`, sobre los **mismos bytes** que viajan en la solicitud (JSON compacto, UTF-8) |
+| Cálculo | Una vez por evento: los reintentos llevan la misma firma y el mismo timestamp |
+| Ventana de repetición | 5 minutos de desfase máximo de `X-Webhook-Timestamp`, comprobados por tu verificador |
 
-:::warning[Verifica contra los bytes crudos que recibes]
-1Platform firma la re-serialización canónica del cuerpo, pero tú **debes
-verificar contra los bytes crudos que llegaron por el cable** — no contra el
-resultado de re-stringificar un objeto JSON ya parseado. Cualquier diferencia de
-espacios en blanco romperá el HMAC.
+:::warning[Verifica sobre los bytes que recibes]
+Lo que firmamos es exactamente el cuerpo que te llega. Calcula el HMAC sobre esos bytes crudos, antes de
+parsearlos. No intentes reconstruir el JSON: cualquier re-serialización (orden de las claves, espacios, escape de
+caracteres no ASCII) rompe la firma.
 :::
 
-## Verificación — Python (httpx + hmac)
+## Verificación — Python (hmac)
 
 ```python
 import hmac
@@ -48,7 +46,7 @@ def verify_webhook(
     if not signature_header.startswith("sha256="):
         return False
 
-    # Rechaza cualquier cosa fuera de la ventana de replay
+    # Rechaza lo que esté fuera de la ventana de repetición
     try:
         ts = int(timestamp_header)
     except ValueError:
@@ -121,27 +119,25 @@ function verifyWebhook(string $rawBody, string $signatureHeader, string $timesta
 - **Re-stringificar el cuerpo antes de verificar** — consulta la advertencia de arriba.
 - **Recortar el prefijo `sha256=` en el lugar equivocado** — quítalo de
   `signature_header`, no del valor calculado.
-- **Ventana de replay ausente** — sin una comprobación de timestamp, un atacante
-  puede repetir indefinidamente un payload capturado.
+- **Sin ventana de repetición** — sin una comprobación de timestamp, un atacante
+  puede repetir indefinidamente una entrega capturada.
 - **Comparación de strings en lugar de comparación de tiempo constante** — usa
   `hmac.compare_digest`, `timingSafeEqual`, `hash_equals`.
 
 ## Rotación del secreto {#secret-rotation}
-:::danger[El secreto del webhook se muestra solo una vez]
-`POST /webhooks/config/rotate-secret` devuelve el nuevo `webhook_secret`
-exactamente una vez. No existe un endpoint `GET`. Si pierdes la respuesta, debes
-rotar de nuevo — y cualquier webhook en vuelo firmado con el secreto anterior
-fallará la verificación de tu lado.
 
-**Siempre canaliza la respuesta a una escritura en el gestor de secretos antes de
-cualquier otra acción.**
+:::danger[El secreto se muestra una sola vez]
+`POST /webhooks/config/rotate-secret` devuelve el nuevo `webhook_secret` una sola vez y no hay forma de volver a
+leerlo. Si pierdes la respuesta, tienes que rotar de nuevo. Guarda la respuesta en tu gestor de secretos antes de
+cualquier otra acción.
 :::
 
-Un runbook de rotación seguro:
+La rotación la hace un administrador del espacio de trabajo (ver
+[Webhooks → Paso 7](/docs/saas/1platform-api/plataforma/webhooks)). Un procedimiento seguro:
 
-1. Llama a `POST /webhooks/config/rotate-secret` en un script que capture `stdout`
-   directamente a tu gestor de secretos (p. ej. `vault kv put`, `gcloud secrets`).
-2. Mantén el secreto anterior en tu verificador durante **24 horas** (acepta
-   cualquiera de los dos) para absorber los reintentos en vuelo previos a la
-   rotación.
-3. Después de 24 h, elimina el secreto viejo del verificador.
+1. Llama a `POST /webhooks/config/rotate-secret` desde un script que escriba la respuesta directamente en tu gestor
+   de secretos.
+2. Despliega el secreto nuevo en tu verificador y **conserva el anterior unos minutos** (acepta cualquiera de los
+   dos). Los eventos firmados antes de la rotación siguen reintentándose con la firma vieja durante alrededor de un
+   minuto.
+3. Pasados esos minutos, elimina el secreto anterior del verificador.

@@ -1,0 +1,67 @@
+---
+title: Suscripciones
+description: Crea planes de cobro recurrente para tu comercio, invita a tus clientes y sigue sus suscripciones.
+sidebar_position: 1
+---
+
+# Suscripciones
+
+<p className="lead">Vende suscripciones desde tu comercio. Defines un plan con monto y frecuencia, invitas a cada cliente con un enlace de pago y, desde el primer pago, las renovaciones se cobran solas.</p>
+
+El tag **Subscriptions** de la Referencia de API mezcla dos cosas distintas:
+
+- **Las suscripciones que vende tu comercio** a sus clientes. Son las operaciones bajo `/businesses/{businessId}/…` y son el tema de esta página.
+- **El plan de tu propia cuenta con la plataforma.** Son dos lecturas, descritas en [Tu propio plan](#tu-propio-plan).
+
+## Cómo funciona
+
+1. **Plan.** Creas un plan para un comercio. La moneda es la del comercio. El plan nace en `draft` y no se puede cobrar hasta que lo **publicas**. Ya publicado, el monto y la frecuencia quedan fijos: sólo cambian el nombre y la descripción. Para cobrar otro monto, archiva el plan y crea uno nuevo.
+2. **Cliente.** Registras al cliente en la libreta de clientes del comercio. El correo lo identifica dentro de ese comercio y no se puede editar.
+3. **Invitación.** Emites una invitación de un solo uso para un plan publicado. Es un link de pago por el monto del plan. Cada invitación sirve para un solo cliente.
+4. **Suscripción.** Cuando el cliente paga la invitación, nace la suscripción. El servicio de cobro guarda la tarjeta y cobra las renovaciones en su calendario.
+5. **Estados de la suscripción.**
+   - `active`: está al día.
+   - `past_due`: pasó una fecha de renovación sin noticias del cobro. Puede volver a `active`.
+   - Estados finales: `cancelled` (la cancelaste) o `ended` (se agotaron los reintentos de cobro).
+
+Archivar un plan no cancela las suscripciones que ya se vendieron con él. Cancelar una suscripción la detiene primero en el servicio de cobro, y sólo después cambia su estado aquí. Repetir la cancelación no tiene otro efecto.
+
+## Qué necesitas
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Un **comercio** con su sucursal, donde seas dueño o administrador ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)).
+- El módulo de Links de pago encendido para tu espacio de trabajo y asignado a tu cuenta, porque las suscripciones se venden con invitaciones que son links de pago. Si falta, recibes `403` con `data.code` = `module_disabled`.
+- No necesitas tener activa la [Facturación electrónica](/docs/saas/1platform-api/facturacion-electronica) para invitar clientes. Si la Referencia de API todavía lista un `409` `business_not_activated` en la invitación, ya no se produce.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `POST /businesses/{businessId}/subscription-plans` | Crear un plan en borrador |
+| `PATCH /businesses/{businessId}/subscription-plans/{planId}` | Editar un plan |
+| `POST /businesses/{businessId}/subscription-plans/{planId}/publish` | Publicar el plan para poder cobrarlo |
+| `POST /businesses/{businessId}/subscription-plans/{planId}/archive` | Archivar el plan para que no reciba invitaciones nuevas |
+| `GET /businesses/{businessId}/subscription-plans` | Listar los planes del comercio |
+| `POST /businesses/{businessId}/customers` | Registrar un cliente |
+| `GET /businesses/{businessId}/customers` | Buscar clientes por correo o nombre |
+| `POST /businesses/{businessId}/subscription-plans/{planId}/invitations` | Emitir la invitación de un cliente a un plan |
+| `GET /businesses/{businessId}/subscriptions` | Listar las suscripciones vendidas, con filtro por estado, plan o cliente |
+| `GET /businesses/{businessId}/subscriptions/{subscriptionId}` | Ver una suscripción con su historial de cobros |
+| `POST /businesses/{businessId}/subscriptions/{subscriptionId}/cancel` | Cancelar una suscripción |
+
+Las dos operaciones `/webhooks/subscriptions…` del tag las llama el servicio de cobro para avisar altas, renovaciones y bajas. Tu integración no las llama.
+
+Todas las operaciones: [Referencia de API → Subscriptions](/api-reference/1platform-api#tag/subscriptions).
+
+Lo cobrado con las invitaciones aparece en el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros) con el canal `subscription`.
+
+## Tu propio plan {#tu-propio-plan}
+
+Estas dos operaciones del mismo tag no tienen que ver con tus clientes. Describen la relación de **tu cuenta** con la plataforma:
+
+| Operación | Para qué |
+|---|---|
+| `GET /plans` | Listar los planes de la plataforma disponibles para tu cuenta |
+| `GET /users/subscriptions/{subscription_id}` | Consultar tu suscripción a la plataforma. Hoy devuelve una vista preliminar |
+
+El id de tu suscripción viene en `GET /users/billing`. Cómo se paga el uso de la plataforma está en [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).

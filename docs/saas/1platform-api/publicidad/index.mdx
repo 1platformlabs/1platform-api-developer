@@ -1,0 +1,49 @@
+---
+title: Publicidad
+description: Lanza campañas publicitarias pagadas con el saldo de la cuenta y recupera lo que no se gastó al cerrarlas.
+sidebar_position: 1
+---
+
+# Publicidad
+
+<p className="lead">Campañas de anuncios pagadas con el saldo: el comercio conecta la marca con la que publica, arma una campaña sencilla, le asigna presupuesto desde su saldo y, al cerrarla, recupera lo que no se gastó.</p>
+
+## Cómo funciona
+
+1. **Conectar la marca.** El usuario autoriza su cuenta de anuncios en una ventana de consentimiento (`GET /ads/connection/authorize`) y luego elige con qué página o perfil se publican las campañas (`PUT /ads/connection/brand`).
+2. **Crear el borrador.** `POST /ads/campaigns` crea la campaña en `draft` con su objetivo, audiencia, creatividad, URL de destino y fechas. Un borrador no toca la red de anuncios ni el saldo, y es lo único que se puede editar o borrar. Los objetivos disponibles salen de `GET /ads/objectives` y los límites de tu espacio de trabajo (rango de presupuesto, cupo de campañas) de `GET /ads/settings`.
+3. **Asignar presupuesto.** `POST /ads/campaigns/{campaign_id}/fund` descuenta el monto del saldo una sola vez. **Exige el header `Idempotency-Key`**, generado por tu cliente: si repites la clave, recibes el resultado de la primera llamada; si la repites mientras la primera sigue en curso, la respuesta es `409` `ads_funding_in_progress` y no hay un segundo cargo.
+4. **Publicar.** `POST /ads/campaigns/{campaign_id}/publish` crea la campaña en la red y la activa. Es idempotente: un reintento continúa desde el paso que faltaba y no crea una segunda campaña.
+5. **Pausar, reanudar y medir.** Los resultados (`GET /ads/campaigns/{campaign_id}/results`) se leen de lo ya conciliado, no de la red en vivo. `has_data: false` significa que la red todavía no reportó, que es distinto de una campaña con resultados en cero.
+6. **Cerrar.** `POST /ads/campaigns/{campaign_id}/close` detiene la campaña y abre la liquidación. Lo no gastado **no vuelve en el momento**: se devuelve al saldo cuando la cifra de gasto de la red se estabiliza, lo que puede tardar días.
+
+Pausar y cerrar funcionan aunque la publicidad se apague en tu espacio de trabajo, para que nadie quede con dinero atrapado en una campaña activa. Reanudar no, porque compromete dinero nuevo.
+
+## Qué necesitas
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- La publicidad **encendida para tu espacio de trabajo**. La enciende el equipo de la plataforma. Si el módulo no está habilitado, la respuesta es `403`; si la publicidad está apagada para tu espacio de trabajo, operaciones como conectar la marca, crear, asignar presupuesto, publicar y reanudar responden `503`.
+- **Saldo** suficiente para el presupuesto (`402` si no alcanza). Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
+- Una cuenta de anuncios del usuario, que autoriza él mismo en el navegador.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `GET /ads/connection/authorize` | URL de consentimiento para conectar la cuenta de anuncios |
+| `PUT /ads/connection/brand` | Elegir la marca con la que se publica |
+| `GET /ads/settings` | Límites que aplican a tu espacio de trabajo |
+| `GET /ads/objectives` | Catálogo de objetivos de campaña |
+| `POST /ads/campaigns` | Crear un borrador |
+| `PATCH /ads/campaigns/{campaign_id}` | Editar un borrador |
+| `POST /ads/campaigns/{campaign_id}/fund` | Asignar presupuesto desde el saldo (con `Idempotency-Key`) |
+| `POST /ads/campaigns/{campaign_id}/publish` | Publicar en la red |
+| `POST /ads/campaigns/{campaign_id}/pause` | Pausar |
+| `POST /ads/campaigns/{campaign_id}/resume` | Reanudar una campaña pausada |
+| `POST /ads/campaigns/{campaign_id}/close` | Cerrar y abrir la liquidación |
+| `GET /ads/campaigns/{campaign_id}/results` | Gasto y resultados, con la antigüedad del dato |
+| `GET /ads/campaigns` | Listar campañas; `status=live` muestra las que siguen activas o con dinero |
+
+Todas las operaciones: [Referencia de API → Ads](/api-reference/1platform-api#tag/ads).
+
+`GET /ads/oauth/callback` es la devolución de llamada de la autorización: la llama el proveedor de anuncios, no tu backend. `DELETE /ads/connection` desconecta la marca y pausa todas las campañas que estén publicándose.

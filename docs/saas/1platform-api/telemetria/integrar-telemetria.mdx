@@ -1,0 +1,109 @@
+---
+title: Integrar telemetría
+description: Crea un proyecto, instala la etiqueta, comprueba que reporta, lee los errores por la API y define cuándo te avisan.
+sidebar_position: 2
+---
+
+# Integrar telemetría
+
+Cada paso de esta guía responde una pregunta que el siguiente da por contestada: sin proyecto no hay credencial, sin credencial no hay etiqueta y sin etiqueta no llega nada. Hasta que llega algo, todas las lecturas vuelven vacías, y ese vacío se confunde con «mi sitio no falló». Por eso el paso 3 comprueba la instalación antes de leer nada. Los ejemplos usan las variables de [Convenciones](/docs/saas/1platform-api/reference/convenciones).
+
+## Paso 1 — Crear el proyecto
+
+Todo lo demás depende de su id, y las dos credenciales sólo aparecen en esta respuesta.
+
+```bash
+curl -X POST "$BASE_URL/users/telemetry/projects" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Tienda", "hosts": ["tienda.example"]}'
+```
+
+Guarda `data.id` como `$PROJECT_ID`. `data.public_credential` va en el navegador. `data.secret_credential` va en tus servidores, nunca en el navegador ni en un repositorio. La secreta **se muestra una sola vez**: ninguna lectura la vuelve a devolver y, si la pierdes, hay que rotarla.
+
+`hosts` es opcional y limita desde qué sitios se aceptan eventos del navegador, incluidos sus subdominios. Sin él se aceptan de cualquier origen: es cómodo el primer día, pero conviene declararlo antes de publicar el sitio. No es una protección contra abusos, porque fuera de un navegador el origen lo escribe quien llama.
+
+`403` significa que Telemetría está apagada para tu espacio de trabajo. `409` significa que llegaste al tope de proyectos de tu cuenta o que ya tienes un proyecto que mide esos hosts.
+
+Si el sitio es una tienda tuya, `POST /users/telemetry/projects/for-website/{website_id}` hace lo mismo partiendo del sitio y es idempotente: si ya existe un proyecto propio que lo mide, lo reutiliza.
+
+[Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
+
+## Paso 2 — Pegar la etiqueta
+
+```bash
+curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.tag_snippet` es la línea exacta que va en el `<head>`, armada por el servidor. No la compongas a mano: el origen de recepción cambia según el entorno. Conserva el atributo `crossorigin` que trae. Sin él, el navegador oculta el mensaje y la traza de los errores de scripts servidos desde otro dominio, que suele ser donde vive tu código.
+
+[Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
+
+## Paso 3 — Comprobar que reporta
+
+Es el único paso que distingue «mi sitio no falló» de «no está llegando nada».
+
+```bash
+curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/install-status" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.verdict` tiene siete valores posibles, y cada uno pide algo distinto:
+
+- `receiving`: están llegando eventos. No hace falta nada.
+- `waiting_first_event`: el sitio pidió la etiqueta y todavía no llegó ningún evento. Si tu sitio no tuvo errores, es lo esperable.
+- `never_requested`: nadie pidió la etiqueta. Puede no estar pegada, tener mal la dirección o estar bloqueada por la política de seguridad de contenido del sitio.
+- `rejecting`: la etiqueta corre, pero se rechaza todo lo que envía. Revisa que el dominio del sitio esté en `hosts`.
+- `throttled`: el proyecto está limitado. Estás perdiendo parte de los eventos y desde el sitio no se nota, porque un script limitado no llega a ejecutarse. Si envías eventos desde un servidor, el origen de recepción sí manda `Retry-After`: respétalo.
+- `blocked`: superaste la cuota o el tope de gasto. Sólo entra una muestra reservada hasta el mes siguiente, salvo que subas el tope.
+- `disabled`: apagaste el proyecto.
+
+[Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
+
+## Paso 4 — Leer los errores
+
+```bash
+curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/issues" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+El id de cada grupo de errores (*issue*) (`tlm_…`) lo genera la API y es estable, así que puedes guardar enlaces a él. La paginación usa un cursor opaco y firmado, atado al proyecto: devuelve `next_cursor` tal como llegó. Un cursor modificado, o de otro proyecto, responde `422`.
+
+El último evento de un grupo de errores sale de `GET /users/telemetry/projects/{project_id}/issues/{issue_id}/events/latest`. Si su campo `opaque` es `true`, el navegador no describió el error porque tus scripts se sirven desde otro origen sin `crossorigin`; se corrige en la etiqueta del paso 2. Rendimiento y registros se piden en días hacia atrás (`days`): hasta 30 en `GET /users/telemetry/projects/{project_id}/performance` y hasta 6 en `GET /users/telemetry/projects/{project_id}/logs`. Pedir más responde `422`.
+
+[Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
+
+## Paso 5 — Configurar los avisos
+
+Una regla separa tres cosas que se editan por separado: qué vigila, sobre qué proyecto y a quién avisa. Cambiar el destinatario no obliga a redefinir la condición.
+
+```bash
+curl -X POST "$BASE_URL/users/telemetry/projects/$PROJECT_ID/alert-rules" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Errores nuevos en la tienda", "condition": "new_issue", "cooldown_minutes": 60}'
+```
+
+Las condiciones son `new_issue` (un error nunca visto), `event_burst` (N eventos en M minutos) y `monitor_down` (un monitor de disponibilidad caído, que creas con `POST /users/telemetry/projects/{project_id}/monitors`). `cooldown_minutes` evita que una condición sostenida envíe un aviso en cada evaluación.
+
+Los avisos llegan al dueño y a las direcciones que **aceptaron**. Una dirección nueva se agrega con `POST /users/telemetry/recipients`, recibe un correo de confirmación y no recibe nada hasta confirmar. Un aviso nunca incluye el cuerpo del evento, su URL ni su traza: sólo conteos, etiquetas de la plataforma y el título recortado del grupo de errores. Si la recepción del proyecto está limitada o interrumpida, un incidente abierto no se declara recuperado hasta tener dos evaluaciones seguidas con recepción normal.
+
+[Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
+
+## Paso 6 — Vigilar el consumo
+
+```bash
+curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/usage" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Trae los eventos del mes, el porcentaje de la cuota, el gasto contra el tope y `gaps`: los tramos de los últimos 30 días en los que no se pudo contar la recepción. Es la única forma de distinguir un período sin errores de un período sin recepción. Los conteos se consolidan por minuto, así que pueden llevar unos minutos de atraso.
+
+[Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)

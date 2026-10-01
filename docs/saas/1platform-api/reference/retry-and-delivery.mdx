@@ -1,98 +1,62 @@
 ---
 title: Reintentos y entrega
-description: Semántica de entrega at-least-once, calendario de reintentos, comportamiento dead-letter y los códigos de respuesta que 1Platform espera de tu manejador.
+description: Cómo entrega 1Platform los webhooks — al menos una vez, 3 intentos en poco más de un minuto — y qué respuestas espera de tu receptor.
 sidebar_position: 5
 ---
 
 # Reintentos y entrega
 
-## Garantías de entrega
+## Garantía de entrega
 
-1Platform entrega los webhooks salientes con semántica **at-least-once**. Tu
-manejador **debe** ser idempotente — consulta
-[Recibir notificaciones → idempotencia](./webhooks-payload#idempotency-on-the-merchant-side).
+1Platform entrega los webhooks **al menos una vez**: el mismo evento puede llegarte más de una vez. Tu receptor
+tiene que deduplicar; ver
+[Webhooks — cuerpo saliente → Idempotencia de tu lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
 
 ## Calendario de reintentos
 
-Cuando 1Platform recibe cualquier respuesta no exitosa (o la solicitud falla por
-completo), reintenta con backoff exponencial:
+Si tu receptor no responde `2xx`, o la solicitud falla por completo, el evento se reintenta:
 
-| Intento | Espera antes del reintento | Tiempo acumulado |
+| Intento | Espera antes del intento | Tiempo acumulado (sin contar las respuestas) |
 |---|---|---|
-| 1 | — | 0 |
+| 1 | — | 0 s |
 | 2 | 5 s | 5 s |
 | 3 | 30 s | 35 s |
-| 4 | 120 s | 155 s |
 
-Cada respuesta que no es `2xx` se registra como `payment_webhook.rejected` con
-el status y un extracto del cuerpo que respondió tu manejador. Después de que el
-cuarto intento falla, el webhook se registra como
-`payment_webhook.exhausted_retries` y se descarta. Hoy no hay una cola
-dead-letter automática — los operadores deben reconciliar vía
-`GET /users/transactions` y un replay manual.
+Si el tercer intento falla, la entrega se da por agotada y no se vuelve a intentar. Cada intento espera tu
+respuesta hasta 10 segundos, así que el ciclo completo dura como máximo unos 65 segundos.
 
-:::info[Corregido el 2026-08-18]
-La tabla de abajo describe el contrato desde siempre, pero hasta esa fecha el
-dispatcher trataba como éxito **cualquier** respuesta por debajo de `500`. Un
-receptor detrás de una compuerta de acceso respondía `401`, nosotros lo
-anotábamos como entregado y el evento se descartaba en el primer intento: el
-comercio no veía llegar nada y del lado nuestro figuraba un éxito. Hoy un `3xx`
-o un `4xx` es una entrega fallida, se reintenta según el calendario de arriba y
-queda registrado.
+:::caution[Planifica para las caídas]
+Si tu receptor está caído más de un minuto, **pierdes ese evento**: no hay una cola de reenvío. Concilia
+periódicamente recorriendo `GET /users/transactions`; la forma de hacerlo está en
+[Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar).
 :::
 
-:::caution[Planifica para caídas]
-Si tu backend está caído por más de ~3 minutos, espera perder algunas entregas
-de webhooks. Reconcilia periódicamente con
-`GET /users/transactions?from=...&to=...` para reponer los eventos perdidos.
-:::
-
-## Códigos de respuesta que 1Platform espera
+## Respuestas que 1Platform espera
 
 | Status | Comportamiento |
 |---|---|
-| `2xx` | Éxito. Sin reintento. **Sólo esto cuenta como entrega.** |
-| `3xx` | **Se trata como falla** — tu manejador no debe redirigir, ni siquiera en duplicados. |
-| `4xx` | **Se trata como falla y se reintenta.** Aunque la solicitud sea "culpa tuya", 1Platform reintenta porque un encabezado `Authorization` mal configurado no debería descartar el evento silenciosamente. |
-| `5xx` | Se reintenta (esta es la ruta esperada para fallas transitorias). |
-| Conexión rechazada / falla de DNS / timeout | Se reintenta. |
+| `2xx` | Entregado. **Sólo esto cuenta como entrega** |
+| `3xx` | Falla. La redirección no se sigue: tu receptor no debe redirigir, ni siquiera en duplicados |
+| `4xx` | Falla, y se reintenta. Aunque el error sea de configuración (por ejemplo, un header de acceso equivocado), el evento no se descarta en el primer intento |
+| `5xx` | Falla, y se reintenta |
+| Conexión rechazada, error de DNS o tiempo agotado | Falla, y se reintenta |
 
-:::tip[Devuelve siempre 200 rápidamente]
-Acusa recibo con `200 OK` (o `202 Accepted`) y un cuerpo mínimo **antes** de
-ejecutar trabajo pesado. Difiere el cumplimiento a una cola en segundo plano para
-que un manejador lento no dispare reintentos espurios que amplifiquen la carga
-durante caídas.
+:::tip[Responde 200 cuanto antes]
+Responde `200` (o `202`) con un cuerpo mínimo **antes** de hacer el trabajo pesado y deja el procesamiento para
+una cola en segundo plano. Un receptor lento consume los intentos aunque al final termine bien.
 :::
 
-## Timeouts
+## Carga alta
 
-El dispatcher usa un timeout de solicitud de **10 segundos** por intento. Si tu
-manejador tarda más que eso, la solicitud fallará y 1Platform reintentará según
-el calendario anterior.
+Cuando hay muchas entregas en curso a la vez, un evento que no consigue turno de envío en 5 segundos se descarta
+sin reintentos. Es otra razón para conciliar periódicamente en lugar de confiar en que todo llegó.
 
-## Concurrencia
+## Headers de cada intento
 
-El dispatcher limita los webhooks salientes en vuelo a **20 envíos concurrentes
-por proceso**. Los webhooks que exceden este límite esperan hasta 5 s por un
-espacio antes de ser descartados — los eventos descartados aparecen como
-`payment_webhook.semaphore_timeout` en los logs y **no** se reintentan.
-
-Este límite protege a 1Platform del agotamiento de memoria cuando un comercio
-downstream responde con lentitud. Si necesitas mayor throughput, contacta a tu
-gerente de cuenta.
-
-## Encabezados en cada reintento
-
-| Encabezado | Notas |
+| Header | Notas |
 |---|---|
-| `X-Webhook-Signature` | Se recalcula en cada intento (el timestamp cambia entre reintentos) |
-| `X-Webhook-Timestamp` | También se recalcula — verifica la ventana de replay contra este valor |
+| `X-Webhook-Signature` | Se calcula **una vez por evento**: los tres intentos llevan el mismo valor |
+| `X-Webhook-Timestamp` | También es el mismo en los tres intentos. Como el ciclo dura alrededor de un minuto, la ventana de 5 minutos de tu verificador alcanza para todos |
 | `Content-Type: application/json` | Siempre |
-| Encabezados propios del campo `headers` del evento | Se reenvían **todos**, salvo los reservados que el dispatcher pone él mismo — ver [Configurar URLs → headers](../journeys/webhooks) |
-
-## URLs internas vs externas
-
-Si la URL configurada apunta a un dominio 1platform.pro (p. ej. el endpoint
-interno de crédito de billing), el dispatcher **no reintenta** y usa un token
-bearer de vida corta en lugar de HMAC. Las URLs externas siempre usan HMAC + el
-calendario de reintentos anterior.
+| `Authorization` | Sólo si se acordó con 1Platform un token para autenticarse ante tu receptor; viaja sólo a un dominio verificado |
+| Headers propios del evento | Los que configuraste en `headers`, en cada intento. Ver [Webhooks → Paso 2](/docs/saas/1platform-api/plataforma/webhooks#eventos) |

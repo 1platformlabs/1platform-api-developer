@@ -13,7 +13,7 @@ export default function ApiReferencePage({route}: Props): ReactNode {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
   const atlas = route.id === 'atlas-api';
-  const guide = atlas ? '/docs/saas/atlas-api/quickstart' : '/docs/saas/1platform-api/getting-started';
+  const guide = atlas ? '/docs/saas/atlas-api/quickstart' : '/docs/saas/1platform-api/inicio-rapido';
   useEffect(() => {
     const abort = new AbortController();
     let reference: ReferenceInstance | undefined;

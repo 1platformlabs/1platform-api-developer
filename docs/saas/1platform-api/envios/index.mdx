@@ -1,0 +1,49 @@
+---
+title: Envíos
+description: Registra los envíos de tu comercio, despáchalos con tu propia flota o con una mensajería y comparte un enlace de rastreo público.
+sidebar_position: 1
+---
+
+# Envíos
+
+<p className="lead">Lleva el ciclo de vida de los envíos de un comercio: los registras desde una sucursal, los despachas con tus propios repartidores o con la mensajería configurada y le das a quien espera el paquete un enlace de rastreo que no necesita credenciales.</p>
+
+## Cómo funciona
+
+1. Creas el envío en un comercio indicando la sucursal (`branch_id`), el punto de entrega (`dropoff`) y el paquete. Nace en `draft`. El punto de recogida se **copia** de la sucursal en ese momento: si mañana cambia su dirección, el envío conserva la de salida.
+2. Mientras está en `draft` puedes editarlo. Una vez despachado ya no se puede modificar.
+3. Lo despachas de una de dos formas (`mode`):
+   - `own_fleet`: asignas a uno de tus repartidores (`assignee`). Funciona de punta a punta sin terceros, y tú avanzas el estado a `picked_up`, `delivered` o `failed`.
+   - `courier`: primero pides una **cotización** a la mensajería configurada. La cotización queda guardada en el servidor y el despacho la confirma, así que nunca envías el precio. Si una dirección no se puede cotizar, devuelve el envío a `draft`, corrígela y vuelve a cotizar.
+4. Puedes cancelar cualquier envío que todavía no se entregó, incluso uno ya recogido. Si lo despachó una mensajería, la cancelación se pide primero a ella: si falla, el envío **no** se cancela y recibes el error.
+5. Para el destinatario existe un **rastreo público**: `GET /deliveries/tracking/{handle}` no lleva credenciales. El `handle` viene en el envío (`tracking_handle`) y es una derivación firmada, no el número de guía. La respuesta muestra sólo lo que el destinatario puede ver: estado y nombre de pila, sin dirección, teléfono ni precio. Cuando el envío termina, la respuesta trae `expires_at`; el enlace sigue funcionando hasta ese momento y después responde `410`.
+
+Estados: `draft`, `quoted`, `dispatched`, `picked_up`, `delivered`, `failed`, `cancelled`. El campo `fee` es una referencia informativa y no genera ningún cobro.
+
+## Qué necesitas
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Un **comercio** con al menos una **sucursal** que tenga punto de recogida configurado. Sin él, crear el envío responde `409`. Ver [Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches).
+- Rol de **administrador de la sucursal** para crear, editar, cotizar, despachar, avanzar o cancelar. Leer sólo requiere acceso al comercio.
+- El módulo de Envíos encendido en tu espacio de trabajo (si está apagado, la respuesta es `403` o `503`).
+- Para el modo `courier`, una mensajería configurada en tu espacio de trabajo. Sin ella, cotizar y despachar con `courier` responden `503`. Las ciudades que acepta salen de `GET /deliveries/geo/states`: envía el `code` de la ciudad como `city_code` del punto de entrega y el envío hereda sus coordenadas.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `POST /businesses/{businessId}/deliveries` | Registrar un envío en `draft` |
+| `GET /businesses/{businessId}/deliveries` | Listar envíos; `status=active` muestra todo lo que no terminó |
+| `GET /businesses/{businessId}/deliveries/{deliveryId}` | Un envío con su línea de tiempo |
+| `PATCH /businesses/{businessId}/deliveries/{deliveryId}` | Editar un envío en `draft` |
+| `POST /businesses/{businessId}/deliveries/{deliveryId}/quote` | Cotizar con la mensajería |
+| `POST /businesses/{businessId}/deliveries/{deliveryId}/return-to-draft` | Retirar la cotización y volver a `draft` |
+| `POST /businesses/{businessId}/deliveries/{deliveryId}/dispatch` | Despachar con flota propia o con la mensajería |
+| `POST /businesses/{businessId}/deliveries/{deliveryId}/status` | Avanzar el estado de un envío de flota propia |
+| `POST /businesses/{businessId}/deliveries/{deliveryId}/cancel` | Cancelar un envío no entregado |
+| `GET /deliveries/geo/states` | Departamentos y ciudades que acepta la mensajería |
+| `GET /deliveries/tracking/{handle}` | Rastreo público, sin credenciales |
+
+Todas las operaciones: [Referencia de API → Deliveries](/api-reference/1platform-api#tag/deliveries).
+
+`POST /webhooks/couriers/{token}` también está en el tag, pero no lo llamas tú: por ahí la mensajería avisa a la plataforma de los cambios de estado.

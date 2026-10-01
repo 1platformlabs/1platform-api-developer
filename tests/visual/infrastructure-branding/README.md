@@ -4,8 +4,8 @@ Estas capturas corresponden a la implementación Docusaurus/Scalar de la épica
 `1platform-infraestructura-branding`. No reutilizar las imágenes históricas de
 `../product-composition/` para aprobar este diseño.
 
-- `docs-desktop-1440.jpg`: Primeros pasos, 1440 × 1100
-- `docs-mobile-390.jpg`: Primeros pasos, 390 × 844
+- `docs-desktop-1440.jpg`: portada por productos (Inicio), 1440 × 1100 — recapturada 2026-10-01
+- `docs-mobile-390.jpg`: portada por productos (Inicio), 390 × 844 — recapturada 2026-10-01
 - `api-desktop-1440.jpg`: referencia Core, 1440 × 1100
 - `api-mobile-390.jpg`: referencia Core, 390 × 844
 

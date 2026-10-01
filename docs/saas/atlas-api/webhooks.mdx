@@ -1,127 +1,66 @@
 ---
 title: Webhooks
-description: Cómo la Atlas API recibe eventos de entitlement de un proveedor externo — firmados con HMAC, idempotentes por id de evento y traducidos a escrituras de grant/revoke.
+description: Cómo el proveedor de pagos de un tenant concede y revoca derechos de acceso en la Atlas API con un webhook firmado, y qué garantiza Atlas al recibirlo.
 sidebar_position: 11
 ---
 
 # Webhooks
 
-Atlas recibe eventos de entitlement **entrantes** de un proveedor de entitlements externo (tu lado de
-storefront / checkout / facturación). Un webhook le dice a Atlas que un miembro ganó o perdió acceso —
-Atlas verifica la firma, deduplica la entrega y escribe el registro correspondiente en su tabla
-local de [entitlements](/docs/saas/atlas-api/entitlements).
+Atlas **recibe** un webhook: `POST /webhooks/entitlement`. Lo llama el proveedor de pagos configurado para el tenant
+(hoy, Bowerbird, de 1Platform Labs) para avisar que un miembro ganó o perdió acceso. Atlas verifica la firma, descarta los
+reenvíos y escribe o borra el [derecho de acceso](/docs/saas/atlas-api/entitlements) correspondiente.
 
-> Esta página describe eventos que tu proveedor **envía a Atlas**. Atlas expone un endpoint entrante;
-> tu proveedor es responsable de firmar y reintentar las entregas.
+> No es un endpoint para integradores en general: sólo lo usa quien opera la integración de pagos de un tenant. El secreto
+> de firma lo entrega el equipo de 1Platform Labs ([Referencia de API → webhooks](/api-reference/atlas-api#tag/webhooks)).
 
-## Endpoint
+## Paso 1 — Firma con el secreto de tu tenant
 
+Cada tenant tiene **su propio secreto de webhook**. Incluye siempre `data.tenant_id`: Atlas lo usa para elegir el
+secreto de tu tenant, y un evento sin él o con el de otro tenant no verifica con ese secreto.
+
+La firma es un HMAC-SHA256 en hexadecimal sobre el timestamp, un punto y los **bytes exactos** del cuerpo. Fírmalo antes de
+enviarlo y no lo vuelvas a serializar: cualquier cambio de espacios u orden rompe la firma.
+
+```text
+firma = hex( HMAC_SHA256(secreto_del_tenant, "{timestamp}." + cuerpo_crudo) )
 ```
-POST /api/v1/webhooks/entitlement
-```
+
+## Paso 2 — Envía el evento
+
+La firma va en `x-bowerbird-signature` (con o sin el prefijo `sha256=`), el timestamp en `x-bowerbird-timestamp` y,
+opcionalmente, el identificador del evento en `x-bowerbird-event-id`. Son los nombres por defecto; un despliegue puede
+configurar otros, así que confírmalos con el equipo de 1Platform Labs.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/webhooks/entitlement" \
   -H "Content-Type: application/json" \
-  -H "X-Signature: sha256=<HMAC_HEX>" \
-  -H "X-Signature-Timestamp: 1718712000" \
-  -H "X-Event-Id: evt_01H…" \
-  -d '<RAW_JSON_BODY>'
+  -H "x-bowerbird-signature: sha256=<FIRMA_HEX>" \
+  -H "x-bowerbird-timestamp: 1782000000" \
+  -H "x-bowerbird-event-id: evt_01H…" \
+  -d '{"id":"evt_01H…","type":"access.granted","occurred_at":"2026-06-18T12:00:00Z","data":{"tenant_id":"<TENANT_ID>","member_id":"<MEMBER_ID>","scope":"plan","scope_ref":"anual","expires_at":null}}'
 ```
 
-Los nombres exactos de los headers para la firma, el timestamp y el id de evento se configuran por despliegue.
-Los valores por defecto se ilustran arriba; confirma los tuyos con el operador.
+Una firma o un timestamp ausente o incorrecto responde `401 WEBHOOK_SIGNATURE_INVALID`.
 
-## Payload del evento
-
-```json
-{
-  "id": "evt_01H…",
-  "type": "access.granted",
-  "occurred_at": "2026-06-18T12:00:00Z",
-  "data": {
-    "tenant_id": "9d1c…",
-    "member_id": "1f2e…",
-    "scope": "item",
-    "scope_ref": "a3b4…",
-    "expires_at": null
-  }
-}
-```
-
-| Campo | Descripción |
-|---|---|
-| `id` | Id de evento del lado del proveedor. Usado para idempotencia. |
-| `type` | Uno de los tipos de evento soportados a continuación. |
-| `occurred_at` | Cuándo ocurrió el evento (ISO 8601). |
-| `data.tenant_id` | El tenant de Atlas al que aplica el evento. **Requerido** para una escritura. |
-| `data.member_id` | El miembro de Atlas. **Requerido** para una escritura. |
-| `data.scope` / `data.scope_ref` | El scope del entitlement (consulta [Entitlements](/docs/saas/atlas-api/entitlements)). |
-| `data.expires_at` | Expiración opcional para acceso con tiempo limitado. |
-
-## Tipos de evento soportados
+## Qué tipos de evento acepta
 
 | `type` | Efecto en Atlas |
 |---|---|
-| `access.granted` | Concede un entitlement (`scope` + `scope_ref` requeridos). |
-| `access.revoked` | Revoca el entitlement coincidente. |
-| `subscription.cancelled` | Revoca el acceso. |
-| `rental.expired` | Revoca el acceso. |
-| `subscription.renewed` | Aceptado/reconocido (usado para email transaccional; sin escritura de entitlement por sí mismo). |
-| `subscription.payment_failed` | Aceptado/reconocido (impulsa un email de pago fallido). |
-| `rental.started` | Aceptado/reconocido. |
+| `access.granted` | Concede el derecho de acceso de `data.scope` y `data.scope_ref`. |
+| `access.revoked`, `subscription.cancelled`, `rental.expired` | Revocan el derecho de acceso de `data.scope_ref` (y de `data.scope`, si lo envías). |
+| `subscription.renewed`, `subscription.payment_failed`, `rental.started` | No cambian derechos de acceso; algunos disparan un correo al miembro. |
 
-Un tipo aceptado pero no manejado se registra y se reconoce como un no-op — nunca da error.
+Envía sólo estos siete tipos. Atlas no procesa otro valor de `type` ni un cuerpo que no sea JSON, y no lo registra: no lo
+reintentes, corrige el origen.
 
-## Verificación de firma (HMAC)
+## Qué garantiza Atlas
 
-Atlas calcula un HMAC-SHA256 sobre `"{timestamp}." + raw_body` usando el secreto de webhook compartido, y
-lo compara (en tiempo constante) contra el header de firma (el prefijo `sha256=` es opcional):
-
-```text
-signed   = f"{timestamp}." + raw_request_body          # bytes crudos
-expected = hex( HMAC_SHA256(secret, signed) )
-provided = header["X-Signature"].removeprefix("sha256=")
-valid    = constant_time_equals(expected, provided)
-```
-
-Firma los **bytes crudos exactos** del cuerpo — re-serializar el JSON cambiará los bytes y romperá la
-verificación. Una firma/timestamp faltante o incorrecta devuelve:
-
-```json
-{ "code": "WEBHOOK_SIGNATURE_INVALID" }
-```
-
-(HTTP `401`.)
-
-## Idempotencia
-
-Atlas deduplica por `(provider, event_id)`. El id de evento proviene del header `X-Event-Id` cuando está
-presente, de lo contrario del `id` del payload. La primera entrega se procesa y se reconoce:
-
-```json
-{ "received": true, "event_id": "evt_01H…", "deduplicated": false }
-```
-
-Un **replay** del mismo id de evento se reconoce sin volver a ejecutar el grant/revoke:
-
-```json
-{ "received": true, "event_id": "evt_01H…", "deduplicated": true }
-```
-
-Envía un id de evento **estable** por evento lógico para que los reintentos sean seguros de reproducir.
-
-## Semántica de entrega y reintento
-
-- Atlas procesa la escritura del entitlement dentro de una transacción, hace commit, y luego dispara cualquier email
-  transaccional **best-effort** después — un fallo de email nunca convierte un webhook procesado en un `5xx`.
-- Un procesamiento exitoso (o una deduplicación) devuelve `2xx`. Reintenta solo ante `5xx` o un fallo de red.
-- Los payloads parciales (sin `tenant_id`/`member_id`, o un grant sin `scope`/`scope_ref`) se
-  registran para deduplicación y se reconocen como no-op — **no** se volverán a procesar, así que corrige el
-  payload aguas arriba en lugar de apoyarte en los reintentos.
-
-## Consulta también
-
-- [Entitlements](/docs/saas/atlas-api/entitlements) — lo que escriben los eventos, y el flujo de checkout.
-- [Claves de integración](/docs/saas/atlas-api/integration-keys) — el lado saliente (aprovisionamiento de miembros).
-- [Errores](/docs/saas/atlas-api/errors) — `WEBHOOK_SIGNATURE_INVALID` y el contrato global.
+- **Deduplicación.** Atlas registra cada evento por su identificador: el header de id de evento si lo envías y, si no, el
+  `id` del cuerpo. Un reenvío del mismo identificador responde `2xx` con `deduplicated: true` sin volver a aplicar el
+  cambio. Usa un identificador estable por evento lógico para que tus reintentos sean seguros.
+- **Sin control de antigüedad.** Atlas no rechaza timestamps viejos; la protección contra reenvíos es la deduplicación.
+- **Un `2xx` significa que Atlas tiene el evento.** Reintenta sólo ante `5xx` o un fallo de red. Los correos al miembro se
+  envían después de guardar el cambio y su fallo nunca convierte el webhook en un error.
+- **Los datos incompletos no se reprocesan.** Un evento sin `tenant_id` o `member_id`, una concesión sin `scope` o
+  `scope_ref`, o una revocación sin `scope_ref` se registra y responde `2xx` sin efecto. Como ya quedó registrado, reenviarlo
+  con el mismo identificador tampoco tendrá efecto: corrige el origen y envía un evento nuevo.

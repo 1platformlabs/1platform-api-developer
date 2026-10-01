@@ -1,127 +1,90 @@
 /**
- * Card grid for the docs landing page (docs/intro.mdx).
- * Lives inside the docs content column, so grids fill the available width
- * (no own max-width / centering — the doc layout already constrains it).
+ * Home (Inicio) grids. Products: two columns of cards with an icon badge, the
+ * product name and one line. Shortcuts: a single stacked column beside them.
  *
- * Anatomy mirrors the marketing site's Card primitive: a plain surface with a
- * hairline that firms up on hover. Products used to be identified by pastel
- * tiles (blue = Dashboard, purple = Atlas Dashboard, ...), which encoded
- * information in colour alone — invisible to a colour-blind reader and to high
- * contrast mode. The icon now sits in ink and the hierarchy is carried by
- * weight and tracking.
+ * Every product badge is the same neutral wash with the accent icon. Products
+ * are identified by their NAME, never by a hue of their own (a pastel tile per
+ * product encodes identity in colour alone — see CLAUDE.md, "Never").
  */
 
-.grid3 {
+.products {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.1rem;
-  margin: 1.5rem 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
-.grid2 {
+.quickList {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.1rem;
-  margin: 1.5rem 0 0;
+  gap: 14px;
 }
 
-.card {
+.card,
+.quick {
   display: flex;
-  flex-direction: column;
-  min-height: 205px;
-  padding: 1.6rem;
+  align-items: flex-start;
+  gap: 18px;
+  min-height: 132px;
+  padding: 22px;
   background: var(--color-bg-alt);
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-xl);
-  text-decoration: none;
+  border-radius: var(--border-radius-lg);
   color: inherit;
-  position: relative;
+  text-decoration: none;
 }
 
-/* The hover signs the border and lifts the shadow — it does NOT move the card.
-   A card that jumps under the cursor is the template look the system dropped. */
-.card:hover {
+.quick {
+  min-height: 0;
+  align-items: center;
+}
+
+/* The hover signs the border and tints the surface; it does NOT move the card. */
+.card:hover,
+.quick:hover {
   border-color: var(--color-border-hover);
-  box-shadow: var(--shadow-card-hover);
-  text-decoration: none;
+  background: var(--color-bg-muted);
   color: inherit;
+  text-decoration: none;
 }
 
 .cardIcon {
   display: inline-flex;
-  width: 44px;
-  height: 44px;
+  flex: none;
+  width: 48px;
+  height: 48px;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1.35rem;
   border-radius: 50%;
-  color: var(--color-text);
-  background: var(--color-bg-muted);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
-.card:hover .cardIcon {
-  color: var(--color-accent);
+.cardText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .cardTitle {
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1.3;
   color: var(--color-text);
-  margin-bottom: 0.4rem;
-  letter-spacing: -0.014em;
 }
 
 .cardDesc {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
+  font-size: 15px;
   line-height: 1.55;
-  margin: 0;
-  flex: 1;
+  color: var(--color-text-secondary);
 }
 
-.cardCue {
-  display: inline-flex;
-  width: 34px;
-  height: 34px;
-  align-items: center;
-  justify-content: center;
-  align-self: flex-end;
-  color: var(--color-text-inverse);
-  background: var(--ink);
-  border-radius: 50%;
-  margin-top: 1rem;
-}
+@media (max-width: 1200px) {
+  .products {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
-@media (prefers-reduced-motion: no-preference) {
   .card {
-    transition: border-color var(--duration-normal) var(--ease-out-expo),
-      box-shadow var(--duration-normal) var(--ease-out-expo);
-  }
-
-  .cardIcon {
-    transition: color var(--duration-normal) var(--ease-out-expo);
-  }
-
-  .cardCue {
-    transition: transform var(--duration-normal) var(--ease-out-expo);
-  }
-
-  .card:hover .cardCue {
-    transform: translateX(3px);
-  }
-}
-
-@media (max-width: 996px) {
-  .grid3,
-  .grid2 {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 600px) {
-  .grid3,
-  .grid2 {
-    grid-template-columns: 1fr;
+    min-height: 0;
   }
 }

@@ -1,104 +1,70 @@
 ---
 title: Entrega de contenido
-description: Genera tickets de reproducción de corta duración y verificados por entitlement en la Atlas API — descargas con URL firmada y envoltorios de streaming HLS, resueltos por arquetipo de tenant.
+description: Cómo emitir tickets de reproducción o descarga de corta duración en la Atlas API, por qué hay que ramificar por delivery_kind y cómo reaccionar a cada rechazo.
 sidebar_position: 9
 ---
 
 # Entrega de contenido
 
-Atlas nunca entrega un enlace permanente al archivo subyacente. En su lugar, un miembro autenticado
-solicita un **ticket de reproducción** — una credencial de corta duración, verificada por entitlement, que apunta al
-asset. Dependiendo del [arquetipo](/docs/saas/atlas-api/tenant-resolution) del tenant, el ticket es
-una **URL firmada** (archivos descargables: ebooks, audio) o un **envoltorio de streaming HLS** (video,
-live, TV) que porta un token de DRM.
+Atlas nunca entrega un enlace permanente a un archivo. Un miembro con sesión pide un **ticket de reproducción**: una URL de
+corta duración que Atlas emite sólo después de comprobar su [derecho de acceso](/docs/saas/atlas-api/entitlements).
 
-## Generar un ticket de reproducción
+## Paso 1 — Pide el ticket justo antes de usarlo
+
+`GET /delivery/items/{content_id}/playback` recibe el `id` del ítem (no su slug) y, opcionalmente, el formato que quieres
+(`format`, por ejemplo `epub` o `mp3`) y el capítulo de un audiolibro (`chapter`). Sin `format`, Atlas elige el primer
+formato disponible del ítem ([Referencia de API → delivery](/api-reference/atlas-api#tag/delivery)).
 
 ```bash
 curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=epub" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
-  -H "Authorization: Bearer $ATLAS_JWT"
-```
-
-```json
-{
-  "content_id": "a3b4…",
-  "delivery_kind": "signed_url",
-  "url": "https://storage.example/…?signature=…&expires=…",
-  "expires_in_seconds": 600,
-  "drm_token": null,
-  "renderable": true,
-  "render_format": "epub"
-}
-```
-
-### Campos de la respuesta
-
-| Campo | Descripción |
-|---|---|
-| `content_id` | El ítem para el que es este ticket. |
-| `delivery_kind` | `signed_url` (descarga de archivo) o `hls` (streaming). |
-| `url` | La URL del asset — un enlace de descarga firmado, o una URL de manifiesto HLS. |
-| `expires_in_seconds` | Vida útil del ticket (actualmente ~600s / 10 minutos). Vuelve a solicitarlo tras la expiración. |
-| `drm_token` | Presente en envoltorios HLS; ligado a (content, member, expiry). `null` para descargas con URL firmada. |
-| `renderable` | `false` solo cuando un formato aún no tiene una representación renderizable — el cliente debe degradar a descargar/abrir externamente en lugar de abrir un lector in-app. |
-| `render_format` | El formato del motor con el que el cliente debe renderizar (p. ej., `epub`). |
-
-### La pista `format`
-
-La consulta opcional `?format=` selecciona qué asset subido entregar — `pdf`, `epub`, `mobi`,
-`mp3`, `m4a`, etc. Cuando se omite, la estrategia elige el primer formato subido de los
-metadatos del ítem, o el formato por defecto de su estrategia.
-
-```bash
-# Descarga de audio
-curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=mp3" \
   -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
 ```
 
-Un formato que no esté en la lista de permitidos del tenant devuelve `403 { "code": "ASSET_FORMAT_NOT_ALLOWED" }`.
+El ticket vence a los pocos minutos (`expires_in_seconds`). Pídelo justo antes de abrir el contenido, no lo guardes en caché
+ni lo compartas, y pide uno nuevo cuando venza.
 
-## Estrategia de entrega por arquetipo
+## Paso 2 — Ramifica por `delivery_kind`
 
-La estrategia de entrega se resuelve a partir del arquetipo del tenant — no la eliges por solicitud:
+La forma de entrega la decide el arquetipo del tenant, no tu solicitud, y un mismo producto puede tener tenants de distintos
+arquetipos. Por eso no la deduzcas: lee `delivery_kind` en cada respuesta.
 
-| Arquetipos | `delivery_kind` | Forma |
+- **`signed_url`**: una URL firmada al archivo; el cliente la descarga o la abre. Si `renderable` es `false`, el formato no
+  puede abrirse en un lector integrado: ofrece descargarlo o abrirlo fuera de tu app, y usa `render_format` para elegir el
+  motor de lectura cuando sí es renderizable.
+- **`hls`** (y, según el tenant, otros formatos de streaming): una URL de manifiesto más un `drm_token` ligado al miembro
+  y al vencimiento; tu reproductor lo usa para reproducir.
+
+Trata cualquier otro valor como no soportado por tu cliente en lugar de suponer una forma.
+
+## Paso 3 — Reacciona a cada rechazo
+
+Antes de emitir el ticket, Atlas comprueba el acceso. Los operadores y administradores del tenant no pasan por esa
+comprobación. Para un miembro, si el tenant tiene acceso gratuito y el miembro todavía no tiene derecho de acceso, Atlas
+intenta concederlo en ese momento antes de rechazar.
+
+| Respuesta | Qué significa | Qué hacer |
 |---|---|---|
-| `library`, `podcast`, `education` | `signed_url` | Una URL firmada y con expiración al archivo. El cliente lo descarga o lo abre. |
-| `streaming`, `live`, `tv`, `events` | `hls` | Una URL de manifiesto HLS más un `drm_token` ligado al miembro y a la expiración. |
+| `403 ENTITLEMENT_DENIED` | El miembro no tiene acceso a este ítem. | Muestra el muro de suscripción o compra. |
+| `402 FREEMIUM_GATE_BLOCKED` | Miembro gratuito: agotó su cuota diaria o el ítem exige un plan. | Muestra el muro de suscripción. |
+| `403 ASSET_FORMAT_NOT_ALLOWED` | El tenant no permite ese formato. | Pide otro formato. |
+| `404 ASSET_NOT_AVAILABLE` / `404 CHAPTER_NOT_FOUND` | El formato o el capítulo no existe para este ítem. | Pide otro formato o capítulo. |
+| `404 CONTENT_NOT_FOUND` | El ítem no existe en este tenant. | Revisa el `content_id` y el slug del tenant. |
+| `403 TENANT_MISMATCH` | Tu sesión es de otro tenant. | Inicia sesión en el tenant correcto. |
+| `429 DOWNLOAD_RATE_LIMITED` | Demasiadas descargas seguidas. | Espera lo que indique `Retry-After`. |
+| `403 ACCOUNT_TEMPORARILY_BLOCKED` | La cuenta está bloqueada temporalmente. | No reintentes; informa al miembro. |
+| `503 MEDIA_UNAVAILABLE` | El origen del archivo no responde. | Reintenta con espera creciente. |
+| `403 ASSET_KEY_FORBIDDEN` | El ítem está mal configurado y Atlas se niega a firmarlo. | No reintentes; avisa al operador. |
 
-## Control de acceso
+`ASSET_KEY_FORBIDDEN` y `MEDIA_UNAVAILABLE` llegan con el código en el primer nivel del cuerpo; los demás, anidados en
+`detail`. Lee el código como se explica en [Errores](/docs/saas/atlas-api/errors). La lista vigente de respuestas está en la
+[Referencia de API](/api-reference/atlas-api#tag/delivery).
 
-Antes de generar un ticket, Atlas hace cumplir el acceso:
-
-1. **Los operadores se saltan la verificación.** Un llamador con rol `admin` u `operator` se salta la verificación de entitlement
-   y las guardas de formato/cuota (son dueños del catálogo que subieron). Cada salto se escribe en el log de auditoría.
-2. **Entitlement activo.** Un miembro regular debe tener un entitlement activo que cubra el ítem.
-3. **Auto-grant perezoso.** En tenants de nivel gratuito, si el miembro aún no tiene entitlement, Atlas intenta un
-   grant en línea y vuelve a verificar — cubriendo el caso en que el grant al iniciar sesión no se concretó.
-4. **Denegado.** De lo contrario, la solicitud falla con el muro de suscripción:
-
-```json
-{ "code": "ENTITLEMENT_DENIED" }
-```
-
-(HTTP `403`.) Consulta [Entitlements](/docs/saas/atlas-api/entitlements) para saber cómo se concede el acceso.
-
-## Flujo del cliente
+## El recorrido completo
 
 ```text
-GET /public/items/{slug}                         → descubre el ítem (anónimo)
-GET /delivery/items/{content_id}/playback        → genera un ticket (JWT requerido)
-   ├─ delivery_kind = signed_url  → GET url       → descarga / abre el archivo
-   └─ delivery_kind = hls         → play url       → el reproductor HLS usa drm_token
-(el ticket expira)                                → vuelve a solicitar el ticket
+GET /public/items/{slug}                    → el ítem y su id (anónimo)
+GET /delivery/items/{content_id}/playback   → ticket (JWT del miembro)
+   ├─ signed_url → descarga o abre el archivo
+   └─ hls        → el reproductor usa la URL y el drm_token
+ticket vencido                              → vuelve a pedirlo
 ```
-
-Los tickets son intencionalmente de corta duración. Trata la `url` como efímera: obtenla justo antes de la reproducción,
-no la caches ni la compartas, y vuelve a generarla cuando transcurra `expires_in_seconds`.
-
-## Consulta también
-
-- [Entitlements](/docs/saas/atlas-api/entitlements) — conceder y verificar el acceso.
-- [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing) — encuentra el `content_id` / slug a entregar.
-- [Errores](/docs/saas/atlas-api/errors) — `ENTITLEMENT_DENIED`, `ASSET_FORMAT_NOT_ALLOWED`.

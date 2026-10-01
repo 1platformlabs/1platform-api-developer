@@ -1,51 +1,53 @@
 ---
 title: Primeros pasos
-description: Realiza tu primera llamada autenticada a la 1Platform API con el modelo de dos tokens.
-sidebar_position: 2
+description: Realice su primera llamada autenticada a la API de 1Platform con el modelo de dos tokens
+sidebar_position: 1
+hide_title: true
 ---
 
-# Primeros pasos
+<p className="lead">Esta guía le lleva desde cero hasta su primera respuesta autenticada contra la <strong>1Platform API</strong></p>
 
-Esta guía te lleva desde cero hasta tu primera respuesta autenticada contra la **1Platform API**.
-
-## 1. Obtén tus tokens
+<span id="1-obtén-tus-tokens" />
+## 1. Obtenga sus tokens {#tokens}
 
 La 1Platform API usa un modelo de **dos tokens**:
 
-- **Token de aplicación** (`ak-...`) — identifica tu aplicación. Se envía como `Authorization: Bearer ak-...`.
-- **Token de usuario** (`sk-...`) — identifica al usuario final que actúa. Se envía como `x-user-token: sk-...`.
+- **Token de aplicación** — canjee su clave de aplicación en `POST /api/v1/auth/token`. El JWT recibido se envía como `Authorization: Bearer $APP_TOKEN`
+- **Token de usuario** — canjee la clave del usuario en `POST /api/v1/users/token`, usando el token de aplicación. El JWT recibido se envía como `x-user-token: $USER_TOKEN`
 
-Las claves de aplicación se gestionan desde el panel de tu espacio de trabajo. Los tokens de usuario
-se generan a través del flujo de autenticación — el recorrido completo, con el orden que hay que
-respetar, está en [Autenticación](./journeys/autenticacion).
+Las claves de aplicación se gestionan desde el Panel de su espacio de trabajo. Las claves API y los JWT son credenciales distintas: envíe los JWT en los headers de las llamadas protegidas. El recorrido completo está en [Autenticación](./journeys/autenticacion).
 
-## 2. Elige un entorno
+<span id="2-elige-un-entorno" />
+## 2. Elija un entorno {#entornos}
+
+<div className="table-scroll" role="region" aria-label="Entornos de la API" tabIndex={0}>
 
 | Entorno | URL base |
 |---|---|
 | Producción | `https://api.1platform.pro/api/v1` |
 | QA / sandbox | `https://api-qa.1platform.pro/api/v1` |
 
-Detalles completos en [Entornos](./reference/environments).
+</div>
 
-## 3. Realiza tu primera llamada
+Consulte los detalles completos en [Entornos](./reference/environments).
+
+<span id="3-realiza-tu-primera-llamada" />
+## 3. Realice su primera llamada {#primera-llamada}
 
 ```bash
-curl https://api-qa.1platform.pro/api/v1/users/me \
-  -H "Authorization: Bearer ak-your-app-token" \
-  -H "x-user-token: sk-the-user-token"
+curl https://api-qa.1platform.pro/api/v1/users/profile \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
 ```
 
-Toda respuesta llega dentro del mismo sobre — lo que pediste viaja en `data`, y `success` te dice
-si mirarlo. La forma exacta, con sus variantes, está en
-[Formato de respuestas](./reference/response-format).
+Toda respuesta llega dentro del mismo sobre: lo que solicitó viaja en `data`, y `success` indica el resultado de la operación. La forma exacta está en [Formato de respuestas](./reference/response-format).
 
-Si una llamada requiere créditos que no tienes, recibirás `402 Payment Required`; si superas un
-límite de uso, `429 Too Many Requests`. Consulta [Códigos de error](./reference/error-codes)
-y [Límites de uso](./reference/rate-limits).
+Si una llamada requiere créditos que no tiene, recibirá `402 Payment Required`; si supera un límite de uso, `429 Too Many Requests`. Consulte los [Códigos de error](./reference/error-codes) y los [Límites de uso](./reference/rate-limits).
 
-## 4. Siguientes pasos
+<span id="4-siguientes-pasos" />
+## 4. Siguientes pasos {#siguientes-pasos}
 
-- **[Referencia interactiva de la API →](/api-reference/1platform-api)** — prueba cada endpoint en el navegador.
-- **[Recorridos](./journeys/autenticacion)** — las integraciones con orden obligatorio, de punta a punta.
-- **[Convenciones](./reference/convenciones)** — lo que vale para todas las llamadas, una sola vez.
+<div className="docs-actions">
+  <a href="/api-reference/1platform-api">Referencia interactiva de la API</a>
+  <a href="/docs/saas/1platform-api/journeys/autenticacion">Recorridos de integración</a>
+</div>

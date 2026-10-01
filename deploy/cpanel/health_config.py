@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Bounded QA migration: diagnose the root redirect before changing its health URL."""
+import pathlib
+import re
+import sys
+import hashlib
+import json
+
+QA_ORIGIN = "https://developer-qa.1platform.pro"
+GUIDE = "/docs/saas/1platform-api/getting-started"
+CANONICAL = 'href="https://developer.1platform.pro' + GUIDE + '"'
+ROOT_RULE = 'RewriteRule ^$ ' + GUIDE + ' [R=301,L]'
+
+
+def plan(health_url, marker, failed_version, log, index_html, server_rules):
+    if health_url == QA_ORIGIN + "/index.html":
+        if marker and marker in index_html:
+            return "already_migrated", None
+        if ROOT_RULE in server_rules and CANONICAL in index_html:
+            return "index_marker_refresh", (QA_ORIGIN + "/index.html", CANONICAL)
+        return "index_marker_not_confirmed", None
+    if health_url not in (QA_ORIGIN, QA_ORIGIN + "/"):
+        return "health_url_not_qa_root", None
+    if ROOT_RULE not in server_rules:
+        return "bundle_root_redirect_not_confirmed", None
+    if not re.fullmatch(r"qa-[0-9]+\.[0-9]+", failed_version):
+        return "quarantined_version_not_confirmed", None
+    start = log.rfind("activating version " + failed_version + " ")
+    if start < 0:
+        return "activation_not_found", None
+    # Include the selected activation's first line, then stop at any later one.
+    activation = log[start:]
+    next_start = activation.find("activating version ", len("activating version "))
+    if next_start >= 0:
+        activation = activation[:next_start]
+    if "health FAILED (final status 301, marker not matched)" not in activation:
+        return "rollback_cause_not_confirmed", None
+    if "version " + failed_version + " quarantined in .failed_version" not in activation:
+        return "quarantine_not_confirmed", None
+    if CANONICAL not in index_html:
+        return "build_canonical_not_confirmed", None
+    # Preserve a valid existing marker. An obsolete title must be replaced by
+    # the exact site's canonical, never a bare 200 or a generic HTML marker.
+    new_marker = marker if marker and marker in index_html else CANONICAL
+    return "root_301_rollback_confirmed", (QA_ORIGIN + "/index.html", new_marker)
+
+
+def self_test():
+    version = "qa-33.1"
+    log = ("activating version " + version + " → release\n"
+           "health FAILED (final status 301, marker not matched) — rolling back\n"
+           "version " + version + " quarantined in .failed_version\n")
+    args = [QA_ORIGIN + "/", "old title", version, log, CANONICAL, ROOT_RULE]
+    reason, update = plan(*args)
+    assert reason == "root_301_rollback_confirmed" and update == (QA_ORIGIN + "/index.html", CANONICAL)
+    preserved = args.copy()
+    preserved[1] = CANONICAL
+    assert plan(*preserved)[1][1] == CANONICAL
+    negatives = [(0, "https://developer.1platform.pro/"), (0, QA_ORIGIN + "/api"),
+                 (0, "https://user:password@developer-qa.1platform.pro/"), (0, ""),
+                 (2, "untrusted-version"), (3, log.replace("301", "500")),
+                 (3, log.replace("quarantined", "kept")), (3, ""),
+                 (4, "<html>other site</html>"), (5, "RewriteRule ^$ /other [R=301,L]")]
+    for index, value in negatives:
+        case = args.copy()
+        case[index] = value
+        assert plan(*case)[1] is None
+    later = args.copy()
+    later[3] = "activating version qa-33.1 → release\nactivating version qa-34.1 → release\n" + log.split("\n", 1)[1]
+    assert plan(*later)[1] is None
+    migrated = args.copy()
+    migrated[0] = QA_ORIGIN + "/index.html"
+    migrated[1] = CANONICAL
+    assert plan(*migrated) == ("already_migrated", None)
+    migrated[1] = "old title"
+    assert plan(*migrated)[1] == (QA_ORIGIN + "/index.html", CANONICAL)
+    migrated[4] = "other site"
+    assert plan(*migrated)[1] is None
+    print("health config: 16 positive/negative/idempotency cases passed; no network")
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--self-test"]:
+        self_test()
+    else:
+        folder, build_index = map(pathlib.Path, sys.argv[1:3])
+        def read(name):
+            path = folder / name
+            return path.read_text(errors="replace").strip() if path.is_file() else ""
+        index_html = build_index.read_text()
+        server_rules = (build_index.parent / ".htaccess").read_text()
+        remote_script = read("activate.sh")
+        failures = re.findall(r"health FAILED \(final status ([0-9]{3}), marker not matched\)", read("activate.log"))
+        diagnostic = {
+            "health_is_qa_root": read("health_url") in (QA_ORIGIN, QA_ORIGIN + "/"),
+            "health_is_qa_index": read("health_url") == QA_ORIGIN + "/index.html",
+            "marker_matches_build_index": bool(read("health_marker")) and read("health_marker") in index_html,
+            "last_health_failure_status": failures[-1] if failures else None,
+            "installed_script_available": bool(remote_script),
+            "installed_script_matches_repo": remote_script == pathlib.Path("deploy/cpanel/activate.sh").read_text().strip(),
+            "installed_script_reads_health_file": 'HEALTH_FILE="$ROOT/.health_url"' in remote_script,
+            "installed_script_accepts_health_env": "CPANEL_HEALTH_URL:-" in remote_script,
+            "installed_script_sha256": hashlib.sha256(remote_script.encode()).hexdigest() if remote_script else None,
+        }
+        print("::notice::QA health state: " + json.dumps(diagnostic))
+        reason, update = plan(read("health_url"), read("health_marker"), read("failed_version"),
+                              read("activate.log"), index_html, server_rules)
+        print("::notice::QA health diagnostic: " + reason)
+        if update:
+            (folder / "planned_url").write_text(update[0] + "\n")
+            (folder / "planned_marker").write_text(update[1] + "\n")

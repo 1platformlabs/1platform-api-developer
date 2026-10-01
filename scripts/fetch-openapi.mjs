@@ -18,6 +18,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { sanitizeOpenApiExamples } from './openapi-examples.mjs';
+import { correctAuthDescriptions } from './openapi-auth-descriptions.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,26 +52,33 @@ const SPECS = [
 
 async function fetchOne(spec) {
   const outPath = resolve(OUTPUT_DIR, `${spec.id}.json`);
-  console.log(`[${spec.id}] fetching ${spec.url}`);
+  // Configured URLs and parser errors can contain credentials or response data.
+  // Log the contract identity, never the URL or an untrusted error message.
+  console.log(`[${spec.id}] fetching configured public contract`);
   try {
-    const response = await fetch(spec.url);
+    const response = await fetch(spec.url, {signal: AbortSignal.timeout(30_000)});
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
     }
-    const json = JSON.parse(await response.text());
+    const source = JSON.parse(await response.text());
+    if (!source.openapi || !source.paths || !Object.keys(source.paths).length) throw new Error('Response is not a populated OpenAPI contract');
+    const {spec: safeExamples, changed} = sanitizeOpenApiExamples(source);
+    const {spec: json, changed: authDescriptions} = correctAuthDescriptions(safeExamples, spec.id);
+    console.log(`[${spec.id}] illustrative credential values replaced: ${changed}`);
+    console.log(`[${spec.id}] authentication descriptions corrected: ${authDescriptions}`);
     json.servers = spec.servers;
     mkdirSync(OUTPUT_DIR, { recursive: true });
     writeFileSync(outPath, JSON.stringify(json, null, 2), 'utf-8');
     console.log(`[${spec.id}] saved → ${outPath}`);
-  } catch (err) {
+  } catch {
     if (existsSync(outPath)) {
       console.warn(
-        `[${spec.id}] WARN: fetch failed (${err.message}); using cached ${outPath} (may be stale)`,
+        `[${spec.id}] WARN: fetch or contract validation failed; using cached ${outPath} (may be stale)`,
       );
       return;
     }
     throw new Error(
-      `[${spec.id}] fetch failed (${err.message}) and no cached spec at ${outPath}. ` +
+      `[${spec.id}] fetch or contract validation failed and no cached spec at ${outPath}. ` +
         `Set ${spec.id === 'atlas-api' ? 'ATLAS_API_OPENAPI_URL' : 'ONEP_API_OPENAPI_URL'} ` +
         `or commit a cached spec before building.`,
     );

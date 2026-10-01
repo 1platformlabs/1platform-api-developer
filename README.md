@@ -1,74 +1,61 @@
-<h1 align="center">1Platform — API Developer Documentation</h1>
+# Documentación de 1Platform
 
-<p align="center"><strong>One platform. Every solution.</strong></p>
-
-<p align="center">
-  Source code for <a href="https://developer.1platform.pro">developer.1platform.pro</a> — the interactive API reference, integration flows and code examples for the <a href="https://api.1platform.pro/api/v1/">1Platform REST API</a>.
-</p>
-
-<p align="center">
-  <a href="https://developer.1platform.pro"><img src="https://img.shields.io/badge/Docs-developer.1platform.pro-2563eb?style=flat-square" alt="Live docs" /></a>
-  <img src="https://img.shields.io/badge/Docusaurus-3.9-3ECC5F?logo=docusaurus&logoColor=white&style=flat-square" alt="Docusaurus 3.9" />
-  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white&style=flat-square" alt="React 19" />
-  <img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat-square" alt="MIT License" />
-</p>
-
----
-
-## What's in here
-
-Interactive documentation covering:
-
-- **OpenAPI reference** (powered by Scalar) auto-generated from the live spec
-- **9 integration flows** — invoicing, onboarding, AI agents, content generation, payments, websites, logs, link building, AI generations
-- **Full request/response examples** in every flow, using copy-ready `curl` snippets
-- **Auth model** — two-token system (app token + user token)
-
-## Stack
-
-- **[Docusaurus 3.9](https://docusaurus.io/)** — static documentation site generator
-- **React 19** · **TypeScript 5.6** · **MDX**
-- **[@scalar/docusaurus](https://github.com/scalar/scalar)** — interactive API reference
-- Package manager: **pnpm** · Node: **24** (see `.nvmrc`)
-- Output: `build/` with pure static HTML/CSS/JS
-
-## Development
+Portal Docusaurus para integrar las APIs de 1Platform y Atlas. La entrada pública
+abre **Primeros pasos** directamente; la referencia interactiva conserva Scalar.
 
 ```bash
-pnpm install
-pnpm start           # → http://localhost:3001 (hot reload)
-pnpm build           # → build/ (production, runs fetch-openapi first)
-pnpm fetch-openapi   # Manually refresh static/openapi.json
-pnpm typecheck       # TypeScript check
+pnpm install --frozen-lockfile
+pnpm start
+pnpm typecheck
+pnpm build
 ```
 
-The `build` script first runs `scripts/fetch-openapi.mjs` which downloads the latest spec from `https://api.1platform.pro/openapi.json` (override with `OPENAPI_URL` env var).
+Use Node 24 y la versión pnpm del manifiesto. Consulte [CLAUDE.md](CLAUDE.md) para
+arquitectura, diseño aprobado, fuentes visuales, autenticación, guards y entrega.
 
-## Structure
+- Guía: `/docs/saas/1platform-api/getting-started`
+- Referencia Core: `/api-reference/1platform-api`
+- Referencia Atlas: `/api-reference/atlas-api`
+- Producción: `https://developer.1platform.pro`
 
-```
-docs/flows/          9 integration flow MDX files (~5,800 lines)
-src/
-├── pages/           Homepage (React)
-├── theme/Logo/      Custom "1Platform" logo component
-└── css/custom.css   Light theme (matches dev docs convention), harmonized with 1platform.pro
-scripts/
-└── fetch-openapi.mjs   OpenAPI spec fetcher (runs on prebuild)
-static/              Public assets + generated openapi.json
-docusaurus.config.ts Site config
-sidebars.ts          Navigation
-```
+El portal tiene una única marca pública. `WEBSITE_URL` y `DEVELOPER_URL` configuran
+los orígenes del entorno, sin resolución de tenant. El contacto comercial es
+`https://wa.me/50253946564`.
 
-## Design
+`pnpm fetch-openapi` actualiza ambas copias públicas en `static/openapi/` y sustituye
+valores ilustrativos de credenciales. Build no hace descargas. El número de
+operaciones se deriva del contrato, nunca del snapshot visual del prototipo.
+Una adaptación de publicación corrige las dos descripciones de autenticación
+heredadas que llamaban `ak-...`/`sk-...` a los JWT. Conserva los esquemas, headers,
+requisitos y operaciones; su guard verifica esa preservación.
 
-Light mode by default — intentionally differentiates technical docs from the dark-themed [marketing site](https://1platform.pro). Shared accent (`#2563eb`) and typography (Inter + JetBrains Mono) keep the brand consistent. Dark mode toggle respects system preference.
+La identidad vigente usa Manrope, navy opaco y tokens compartidos con el website.
+No sustituya el renderer de Scalar ni retire su búsqueda, autenticación o esquemas
+para aproximar una captura. La revisión visual se hace por separado de los guards.
 
-## Related
+La capa de integración cambia únicamente el anfitrión de las rutas del plugin;
+no vuelve a implementar operaciones. El HTML inicial tiene el título de la página.
+Al cargar, Scalar agrega su título y el título Markdown del contrato: la referencia
+Core conserva esos tres `h1` visibles. No se altera el contrato ni su renderer para
+reducirlos, y el guard del HTML inicial no acredita la jerarquía completa del runtime.
 
-- **Marketing site:** [1platform.pro](https://1platform.pro) · [repo](https://github.com/1platformlabs/1platform-website)
-- **WordPress plugin:** [wordpress.org](https://wordpress.org/plugins/1platform-content-ai/) · [repo](https://github.com/1platformlabs/1platform-content-ai)
-- **Live API:** [api.1platform.pro/api/v1](https://api.1platform.pro/api/v1/) · [OpenAPI](https://api.1platform.pro/openapi.json)
+La revisión local de esta épica sirve `build-local/` en 4473, con enlaces al website
+en `http://1platform.localhost:4460`. Ese preview y las sondas públicas de contratos
+son independientes del banco de APIs, DB y autenticación de `/verify-epic-e2e`.
 
-## License
+Para ese banco, `SCALAR_PROXY_URL=''` desactiva el proxy externo y permite llamadas
+directas. `ONEP_API_SERVER_URL` y `ATLAS_API_SERVER_URL` reemplazan sólo los servidores
+del runtime de cada referencia; no reescriben OpenAPI. Configure los orígenes de las
+APIs del banco, sin `/api/v1` (las rutas del contrato ya lo incluyen), y habilite CORS
+para el origen del portal, previsto en `http://localhost:3301`. Las APIs, DB privada,
+seeds y claves de prueba pertenecen al banco autorizado; no a este preview visual.
+Las URL configuradas requieren HTTPS excepto loopback HTTP, y rechazan credenciales,
+query y fragmentos. Si las variables no existen, se conservan el proxy y servidores
+públicos actuales. `pnpm check:scalar-environment` verifica estas reglas sin red.
 
-[MIT](./LICENSE) © 1Platform Labs
+Los PRs ejecutan CI y el canal QA automáticamente. El merge despliega producción;
+la épica de branding entrega PR para revisión, sin merge ni despliegue productivo.
+QA usa cPanel y exige checksum + estado terminal del activador. Producción usa
+nginx; su canal cPanel permanece deshabilitado. `pnpm check:serving` requiere
+Docker y prueba la configuración real de nginx 1.27 con el build local, en un
+puerto loopback efímero. No es una ejecución del banco de APIs ni de producción.

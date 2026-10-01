@@ -1,409 +1,161 @@
-# CLAUDE.md — 1Platform API Developer Docs
-
-This file provides project-specific guidance for the **API developer documentation site** (`developer.1platform.pro`).
-See the root `../CLAUDE.md` for shared brand/API context.
-
-> Everything below is meant to be checkable. If a statement here disagrees with
-> the code, the code wins and this file is the bug — a memory that describes a
-> system that no longer exists is worse than no memory at all.
-
-## Project Overview
-
-Documentation portal for **1Platform**, written for one reader: the developer
-integrating from outside. Journeys that explain order and why, plus two
-interactive OpenAPI references (Scalar) that carry the contract itself. The
-per-tenant operator guides were withdrawn (epic `docs-developer-minimalista`,
-D-1) — they addressed a different audience and were 55% of the portal. The full
-specification is in `../DOCUMENTATION_PROMPT.md`.
-
-## Tech Stack
-
-- **[Docusaurus](https://docusaurus.io/) 3.9** — static documentation site generator
-- **React 19** — swizzled theme components
-- **TypeScript 5.6** — type-safe configuration and components
-- **[@scalar/docusaurus](https://github.com/scalar/scalar)** — interactive API reference, one instance per API
-- **MDX** — enhanced Markdown with React components
-- **Prism** — syntax highlighting (GitHub light)
-- **Package manager:** pnpm, pinned via `packageManager` in `package.json`
-- **Node version:** 24 (see `.nvmrc`)
-- **Output:** `build/` folder with pure static HTML/CSS/JS
-
-## Development
-
-```bash
-pnpm start            # Dev server → http://localhost:3001 (hot reload)
-pnpm build            # Production build → build/
-pnpm serve            # Serve the built output locally (port 3001)
-pnpm fetch-openapi    # Download the OpenAPI specs manually
-pnpm typecheck        # TypeScript type checking (tsc)
-pnpm check:tells      # Design-system guard (see "Gates")
-pnpm check:contract   # Contract-drift gate (see "Gates")
-pnpm clear            # Clear Docusaurus cache
-```
-
-`build` does NOT fetch the OpenAPI specs. The committed copies under
-`static/openapi/` are what gets built; refreshing them is a CI step (or a manual
-`pnpm fetch-openapi`).
-
-## Folder Structure
-
-```
-1platform-api-developer/
-├── docs/
-│   ├── intro.mdx                     # Landing page (renders the HomeCards grids)
-│   └── saas/                         # Developer docs — the portal's only audience
-│       ├── 1platform-api/
-│       │   ├── journeys/             #   8 journeys: order + why, <=7 steps each
-│       │   ├── capacidades.mdx       #   index of what lives only in the reference
-│       │   └── reference/            #   cross-cutting: conventions, webhooks, errors
-│       └── atlas-api/
-├── i18n/es/code.json                 # theme.* UI strings ONLY (see i18n below)
-├── scripts/
-│   ├── fetch-openapi.mjs             # Downloads both specs (multi-spec)
-│   ├── check-tells.sh                # Design-system guard
-│   └── check-contract-drift.sh       # Contract-drift gate (prose vs OpenAPI)
-├── src/
-│   ├── components/
-│   │   ├── Icon/{index.tsx,icons.ts} # The icon registry — single source
-│   │   └── HomeCards/                # Landing card grids
-│   ├── css/custom.css                # Token layer + all theming
-│   ├── pages/index.tsx               # Redirect: / → /docs/
-│   └── theme/                        # Exactly four swizzles
-│       ├── Logo/
-│       ├── Footer/
-│       ├── Navbar/MobileSidebar/     #   wrap: the panel renders at EVERY width
-│       └── DocSidebarItem/Category/
-├── static/
-│   ├── fonts/                        # 6 woff2 + 3 OFL licences (self-hosted)
-│   ├── img/
-│   └── openapi/<id>.json             # Committed spec cache, one per API
-├── docusaurus.config.ts
-├── sidebars.ts
-└── tsconfig.json
-```
-
-## Key Configuration
-
-### docusaurus.config.ts
-
-- **Site URL:** `https://developer.1platform.pro`
-- **Broken links:** `onBrokenLinks: 'throw'` — a bad internal link fails the build.
-- **API reference routes:** `/api-reference/1platform-api` and
-  `/api-reference/atlas-api`, one Scalar instance each (unique `id` required).
-  `/api-docs` redirects to the first for backward compatibility.
-- **OpenAPI specs:** served from `/openapi/<id>.json` (committed static copies,
-  avoiding CORS).
-- **Scalar proxy:** `https://proxy.scalar.com` (for in-browser API testing)
-- **Blog:** disabled
-- **Colour mode:** light only — `disableSwitch: true`,
-  `respectPrefersColorScheme: false`. There is no dark theme and the stylesheet
-  contains no dark CSS.
-- **i18n:** Spanish only (`defaultLocale: 'es'`, `locales: ['es']`). Spanish is
-  the **canonical source** of the docs. Single locale ⇒ no locale switcher.
-
-**The portal is in Spanish; `1platform.pro` is in English.** This is a known,
-deliberate discontinuity, not an oversight — unifying the language is a content
-decision over ~96 pages and is explicitly out of scope for the design work.
-Do not "fix" it by translating one side in passing.
-
-### OpenAPI spec pipeline
-
-1. `scripts/fetch-openapi.mjs` fetches BOTH specs. It is run by CI
-   (`update_spec`), never by `build`.
-2. Source URLs are overridable per API: `ONEP_API_OPENAPI_URL` and
-   `ATLAS_API_OPENAPI_URL`.
-3. Server info is injected (Production + QA URLs).
-4. Results are written to `static/openapi/<id>.json` and committed as cache.
-
-### Sidebar structure
-
-One audience, so no audience grouping: `sidebars.ts` lists the intro doc and
-then autogenerates `saas/`, whose two API products are the top-level categories.
-A product's label, icon and description live in its `_category_.json` under
-`customProps`; each section's `index.mdx` acts as the category index page. Do not
-hardcode the document list here.
-
-## Design System
-
-The portal shares **one** design system with `1platform.pro`. It is not a
-sibling palette or a "docs variant" — the same tokens, the same FOUR
-typefaces (Instrument Serif joined with the site's home redesign), the same
-logo. A visitor clicking "Docs" on the marketing site should not be able to
-tell they changed origin.
-
-### The shared editorial chrome
-
-The navbar and footer mirror the site's current public system. The navigation
-is a floating, white editorial rail: desktop keeps the public destinations
-visible, compact viewports use Docusaurus's native drawer, and the local search
-stays in the rail because it is a primary documentation task. The footer is a
-dark editorial band with the brand, a practical CTA, a `mailto:` sign-up, three
-link columns and the legal row. Every text/surface pair in this chrome is
-pinned to AA by `scripts/check-chrome-contrast.mjs`, which runs in CI next to
-the design guard.
-
-### Where a decision lives
-
-All of it in `src/css/custom.css`, in this order: primitives → semantic
-aliases → `--ifm-*` mapping → `--scalar-*` mapping. **Nothing else decides a
-colour.** `--ifm-*` variables are mapped onto tokens, never replaced, so a
-Docusaurus upgrade that adds a variable keeps working.
-
-### Tokens
-
-- **Primitives:** `--ink #13151A`, `--paper #FFFFFF`, `--surface #FFFFFF`,
-  `--recessed #F3F5F7`, `--cobalt #1748A7`, `--cobalt-deep #10377F`,
-  `--cobalt-bright #78A6FF`, `--cobalt-wash #E5EDFC`, `--signal #F5A524`,
-  `--muted #555A64`, `--subtle #626873`, `--hairline`, `--hairline-strong`.
-- **One accent** (cobalt). **One signal** (amber), reserved for graphics —
-  `--signal` measures 1.87:1 on paper and must NEVER carry text.
-- **Status colours are functional only** (success / danger / warning). There is
-  no decorative hue; the purple/cyan/green/orange ramp was removed.
-- **Contrast is verified on the WORST surface a token can land on**, not the one
-  it happens to sit on. The chrome pairs are pinned by
-  `scripts/check-chrome-contrast.mjs`; re-run it whenever a shared token moves.
-- **Radius:** 6px standard, 10px large, 14px xl. **Easing:** `ease-out-expo`.
-
-### Typography
-
-Four self-hosted families, latin subsets, in `static/fonts/` with their OFL
-licences: **Space Grotesk** (display/headings, 500/700), **Inter** (text,
-400/500/600), **JetBrains Mono** (code and the eyebrow label, 400) and
-**Instrument Serif** (footer editorial display, 400). Declared as seven
-`@font-face` rules; the three above-the-fold faces are preloaded via
-`headTags`. There is no CDN font request anywhere in the repo — verifying "the
-font loaded" means counting woff2 responses, not calling `document.fonts.check()`,
-which returns true against a fallback.
-
-### Icons
-
-`src/components/Icon/icons.ts` is the single registry: 24×24, 1.5 stroke,
-`currentColor`, `aria-hidden`. Paths are copied from
-`1platform-website/src/components/icons.ts` so a concept is the same drawing on
-both domains. Adding an icon means adding it there. An unknown name in a
-`_category_.json` degrades to no icon rather than breaking the build.
-
-### Never
-
-- Never write a hex outside the `:root` token layer — including inside `rgba()`,
-  which is how the retired blue survived several cleanups.
-- Never use `var(--token, #fallback)`: a fallback silently renders off-system.
-- Never use an emoji (or an HTML entity glyph) as an icon.
-- Never identify a product by colour alone — no pastel tiles.
-- Never use `transition: all`; list the properties.
-- Never add a decorative gradient, `backdrop-filter`, or a hover lift.
-- Never let a tap target fall below 44px.
-- Never swizzle `Navbar`, `Layout` or `Root`. The native chrome supplies the
-  keyboard, focus, landmark and mobile-drawer behaviour that a bespoke shell
-  would have to reimplement; only its skin is ours.
-
-## Content Guidelines
-
-### The prose does not copy the contract
-
-**This is the rule the whole `journeys/` section exists to enforce.** Request and
-response bodies, field tables, and error codes live in **exactly one place** —
-the OpenAPI reference, which the pipeline re-downloads from PROD on every deploy
-and therefore cannot go stale. Hand-written copies only ever go stale, and did:
-PRs #34, #35 and #36 in a single month were all "the docs said the opposite of
-what the API does".
-
-Prose explains **order and why**, and links. `pnpm check:contract` fails the
-build if a page pastes an endpoint response body or names an operation that is
-not in the spec.
-
-The narrow, deliberate exceptions — pages that teach the *shape* of the contract
-rather than one endpoint's answer — are `reference/response-format.mdx`,
-`reference/error-codes.mdx` and `reference/webhooks-payload.mdx`. The last one
-exists because an **outbound** webhook body has no operation in the spec at all:
-there is no OpenAPI entry for "we call you".
-
-### Journeys (`docs/saas/1platform-api/journeys/`)
-
-A journey earns its page only if it has an order the reference cannot express
-(chained credentials, async polling, a state machine, signature verification)
-**and** a real external integrator walks it. Everything else is self-contained
-CRUD and belongs to the reference, indexed from `capacidades.mdx`.
-
-1. **Title & description** in frontmatter
-2. **What you get and why the order matters** — one short opening, no "Overview"
-   boilerplate
-3. **`## Paso N — …`** — at most **7**, level-2 headings only. Each step says what
-   it achieves, why it sits there, and links to its operation in the reference
-4. At most one `curl` per step, resting on the variables defined once in
-   `reference/convenciones.mdx`
-
-Do **not** write a "Requisitos previos"/"Headers requeridos"/"Variables usadas en
-los ejemplos"/"Idempotencia y buenas prácticas" section: all four live once in
-`reference/convenciones.mdx`. Twenty-two of the twenty-three old flow pages
-repeated them.
-
-Do **not** write an "Ejemplo completo de extremo a extremo": twenty-one of them
-re-did the whole page they were on.
-
-### Code examples
-
-- Use `bash` for requests; name the field a later step needs instead of pasting
-  the response
-- Use variables (`$BASE_URL`, `$APP_TOKEN`) for reusable examples
-
-### Provider names
-
-This portal is 100% developer documentation, where the ecosystem rule permits
-naming an external provider **when it is technically necessary** (e.g. TribuTax
-in the invoicing flow, or the analytics/ad accounts the integrator owns and
-connects). Prefer generic capability wording where the name adds nothing.
-
-The `check-provider-leak.mjs` gate that guarded the client-facing per-tenant docs
-was retired with them (epic `docs-developer-minimalista`, D-6): once
-`docs/products/**` was withdrawn it scanned zero files and passed silently. **If
-per-tenant operator docs are ever re-hosted here, that gate must come back with
-them** — and must fail loudly when its scan surface is empty.
-
-## i18n — one source per string
-
-Spanish is the only locale, so `i18n/es/code.json` is what actually renders.
-That made it possible for a translation to silently override its own source, and
-it happened: the landing cards' strings existed in both `code.json` and
-`HomeCards/index.tsx`, and the two had drifted.
-
-The rule now: **`code.json` holds `theme.*` UI strings only.** Content strings
-live in the component that renders them. If a second locale is added, translate
-via that locale's `code.json` and leave the source alone.
-
-`navbar.json`, `current.json` and `footer.json` were removed: their keys were
-derived from English labels that no longer exist (or, for the footer, from a
-copyright the swizzle renders itself), so none of them could ever match.
-
-## Gates
-
-`.github/workflows/ci.yml` runs on every pull request and **blocks the merge**:
-`pnpm build` (which includes the provider-leak gate and `onBrokenLinks:'throw'`),
-`pnpm typecheck`, and `pnpm check:tells`.
-
-`typecheck` matters more than it looks: `docusaurus build` transpiles TSX with
-Babel and does **not** check types, so a type error in a swizzle would otherwise
-compile green and deploy.
-
-`scripts/check-tells.sh` guards the design system across 12 categories: emoji and
-entity glyphs as icons, palette hex outside the token layer, the retired palette
-as rgba triplets, `--ifm-*`/`--scalar-*` given literal values,
-`var(--token,#fallback)`, unreachable dark CSS, `transition:all` /
-backdrop-filter / hover lifts, decorative gradients, pastel tiles, fonts
-actually embedded and preloaded, third-party font requests, and provider names
-in the chrome.
-
-`scripts/check-tells-self-test.sh` (`pnpm check:tells:self-test`, and a required
-CI step) injects each tell into a throwaway copy of the tree and requires the
-guard to fail **on that specific category** — plus a control asserting that a
-comment merely naming a retired pattern is NOT a finding. A guard nobody has
-watched fail is not a guard: writing it this way immediately exposed that the
-emoji scan was blind to every real emoji (perl was reading UTF-8 as bytes) and
-that the entity pattern could not match the six-digit example in its own
-comment. Both were inherited from the website's version of this script.
-
-## CI/CD Pipeline (`.github/workflows/prod.yml`)
-
-Deployment only; it is not a PR gate. Six sequential jobs:
-
-1. **update_spec** — fetches latest OpenAPI specs from production, commits if changed
-2. **build** — Node 24, pnpm install, build, uploads artifact
-3. **version_bump** — AI-assisted semver determination, updates package.json, commits
-4. **release** — git tag + GitHub Release with the build artifact
-5. **deploy** — atomic rsync to Hetzner, health check (10 attempts)
-6. **notify** — Slack notifications
-
-**Triggers:** `workflow_dispatch`, `repository_dispatch` (from the API repo
-deploy), `push` to `main`.
-
-⚠️ There is **no `paths-ignore`**: any push to `main`, including a
-documentation-only or CI-only commit, runs the full pipeline through to
-`deploy`. Merging a PR here deploys to production.
-
-## Version
-
-Auto-bumped by the pipeline; read `package.json` rather than trusting a number
-written here.
-
-## Navbar & Footer Harmony Rule (MUST)
-
-The developer docs **navbar AND footer** **MUST mirror the marketing website** so
-users experience a seamless transition between subdomains. Both chromes must
-feel identical across domains — and since the design-system port, that now
-includes the tokens, the four typefaces and the logo, not just the link lists.
-
-**Source of truth on each side:**
-- Website — `1platform-website/src/components/Header.astro` (navbar),
-  `Footer.astro` (footer), `Logo.astro` (mark), `src/styles/global.css` (tokens)
-- Developer docs — `docusaurus.config.ts` (navbar),
-  `src/theme/Footer/` (footer), `src/theme/Logo/` (mark),
-  `src/css/custom.css` (tokens)
-
-**Labels differ by language and that is expected**: the website is English, this
-portal is Spanish. The contract is about **order, destinations and structure**,
-not about the literal strings.
-
-**Navbar contract:**
-- Item order: Solutions · Features · Pricing · Docs · Blog, then the CTA right-aligned.
-  Here: Soluciones · Funciones · Precios · Documentación · Blog · "Comenzar gratis".
-- **Composition:** a floating, white editorial rail on desktop; the native
-  compact drawer carries those same destinations below the desktop breakpoint.
-  Keep local search in the rail.
-- Cross-subdomain links point at `https://1platform.pro/<page>/` with
-  `target: '_self'`; the auto-appended external-link icon is hidden.
-- **Solutions dropdown** — seven items, a rule, then the catch-all, in this order.
-  The first five are merchant capabilities and the last two are platform ones,
-  which is why Deliveries and Advertising sit *before* Whitelabel rather than at
-  the end:
-  1. Online Store → `/solutions/online-store/`
-  2. Website Builder → `/solutions/website/`
-  3. AI Content → `/solutions/content/`
-  4. Deliveries → `/solutions/deliveries/`
-  5. Advertising → `/solutions/ads/`
-  6. Whitelabel Dashboard → `/solutions/whitelabel/`
-  7. Payments & Invoicing → `/payments-invoicing/`
-  8. *(divider)*
-  9. View all solutions → `/solutions/`
-- **Docs entry:** single link, no dropdown. Here it points to `/docs/`.
-- **CTA:** → `https://app.1platform.pro/app/`, ink button, 56 px on desktop
-  and 44 px on compact viewports.
-- **Logo:** the "1" is a cobalt rounded-square node (1.32em, 0.26em radius),
-  not blue text. Identical geometry on both sites.
-
-**Footer contract:**
-- **Opening:** logo, the "Una plataforma. Todas las soluciones." line and one
-  CTA, followed by a `mailto:` sign-up.
-- **Link grid:** three columns in order — **Producto** (8 items), **Empresa**
-  (5), **Recursos** (4) — plus the legal row.
-- **Column titles** use the eyebrow voice: mono, uppercase, `0.14em` tracking.
-- **Bottom row:** `© {year} 1Platform Labs. Todos los derechos reservados.`,
-  rendered by the swizzle from the current year.
-- **Grid:** intro then two content columns, collapsing to one column; the link
-  columns fold into native `details` controls on small screens.
-
-**If you add, remove, rename, or reorder a navbar item or footer column/link on
-either site, you MUST update the other in the same commit.**
-
-## Restrictions (NEVER)
-
-- Never hardcode API tokens or real credentials in examples — always use placeholders
-- Never skip heading levels (H1 → H3 without H2)
-- Never leave incomplete code examples — always show full request + response
-- Never reference internal implementation details that could change without notice
-- Never modify `prod.yml` to trigger on pull requests — validation and
-  deployment stay separate workflows
-
-## Verification (after implementation)
-
-```bash
-pnpm typecheck        # zero errors
-pnpm build            # zero errors; provider-leak gate and broken links pass
-pnpm check:tells      # every category ok
-pnpm serve            # then review in a browser:
-# - both Scalar routes render on the white canvas with the cobalt accent, no console errors
-# - the header matches 1platform.pro side by side (background, height, logo, family)
-# - seven /fonts/*.woff2 responses return 200, and an h1 measures DIFFERENTLY
-#   than the same h1 forced to system-ui (a font can be "declared" and absent)
-# - no horizontal overflow from 320px to 2560px
-# - with prefers-reduced-motion emulated, nothing animates and all content is visible
-```
+# 1Platform API Developer
+
+Portal técnico de una sola identidad pública: **1Platform**. No resuelve tenants
+ni permite elegir marca. La guía de entrada es
+`/docs/saas/1platform-api/getting-started`; las guías de Atlas describen un producto
+independiente de 1Platform Labs y conservan sus rutas técnicas.
+
+## Entorno y comandos
+
+Los manifiestos mandan: Docusaurus 3.9.2, React 19, TypeScript 5.6,
+`@scalar/docusaurus` 0.7.36, Node 24, pnpm 10.34.5. No actualizar dependencias
+como parte de un ajuste visual. Instalar con `pnpm install --frozen-lockfile`.
+
+- `pnpm start`: desarrollo en 3001
+- `pnpm typecheck`: TypeScript real; build sólo transpila
+- `pnpm build`: genera `build/`, sin descargar contratos
+- `pnpm serve`: sirve la build en 3001
+- `pnpm fetch-openapi`: refresca ambas referencias públicas y sanea ejemplos
+- `pnpm check:tells`, `pnpm check:chrome-contrast`, `pnpm check:contract`,
+  `pnpm check:anchors`, `pnpm check:openapi-examples`, `pnpm check:public-ui`
+- Cada guard tiene `:self-test`; ejecutar ambos antes de abrir PR
+- `pnpm check:reference`: valida aliases de operaciones contra ambos contratos;
+  incluye sus casos sintéticos en el mismo comando
+- `pnpm check:scalar-environment`: prueba configuración y aislamiento de servidores,
+  proxy directo, URLs rechazadas y defaults, sin llamadas de red
+
+`WEBSITE_URL` y `DEVELOPER_URL` configuran orígenes HTTP(S) sin credenciales,
+con defaults `https://1platform.pro` y `https://developer.1platform.pro`.
+Usar el origen del website real del banco local para probar enlaces cruzados;
+no guardar localhost en el código, los contratos ni los destinos públicos.
+
+## Diseño aprobado
+
+Fuente visual vigente: épica `1platform-infraestructura-branding`, prototipo
+`prototipo/documentacion/` DEL WORKSPACE RAÍZ. La copia antigua de
+`developer-docs-photographic-prototype` es histórica. No modificar el prototipo
+para acomodar diferencias de producto. Comparar capturas equivalentes en
+escritorio, 360/390/430 y horizontal; tolerancia geométrica de ±2 px en elementos
+comparables. Builds, guards y capturas con dimensiones correctas no prueban fidelidad.
+
+Los tokens canónicos son `src/styles/brand-tokens.json` del website; este repo
+mantiene su espejo exacto en `src/css/brand-tokens.json`. Docusaurus los inyecta
+como `--brand-*`; `src/css/custom.css` define roles y mapas Infima/Scalar. Los
+roles de marca no llevan hex repetidos en los componentes.
+
+- Navy `#0d1c3a`, navy profundo `#08152f`, azul `#2854a7`
+- Texto `#172640`, texto secundario `#5c697b`
+- Superficie secundaria `#f2f5f7`, selección `#edf2fa`
+- Manrope variable autoalojada para interfaz; JetBrains Mono para código
+- Navbar navy OPACO, lectura clara, código navy uniforme; colores HTTP funcionales
+- Navegación: Soluciones, Infraestructura, IA, Blog, Documentación, Contacto
+- CTA: Hablemos de su proyecto, `https://wa.me/50253946564`
+- Documentación abre Primeros pasos, sin portada intermedia
+- Copy comercial formal, sin punto final en títulos y subtítulos
+
+Mantener navbar y footer coordinados con el website. Conservar búsqueda local,
+skip link, foco visible, menús técnicos y drawer nativo; targets de al menos 44 px.
+No swizzlear Navbar, Layout ni Root. El masthead usa un wrapper de DocRoot/Layout.
+No controles de animación nuevos, proveedores internos ni claims sin evidencia.
+El gradiente del token `--masthead-shade` sólo asegura contraste sobre la foto
+aprobada; no habilita gradientes decorativos arbitrarios.
+
+## Referencia viva con Scalar
+
+`plugins/scalar-reference/index.cjs` delega assets/configuración al plugin oficial
+mediante sus hooks Docusaurus y cambia sólo el componente anfitrión de la ruta.
+`src/components/ApiReferencePage` coloca el título/tabs antes del contenedor y usa
+la API pública `window.Scalar.createApiReference`. El runtime está fijado en CDN a
+1.72.3; una actualización requiere repetir revisión funcional y visual.
+
+No sustituir Scalar por `reference.json`, el renderer ni las operaciones HTML del
+prototipo. Scalar conserva búsqueda, catálogo, autenticación, parámetros, esquemas,
+respuestas, ejemplos, selector de entorno, descargas y constructor de solicitudes.
+La envoltura destruye la instancia al salir y permite reintentar errores de carga.
+`agent.disabled` y `mcp.disabled` deshabilitan asistentes y conectores externos
+sin configurar, también en localhost. Se mantienen los clientes HTTP nativos.
+La localización oficial `locale: 'es'` traduce el chrome de Scalar; su entrada
+móvil nativa se rotula «Explorar endpoints». No traduce ni reescribe el contrato.
+Estas opciones están documentadas en la [configuración oficial de Scalar](https://scalar.com/products/api-references/configuration).
+Scalar 1.72.3 no ofrece una opción de nivel de heading para su introducción.
+Conservar su semántica nativa: Core agrega dos `h1` del contrato al `h1` del
+anfitrión. No parchear el DOM ni modificar u ocultar `info.title`/`info.description`
+para obtener un solo tag. El guard del build comprueba sólo el anfitrión SSR;
+no presentar su resultado como una afirmación de un único `h1` en runtime.
+Los hashes existentes por tag/método/ruta se mantienen; `#operation/<operationId>`
+se traduce al hash nativo a partir del contrato cargado, sin lista fija de endpoints.
+
+Referencias: `/api-reference/1platform-api` y `/api-reference/atlas-api`.
+Copias completas bajo `static/openapi/`, fuentes públicas sobrescribibles mediante
+`ONEP_API_OPENAPI_URL` y `ATLAS_API_OPENAPI_URL`. No hay fetch implícito durante build.
+El fetch usa un límite de 30 segundos y no imprime URLs configuradas ni errores
+que puedan contener credenciales. Mantiene el fallback histórico al cache con
+WARN explícito si falla la red.
+Revisar ese resultado: fallback no equivale a contrato fresco.
+
+`openapi-examples.mjs` sustituye únicamente valores ilustrativos de claves/JWT en
+`example`, `examples`, `default` y ejemplos de credenciales en `description`. No altera paths, métodos, required, schemas,
+security ni nombres de campos. El guard no imprime credenciales. No pegar ejemplos
+reales en documentación, logs ni PRs.
+
+La fuente Core todavía describía los JWT como `ak-...`/`sk-...` en sus dos
+`securitySchemes`, aunque `bearerFormat` ya era `JWT`. `openapi-auth-descriptions.mjs`
+corrige únicamente esas dos descripciones al publicar. Evidencia: el backend
+`app/dependencies/auth.py` decodifica JWT de ambos headers y
+`app/services/auth/{app_token_service,auth_service}.py` los genera. El guard prueba
+inmutabilidad y preservación de type/scheme/bearerFormat/in/name/security/operaciones;
+un cambio estructural aguas arriba exige revisar la adaptación, no reconstruir el
+esquema. No se modificó el backend.
+
+## Contenido, autenticación y compatibilidad
+
+El contrato OpenAPI es fuente de requests/responses/esquemas. La prosa explica
+orden y motivo, y enlaza las operaciones. Conservar el guard de drift y sus
+excepciones existentes para formatos comunes y webhooks salientes.
+
+Las claves API NO son los JWT de headers: canjear la clave de aplicación por JWT
+en `POST /api/v1/auth/token` y la del usuario en `POST /api/v1/users/token` con el
+JWT de aplicación. Llamadas protegidas usan `Authorization: Bearer $APP_TOKEN`
+y `x-user-token: $USER_TOKEN`. La primera consulta es `/api/v1/users/profile`;
+`/users/me` no existe en el contrato verificado.
+
+Raíz, `/docs`, `/docs/quick-start` y la antigua vista general Core redirigen a
+Primeros pasos. `/api-docs` redirige a la referencia Core. Mantener aliases de
+flows/webhooks/productos retirados y rutas técnicas de Atlas. Las entradas públicas
+tienen también 301 en el `.htaccess` empaquetado de cPanel. No copiar noindex del
+prototipo. Mantener canonical/hreflang/sitemap; fuente española única, sin selector
+de idioma porque no existe una segunda traducción.
+
+## CI y entrega
+
+PR: typecheck, build, guards+self-tests, CodeQL y SonarCloud informativo. El PR
+también dispara build/deploy de QA (`developer-qa.1platform.pro`) automáticamente.
+El merge a main dispara producción: no mergear como parte de implementación.
+La versión de publicación se calcula desde tags en el pipeline productivo, sin
+reescribir `package.json`; no adelantar ese bump en un PR de implementación.
+
+`check:public-ui` lee HTML real, metadatos, CTA, búsqueda, accesibilidad y budgets.
+Sus capturas son evidencia de revisión separada: comprobar dimensiones no acredita el
+contenido. Archivar diferencias y comparaciones actuales en la épica.
+
+Al cerrar implementación pedir `/verify-epic-e2e 1platform-infraestructura-branding`
+usando `.claude/commands/verify-epic-e2e.md` DEL MONOREPO. Necesita autorización
+humana, worktree/branch actuales, puertos separados, API/DB/seeds privados para
+operaciones autenticadas. No llamar una API productiva mutante para probar el UI.
+
+Banco local previsto: portal en `http://localhost:3301` y website en su origen
+local configurado. Antes de construirlo, declarar `SCALAR_PROXY_URL=''` para
+desactivar el proxy remoto, `ONEP_API_SERVER_URL` con el origen del Core local y
+`ATLAS_API_SERVER_URL` con el de Atlas local si se verifica esa referencia. La
+opción pública `servers` de Scalar afecta sólo la instancia correspondiente y no
+modifica los archivos del contrato. Usar orígenes sin `/api/v1`: las operaciones ya
+incluyen ese prefijo. Cada API debe permitir CORS desde el origen exacto del portal,
+incluidos los headers de autenticación del contrato. Son necesarios DB privada,
+seeds de aplicación/usuario y canje de claves por JWT válidos para el banco.
+
+Sin esas variables, se conservan los servidores publicados y el proxy predeterminado.
+Un proxy vacío significa solicitudes directas; un servidor vacío es un error.
+URLs de servidor: sólo origen HTTPS, o HTTP en localhost/`.localhost`/127.0.0.0/8/::1.
+URLs del proxy pueden incluir path con las mismas reglas de transporte. Ambos
+rechazan credenciales, query y fragmentos, y sus errores no imprimen valores.
+La validación usa casos positivos/negativos, no accede a APIs ni simula E2E.

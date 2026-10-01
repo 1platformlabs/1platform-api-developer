@@ -1,17 +1,19 @@
 import type {ReactNode} from 'react';
 import {Redirect} from '@docusaurus/router';
+import Head from '@docusaurus/Head';
 import useBaseUrl from '@docusaurus/useBaseUrl';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
-/**
- * This site is pure 1Platform documentation — the marketing home lives at
- * 1platform.pro. The root therefore has no standalone landing page; it simply
- * sends visitors straight into the docs entry. Keeping a real route at `/`
- * (instead of only a client-redirect) also keeps the brand logo's `to="/"`
- * link valid for the broken-link checker.
- *
- * `useBaseUrl` prepends the active locale's baseUrl, so Spanish visitors at
- * `/es/` land on `/es/docs/` rather than the English `/docs/`.
- */
+/** Static hosts also redirect without JavaScript; cPanel distributes an HTTP 301. */
 export default function Home(): ReactNode {
-  return <Redirect to={useBaseUrl('/docs/')} />;
+  const target = useBaseUrl('/docs/saas/1platform-api/getting-started');
+  const {siteConfig} = useDocusaurusContext();
+  const canonical = `${siteConfig.url}${target}`;
+  return <>
+    <Head>
+      <meta httpEquiv="refresh" content={`0;url=${target}`} />
+      <link rel="canonical" href={canonical} />
+    </Head>
+    <Redirect to={target} />
+  </>;
 }

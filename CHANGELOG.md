@@ -2,20 +2,28 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
-## [Unreleased] — Composición de producto compartida
+## [Unreleased] — Infraestructura de 1Platform
 
-- Chrome blanco con el mismo rail flotante de 78 px del sitio, a 32 px del
-  borde; CTA de tinta, destinos en la misma pestaña y buscador local intacto.
-- `/docs/` deja de abrir como un artículo: hero editorial centrado, dos CTAs
-  reales y tarjetas de entrada a 1Platform API, Atlas API, recorridos y webhooks.
-- Scalar conserva toda su navegación y cliente interactivo sobre las mismas
-  superficies, bordes, tipografías y offsets del portal.
-- Contrato de contraste actualizado para el CTA de tinta y el control de
-  búsqueda; ambos superan WCAG AA con margen.
-- Nuevo contrato sobre el build para canonical/hreflang, CTAs, buscador,
-  controles de teclado, foco, movimiento reducido y presupuestos de JS/CSS.
-- Snapshots revisables de Docs y API Reference a 1440 px y 390 px; el contrato
-  del build exige que los cuatro permanezcan presentes en su viewport declarado.
+- Guía de primeros pasos con la composición aprobada, Manrope autoalojada,
+  navbar navy opaco de 82 px y tokens compartidos con el website. Una identidad
+  pública, sin resolución de tenants ni selector de marca.
+- Navegación comercial y footer coordinados con el website, retorno en español,
+  contacto vigente y orígenes públicos configurables por entorno.
+- Raíz, `/docs`, quick-start y la vista general anterior abren Primeros pasos;
+  `/api-docs` conserva su enlace a la referencia. Redirects HTML y HTTP 301
+  empaquetados, con rutas técnicas y búsqueda local preservadas.
+- Referencia alojada mediante los hooks del plugin oficial y la API pública de
+  Scalar: catálogo, solicitudes, autenticación, esquemas, respuestas y búsqueda
+  nativos. Ejemplos navy legibles; asistentes externos sin configurar desactivados.
+- Accesos móviles al sidebar real de Docusaurus y al catálogo nativo de Scalar,
+  foco dentro del menú y devolución al control que lo abrió. Servidores del banco
+  por API y proxy directo configurables, con validación de URL y pruebas sin red.
+- Contratos OpenAPI completos actualizados, con aliases derivados de cada
+  operación y ejemplos de credenciales saneados. La guía distingue claves API
+  de JWT y utiliza la ruta existente `/api/v1/users/profile`.
+- Guards de anclas, credenciales ilustrativas y aliases, más contraste de sintaxis
+  de código y revisión del HTML construido. Las capturas, CI y el banco E2E real
+  se registran por separado; un guard verde no declara aprobación visual.
 
 ## [Unreleased]
 

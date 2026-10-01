@@ -1,1193 +1,385 @@
-/**
- * 1Platform Developer Docs — theme.
- *
- * The portal shares one design system with the marketing site
- * (1platform-website). Colour, type and spacing decisions are made ONCE, in the
- * token layer below, and everything else — Infima's chrome, Scalar's API
- * reference, the swizzled components — consumes those tokens. If you need a
- * colour, add or reference a token; never write a hex outside :root.
- *
- * Light-only. The colour-mode switch is disabled in docusaurus.config.ts
- * (`disableSwitch: true`, `respectPrefersColorScheme: false`), so there is no
- * dark theme and no unreachable dark CSS. Reintroducing dark mode means adding
- * a second token set here, not resurrecting the old palette.
- */
-
-/* ─── Typefaces ───────────────────────────────────────────────────────────────
-   The seven @font-face rules are NOT here. They live in `headTags` in
-   docusaurus.config.ts, next to the three `rel=preload` links, and this is a
-   deliberate trade rather than an oversight.
-
-   webpack's css-loader rewrites every `url()` it can resolve into a
-   content-hashed copy under /assets/fonts/. So a stylesheet saying
-   `url('/fonts/inter-latin-400-normal.woff2')` shipped TWO copies of every face
-   — the static passthrough and the hashed one — while the preload pointed at the
-   static path and the page actually fetched the hashed path. The preload was
-   downloading bytes that nothing on the page ever used, which is worse than
-   having no preload at all. The redundant request was measured in the browser,
-   not inferred from the build tree.
-
-   Declaring the faces in the head keeps the URL webpack never sees, so the
-   preload and the @font-face agree by construction, and there is exactly one
-   copy of each file. Everything else about typography — the families, the roles,
-   the scale — is still decided here in the token layer below. */
-
-/* ─── Design tokens — "ink & signal" ──────────────────────────────────────────
-   Ported verbatim from 1platform-website/src/styles/global.css. One accent
-   (cobalt). One signal (amber), reserved for graphics — never text. Everything
-   else is ink on paper. Text tokens are verified against WCAG AA on their WORST
-   surface (--paper / --surface / --recessed), not just the one they happen to
-   sit on today. */
+/** Approved 1Platform infrastructure identity. Brand primitives are injected
+ * from brand-tokens.json by the Docusaurus config, mirrored from the website.
+ * Functional roles live here; Infima and Scalar only consume aliases. */
 :root {
-  /* Primitives */
-  --ink:         #13151A;
-  --paper:       #FFFFFF;
-  --surface:     #FFFFFF;
-  --recessed:    #F3F5F7;
-  --cobalt:      #1748A7;
-  --cobalt-deep: #10377F;
-  --cobalt-bright: #78A6FF;
-  --cobalt-wash: #E5EDFC;
-  /* Reserved for graphics. Never text — 1.87:1 on paper. */
-  --signal:      #F5A524;
-  --muted:       #555A64;
-  /* Checked against every surface it can land on, not just --paper: the
-     earlier #696D79 cleared paper (4.74) and surface (5.17) but fell to 4.45
-     on --recessed, which is where code-block headers sit. */
-  --subtle:      #626873;
-  --hairline:        rgba(20, 22, 27, 0.10);
-  --hairline-strong: rgba(20, 22, 27, 0.16);
-
-  /* Shared editorial chrome. The public site is upstream for these values. */
-  --color-footer:       #111720;
-  --color-footer-text:  #F8F4EC;
-  --color-footer-muted: #B3B5BB;
-  --color-footer-line:  rgba(248, 244, 236, 0.17);
-  --font-serif:     'Instrument Serif', Georgia, 'Times New Roman', serif;
-
-  /* Semantic surfaces */
-  --color-bg:          var(--paper);
-  --color-bg-alt:      var(--surface);
+  --navy: var(--brand-navy);
+  --navy-deep: var(--brand-navyDeep);
+  --blue: var(--brand-blue);
+  --ink: var(--brand-text);
+  --muted: var(--brand-textSecondary);
+  --wash: var(--brand-surfaceSecondary);
+  --selected: var(--brand-selection);
+  --surface: #ffffff;
+  --line: #dbe2e9;
+  --control-border: #7b899b;
+  --on-dark: #ffffff;
+  --code-text: #e8edf4;
+  --code-muted: #c5d1e3;
+  --code-raised: #1a2e4e;
+  --code-line: #4c648a;
+  --code-accent: #aac5f5;
+  --code-green: #98dbc7;
+  --code-purple: #d3b6ff;
+  --code-orange: #f2cf9a;
+  --code-red: #ffb7c2;
+  --masthead-eyebrow: #b9d0fa;
+  --masthead-text: #dbe5f3;
+  --http-post: #176a50;
+  --http-post-bg: #dcece7;
+  --http-write: #84570c;
+  --http-write-bg: #f5ecd6;
+  --http-delete: #a2313c;
+  --http-delete-bg: #f9e4e4;
+  --footer-muted: #bdcade;
+  --footer-heading: #a8bddb;
+  --footer-link: #e1e8f2;
+  --footer-bottom: #acbcd4;
+  --footer-line: rgb(255 255 255 / 20%);
+  --header-line: rgb(255 255 255 / 25%);
+  --header-shadow: 0 14px 38px rgb(7 18 39 / 12%);
+  --masthead-shade: linear-gradient(180deg, rgb(8 21 47 / 75%), rgb(8 21 47 / 92%));
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+  --color-bg: var(--surface);
+  --color-bg-alt: var(--surface);
+  --color-bg-muted: var(--wash);
   --color-bg-elevated: var(--surface);
-  --color-surface:     var(--surface);
-  --color-bg-muted:    var(--recessed);
-
-  /* Semantic borders */
-  --color-border:        var(--hairline);
-  --color-border-hover:  var(--hairline-strong);
-  --color-border-strong: var(--hairline-strong);
-
-  /* Semantic foreground */
-  --color-text:           var(--ink);
+  --color-surface: var(--surface);
+  --color-text: var(--ink);
   --color-text-secondary: var(--muted);
-  --color-text-tertiary:  var(--subtle);
-  --color-text-inverse:   var(--surface);
-
-  /* Accent */
-  --color-accent:       var(--cobalt);
-  --color-accent-hover: var(--cobalt-deep);
-  --color-accent-soft:  var(--cobalt-wash);
-  --color-accent-glow:  rgba(31, 79, 224, 0.07);
-  --color-accent-ring:  rgba(31, 79, 224, 0.28);
-  /* Docs-only: the site has no accent-tinted border because it has no
-     admonitions or inline-code chips. Derived from cobalt, not a new hue. */
-  --color-accent-border: rgba(31, 79, 224, 0.22);
-
-  /* Syntax highlighting — functional differentiation, like status, not
-     decoration. The bundled github Prism theme colours two large token groups
-     with values that fail AA on every surface this portal has: teal #36acaa at
-     2.37:1 and pink #e3116c at 3.96:1 on --recessed, which is where code blocks
-     sit. On a documentation site that is mostly code examples, that was 419
-     failing nodes on a single flow page. These keep the hue and clear AA on
-     paper, surface AND recessed (worst case 5.22 and 6.42). */
-  --syntax-ink:  #2C2E28;
-  --syntax-teal: #0F6E6C;
-  --syntax-pink: #A3155C;
-
-  /* Functional status only — never decoration */
-  --color-success:    #0F7B4F;
-  --color-success-bg: #E9F6EF;
-  --color-danger:     #B4291F;
-  --color-danger-bg:  #FBEDEC;
-  --color-warning:    #8A5A08;
-  --color-warning-bg: #FBF3E4;
-
-  /* Shadows — restrained, neutral */
-  --shadow-sm:         0 1px 2px rgba(20, 22, 27, 0.04);
-  --shadow-md:         0 4px 12px rgba(20, 22, 27, 0.05), 0 1px 2px rgba(20, 22, 27, 0.04);
-  --shadow-lg:         0 12px 32px rgba(20, 22, 27, 0.07), 0 2px 6px rgba(20, 22, 27, 0.04);
-  --shadow-card-hover: 0 6px 20px rgba(20, 22, 27, 0.06);
-  --shadow-glow-ring:  0 0 0 3px var(--color-accent-ring);
-
-  /* Typography */
-  --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-sans:    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono:    'JetBrains Mono', 'SF Mono', Consolas, monospace;
-
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
+  --color-text-tertiary: var(--muted);
+  --color-text-inverse: var(--on-dark);
+  --color-accent: var(--blue);
+  --color-accent-hover: var(--navy);
+  --color-accent-soft: var(--selected);
+  --color-border: var(--line);
+  --color-border-hover: var(--control-border);
+  --color-success: var(--http-post);
+  --color-danger: var(--http-delete);
+  --color-warning: var(--http-write);
+  --border-radius: 10px;
+  --border-radius-lg: 14px;
+  --border-radius-xl: 16px;
+  --border-radius-pill: 999px;
+  --text-xs: .8125rem;
+  --text-sm: .875rem;
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
-
-  /* Layout */
-  /* 32px air + 78px rail + 32px air. Docusaurus and Scalar both consume
-     --ifm-navbar-height, so the visible chrome and their sticky offsets stay
-     one contract instead of drifting independently. */
-  --header-height: 142px;
-  --header-rail-height: 78px;
-  --border-radius:      6px;
-  --border-radius-lg:  10px;
-  --border-radius-xl:  14px;
-  --border-radius-pill: 9999px;
-
-  /* Animation */
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
-  --duration-normal: 250ms;
-
-  /* The one icon that cannot be a component: the sidebar's "Overview" entry is
-     a plain link, so its glyph is a CSS mask. Same path as `home` in
-     src/components/Icon/icons.ts. Stroked in black because a mask reads alpha,
-     not colour — the ink comes from `background-color: currentColor`. */
-  --icon-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3Cpolyline points='9 22 9 12 15 12 15 22'/%3E%3C/svg%3E");
-
+  --header-height: 126px;
+  --ifm-navbar-height: var(--header-height);
+  --ifm-navbar-sidebar-width: min(440px, 100vw);
+  --ifm-color-primary: var(--blue);
+  --ifm-color-primary-dark: var(--navy);
+  --ifm-color-primary-darker: var(--navy);
+  --ifm-color-primary-darkest: var(--navy-deep);
+  --ifm-color-primary-light: var(--blue);
+  --ifm-color-primary-lighter: var(--blue);
+  --ifm-color-primary-lightest: var(--blue);
+  --ifm-font-family-base: var(--font-sans);
+  --ifm-heading-font-family: var(--font-display);
+  --ifm-font-family-monospace: var(--font-mono);
+  --ifm-font-color-base: var(--ink);
+  --ifm-font-color-secondary: var(--muted);
+  --ifm-heading-color: var(--ink);
+  --ifm-link-color: var(--blue);
+  --ifm-link-hover-color: var(--navy);
+  --ifm-background-color: var(--surface);
+  --ifm-background-surface-color: var(--surface);
+  --ifm-navbar-background-color: var(--navy);
+  --ifm-navbar-link-color: var(--on-dark);
+  --ifm-navbar-link-hover-color: var(--on-dark);
+  --ifm-menu-color: var(--muted);
+  --ifm-menu-color-active: var(--blue);
+  --ifm-menu-color-background-active: var(--selected);
+  --ifm-color-emphasis-200: var(--line);
+  --ifm-color-emphasis-300: var(--control-border);
+  --ifm-color-emphasis-600: var(--muted);
+  --ifm-color-emphasis-700: var(--muted);
+  --ifm-table-border-color: var(--line);
+  --ifm-table-stripe-background: var(--surface);
+  --ifm-toc-border-color: var(--line);
+  --search-local-muted-color: var(--muted);
+  --search-local-hit-color: var(--ink);
+  --search-local-hit-active-color: var(--on-dark);
+  --ifm-code-background: var(--selected);
+  --ifm-global-radius: var(--border-radius);
+  --ifm-code-font-size: 87%;
+  --doc-sidebar-width: 245px;
+  --ifm-container-width-xl: 1380px;
+  --ifm-heading-font-weight: 800;
+  --ifm-heading-line-height: 1.19;
+  --docusaurus-highlighted-code-line-bg: var(--code-raised);
+  --arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7'%3E%3Cpath d='M6 18 18 6M6 6h12v12'/%3E%3C/svg%3E");
   color-scheme: light;
 }
-
-/* ─── Infima mapping ──────────────────────────────────────────────────────────
-   Docusaurus paints its chrome with --ifm-* variables. We MAP them onto the
-   tokens above rather than replacing them: an upgrade that introduces a new
-   --ifm-* keeps working, and there is still exactly one place where a colour is
-   decided. Never give an --ifm-* a hex literal — the tells guard rejects it. */
-:root {
-  /* Primary. The system has ONE accent, so the light/dark shade ramp collapses
-     onto cobalt and its single deeper step instead of inventing five blues. */
-  --ifm-color-primary:         var(--color-accent);
-  --ifm-color-primary-dark:    var(--color-accent-hover);
-  --ifm-color-primary-darker:  var(--color-accent-hover);
-  --ifm-color-primary-darkest: var(--color-accent-hover);
-  --ifm-color-primary-light:   var(--color-accent);
-  --ifm-color-primary-lighter: var(--color-accent);
-  --ifm-color-primary-lightest: var(--color-accent);
-
-  /* Typography */
-  --ifm-font-family-base: var(--font-sans);
-  --ifm-font-family-monospace: var(--font-mono);
-  --ifm-heading-font-family: var(--font-display);
-  --ifm-heading-font-weight: 700;
-  --ifm-code-font-size: 95%;
-
-  /* Surfaces */
-  --ifm-background-color: var(--color-bg);
-  --ifm-background-surface-color: var(--color-bg-alt);
-  --ifm-navbar-background-color: var(--color-bg);
-  --ifm-footer-background-color: var(--color-bg);
-  --ifm-card-background-color: var(--color-bg-alt);
-  --ifm-table-stripe-background: var(--color-bg-muted);
-
-  /* Text */
-  --ifm-font-color-base: var(--color-text);
-  --ifm-font-color-secondary: var(--color-text-secondary);
-  --ifm-heading-color: var(--color-text);
-  --ifm-link-color: var(--color-accent);
-  --ifm-link-hover-color: var(--color-accent-hover);
-
-  /* Emphasis ramp — consumed by swizzled components and Infima internals. */
-  --ifm-color-emphasis-200: var(--color-border);
-  --ifm-color-emphasis-300: var(--color-border-hover);
-  --ifm-color-emphasis-600: var(--color-text-tertiary);
-  --ifm-color-emphasis-700: var(--color-text-secondary);
-
-  /* Borders */
-  --ifm-toc-border-color: var(--color-border);
-  --ifm-table-border-color: var(--color-border);
-  --ifm-hr-border-color: var(--color-border);
-
-  /* Geometry */
-  --ifm-global-radius: var(--border-radius);
-  --ifm-navbar-height: var(--header-height);
-
-  /* Code */
-  --docusaurus-highlighted-code-line-bg: var(--color-accent-soft);
+* { box-sizing:border-box; }
+html { scroll-padding-top:128px; }
+html body { background:var(--surface); color:var(--ink); font-size:17px; line-height:1.7; font-synthesis:none; }
+input, select, textarea, button { font-family:inherit; }
+:where(a, button, input, summary):focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+.brand-wrap { width:min(calc(100% - 112px),1380px); margin-inline:auto; }
+.eyebrow { margin:0 0 17px; color:var(--blue); font-size:13px; font-weight:800; letter-spacing:.14em; line-height:1.5; text-transform:uppercase; }
+.navbar { position:fixed; z-index:30; top:24px; left:40px; right:40px; width:min(calc(100% - 80px),1880px); height:82px; min-height:82px; margin-inline:auto; padding:12px 16px 12px 24px; border:1px solid var(--header-line); border-radius:999px; background:var(--navy); box-shadow:var(--header-shadow); color:var(--on-dark); }
+.navbar[data-scrolled='true'] { background:var(--navy-deep); }
+.navbar__inner { flex-wrap:nowrap; gap:16px; }
+.navbar__items { gap:clamp(12px,1.8vw,28px); min-width:0; }
+.navbar__items:first-child { flex:1; }
+.navbar__brand { margin-right:auto; flex:none; }
+.navbar__item { padding:0; min-height:44px; display:inline-flex; align-items:center; white-space:nowrap; font-size:15px; font-weight:600; }
+.navbar__link { font-weight:600; }
+.navbar__link--active { text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:7px; }
+.navbar__link:hover { opacity:.8; }
+.navbar__link svg[class*='iconExternalLink'] { display:none; }
+.navbar__cta { min-height:56px; padding:14px 24px; gap:20px; border-radius:999px; background:var(--surface); color:var(--navy); font-size:16px; font-weight:700; }
+.navbar__cta:hover { color:var(--navy); background:var(--selected); opacity:1; }
+.navbar__cta::after { content:''; width:18px; height:18px; background:currentColor; mask:var(--arrow-up) center / contain no-repeat; }
+.navbar :focus-visible { outline-color:var(--code-accent); }
+.navbar__search { margin-left:0; }
+.navbar__search-input { width:44px; height:44px; padding:0 12px 0 32px; color:var(--ink); background-color:var(--surface); border:1px solid var(--line); border-radius:999px; }
+.navbar__search-input:focus { width:180px; }
+.navbar__search-input::placeholder { color:var(--muted); }
+.navbar [class*='searchHintContainer'] { display:none; }
+.navbar__toggle { order:3; width:48px; height:48px; padding:11px; color:var(--on-dark); margin:0; }
+.navbar-dialog { display:contents; }
+.navbar-sidebar { position:fixed; top:0; left:0; width:min(440px,100vw); height:100dvh; border-radius:0; background:var(--navy-deep); color:var(--on-dark); --ifm-menu-color:var(--on-dark); --ifm-menu-color-active:var(--on-dark); --ifm-menu-color-background-active:var(--code-raised); }
+.navbar-sidebar .navbar__brand { margin:0; }
+.navbar-sidebar__brand { padding:20px; box-shadow:none; }
+.navbar-sidebar__close { color:var(--on-dark); min-width:44px; min-height:44px; }
+.navbar-sidebar .menu__link { color:var(--on-dark); min-height:52px; font-size:16px; }
+.navbar-sidebar .theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link { color:var(--on-dark); }
+.navbar-sidebar .menu__link--sublist-caret::after, .navbar-sidebar .menu__caret::before { filter:brightness(0) invert(1); }
+.navbar-sidebar .navbar-sidebar__close svg { color:var(--on-dark); }
+.navbar-sidebar .navbar-sidebar__close svg g { stroke:var(--on-dark); }
+.navbar-sidebar__back { background:var(--code-raised); color:var(--on-dark); min-height:48px; }
+.navbar-sidebar__item { padding:18px; }
+.navbar-sidebar .navbar__cta { display:flex; justify-content:center; color:var(--navy); }
+.navbar-sidebar--show ~ .navbar-sidebar__backdrop { position:fixed; inset:0; }
+.docs-reading { padding-top:var(--header-height); }
+.docs-masthead { position:relative; isolation:isolate; min-height:355px; overflow:hidden; background:var(--navy); color:var(--on-dark); }
+.docs-masthead > img, .docs-masthead::after { position:absolute; z-index:-1; inset:0; width:100%; height:100%; }
+.docs-masthead > img { object-fit:cover; object-position:center 49%; }
+.docs-masthead::after { content:''; background:var(--masthead-shade); }
+.docs-masthead .brand-wrap { padding-top:152px; padding-bottom:54px; }
+.docs-masthead .eyebrow { color:var(--masthead-eyebrow); }
+.docs-masthead h1 { margin:0; color:inherit; font-size:clamp(50px,5.2vw,82px); font-weight:800; letter-spacing:-.06em; line-height:1.08; }
+.docs-masthead p:last-child { max-width:880px; margin:18px 0 0; color:var(--masthead-text); font-size:18px; line-height:1.6; }
+.docs-entry > div:last-child, .docs-reading > div:last-child { width:min(calc(100% - 112px),1380px); margin-inline:auto; padding-top:62px; padding-bottom:135px; }
+.docs-entry [class*='docRoot_'], .docs-reading [class*='docRoot_'] { gap:clamp(34px,3.4vw,62px); }
+.theme-doc-sidebar-container { border-right:1px solid var(--line); margin-top:0 !important; align-self:flex-start; position:sticky; top:130px; }
+.theme-doc-sidebar-container [class*='sidebarViewport_'] { position:static; max-height:calc(100dvh - 150px); }
+.theme-doc-sidebar-container [class*='sidebar_'] { padding-top:0; }
+.docs-menu-title { margin-bottom:11px; }
+.docs-sections-toggle { display:none; }
+.docs-toc { position:sticky; top:130px; padding-left:20px; border-left:1px solid var(--line); }
+.docs-toc > .eyebrow { margin-bottom:15px; }
+.docs-toc > div { position:static; }
+.docs-toc .table-of-contents { border:0; padding:0; }
+/* Infima spacing utilities are important declarations inside their cascade
+   layer. Override in that layer so the native article starts with its sidebar. */
+@layer docusaurus.infima {
+  .docs-entry main > .container.padding-top--md { padding-top:0 !important; }
 }
-
-/* ─── Scalar mapping (the API reference) ──────────────────────────────────────
-   The two Scalar instances are the most technical surface in the portal, and
-   they used to be the one that broke the brand: the palette was re-declared as
-   hex literals inside docusaurus.config.ts, a second place where colour was
-   decided. Those variables now map onto the same tokens as everything else.
-
-   The doubled class is deliberate. Scalar sets its own defaults ON `.light-mode`,
-   and a value set directly on an element beats one inherited from :root no
-   matter the source order. `.light-mode.light-mode` matches the same element
-   with higher specificity, so our mapping wins without !important and without
-   depending on which stylesheet loads first. */
-.light-mode.light-mode {
-  --scalar-color-accent: var(--color-accent);
-  --scalar-color-1: var(--color-text);
-  --scalar-color-2: var(--color-text-secondary);
-  --scalar-color-3: var(--color-text-tertiary);
-  --scalar-background-1: var(--color-bg-alt);
-  --scalar-background-2: var(--color-bg);
-  --scalar-background-3: var(--color-bg-muted);
-  --scalar-border-color: var(--color-border);
-  --scalar-font: var(--font-sans);
-  --scalar-font-code: var(--font-mono);
+.theme-doc-sidebar-container .menu__list .menu__list { padding-left:0; }
+.theme-doc-sidebar-menu > .theme-doc-sidebar-item-link-level-1 + .theme-doc-sidebar-item-category-level-1 { padding-top:11px; }
+.theme-doc-sidebar-container .guide-subsection .menu__link { padding-left:23px; font-weight:500; }
+.theme-doc-sidebar-container .menu__link--active:not(.menu__link--sublist) { background:var(--selected); color:var(--blue); }
+.theme-doc-sidebar-container .menu__link--sublist { font-weight:800; color:var(--ink); }
+.theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link { color:var(--ink); background:transparent; font-weight:700; }
+.theme-doc-sidebar-container > div { padding-top:0; }
+.theme-doc-sidebar-container nav { padding:0 21px 0 0; }
+.theme-doc-sidebar-container .menu__link { min-height:46px; padding:9px 12px; border-radius:10px; font-size:16px; line-height:1.4; }
+.theme-doc-sidebar-container [class*='richIcon_'] { display:none; }
+.theme-doc-sidebar-container [class*='richDesc_'] { display:none; }
+.theme-doc-sidebar-container [class*='richTitle_'] { font-size:16px; line-height:1.4; }
+.docs-entry main .container, .docs-reading main .container { padding:0; max-width:none; }
+.docs-entry main .row, .docs-reading main .row { margin:0; flex-wrap:nowrap; gap:clamp(34px,3.4vw,62px); }
+.docs-entry main .row > .col, .docs-reading main .row > .col { padding:0; min-width:0; }
+.docs-entry main .col--3, .docs-reading main .col--3 { flex:0 0 170px; }
+.docs-entry main .col--9, .docs-reading main .col--9 { flex:1; max-width:none; }
+.theme-doc-breadcrumbs { margin-bottom:34px; }
+.breadcrumbs__item, .breadcrumbs__link { font-size:15px; color:var(--muted); }
+.breadcrumbs__link { padding:0; background:transparent; }
+.table-of-contents { padding-left:20px; font-size:15px; }
+.table-of-contents li { margin:0; }
+.table-of-contents a { display:block; padding:8px 0; line-height:1.45; }
+.markdown { font-size:18px; line-height:1.83; }
+.markdown p { margin:0 0 23px; }
+.markdown .lead { margin:0 0 54px; font-size:21px; line-height:1.67; }
+.markdown h2 { margin:70px 0 22px; font-size:clamp(32px,3vw,43px); letter-spacing:-.045em; line-height:1.19; }
+.markdown h2:first-of-type { margin-top:0; }
+.markdown ul { margin:0 0 23px; padding-left:25px; }
+.markdown li { padding-left:5px; margin-bottom:13px; }
+.markdown a:not(.button) { text-underline-offset:3px; }
+.markdown code { padding:3px 7px; border-radius:5px; background:var(--selected); color:var(--blue); overflow-wrap:anywhere; }
+.markdown pre, .theme-code-block { background:var(--navy) !important; color:var(--code-text) !important; border-radius:16px; }
+.markdown pre { padding:28px; font-size:15px; line-height:1.72; }
+.markdown pre code { padding:0; background:transparent; color:inherit; overflow-wrap:normal; }
+.theme-code-block [class*='codeBlockTitle'] { background:var(--code-raised); border-color:var(--code-line); color:var(--code-text); }
+.theme-code-block button { color:var(--code-text); background:var(--code-raised); border-color:var(--code-line); min-width:44px; min-height:44px; }
+.theme-code-block .token { color:var(--code-text) !important; }
+.theme-code-block .token.string, .theme-code-block .token.function { color:var(--code-accent) !important; }
+.table-scroll { max-width:100%; overflow-x:auto; margin:23px 0 27px; }
+.markdown table { width:100%; font-size:16px; margin:0; display:table; }
+.markdown th { padding:14px 18px; background:var(--wash); color:var(--muted); text-align:left; font-size:13px; letter-spacing:.07em; text-transform:uppercase; border:0; }
+.markdown td { padding:17px 18px; border:0; border-bottom:1px solid var(--line); }
+.docs-actions { display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:30px; }
+.docs-actions a { display:flex; align-items:center; justify-content:space-between; gap:14px; min-height:95px; padding:20px; border:1px solid var(--line); border-radius:14px; color:var(--ink); font-weight:700; text-decoration:none; }
+.docs-actions a::after { content:''; width:22px; height:22px; flex:none; background:var(--blue); mask:var(--arrow-up) center / contain no-repeat; }
+.docs-actions a:hover { border-color:var(--control-border); background:var(--selected); }
+.api-reference-page { padding-top:126px; }
+.api-reference-page > .brand-wrap { width:min(calc(100% - 80px),1744px); }
+.reference-intro { display:flex; align-items:flex-end; justify-content:space-between; gap:40px; padding-top:27px; padding-bottom:39px; }
+.reference-intro .eyebrow { font-size:12px; margin-bottom:12px; }
+.reference-intro h1 { margin:0; font-size:clamp(38px,3.5vw,54px); font-weight:800; line-height:1.13; letter-spacing:-.055em; }
+.reference-intro > div > p:last-child { margin:15px 0 0; font-size:18px; color:var(--muted); }
+.reference-tabs { display:flex; gap:28px; flex:none; border-bottom:1px solid var(--line); }
+.reference-tabs a { display:flex; align-items:center; gap:15px; min-height:52px; font-size:15px; font-weight:700; color:var(--muted); }
+.reference-tabs a[aria-current] { border-bottom:2px solid var(--blue); color:var(--blue); }
+.scalar-reference { border-top:1px solid var(--line); padding-top:30px; padding-bottom:90px; }
+.reference-status { color:var(--muted); }
+.reference-error { padding-block:40px; }
+.reference-error button { min-height:44px; padding:10px 18px; background:var(--navy); color:var(--on-dark); border:0; border-radius:10px; }
+.light-mode.light-mode, .scalar-reference .light-mode.light-mode {
+  --scalar-font:var(--font-sans);
+  --scalar-font-code:var(--font-mono);
+  --scalar-color-1:var(--ink);
+  --scalar-color-2:var(--muted);
+  --scalar-color-3:var(--muted);
+  --scalar-color-accent:var(--blue);
+  --scalar-background-1:var(--surface);
+  --scalar-background-2:var(--wash);
+  --scalar-background-3:var(--selected);
+  --scalar-background-accent:var(--selected);
+  --scalar-border-color:var(--line);
+  --scalar-sidebar-color-1:var(--ink);
+  --scalar-sidebar-color-2:var(--muted);
+  --scalar-sidebar-background-1:var(--surface);
+  --scalar-sidebar-item-active-background:var(--selected);
+  --scalar-sidebar-item-active-color:var(--blue);
+  --scalar-color-blue:var(--blue);
+  --scalar-color-green:var(--http-post);
+  --scalar-color-red:var(--http-delete);
+  --scalar-color-orange:var(--http-write);
+  --scalar-color-yellow:var(--http-write);
+  --scalar-radius:var(--border-radius);
+  --scalar-sidebar-width:245px;
 }
-
-/* Scalar is client-rendered outside the ordinary docs column. These selectors
-   only align its surfaces and geometry; its navigation, request builder and
-   generated operation content remain owned by Scalar. */
-.scalar-app {
-  background: var(--color-bg);
-  color: var(--color-text);
+.scalar-reference { --scalar-header-height:0px; --scalar-custom-header-height:126px; --scalar-sidebar-padding:0px; }
+.scalar-reference .t-doc__sidebar { background:var(--surface); border:0; }
+.scalar-reference .t-doc__sidebar > .flex:first-child { padding:0 16px 0 0; }
+.scalar-reference .t-doc__sidebar button:has(.sidebar-search-placeholder) { height:48px; min-height:48px; }
+.scalar-reference .scalar-app .markdown th { word-break:normal; overflow-wrap:normal; }
+.scalar-reference .references-layout { background:var(--surface); }
+.scalar-reference .references-rendered .section-container { padding:0 0 0 38px; }
+.scalar-reference .section-container .section { padding:0 0 48px; }
+.scalar-reference .section-header { font-size:38px; letter-spacing:-.045em; }
+.scalar-reference .operation-title .section-header-label { font-size:clamp(27px,2.3vw,38px); line-height:1.17; font-weight:800; letter-spacing:-.045em; overflow-wrap:anywhere; }
+.scalar-reference .scalar-card { border-radius:13px; }
+.scalar-reference .dark-mode, .scalar-reference .scalar-code-block, .scalar-reference .code-snippet, .scalar-reference .request-card, .scalar-reference .response-card {
+  --scalar-color-1:var(--code-text);
+  --scalar-color-2:var(--code-muted);
+  --scalar-color-3:var(--code-muted);
+  --scalar-background-1:var(--navy);
+  --scalar-background-2:var(--code-raised);
+  --scalar-background-3:var(--code-raised);
+  --scalar-border-color:var(--code-line);
+  --scalar-color-accent:var(--code-accent);
 }
-
-.scalar-app .t-doc__sidebar,
-.scalar-app .references-header,
-.scalar-app .sidebar {
-  background: var(--color-surface);
-  border-color: var(--color-border);
+.scalar-reference .scalar-card.request-card, .scalar-reference .scalar-card.response-card { --scalar-background-2:var(--navy); background:var(--navy); color:var(--code-text); }
+.scalar-reference .request-card .scalar-card-header, .scalar-reference .response-card .scalar-card-header { background:var(--code-raised); color:var(--code-text); }
+.scalar-reference :is(.request-card, .response-card) .request-method {
+  --scalar-color-blue:var(--code-accent);
+  --scalar-color-green:var(--code-green);
+  --scalar-color-purple:var(--code-purple);
+  --scalar-color-orange:var(--code-orange);
+  --scalar-color-yellow:var(--code-orange);
+  --scalar-color-red:var(--code-red);
 }
-
-.scalar-app .scalar-card,
-.scalar-app .server-form,
-.scalar-app .authentication-form {
-  border-color: var(--color-border);
-  border-radius: var(--border-radius-xl);
-  box-shadow: none;
+.scalar-reference .scalar-code-block {
+  --scalar-color-blue:var(--code-accent);
+  --scalar-color-green:var(--code-green);
+  --scalar-color-purple:var(--code-purple);
+  --scalar-color-orange:var(--code-orange);
+  --scalar-color-yellow:var(--code-orange);
+  --scalar-color-red:var(--code-red);
+  --scalar-background-2:var(--navy);
 }
-
-.scalar-app .sidebar-search,
-.scalar-app .sidebar-search-input {
-  border-radius: var(--border-radius-pill);
+.scalar-reference .dark-mode :focus-visible { outline-color:var(--code-accent); }
+.scalar-reference a[href^='https://www.scalar.com'] { display:none; }
+@media (min-width:1201px) {
+  @container references-container (width > 900px) {
+    .scalar-reference .scalar-api-reference .operation-layout { grid-template-columns:minmax(0,1fr) minmax(280px,.84fr); column-gap:clamp(24px,2.8vw,50px); }
+  }
 }
-
-.scalar-app .references-layout,
-.scalar-app .section-container,
-.scalar-app .references-classic {
-  background: var(--color-bg);
+@media (min-width:997px) and (max-width:1290px) {
+  .navbar__link:not(.navbar__cta) { display:none; }
+  .navbar__toggle { display:block; }
+  .navbar__items:first-child { flex:1; }
 }
-
-.scalar-app .references-header {
-  border-bottom: 1px solid var(--color-border);
-  box-shadow: none;
+@media (max-width:1250px) {
+  .docs-entry main .col--3, .docs-reading main .col--3 { display:none; }
+  :root { --doc-sidebar-width:220px; }
 }
-
-/* The embedded reference is a 1Platform surface. Its implementation credit is
-   technical plumbing, not product navigation, and must not leak into public UI. */
-.scalar-app a[href^='https://www.scalar.com'] {
-  display: none;
+@media (max-width:1200px) {
+  .api-reference-page > .brand-wrap { width:calc(100% - 64px); }
+  .scalar-reference .references-rendered .section-container { padding-left:28px; }
 }
-
-/* ── The canvas belongs to the design system, not to Scalar ────────────────
-   Scalar ships `body { background-color: var(--scalar-background-1) }`, and that
-   rule applies on EVERY page of the portal, not only the API reference — the
-   stylesheet is global. The effect measured in the browser: `html` painted the
-   canvas while `body` painted its own default on top of it, so the only surface
-   still showing the design system was the navbar, which sets it explicitly. Two
-   different backgrounds on one page created a seam wherever the navbar ended.
-
-   `html body` (0,0,2) outranks Scalar's `body` (0,0,1), so this wins without
-   !important and without depending on which stylesheet loads first — the same
-   discipline as the .light-mode.light-mode mapping above. Scalar's own component
-   surfaces keep using --scalar-background-* and are untouched. */
-html body {
-  background-color: var(--color-bg);
+@media (max-width:996px) {
+  .navbar { height:78px; min-height:78px; }
+  .navbar [class*='navbarSearchContainer'] { position:static; padding:0; }
+  .navbar [class*='searchBarContainer'] { margin-left:0; }
+  .navbar__items .navbar__link { display:none; }
+  .navbar-sidebar .navbar__cta { display:flex; }
+  .docs-entry > div:last-child, .docs-reading > div:last-child { width:calc(100% - 40px); padding-top:35px; }
+  .docs-sections-toggle { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; height:50px; margin-bottom:34px; padding:12px 16px; border:1px solid var(--line); border-radius:9px; background:var(--wash); color:var(--ink); font-size:16px; font-weight:700; text-align:left; }
+  .theme-doc-toc-mobile { margin-bottom:34px; border:1px solid var(--line); border-radius:10px; background:var(--wash); }
+  .reference-intro { flex-direction:column; align-items:flex-start; gap:26px; }
+  .reference-tabs { margin-top:0; }
+  .scalar-reference .references-rendered .section-container { padding:0; }
+  .scalar-reference .scalar-api-reference.scalar-app.references-layout { --scalar-header-height:79px; }
+  .scalar-reference .scalar-api-reference .t-doc__header { height:55px; min-height:55px; margin-bottom:24px; align-self:start; }
+  .scalar-reference .t-doc__header > header { display:grid; height:auto; min-height:55px; padding:0; border:0; }
+  .scalar-reference .t-doc__header > header > :empty { display:none; }
+  .scalar-reference .t-doc__header > header > .scalar-icon-button { display:flex; flex-direction:row-reverse; align-items:center; justify-content:space-between; gap:12px; width:100%; height:55px; min-height:55px; margin:0; padding:12px 17px; border:1px solid var(--control-border); border-radius:9px; background:var(--surface); color:var(--ink); aspect-ratio:auto; }
+  .scalar-reference .t-doc__header > header > .scalar-icon-button > svg { width:18px; height:18px; flex:none; }
+  .scalar-reference .t-doc__header > header > .scalar-icon-button > .sr-only { position:static; width:auto; height:auto; margin:0; padding:0; overflow:visible; clip:auto; clip-path:none; white-space:normal; font-size:17px; font-weight:400; line-height:1.7; }
 }
-
-/* NOT mapped here, deliberately: --scalar-color-{blue,green,red,yellow,orange,
-   purple}, the HTTP method badge colours. Scalar re-declares them deeper in its
-   own component tree, so setting them at this level has no effect — measured,
-   the GET badge still computes to Scalar's #0082d0 (4.11:1, below AA at its
-   10px size) with the mapping in place. Reaching them means overriding inside
-   Scalar's markup, which is beyond re-theming and would need re-checking on
-   every Scalar upgrade. Left as a documented limitation of the vendored
-   reference rather than an unverified change that looks like a fix. */
-
-/* ─── Reduced motion ──────────────────────────────────────────────────────────
-   A blanket reset rather than eleven individually wrapped rules, because most of
-   the motion on this site is not ours: Infima and Scalar ship their own
-   transitions and we cannot wrap those at the source. Verified in a browser with
-   the media feature emulated — before this, every landing card still animated
-   under `prefers-reduced-motion: reduce`, since the card links inherit a colour
-   transition from `.markdown a`.
-
-   Durations collapse to 0.01ms rather than 0 so that `transitionend` listeners
-   still fire and nothing hangs waiting for an event that never arrives. */
+@media (max-width:880px) {
+  .brand-wrap { width:calc(100% - 40px); }
+  .docs-masthead { min-height:340px; }
+  .docs-masthead .brand-wrap { padding-top:130px; }
+}
+@media (max-width:680px) {
+  :root { --header-height:94px; }
+  .navbar { top:14px; left:15px; right:15px; width:calc(100% - 30px); min-height:64px; height:64px; padding:8px 9px 8px 15px; }
+  .navbar__inner { gap:8px; }
+  .navbar__items { gap:8px; }
+  .navbar .navbar__search-input:not(:focus) { width:44px; }
+  .navbar__search-input:focus { width:44px; }
+  .navbar:has(.navbar__search-input:focus) .navbar__brand { display:none; }
+  .navbar:has(.navbar__search-input:focus) .navbar__search-input { width:min(210px,calc(100vw - 128px)); }
+  .api-reference-page { padding-top:94px; }
+  .api-reference-page > .brand-wrap { width:calc(100% - 36px); }
+  .reference-intro { padding-top:23px; padding-bottom:23px; gap:23px; }
+  .reference-intro h1 { font-size:38px; }
+  .reference-intro .eyebrow { font-size:10px; }
+  .reference-intro > div > p:last-child { max-width:32ch; font-size:16px; line-height:1.7; }
+  .reference-tabs { gap:30px; width:100%; }
+  .reference-tabs a { font-size:13px; min-height:47px; }
+  .scalar-reference .operation-title .section-header-label { font-size:30px; }
+  .scalar-reference { --scalar-custom-header-height:94px; padding-top:24px; }
+}
+@media (max-width:520px) {
+  .docs-masthead h1 { font-size:47px; }
+  .docs-masthead p:last-child { font-size:16px; }
+  .markdown { font-size:17px; }
+  .markdown .lead { font-size:19px; }
+  .markdown h2 { font-size:31px; }
+  .table-scroll table { min-width:520px; }
+  .docs-actions { grid-template-columns:1fr; }
+}
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* ─── Form controls inherit the type system ──────────────────────────────────
-   `font-family` does not inherit into replaced elements: a bare `<input>` falls
-   back to the UA font regardless of what `body` is set to. That left the search
-   box — the one form control this portal actually ships, and a primary way in
-   (⌘K) — rendering in Arial next to a page of Inter. Only the family is
-   inherited; size and weight stay with whatever styles the control. */
-input,
-select,
-textarea {
-  font-family: inherit;
-}
-
-:where(a, button, input, summary):focus-visible {
-  outline: 3px solid var(--color-accent);
-  outline-offset: 3px;
-}
-
-/* ─── Eyebrow — the structural label device ───────────────────────────────────
-   Mono, tracked out, naming a section. Same voice as the marketing site. */
-.eyebrow {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 400;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-text-tertiary);
-}
-
-/* ─── Docs landing — product composition ─────────────────────────────────────
-   `/docs/` is the portal's public landing, so it uses the same generous,
-   centered editorial opening as the website instead of beginning as an article
-   inside a navigation column. Every page after this entry keeps the native docs
-   sidebar and reading layout. */
-.docs-doc-id-intro .theme-doc-sidebar-container {
-  display: none;
-}
-
-.docs-doc-id-intro .theme-doc-breadcrumbs {
-  display: none;
-}
-
-.docs-doc-id-intro main > .container {
-  max-width: none;
-  padding: 0 24px 96px;
-}
-
-.docs-doc-id-intro main .row {
-  margin: 0;
-}
-
-.docs-doc-id-intro main .col {
-  max-width: 100%;
-  padding: 0;
-  flex-basis: 100%;
-}
-
-.docs-home {
-  width: min(1160px, 100%);
-  margin: 0 auto;
-}
-
-.docs-home__hero {
-  display: flex;
-  min-height: 590px;
-  align-items: center;
-  flex-direction: column;
-  justify-content: center;
-  padding: 76px 24px 88px;
-  text-align: center;
-}
-
-.docs-home__badge {
-  display: inline-flex;
-  min-height: 38px;
-  align-items: center;
-  margin: 0 0 28px;
-  padding: 0 17px;
-  border-radius: var(--border-radius-pill);
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-.markdown .docs-home__hero h1 {
-  width: 100%;
-  max-width: 1050px;
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(3.15rem, 5vw, 4.6rem);
-  font-weight: 700;
-  line-height: 0.98;
-  letter-spacing: -0.058em;
-  text-wrap: balance;
-}
-
-.docs-home__lead {
-  width: 100%;
-  max-width: 790px;
-  margin: 28px auto 0;
-  color: var(--color-text-secondary);
-  font-size: clamp(1rem, 1.7vw, 1.2rem);
-  line-height: 1.6;
-  text-wrap: balance;
-}
-
-.docs-home__actions {
-  display: flex;
-  width: 100%;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 30px;
-}
-
-.markdown .docs-home__button,
-.markdown .docs-home__button:hover,
-.markdown .docs-home__button:focus {
-  display: inline-flex;
-  min-height: 56px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 24px;
-  border: 1px solid var(--ink);
-  border-radius: var(--border-radius-pill);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.markdown .docs-home__button--primary,
-.markdown .docs-home__button--primary:hover,
-.markdown .docs-home__button--primary:focus {
-  color: var(--color-text-inverse);
-  background: var(--ink);
-}
-
-.markdown .docs-home__button--secondary,
-.markdown .docs-home__button--secondary:hover,
-.markdown .docs-home__button--secondary:focus {
-  color: var(--color-text);
-  background: var(--color-surface);
-}
-
-.docs-home__signals {
-  display: flex;
-  width: 100%;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 16px 32px;
-  margin: 70px 0 0;
-  padding: 0;
-  color: var(--color-accent);
-  font-size: var(--text-sm);
-  list-style: none;
-}
-
-.docs-home__signals li {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.docs-home__signals span {
-  width: 10px;
-  height: 10px;
-  border: 3px solid var(--color-accent-soft);
-  border-radius: 50%;
-  background: var(--color-accent);
-  box-sizing: content-box;
-}
-
-.docs-home__section {
-  padding: 96px 0;
-  border-top: 1px solid var(--color-border);
-}
-
-.docs-home__section > h2 {
-  margin: 14px 0 0;
-  padding: 0;
-  border: 0;
-  font-size: clamp(2.4rem, 4vw, 4rem);
-  letter-spacing: -0.045em;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .docs-home__button {
-    transition: color var(--duration-fast) ease,
-      background-color var(--duration-fast) ease,
-      border-color var(--duration-fast) ease;
-  }
-
-  .docs-home__button--secondary:hover {
-    background: var(--color-bg-muted);
-  }
-}
-
-@media (max-width: 700px) {
-  .docs-doc-id-intro main > .container {
-    padding: 0 16px 72px;
-  }
-
-  .docs-home__hero {
-    min-height: 600px;
-    padding: 64px 0 76px;
-  }
-
-  .markdown .docs-home__hero h1 {
-    font-size: clamp(2.55rem, 10.5vw, 3.25rem);
-    letter-spacing: -0.048em;
-  }
-
-  .docs-home__lead {
-    margin-top: 22px;
-  }
-
-  .docs-home__actions {
-    display: grid;
-    width: 100%;
-  }
-
-  .docs-home__signals {
-    align-items: flex-start;
-    flex-direction: column;
-    margin-top: 48px;
-    padding-left: 8px;
-    text-align: left;
-  }
-
-  .docs-home__section {
-    padding: 72px 0;
-  }
-}
-
-/* ─── Navbar — floating editorial rail ───────────────────────────────────────
-   The docs use the same public destinations and visual rhythm as the website.
-   Search remains in this rail because it is a primary documentation task. */
-.navbar {
-  z-index: calc(var(--ifm-z-index-fixed) + 10);
-  height: var(--header-height);
-  padding: 32px 16px;
-  background: transparent;
-  border-bottom: 0;
-  box-shadow: none;
-}
-
-.navbar__inner {
-  width: min(1480px, 100%);
-  min-height: var(--header-rail-height);
-  margin: 0 auto;
-  padding: 8px 12px 8px 28px;
-  background: color-mix(in srgb, var(--color-surface) 97%, transparent);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-pill);
-  box-shadow: 0 1px 3px var(--hairline);
-}
-
-.navbar__items:not(.navbar__items--right) {
-  min-width: 0;
-  gap: 8px;
-}
-
-.navbar__brand {
-  height: 56px;
-  margin: 0 24px 0 0;
-  padding: 0;
-  font-size: var(--text-lg);
-}
-
-.navbar__item {
-  padding: 0;
-}
-
-.navbar__link {
-  display: inline-flex;
-  min-height: 40px;
-  align-items: center;
-  padding: 0 10px;
-  border-radius: var(--border-radius-pill);
-  color: var(--color-text);
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-.navbar__link:hover,
-.navbar__link--active,
-.dropdown__link:hover,
-.dropdown__link--active {
-  color: var(--color-accent);
-  background: var(--color-bg-muted);
-}
-
-.dropdown__menu {
-  min-width: 270px;
-  margin-top: 12px;
-  padding: 10px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--border-radius-xl);
-  box-shadow: var(--shadow-lg);
-}
-
-.dropdown__link {
-  min-height: 40px;
-  padding: 9px 10px;
-  border-radius: var(--border-radius);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
-.dropdown__divider {
-  margin: 8px 10px;
-  border-color: var(--color-border);
-}
-
-.navbar__items--right {
-  flex: 0 0 auto;
-  gap: 8px;
-}
-
-.navbar__items svg[class*='iconExternalLink'],
-.navbar__cta svg[class*='iconExternalLink'],
-.navbar__signin svg[class*='iconExternalLink'],
-.navbar-sidebar svg[class*='iconExternalLink'] {
-  display: none;
-}
-
-.navbar__signin,
-.navbar__cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 56px;
-  margin: 0;
-  padding: 0 25px;
-  border-radius: var(--border-radius-pill);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.navbar__signin { color: var(--color-text) !important; }
-.navbar__cta { color: var(--color-text-inverse) !important; background: var(--ink); }
-.navbar__cta:hover { background: var(--color-text-secondary); text-decoration: none; }
-.navbar__signin:hover { color: var(--color-accent) !important; text-decoration: none; }
-
-.navbar__search { margin-right: 2px; }
-
-.navbar__search-input {
-  width: 168px;
-  min-height: 44px;
-  border: 1px solid transparent;
-  border-radius: var(--border-radius-pill);
-  background-color: var(--color-bg-muted);
-  color: var(--color-text);
-}
-
-.navbar__search-input:focus {
-  border-color: var(--color-accent);
-  box-shadow: var(--shadow-glow-ring);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .navbar__link,
-  .navbar__signin,
-  .navbar__cta { transition: color var(--duration-fast) ease, background-color var(--duration-fast) ease; }
-}
-
-/* The native Docusaurus drawer owns focus and keyboard handling on compact
-   screens; this layer only gives it the shared paper-and-ink finish. */
-.navbar-sidebar { background: var(--color-surface); color: var(--color-text); border-right: 1px solid var(--color-border); }
-.navbar-sidebar__brand { height: var(--header-height); padding: 16px; box-shadow: none; border-bottom: 1px solid var(--color-border); }
-.navbar-sidebar__close { color: var(--color-text); }
-.navbar-sidebar .menu__link,
-.navbar-sidebar .menu__list-item-collapsible,
-.navbar-sidebar .navbar-sidebar__back { color: var(--color-text); }
-.navbar-sidebar .menu__link:hover,
-.navbar-sidebar .menu__link--active,
-.navbar-sidebar .menu__list-item-collapsible:hover,
-.navbar-sidebar .menu__list-item-collapsible--active { background: var(--color-accent-soft); color: var(--color-accent) !important; }
-.navbar-sidebar .menu__link { display: flex; align-items: center; min-height: 44px; }
-
-@media (max-width: 996px) {
-  :root {
-    --header-height: 102px;
-    --header-rail-height: 54px;
-  }
-
-  .navbar { padding: 32px 12px 16px; }
-  .navbar__inner { min-height: var(--header-rail-height); padding: 5px 5px 5px 14px; }
-  .navbar__brand { height: 44px; margin-right: 8px; }
-  .navbar__items--right > .navbar__cta { display: inline-flex; }
-  .navbar__cta { min-height: 44px; padding-inline: 14px; }
-  .navbar__signin, .navbar__search { display: none; }
-}
-
-@media (min-width: 997px) and (max-width: 1200px) {
-  .navbar__signin { display: none; }
-  .navbar__search-input { width: 140px; }
-}
-
-/* ─── Sidebar ──────────────────────────────────────────────────────────────── */
-.menu__link {
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: var(--border-radius);
-  color: var(--color-text-secondary);
-  transition: background-color var(--duration-normal) var(--ease-out-expo), color var(--duration-normal) var(--ease-out-expo);
-}
-
-.menu__link:hover:not(.menu__link--active) {
-  background-color: var(--color-accent-soft);
-  color: var(--color-accent-hover);
-}
-
-.menu__link--active {
-  background-color: var(--color-accent-soft);
-  color: var(--color-accent) !important;
-  font-weight: 600;
-}
-
-.menu__list-item-collapsible:hover {
-  background-color: var(--color-accent-soft);
-}
-
-/* ─── Migo-style sidebar IA ────────────────────────────────────────────────────
-   Top: a quiet "Overview" link. Then audience groups rendered as non-collapsible
-   uppercase section labels, each containing flush-left product/API sections with
-   an icon badge + title + one-line description (see the DocSidebarItem/Category
-   swizzle). */
-
-/* Overview entry — home icon badge, first item. */
-.sidebar-overview {
-  margin-bottom: 0.25rem;
-}
-.sidebar-overview > .menu__link {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-/* The "home" glyph from src/components/Icon/icons.ts, as a mask so it inherits
-   currentColor like every other icon. It is a CSS pseudo-element rather than a
-   component because this entry is a plain sidebar link (only categories go
-   through the DocSidebarItem swizzle). If the registry's `home` path changes,
-   change it here too. */
-.sidebar-overview > .menu__link::before {
-  content: '';
-  flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  background-color: currentColor;
-  -webkit-mask: var(--icon-home) center / 18px 18px no-repeat;
-  mask: var(--icon-home) center / 18px 18px no-repeat;
-}
-
-/* Audience section label (Products (per tenant) / SaaS & API). */
-.sidebar-section {
-  margin-top: 1.5rem;
-}
-.sidebar-section > .menu__list-item-collapsible {
-  cursor: default;
-}
-.sidebar-section > .menu__list-item-collapsible:hover {
-  background: transparent;
-}
-.sidebar-section > .menu__list-item-collapsible > .menu__link,
-.sidebar-section > .menu__list-item-collapsible > .menu__link.menu__link--active {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--color-text-tertiary) !important;
-  background: transparent !important;
-  padding: 0.25rem 0.5rem;
-  pointer-events: none;
-}
-/* Flush-left product sections within a group (no nested indentation). */
-.sidebar-section > .menu__list {
-  padding-left: 0;
-}
-
-/* Rich product/API category: icon badge + title + description. */
-.sidebar-product {
-  margin: 0.1rem 0;
-}
-.sidebar-product > .menu__list-item-collapsible > .menu__link {
-  align-items: flex-start;
-  height: auto;
-  padding: 0.5rem;
-}
-.sidebar-product > .menu__list-item-collapsible > .menu__link.menu__link--sublist-caret::after {
-  align-self: flex-start;
-  /* Nudge the caret down to sit on the title row (the link is top-aligned to
-     fit the 2-line title+description). Tracks .richTitle's first-line center:
-     link padding-top (0.5rem) + ~half the title cap height. */
-  margin-top: 0.55rem;
-  opacity: 0.6;
-}
-/* Doc pages within a product align under the title (past the 30px icon). */
-.sidebar-product > .menu__list {
-  padding-left: 2.5rem;
-}
-.sidebar-product > .menu__list .menu__link {
-  font-size: 0.825rem;
-}
-
-/* ─── Headings ─────────────────────────────────────────────────────────────────
-   The display face carries the headings; the text face carries the reading.
-   Metrics match 1platform-website so a heading is the same shape on both
-   domains. */
-.markdown h1,
-.markdown h2,
-.markdown h3,
-.markdown h4,
-.markdown h5,
-.markdown h6 {
-  font-family: var(--font-display);
-  line-height: 1.12;
-  font-weight: 700;
-  letter-spacing: -0.022em;
-  text-wrap: balance;
-  color: var(--color-text);
-}
-
-.markdown h1 {
-  font-size: 2.25rem;
-  letter-spacing: -0.032em;
-}
-
-.markdown h2 {
-  letter-spacing: -0.026em;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 0.5rem;
-}
-
-.markdown h3 {
-  font-weight: 500;
-  letter-spacing: -0.014em;
-}
-
-.markdown h4 {
-  font-weight: 500;
-  letter-spacing: -0.012em;
-}
-
-/* ─── Code blocks ──────────────────────────────────────────────────────────── */
-pre {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-lg) !important;
-  background: var(--color-bg-muted) !important;
-}
-
-code {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.875rem;
-}
-
-/* Syntax tokens.
-   prism-react-renderer writes its theme as INLINE styles on every token, so
-   this is the one place !important is doing real work rather than papering over
-   specificity: there is no other way to reach an inline style from a stylesheet.
-   Only the two groups that fail AA are overridden; the rest of the github theme
-   is left alone. See the --syntax-* tokens for the measured ratios. */
-.token.string,
-.token.attr-value {
-  color: var(--syntax-pink) !important;
-}
-
-.token.entity,
-.token.url,
-.token.symbol,
-.token.number,
-.token.boolean,
-.token.variable,
-.token.constant,
-.token.property,
-.token.regex,
-.token.inserted {
-  color: var(--syntax-teal) !important;
-}
-
-/* The theme also carries its own near-white background, which would sit inside
-   our recessed surface as a lighter panel. */
-pre[class*='language-'],
-.theme-code-block,
-.theme-code-block > div {
-  background-color: var(--color-bg-muted) !important;
-}
-
-:not(pre) > code {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-hover);
-  border: 1px solid var(--color-accent-border);
-  border-radius: 6px;
-  padding: 0.15rem 0.4rem;
-}
-
-/* ─── Tables ───────────────────────────────────────────────────────────────── */
-table {
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-lg);
-  overflow: hidden;
-}
-
-table thead tr {
-  background: var(--color-bg-alt);
-}
-
-table thead th {
-  border-bottom: 1px solid var(--color-border);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  color: var(--color-text-secondary);
-}
-
-table tbody tr {
-  transition: background-color var(--duration-fast) ease;
-}
-
-table tbody tr:hover {
-  background: var(--color-accent-soft);
-}
-
-table td,
-table th {
-  border-color: var(--color-border);
-}
-
-/* ─── Links ──────────────────────────────────────────────────────────────────
-   Inline prose links are underlined, not merely tinted. Cobalt on ink measures
-   2.8:1 against the surrounding text — below the 3:1 that WCAG requires when
-   colour is the ONLY thing distinguishing a link — so without the underline a
-   reader who cannot separate those hues cannot find the links at all. This is
-   the same principle as D-6 (no product identified by colour alone) applied to
-   body copy, and axe flagged it on three templates.
-
-   The underline sits below the baseline and takes its weight from the font, so
-   it reads as typography rather than as a border. */
-.markdown a {
-  color: var(--color-accent);
-  text-decoration: underline;
-  text-decoration-thickness: from-font;
-  text-underline-offset: 0.18em;
-}
-
-.markdown a:hover {
-  color: var(--color-accent-hover);
-}
-
-/* Links that are not prose: whole-card links, heading anchors and the
-   breadcrumb/TOC chrome carry their own affordances (a surface, a hover, an
-   icon) and are not embedded in a sentence, so an underline there would be
-   noise rather than information. */
-.markdown a.homeCard,
-.markdown a.homeCard:hover,
-.markdown a.homeCard:focus,
-.markdown a.hash-link,
-.markdown a.card,
-.markdown .pagination-nav__link,
-.markdown .tabs__item {
-  text-decoration: none;
-}
-
-/* Whole-card links (landing-page HomeCards) wrap the card's own title +
-   description, so the prose-link rules above would tint every line accent
-   blue and underline them on hover. Opt these links out — the card keeps its
-   own typography; only the explicit ".cardArrow" stays accent-colored. */
-.markdown a.homeCard,
-.markdown a.homeCard:hover,
-.markdown a.homeCard:focus {
-  color: inherit;
-  text-decoration: none;
-}
-
-/* ─── Blockquotes ──────────────────────────────────────────────────────────── */
-blockquote {
-  border-left: 3px solid var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-text-secondary);
-  border-radius: 0 var(--border-radius) var(--border-radius) 0;
-}
-
-/* ─── Admonitions ──────────────────────────────────────────────────────────── */
-.alert {
-  border-radius: var(--border-radius-lg);
-  border-width: 1px;
-}
-
-/* Every admonition colour derives from a status token. The foregrounds were
-   hardcoded hex from the old palette; each is now verified AA against BOTH its
-   own tint and the three general surfaces. */
-.alert--info {
-  --ifm-alert-background-color: var(--color-accent-soft);
-  --ifm-alert-border-color: var(--color-accent-border);
-  --ifm-alert-foreground-color: var(--color-accent-hover);
-}
-
-.alert--success {
-  --ifm-alert-background-color: var(--color-success-bg);
-  --ifm-alert-border-color: var(--color-success);
-  --ifm-alert-foreground-color: var(--color-success);
-}
-
-.alert--warning {
-  --ifm-alert-background-color: var(--color-warning-bg);
-  --ifm-alert-border-color: var(--color-warning);
-  --ifm-alert-foreground-color: var(--color-warning);
-}
-
-.alert--danger {
-  --ifm-alert-background-color: var(--color-danger-bg);
-  --ifm-alert-border-color: var(--color-danger);
-  --ifm-alert-foreground-color: var(--color-danger);
-}
-
-/* ─── Footer ─────────────────────────────────────────────────────────────────
-   The swizzle mirrors the website's dark editorial footer. These fallback
-   selectors protect that surface if a theme update emits Infima's own footer. */
-.footer {
-  border-top: 0;
-  background: var(--color-footer);
-  color: var(--color-footer-text);
-}
-
-.footer__link-item,
-.footer__copyright {
-  color: var(--color-footer-muted);
-}
-
-/* ─── Pagination ───────────────────────────────────────────────────────────── */
-.pagination-nav__link {
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-lg);
-  background: var(--color-bg);
-  transition: border-color var(--duration-normal) var(--ease-out-expo), box-shadow var(--duration-normal) var(--ease-out-expo);
-}
-
-.pagination-nav__link:hover {
-  border-color: var(--color-accent-border);
-  box-shadow: 0 2px 8px var(--color-accent-glow);
-}
-
-.pagination-nav__sublabel {
-  color: var(--color-text-tertiary);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.pagination-nav__label {
-  color: var(--color-accent);
-  font-weight: 600;
-}
-
-/* ─── TOC ──────────────────────────────────────────────────────────────────── */
-.table-of-contents__link {
-  color: var(--color-text-tertiary);
-  font-size: 0.8rem;
-  transition: color var(--duration-normal) var(--ease-out-expo);
-}
-
-.table-of-contents__link:hover,
-.table-of-contents__link--active {
-  color: var(--color-accent);
-}
-
-/* ─── Breadcrumbs ──────────────────────────────────────────────────────────── */
-.breadcrumbs__link {
-  color: var(--color-text-tertiary);
-  font-size: 0.8rem;
-  transition: color var(--duration-normal) var(--ease-out-expo);
-}
-
-.breadcrumbs__link:hover {
-  color: var(--color-accent-hover);
-}
-
-/* ─── Scrollbar ────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-border-hover);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-border-strong);
-}
-
-/* ─── Buttons ──────────────────────────────────────────────────────────────── */
-.button--primary {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-/* No lift and no coloured glow: the shadow was built from the OLD accent as an
-   rgba triplet, so it survived every hex-based search while still painting the
-   retired blue. The colour change alone reports the hover. */
-.button--primary:hover {
-  background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .button--primary {
-    transition: background-color var(--duration-normal) var(--ease-out-expo),
-      border-color var(--duration-normal) var(--ease-out-expo);
-  }
-}
-
-.button--secondary {
-  color: var(--color-accent);
-  border-color: var(--color-border-hover);
-  background: transparent;
-  transition: border-color var(--duration-normal) var(--ease-out-expo), color var(--duration-normal) var(--ease-out-expo),
-    box-shadow var(--duration-normal) var(--ease-out-expo);
-}
-
-.button--secondary:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent-hover);
-  box-shadow: 0 2px 8px var(--color-accent-glow);
-}
-
-/* ─── Sidebar border ──────────────────────────────────────────────────────── */
-.theme-doc-sidebar-container {
-  background: var(--color-surface);
-  border-right: 1px solid var(--color-border) !important;
-}
-
-/* ─── Two-audience IA: top-level group labels read as section headers ──────── */
-.theme-doc-sidebar-menu
-  > .theme-doc-sidebar-item-category-level-1
-  > .menu__list-item-collapsible
-  > .menu__link {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--color-text-tertiary);
-}
-
-/* Product categories (level 2) highlight the accent when active. */
-.theme-doc-sidebar-item-category-level-2
-  > .menu__list-item-collapsible
-  > .menu__link--active {
-  color: var(--color-accent);
+  *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
 }

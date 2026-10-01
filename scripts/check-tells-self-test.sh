@@ -128,11 +128,11 @@ expect_caught "pastel product tiles" \
 
 expect_caught "fonts are self-hosted" \
   "a font file going missing while its @font-face stays" \
-  "rm static/fonts/inter-latin-400-normal.woff2"
+  "rm static/fonts/manrope-variable.woff2"
 
 expect_caught "fonts are self-hosted" \
   "the OFL licence not travelling with the files" \
-  "rm static/fonts/LICENSE-inter.txt"
+  "rm static/fonts/LICENSE-manrope.txt"
 
 expect_caught "fonts are self-hosted" \
   "the preload tags being dropped" \

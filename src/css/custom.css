@@ -139,6 +139,8 @@ input, select, textarea, button { font-family:inherit; }
 .navbar__search { margin-left:0; }
 .navbar__search-input { width:44px; height:44px; padding:0 12px 0 32px; color:var(--ink); background-color:var(--surface); border:1px solid var(--line); border-radius:999px; }
 .navbar__search-input:focus { width:180px; }
+/* Collapsed to a 44px icon, a kept query would show as a sliver beside the icon. */
+@media (min-width:997px) { .navbar__search-input:not(:focus) { color:transparent; } .navbar__search:not(:focus-within) [class*='searchClearButton'] { display:none; } }
 .navbar__search-input::placeholder { color:var(--muted); }
 .navbar [class*='searchHintContainer'] { display:none; }
 .navbar__toggle { order:3; width:48px; height:48px; padding:11px; color:var(--on-dark); margin:0; }
@@ -278,7 +280,7 @@ input, select, textarea, button { font-family:inherit; }
 .scalar-reference .section-header { font-size:38px; letter-spacing:-.045em; }
 .scalar-reference .operation-title .section-header-label { font-size:clamp(27px,2.3vw,38px); line-height:1.17; font-weight:800; letter-spacing:-.045em; overflow-wrap:anywhere; }
 .scalar-reference .scalar-card { border-radius:13px; }
-.scalar-reference .dark-mode, .scalar-reference .scalar-code-block, .scalar-reference .code-snippet, .scalar-reference .request-card, .scalar-reference .response-card {
+.scalar-reference .dark-mode, .scalar-reference .scalar-code-block, .scalar-reference .markdown pre, .scalar-reference .code-snippet, .scalar-reference .request-card, .scalar-reference .response-card {
   --scalar-color-1:var(--code-text);
   --scalar-color-2:var(--code-muted);
   --scalar-color-3:var(--code-muted);
@@ -298,7 +300,12 @@ input, select, textarea, button { font-family:inherit; }
   --scalar-color-yellow:var(--code-orange);
   --scalar-color-red:var(--code-red);
 }
-.scalar-reference .scalar-code-block {
+/* Code surfaces carry light code text, so each one paints its own navy: the
+ * API client's response body sits on a white panel and the contract's markdown
+ * <pre> wraps a <code> that Scalar fills with its light wash. */
+.scalar-reference .scalar-code-block, .scalar-reference .markdown pre {
+  background:var(--navy);
+  color:var(--code-text);
   --scalar-color-blue:var(--code-accent);
   --scalar-color-green:var(--code-green);
   --scalar-color-purple:var(--code-purple);
@@ -307,6 +314,7 @@ input, select, textarea, button { font-family:inherit; }
   --scalar-color-red:var(--code-red);
   --scalar-background-2:var(--navy);
 }
+.scalar-reference .markdown pre code { background:transparent; color:inherit; border:0; box-shadow:none; padding:0; }
 .scalar-reference .dark-mode :focus-visible { outline-color:var(--code-accent); }
 .scalar-reference a[href^='https://www.scalar.com'] { display:none; }
 @media (min-width:1201px) {
@@ -357,7 +365,8 @@ input, select, textarea, button { font-family:inherit; }
   .navbar { top:14px; left:15px; right:15px; width:calc(100% - 30px); min-height:64px; height:64px; padding:8px 9px 8px 15px; }
   .navbar__inner { gap:8px; }
   .navbar__items { gap:8px; }
-  .navbar .navbar__search-input:not(:focus) { width:44px; }
+  .navbar .navbar__search-input:not(:focus) { width:44px; color:transparent; }
+  .navbar__search:not(:focus-within) [class*='searchClearButton'] { display:none; }
   .navbar__search-input:focus { width:44px; }
   .navbar:has(.navbar__search-input:focus) .navbar__brand { display:none; }
   .navbar:has(.navbar__search-input:focus) .navbar__search-input { width:min(210px,calc(100vw - 128px)); }

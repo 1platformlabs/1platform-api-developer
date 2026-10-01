@@ -108,6 +108,12 @@ function audit({docsHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimen
 
   requireText('REDUCED_MOTION', css, '@media (prefers-reduced-motion: reduce)');
   requireText('FOCUS_VISIBLE', css, ':where(a, button, input, summary):focus-visible');
+  // Scalar code surfaces get light code text; without their own navy, the API
+  // client's response body rendered light-on-white (measured 1.18:1 in the E2E bench).
+  requireText('COLLAPSED_SEARCH_QUERY', css, "@media (min-width:997px) { .navbar__search-input:not(:focus) { color:transparent; } .navbar__search:not(:focus-within) [class*='searchClearButton'] { display:none; } }");
+  requireText('COLLAPSED_SEARCH_QUERY_MOBILE', css, ".navbar .navbar__search-input:not(:focus) { width:44px; color:transparent; }\n  .navbar__search:not(:focus-within) [class*='searchClearButton'] { display:none; }");
+  requireText('SCALAR_CODE_SURFACE', css, '.scalar-reference .scalar-code-block, .scalar-reference .markdown pre {\n  background:var(--navy);');
+  requireText('SCALAR_MARKDOWN_CODE', css, '.scalar-reference .markdown pre code { background:transparent; color:inherit; border:0; box-shadow:none; padding:0; }');
 
   for (const requirement of SNAPSHOT_REQUIREMENTS) {
     const dimensions = snapshotDimensions[requirement.code];
@@ -163,7 +169,7 @@ if (process.argv.includes('--self-test')) {
     'DOC_JSONLD', 'BRAND_RETURN', 'BLOG_LANGUAGE', 'SKIP_LINK', 'MOBILE_TOGGLE', 'SEARCH', 'NAV_CTA',
     'DOC_PRIMARY_CTA', 'DOC_API_CTA', 'DOC_CTA_SEMANTICS', 'DOC_LEAD', 'DOC_SECTIONS', 'API_LANG', 'API_CANONICAL',
     'API_HREFLANG_ES', 'API_HREFLANG_DEFAULT', 'API_SHELL', 'API_SEARCH',
-    'REDUCED_MOTION', 'FOCUS_VISIBLE', 'BOOT_JS_BUDGET', 'TOTAL_JS_BUDGET',
+    'REDUCED_MOTION', 'FOCUS_VISIBLE', 'COLLAPSED_SEARCH_QUERY', 'COLLAPSED_SEARCH_QUERY_MOBILE', 'SCALAR_CODE_SURFACE', 'SCALAR_MARKDOWN_CODE', 'BOOT_JS_BUDGET', 'TOTAL_JS_BUDGET',
     'CSS_BUDGET', 'GUIDE_PROFILE', 'GUIDE_APP_JWT', 'GUIDE_USER_JWT', 'DOC_ONE_H1', 'API_ONE_H1', 'DOC_INDEXABLE', 'API_INDEXABLE', ...SNAPSHOT_REQUIREMENTS.map(({code}) => code),
   ];
   const silent = expected.filter((code) => !codes.has(code));
@@ -197,6 +203,7 @@ const apiAlias = readFileSync(join(BUILD, 'api-docs', 'index.html'), 'utf8');
 if (!apiAlias.includes('url=/api-reference/1platform-api')) throw new Error('Missing historical API redirect');
 const rootAlias = readFileSync(join(BUILD, 'index.html'), 'utf8');
 if (!rootAlias.includes('content="0;url=/docs/saas/1platform-api/getting-started"')) throw new Error('Root requires a no-JavaScript redirect');
+if (!rootAlias.includes('window.location.replace("/docs/saas/1platform-api/getting-started"+window.location.search+window.location.hash)')) throw new Error('Root redirect must keep query and fragment');
 const serverRules = readFileSync(join(ROOT, 'deploy/cpanel/htaccess/docs.htaccess'), 'utf8');
 if (!serverRules.includes('RewriteRule ^$ /docs/saas/1platform-api/getting-started [R=301,L]')) throw new Error('Root HTTP redirect missing from deployment');
 

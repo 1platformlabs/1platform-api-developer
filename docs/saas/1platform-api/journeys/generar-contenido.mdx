@@ -73,10 +73,22 @@ curl -X GET "$BASE_URL/posts/content/jobs/$JOB_ID" \
 
 Repetí esta llamada cada 5 segundos aproximadamente — es el intervalo recomendado, ni tan seguido
 como para desperdiciar cupo de límite de tasa ni tan espaciado como para que la espera se sienta
-larga. El campo `data.status` transiciona `pending` → `processing` → `completed` (o `failed`, con el
-detalle en `data.error`). Ningún otro paso de este recorrido tiene sentido hasta que el estado sea
-`completed`; si es `failed`, revisá `data.error` antes de reintentar con una keyword distinta —
-reenviar la misma casi nunca cambia el resultado.
+larga. El campo `data.status` transiciona `pending` → `processing` → `completed` (o `failed`).
+Ningún otro paso de este recorrido tiene sentido hasta que el estado sea `completed`.
+
+Si es `failed`, el motivo estable está en `data.failure_code`, un catálogo cerrado:
+
+| `failure_code` | Qué significa | Qué hacer |
+|---|---|---|
+| `no_keyword_data` | No hubo datos de búsqueda para esa keyword. | Reintentá con una keyword distinta — reenviar la misma casi nunca cambia el resultado. |
+| `generation_failed` | La redacción del artículo no pudo completarse. | Reintentá en unos minutos. |
+| `billing_hold_failed` | No se pudo completar la reserva del saldo del trabajo. | Revisá el saldo y reintentá. |
+| `timed_out` | El trabajo tardó demasiado y se detuvo. | Reintentá. |
+| `internal_error` | Cualquier otro motivo. | Si se repite, contactá a soporte con el `job_id`. |
+
+Ramificá siempre sobre `data.failure_code`. `data.error` trae una frase legible y neutra pensada para
+mostrar o registrar, no para comparar: su texto puede cambiar sin aviso. `failure_code` es `null`
+mientras el trabajo no haya fallado.
 
 [Keywords Content & Indexing →](/api-reference/1platform-api#tag/keywords-content-indexing)
 

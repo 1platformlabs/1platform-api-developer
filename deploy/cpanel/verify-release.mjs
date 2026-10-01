@@ -9,13 +9,18 @@ export async function waitForRelease({probe, want, maxWaitMs = 720_000, stableMs
   pollMs = 10_000, now = Date.now, sleep = (ms) => new Promise((done) => setTimeout(done, ms)), report = () => {}}) {
   const deadline = now() + maxWaitMs;
   let matchedSince;
+  let sawExpected = false;
   while (now() < deadline) {
     const sample = await probe();
     const matches = sample.status === 200 && sample.sha === want && sample.fromOrigin;
     if (matches) {
+      sawExpected = true;
       matchedSince ??= now();
       if (now() - matchedSince >= stableMs) return;
     } else {
+      if (sawExpected && sample.status === 200 && sample.fromOrigin && sample.sha !== want) {
+        throw new Error('El origen revirtió a otro checksum después de servir este build; revise el rollback del activador');
+      }
       matchedSince = undefined;
     }
     report({matches, status: sample.status, sha: sample.sha});

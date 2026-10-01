@@ -3,6 +3,8 @@
 import pathlib
 import re
 import sys
+import hashlib
+import json
 
 QA_ORIGIN = "https://developer-qa.1platform.pro"
 GUIDE = "/docs/saas/1platform-api/getting-started"
@@ -78,9 +80,23 @@ if __name__ == "__main__":
             return path.read_text(errors="replace").strip() if path.is_file() else ""
         index_html = build_index.read_text()
         server_rules = (build_index.parent / ".htaccess").read_text()
+        remote_script = read("activate.sh")
+        failures = re.findall(r"health FAILED \(final status ([0-9]{3}), marker not matched\)", read("activate.log"))
+        diagnostic = {
+            "health_is_qa_root": read("health_url") in (QA_ORIGIN, QA_ORIGIN + "/"),
+            "health_is_qa_index": read("health_url") == QA_ORIGIN + "/index.html",
+            "marker_matches_build_index": bool(read("health_marker")) and read("health_marker") in index_html,
+            "last_health_failure_status": failures[-1] if failures else None,
+            "installed_script_available": bool(remote_script),
+            "installed_script_matches_repo": remote_script == pathlib.Path("deploy/cpanel/activate.sh").read_text().strip(),
+            "installed_script_reads_health_file": 'HEALTH_FILE="$ROOT/.health_url"' in remote_script,
+            "installed_script_accepts_health_env": "CPANEL_HEALTH_URL:-" in remote_script,
+            "installed_script_sha256": hashlib.sha256(remote_script.encode()).hexdigest() if remote_script else None,
+        }
+        print("::notice::QA health state: " + json.dumps(diagnostic))
         reason, update = plan(read("health_url"), read("health_marker"), read("failed_version"),
                               read("activate.log"), index_html, server_rules)
-        print("QA health diagnostic: " + reason)
+        print("::notice::QA health diagnostic: " + reason)
         if update:
             (folder / "planned_url").write_text(update[0] + "\n")
             (folder / "planned_marker").write_text(update[1] + "\n")

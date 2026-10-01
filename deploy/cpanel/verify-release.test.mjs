@@ -24,7 +24,7 @@ for (const sample of [
   if (sample(30).status === 0) {
     assert.deepEqual(await simulate(sample), {time: 90, probes: 10});
   } else {
-    await assert.rejects(simulate(sample), /no sostuvo el checksum/);
+    await assert.rejects(simulate(sample), /no sostuvo el checksum|revirtió a otro checksum/);
   }
 }
 console.log('release verification: 7 stability/checksum/status/origin/rollback cases passed; no network');

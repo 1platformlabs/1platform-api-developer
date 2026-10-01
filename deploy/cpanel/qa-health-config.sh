@@ -19,6 +19,7 @@ get .health_url -o $PRIVATE/health_url
 get .health_marker -o $PRIVATE/health_marker
 get .failed_version -o $PRIVATE/failed_version
 get logs/activate.log -o $PRIVATE/activate.log
+get bin/activate.sh -o $PRIVATE/activate.sh
 bye
 FTPEOF
 then

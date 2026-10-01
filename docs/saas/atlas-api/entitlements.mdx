@@ -1,166 +1,91 @@
 ---
-title: Entitlements
-description: Concede, revoca, verifica y refresca el acceso a contenido en la Atlas API. Scopes de entitlement (item, series, plan, live), enlaces de checkout y la caché local alimentada por webhooks.
+title: Derechos de acceso
+description: Cómo se conceden, consultan y revocan los derechos de acceso (entitlements) en la Atlas API, y cómo cerrar el ciclo de una compra sin esperar al webhook.
 sidebar_position: 10
 ---
 
-# Entitlements
+# Derechos de acceso
 
-Un **entitlement** es un registro que dice "este miembro puede acceder a este contenido." Atlas mantiene una tabla
-`entitlements` local y autoritativa — la caché que el hot path de [entrega de contenido](/docs/saas/atlas-api/content-delivery)
-lee en cada solicitud de reproducción. Los entitlements se escriben de tres maneras: directamente por un operador,
-por un [webhook](/docs/saas/atlas-api/webhooks) entrante de un proveedor tras una compra, o por una llamada de refresco
-que reconcilia con el proveedor de entitlements externo.
+Un **derecho de acceso (*entitlement*)** es el registro que dice «este miembro puede consumir este contenido». Atlas guarda
+sus propios derechos de acceso por tenant y la [entrega de contenido](/docs/saas/atlas-api/content-delivery) los consulta en
+cada ticket. Se escriben de cuatro maneras:
 
-Todos los endpoints a continuación están acotados al tenant mediante `Host` / `X-Tenant-Slug`
-(consulta [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)).
+- un **operador** los concede o revoca a mano;
+- el **acceso gratuito automático** del tenant, si está activado, los concede al iniciar sesión o al pedir un ticket;
+- el **proveedor de pagos del tenant** los concede o revoca con un [webhook](/docs/saas/atlas-api/webhooks) tras cada compra,
+  cancelación o vencimiento;
+- el propio **miembro**, al activar la prueba gratuita del tenant o al reconciliar una compra recién hecha.
 
-## Scopes
+Todas las operaciones van con `X-Tenant-Slug` y un JWT
+([Referencia de API → entitlement](/api-reference/atlas-api#tag/entitlement)).
 
-Cada entitlement tiene un **scope** y una **referencia de scope**:
+## Alcance de un derecho de acceso
 
-| Scope | `scope_ref` es… | Concede acceso a… |
-|---|---|---|
-| `item` | un content id | un único ítem del catálogo |
-| `series` | un series id | todos los ítems de una serie |
-| `plan` | un plan id (o `*`) | todo lo cubierto por el plan |
-| `live` | un id de canal/evento en vivo | un stream en vivo |
+Cada derecho de acceso tiene un **alcance** (`scope`: `item`, `series`, `plan` o `live`) y una **referencia** (`scope_ref`)
+que identifica qué cubre: un ítem, una serie, un plan o una emisión en vivo.
 
-Un `scope_ref` comodín de `*` (común en los grants de `plan` de nivel gratuito) cubre todo el catálogo.
+- **El comodín `*` sólo vale con `scope: "item"`** y cubre todo el catálogo; es lo que escribe el acceso gratuito
+  automático. Con `scope: "plan"`, `*` se rechaza con `422`: un plan siempre se referencia por su identificador.
+- **Al entregar un ítem**, Atlas busca un derecho de alcance `item` para ese ítem (o el comodín). En los tenants con planes
+  configurados, un plan pagado activo desbloquea además todo el catálogo. Un derecho de alcance `series` no habilita por sí
+  solo la entrega de un ítem.
+- Un derecho de acceso sin fecha de vencimiento es permanente; con `expires_at` sirve para alquileres o pruebas.
 
-## Conceder (operador)
+## Paso 1 — Vende el acceso
 
-Los operadores conceden acceso directamente. Requiere un JWT de `admin`/`operator`.
-
-```bash
-curl -s -X POST "$ATLAS_BASE/entitlements" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
-  -H "Authorization: Bearer $ATLAS_ADMIN_JWT" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "member_id": "1f2e…",
-    "scope": "item",
-    "scope_ref": "a3b4…",
-    "granted_by": "operator",
-    "expires_at": null
-  }'
-```
-
-```json
-{
-  "id": "e5f6…",
-  "member_id": "1f2e…",
-  "scope": "item",
-  "scope_ref": "a3b4…",
-  "granted_by": "operator",
-  "expires_at": null,
-  "created_at": "2026-06-18T12:00:00Z"
-}
-```
-
-(HTTP `201`.) Establece `expires_at` para alquileres con tiempo limitado; omítelo o `null` para acceso permanente.
-
-## Verificar acceso
-
-La lectura autoritativa usada para las decisiones de control de acceso. Lee la tabla de entitlements **local** por defecto:
+Un miembro con sesión pide un enlace de pago con `POST /entitlements/checkout`; un comprador sin sesión, con
+`POST /entitlements/guest-checkout`, que sólo pide su correo (crea o reutiliza al miembro y responde igual en los dos casos,
+para no revelar qué correos existen). En ambos casos redirige al comprador a la `url` que devuelve.
 
 ```bash
-curl -s "$ATLAS_BASE/entitlements/check?member_id=1f2e…&content_id=a3b4…" \
-  -H "X-Tenant-Slug: $TENANT_SLUG"
+curl -s -X POST "$ATLAS_BASE/entitlements/checkout" -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT" -H "Content-Type: application/json" \
+  -d '{ "plan_ref": "anual", "return_url": "/cuenta?refreshed=1", "scope": "plan", "scope_ref": "anual" }'
 ```
 
-```json
-{
-  "member_id": "1f2e…",
-  "content_id": "a3b4…",
-  "has_access": true,
-  "reason": "granted"
-}
-```
+Usa como `return_url` una ruta del sitio o una URL `https`; `guest-checkout` rechaza cualquier otra con
+`422 INVALID_RETURN_URL`. Estas operaciones **no**
+conceden el acceso: lo concede el webhook del proveedor cuando el pago se confirma.
 
-Cuando `has_access` es `false`, `reason` es `no_active_entitlement`. Agrega `?source=provider` para forzar una
-llamada en vivo al proveedor de entitlements externo (solo para depuración — no es el hot path). Una caída del proveedor en
-esa ruta devuelve `503 { "code": "PROVIDER_UNAVAILABLE" }`.
+## Paso 2 — Reconcilia al volver del pago
 
-## Listar los entitlements de un miembro
+El comprador suele volver antes de que llegue el webhook. Al volver, llama **una vez** a `POST /entitlements/refresh` con el
+mismo alcance: Atlas consulta al proveedor y, si el pago está confirmado, guarda el derecho de acceso de inmediato.
+`refreshed` es `true` sólo si esta llamada lo escribió. Es idempotente; no lo llames en un bucle.
 
 ```bash
-curl -s "$ATLAS_BASE/entitlements/by-member/1f2e…" \
-  -H "X-Tenant-Slug: $TENANT_SLUG"
+curl -s -X POST "$ATLAS_BASE/entitlements/refresh" -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_JWT" -H "Content-Type: application/json" \
+  -d '{ "scope": "plan", "scope_ref": "anual" }'
 ```
 
-Devuelve un arreglo con la forma de entitlement mostrada arriba.
+Si el proveedor no responde, recibes `503 PROVIDER_UNAVAILABLE`: muestra un estado de «procesando tu compra» y deja que el
+webhook complete el acceso.
 
-## Revocar
+## Paso 3 — Consulta el acceso de un miembro
+
+`GET /entitlements/check` responde si un miembro tiene un derecho de alcance `item` sobre un ítem (incluido el comodín);
+no tiene en cuenta planes ni series. `GET /entitlements/by-member/{member_id}` lista todos sus derechos de acceso.
+
+Las dos exigen el JWT. Un miembro sólo puede consultarse a sí mismo: con otro `member_id` recibe `403 MEMBER_MISMATCH`.
+Un operador puede consultar a cualquier miembro de su tenant. Para decidir si mostrar el muro de pago, no hace falta
+consultar antes: pide el ticket de entrega y reacciona a `ENTITLEMENT_DENIED` o `FREEMIUM_GATE_BLOCKED`.
+
+## Paso 4 — Concede o revoca a mano (operador)
+
+Con un JWT de operador, `POST /entitlements` concede un derecho de acceso a un miembro existente (`404 MEMBER_NOT_FOUND` si no
+existe) y `DELETE /entitlements/{entitlement_id}` lo revoca (`404 ENTITLEMENT_NOT_FOUND` si no es de este tenant).
+`granted_by` es un texto libre para tu auditoría; si no lo envías, queda `webhook`, así que envía un valor propio
+(por ejemplo, `operator`) para distinguir las concesiones manuales.
 
 ```bash
-curl -s -X DELETE "$ATLAS_BASE/entitlements/<ENTITLEMENT_ID>" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
-  -H "Authorization: Bearer $ATLAS_ADMIN_JWT"
+curl -s -X POST "$ATLAS_BASE/entitlements" -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Authorization: Bearer $ATLAS_OPERATOR_JWT" -H "Content-Type: application/json" \
+  -d '{ "member_id": "<MEMBER_ID>", "scope": "item", "scope_ref": "<CONTENT_ID>", "granted_by": "operator" }'
 ```
 
-Devuelve `204` en caso de éxito, o `404 { "code": "ENTITLEMENT_NOT_FOUND" }` si el id no existe para
-este tenant. Requiere un JWT de `admin`/`operator`.
+## Prueba gratuita
 
-## Checkout (acceso pagado)
-
-Para vender acceso, crea un enlace de checkout mediante el proveedor de entitlements configurado. Atlas reenvía tus
-`scope`/`scope_ref` para que rebote de vuelta en el webhook de confirmación del proveedor:
-
-```bash
-curl -s -X POST "$ATLAS_BASE/entitlements/checkout" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
-  -H "Authorization: Bearer $ATLAS_JWT" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "plan_ref": "annual",
-    "return_url": "https://library.example.com/me/library?refreshed=1",
-    "scope": "item",
-    "scope_ref": "a3b4…"
-  }'
-```
-
-```json
-{ "url": "https://checkout.example/session/…" }
-```
-
-Redirige al miembro a `url`. Tras el pago, el proveedor envía un
-[webhook](/docs/saas/atlas-api/webhooks) firmado (`access.granted`) que escribe el registro del entitlement.
-
-## Refrescar tras el checkout
-
-El miembro puede regresar del checkout **antes** de que el webhook llegue. Llama a refresh para reconciliar
-de inmediato — consulta al proveedor una vez y persiste el registro localmente para que la siguiente verificación de acceso
-devuelva `true`:
-
-```bash
-curl -s -X POST "$ATLAS_BASE/entitlements/refresh" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
-  -H "Authorization: Bearer $ATLAS_JWT" \
-  -H "Content-Type: application/json" \
-  -d '{ "scope": "item", "scope_ref": "a3b4…" }'
-```
-
-```json
-{ "has_access": true, "refreshed": true }
-```
-
-`refreshed` es `true` solo cuando esta llamada escribió un nuevo registro local. La llamada es idempotente — repetirla
-es barato y seguro.
-
-## Cómo los entitlements impulsan la entrega
-
-```text
-checkout → pago del proveedor → webhook (access.granted) → registro en la tabla entitlements
-                                                              │
-GET /delivery/items/{id}/playback  ── lee has_active ─────────┘ → ticket o 403
-```
-
-La misma tabla local respalda tanto `entitlements/check` como la guarda de entrega, así que una vez que existe un registro el
-miembro puede reproducir de inmediato.
-
-## Consulta también
-
-- [Webhooks](/docs/saas/atlas-api/webhooks) — los eventos entrantes que conceden/revocan acceso.
-- [Entrega de contenido](/docs/saas/atlas-api/content-delivery) — tickets de reproducción controlados por entitlement.
-- [Errores](/docs/saas/atlas-api/errors) — `ENTITLEMENT_DENIED`, `ENTITLEMENT_NOT_FOUND`, `PROVIDER_UNAVAILABLE`.
+Si el tenant tiene una prueba configurada, el miembro la activa con `POST /entitlements/trial`, que le concede el plan de
+prueba por los días configurados. Si no hay prueba, o el tenant la limita a una por miembro y ya la usó, la respuesta lo
+indica con `granted: false` y un motivo, sin error.

@@ -22,7 +22,12 @@ const CSS_DIR = join(BUILD, 'assets', 'css');
 const SNAPSHOT_DIR = join(ROOT, 'tests', 'visual', 'infrastructure-branding');
 
 const BOOT_JS_BUDGET = 180 * 1024;
-const TOTAL_JS_BUDGET = 375 * 1024;
+// The total grows with the page count: every doc is its own lazily-loaded
+// chunk, fetched only when visited (the boot budget above is what every page
+// pays). Measured 2026-10-01: origin/main 378,806 gzip bytes over 38 docs; the
+// per-product reorganisation 416,177 over 50 docs. Raised for that, with room
+// for a few more pages, not for a heavier boot.
+const TOTAL_JS_BUDGET = 420 * 1024;
 const CSS_BUDGET = 25 * 1024;
 
 const SNAPSHOT_REQUIREMENTS = [
@@ -63,7 +68,7 @@ function gzipFiles(directory, predicate) {
     .reduce((total, name) => total + gzipSync(readFileSync(join(directory, name))).length, 0);
 }
 
-function audit({docsHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimensions}) {
+function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimensions}) {
   const findings = [];
   const requireText = (code, haystack, needle) => {
     if (!haystack.includes(needle)) findings.push(`${code}: missing ${needle}`);
@@ -80,14 +85,17 @@ function audit({docsHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimen
   requireText('BRAND_RETURN', docsHtml, 'href="https://1platform.pro/es/" target="_self"');
   requireText('BLOG_LANGUAGE', docsHtml, 'href="https://1platform.pro/es/blog/" target="_self"');
   requireText('NAV_CTA', docsHtml, 'href="https://wa.me/50253946564" target="_self"');
-  requireText('DOC_PRIMARY_CTA', docsHtml, 'href="/docs/saas/1platform-api/getting-started"');
+  requireText('DOC_PRIMARY_CTA', docsHtml, 'href="/docs/saas/1platform-api/inicio-rapido"');
   requireText('DOC_API_CTA', docsHtml, 'href="/api-reference/1platform-api"');
   requireText(
     'DOC_CTA_SEMANTICS',
     docsHtml,
-    'Referencia interactiva de la API</a>',
+    'Referencia de API</a>',
   );
-  requireText('DOC_LEAD', docsHtml, '<p class="lead">Esta guía le lleva desde cero');
+  requireText('DOC_LEAD', docsHtml, 'Todo lo que necesitas para integrar 1Platform');
+  // The home is a product index; the credentials and the first call live on
+  // Inicio rápido, which is where the guide checks below read.
+  requireText('DOC_PRODUCTS', docsHtml, 'Productos disponibles');
   requireText('DOC_SECTIONS', docsHtml, 'class="docs-sections-toggle"');
 
   requireText('API_LANG', apiHtml, '<html lang="es"');
@@ -96,9 +104,9 @@ function audit({docsHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimen
   requireText('API_HREFLANG_DEFAULT', apiHtml, 'href="https://developer.1platform.pro/api-reference/1platform-api" hreflang="x-default"');
   requireText('API_SHELL', apiHtml, 'plugin-@scalar/docusaurus plugin-id-1platform-api');
   requireText('API_SEARCH', apiHtml, 'class="navbar__search-input');
-  requireText('GUIDE_PROFILE', docsHtml, '/api/v1/users/profile');
-  requireText('GUIDE_APP_JWT', docsHtml, '<code>Authorization: Bearer $APP_TOKEN</code>');
-  requireText('GUIDE_USER_JWT', docsHtml, '<code>x-user-token: $USER_TOKEN</code>');
+  requireText('GUIDE_PROFILE', quickHtml, '/api/v1/users/profile');
+  requireText('GUIDE_APP_JWT', quickHtml, '<code>Authorization: Bearer $APP_TOKEN</code>');
+  requireText('GUIDE_USER_JWT', quickHtml, '<code>x-user-token: $USER_TOKEN</code>');
   for (const [kind, html] of [['DOC', docsHtml], ['API', apiHtml]]) {
     // This is the SSR host. Scalar later renders the native headings contained
     // in the contract; this assertion does not count or approve runtime headings.
@@ -154,6 +162,7 @@ if (process.argv.includes('--self-test')) {
   assert.deepEqual(imageDimensions(png.subarray(0, 20)), {width: 0, height: 0});
   const findings = audit({
     docsHtml: '<meta name="robots" content="noindex">',
+    quickHtml: '',
     apiHtml: '<meta name="robots" content="noindex">',
     css: '',
     bootJs: BOOT_JS_BUDGET + 1,
@@ -167,7 +176,7 @@ if (process.argv.includes('--self-test')) {
   const expected = [
     'DOC_LANG', 'DOC_CANONICAL', 'DOC_HREFLANG_ES', 'DOC_HREFLANG_DEFAULT',
     'DOC_JSONLD', 'BRAND_RETURN', 'BLOG_LANGUAGE', 'SKIP_LINK', 'MOBILE_TOGGLE', 'SEARCH', 'NAV_CTA',
-    'DOC_PRIMARY_CTA', 'DOC_API_CTA', 'DOC_CTA_SEMANTICS', 'DOC_LEAD', 'DOC_SECTIONS', 'API_LANG', 'API_CANONICAL',
+    'DOC_PRIMARY_CTA', 'DOC_API_CTA', 'DOC_CTA_SEMANTICS', 'DOC_LEAD', 'DOC_PRODUCTS', 'DOC_SECTIONS', 'API_LANG', 'API_CANONICAL',
     'API_HREFLANG_ES', 'API_HREFLANG_DEFAULT', 'API_SHELL', 'API_SEARCH',
     'REDUCED_MOTION', 'FOCUS_VISIBLE', 'COLLAPSED_SEARCH_QUERY', 'COLLAPSED_SEARCH_QUERY_MOBILE', 'SCALAR_CODE_SURFACE', 'SCALAR_MARKDOWN_CODE', 'BOOT_JS_BUDGET', 'TOTAL_JS_BUDGET',
     'CSS_BUDGET', 'GUIDE_PROFILE', 'GUIDE_APP_JWT', 'GUIDE_USER_JWT', 'DOC_ONE_H1', 'API_ONE_H1', 'DOC_INDEXABLE', 'API_INDEXABLE', ...SNAPSHOT_REQUIREMENTS.map(({code}) => code),
@@ -183,6 +192,7 @@ if (process.argv.includes('--self-test')) {
 
 const requiredFiles = [
   join(BUILD, 'docs', 'saas', '1platform-api', 'getting-started', 'index.html'),
+  join(BUILD, 'docs', 'saas', '1platform-api', 'inicio-rapido', 'index.html'),
   join(BUILD, 'api-reference', '1platform-api', 'index.html'),
   JS_DIR,
   CSS_DIR,
@@ -215,7 +225,8 @@ if (bootNames.length !== 2) {
 }
 
 const docsHtml = readFileSync(requiredFiles[0], 'utf8');
-const apiHtml = readFileSync(requiredFiles[1], 'utf8');
+const quickHtml = readFileSync(requiredFiles[1], 'utf8');
+const apiHtml = readFileSync(requiredFiles[2], 'utf8');
 const css = readFileSync(join(ROOT, 'src', 'css', 'custom.css'), 'utf8');
 const bootJs = bootNames.reduce(
   (total, name) => total + gzipSync(readFileSync(join(JS_DIR, name))).length,
@@ -229,7 +240,7 @@ const snapshotDimensions = Object.fromEntries(
   }),
 );
 
-const findings = audit({docsHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimensions});
+const findings = audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimensions});
 if (findings.length) {
   findings.forEach((finding) => console.error(`FAIL ${finding}`));
   process.exit(1);

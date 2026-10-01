@@ -1,154 +1,115 @@
 ---
 title: Autenticación
-description: Cómo se autentican los miembros en la Atlas API — magic links sin contraseña que se intercambian por tokens JWT de acceso y de refresco, sesiones, roles e inicio de sesión de administrador.
+description: Cómo inician sesión los miembros (enlace de acceso canjeado por un JWT) y los operadores (correo y contraseña) en la Atlas API, cómo se refresca una sesión y qué cambia en cada caso.
 sidebar_position: 3
 ---
 
 # Autenticación
 
-La **Atlas API** autentica a los *miembros* (los usuarios finales de tu tenant — lectores, espectadores,
-oyentes) con un **magic link sin contraseña**. El flujo emite tokens de acceso **JWT** de corta duración que
-envías como `Authorization: Bearer <token>`.
+Atlas autentica a dos tipos de personas, siempre dentro de un tenant:
 
-> Este **no** es el modelo de dos tokens de 1Platform. Atlas usa autenticación JWT bearer estándar para los miembros y
-> [claves de integración](/docs/saas/atlas-api/integration-keys) separadas para las llamadas de servicio a servicio.
+- **Miembros** (lectores, oyentes, espectadores): inician sesión con un **enlace de acceso (magic link)** sin contraseña.
+- **Operadores del tenant**: inician sesión con correo y contraseña (y un código TOTP si lo tienen activado).
 
-Cada llamada de autenticación está acotada al tenant — envía el tenant mediante el header `Host` o `X-Tenant-Slug`
-(consulta [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)). Los tokens están ligados al tenant
-para el que se emitieron y no pueden reutilizarse contra otro tenant.
+Ambos terminan con un **JWT** que envías como `Authorization: Bearer <token>`. Los servidores que aprovisionan miembros usan
+otra credencial, la [clave de integración](/docs/saas/atlas-api/integration-keys).
 
-## El flujo de magic link
+> No es el modelo de dos tokens de la 1Platform API. Si ves un header `x-user-token` en la
+> [Referencia de API](/api-reference/atlas-api#tag/auth), ignóralo: Atlas no lo usa en QA ni en producción.
 
-```
-POST /auth/magic-link         → email enviado con token de un solo uso
-   (el miembro hace clic en el enlace)
-POST /auth/magic-link/verify  → { access_token, refresh_token, member, roles }
-```
+Todas las operaciones de esta página van con `X-Tenant-Slug`. Antes de empezar,
+[verifica tu slug](/docs/saas/atlas-api/tenant-resolution#verifica-tu-slug-antes-de-integrar): un slug mal escrito enviaría
+el enlace de acceso desde otro tenant.
 
-### 1. Solicitar un magic link
+## Paso 1 — Envía el enlace de acceso
+
+`POST /auth/magic-link` envía un correo al miembro (de registro si el correo es nuevo, de inicio de sesión si ya existe). El
+enlace dura 15 minutos por defecto; cada tenant puede ajustarlo.
 
 ```bash
-curl -s -X POST "$ATLAS_BASE/auth/magic-link" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
+curl -s -X POST "$ATLAS_BASE/auth/magic-link" -H "X-Tenant-Slug: $TENANT_SLUG" \
   -H "Content-Type: application/json" \
-  -d '{
-    "email": "reader@example.com",
-    "return_url": "/me/library",
-    "surface": "web"
-  }'
+  -d '{ "email": "lector@example.com", "return_url": "/catalogo", "surface": "web" }'
 ```
 
-| Campo | Tipo | Notas |
-|---|---|---|
-| `email` | string (email) | Destinatario. Un email nuevo recibe una plantilla de registro; uno recurrente recibe inicio de sesión. |
-| `return_url` | string | A dónde aterrizar tras la verificación. Por defecto `/me/library`. |
-| `surface` | `"web"` \| `"app"` | `web` (por defecto) construye un enlace de verificación de navegador; `app` enruta a través de un puente de deep-link para apps nativas. |
+**Dónde aterriza el enlace.** En el dominio principal del tenant, en `/auth/verify?token=…`. Con `surface: "app"` aterriza
+en una página puente que intenta abrir la app nativa del tenant. En los dos casos, quien opera ese frente es quien recibe el
+`token` y debe canjearlo en el paso 2. `return_url` es opcional: si lo envías (ruta relativa del sitio), el sitio vuelve ahí
+tras el canje; si no, no hay redirección posterior.
 
-```json
-{ "sent": true, "delivery": "email" }
-```
+Si el envío del correo falla, recibes `503 EMAIL_DELIVERY_FAILED`. El token ya se generó, así que puedes pedir un enlace
+nuevo.
 
-El TTL del token es configurable por tenant (acotado a 5–1440 minutos; el valor por defecto de la plataforma suele ser de
-15 minutos). Si el canal de email falla, recibes `502 { "code": "EMAIL_DELIVERY_FAILED" }` — el
-token igualmente se generó, así que el miembro puede solicitar un nuevo enlace.
+## Paso 2 — Canjea el token por una sesión
 
-
-### 2. Verificar el token → sesión
-
-El enlace entrega un token de un solo uso. Intercámbialo por una sesión:
+`POST /auth/magic-link/verify` canjea el token de un solo uso. El primer canje crea el miembro para ese tenant y correo; no
+hay un paso de registro aparte.
 
 ```bash
-curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
+curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Content-Type: application/json" -d '{ "token": "<TOKEN_DEL_ENLACE>" }'
+```
+
+La sesión trae un token de acceso (24 h por defecto, indicado en `expires_in`), un token de refresco (30 días) y los roles
+del miembro (`fan`). Un token ya usado, vencido o inválido responde `401` con `TOKEN_CONSUMED`, `TOKEN_EXPIRED` o
+`TOKEN_INVALID`. Si envías un identificador de dispositivo nuevo para el miembro, Atlas le manda un aviso de seguridad por
+correo; ese aviso nunca bloquea el inicio de sesión.
+
+## Paso 3 — Llama con el token de acceso
+
+```bash
+curl -s "$ATLAS_BASE/me" -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
+```
+
+Los navegadores del sitio del tenant usan la cookie `atlas_session`; desde tu servidor usa siempre el header `Authorization`.
+Las operaciones del miembro (perfil, progreso, listas, sesiones) están en
+[Referencia de API → me](/api-reference/atlas-api#tag/me).
+
+## Paso 4 — Refresca antes de que venza
+
+`POST /auth/refresh` cambia el token de refresco por una sesión nueva sin otro correo. Un token de refresco emitido para
+otro tenant responde `401 TOKEN_INVALID`.
+
+```bash
+curl -s -X POST "$ATLAS_BASE/auth/refresh" -H "X-Tenant-Slug: $TENANT_SLUG" \
+  -H "Content-Type: application/json" -d '{ "refresh_token": "<REFRESH_TOKEN>" }'
+```
+
+:::warning El refresco siempre emite roles de miembro
+La sesión que devuelve el refresco lleva sólo el rol `fan`, aunque la original fuera de operador. Para una sesión de
+operador, no refresques: vuelve a iniciar sesión con `POST /auth/admin/sign-in` cuando venza el token de acceso.
+:::
+
+## Inicio de sesión de operador {#inicio-de-sesion-de-operador}
+
+Los operadores del tenant no usan enlaces de acceso. `POST /auth/admin/sign-in` recibe correo, contraseña y, si la cuenta
+tiene TOTP, el código. La sesión trae los roles `admin`, `operator` y `fan`, que habilitan la
+[gestión de contenido](/docs/saas/atlas-api/content-management) y las operaciones `/admin/*`.
+
+```bash
+curl -s -X POST "$ATLAS_BASE/auth/admin/sign-in" -H "X-Tenant-Slug: $TENANT_SLUG" \
   -H "Content-Type: application/json" \
-  -d '{
-    "token": "<TOKEN_FROM_EMAIL_LINK>",
-    "device_fingerprint": "optional-client-hash",
-    "device_label": "Chrome on macOS"
-  }'
+  -d '{ "email": "operador@example.com", "password": "<CONTRASENA>", "totp_code": "123456" }'
 ```
 
-```json
-{
-  "member_id": "1f2e…",
-  "access_token": "<JWT_ACCESS_TOKEN>",
-  "refresh_token": "<JWT_REFRESH_TOKEN>",
-  "expires_in": 86400,
-  "member": { "id": "1f2e…", "email": "reader@example.com", "tenant_id": "9d1c…" },
-  "roles": ["fan"]
-}
-```
+Credenciales incorrectas responden `401 CREDENTIALS_INVALID`; falta el código TOTP: `401 TOTP_REQUIRED`; código
+incorrecto: `401 TOTP_INVALID`. La cuenta de operador la crea el equipo de 1Platform Labs.
 
-Notas:
-
-- La verificación hace **upsert** del registro del miembro para el par `(tenant, email)` — el primer inicio de sesión no necesita un
-  paso de registro separado.
-- `expires_in` es la duración del token de acceso en segundos.
-- Un `device_fingerprint` opcional que sea nuevo para el miembro dispara un email de seguridad de "nuevo dispositivo"
-  (best-effort; nunca bloquea el inicio de sesión).
-- Un token consumido, expirado o inválido devuelve `401` con un código como `TOKEN_CONSUMED`,
-  `TOKEN_EXPIRED` o `TOKEN_INVALID`.
-
-## Usar el token de acceso
-
-Envía el JWT en cada solicitud autenticada:
-
-```bash
-curl -s "$ATLAS_BASE/me/library" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
-  -H "Authorization: Bearer <JWT_ACCESS_TOKEN>"
-```
-
-Los clientes de navegador pueden, en su lugar, apoyarse en la cookie HttpOnly `atlas_session` que establece el flujo de
-inicio de sesión del dashboard — los llamadores de servidor a servidor siempre deben usar el header bearer.
-
-## Refrescar una sesión
-
-Los tokens de acceso son de corta duración; el token de refresco genera un nuevo par sin otro magic link:
-
-```bash
-curl -s -X POST "$ATLAS_BASE/auth/refresh" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
-  -H "Content-Type: application/json" \
-  -d '{ "refresh_token": "<JWT_REFRESH_TOKEN>" }'
-```
-
-La respuesta tiene la misma forma `SessionOut` que la verificación. Un token de refresco emitido para un tenant distinto
-se rechaza con `401 { "code": "TOKEN_INVALID" }`.
+Una cuenta de operador trabaja sobre su propio tenant. Sólo si tiene permiso explícito sobre otros tenants puede elegir uno
+con el header `X-Admin-Tenant-Slug` en las operaciones `/admin/*`. Con una cuenta sin ese permiso, el header responde
+`403 TENANT_SWITCH_FORBIDDEN`: no lo envíes.
 
 ## Roles
 
-Las sesiones llevan un arreglo `roles`. Los miembros del flujo de magic link son `["fan"]`. Los operadores y administradores
-(consulta inicio de sesión de administrador) llevan roles elevados y pueden saltarse algunas verificaciones de acceso (p. ej., un `operator` puede
-generar un ticket de reproducción sin un entitlement). Los endpoints que requieren un rol devuelven
-`403 { "code": "INSUFFICIENT_ROLE" }` cuando el llamador carece de él.
+Una operación que exige un rol que la sesión no tiene responde `403 INSUFFICIENT_ROLE`; una que exige un permiso concreto
+de contenido responde `403 INSUFFICIENT_PERMISSION`. Los operadores pueden emitir tickets de entrega sin derecho de acceso,
+porque son dueños del catálogo.
 
-## Inicio de sesión de administrador / operador
+## Sesiones y cierre de sesión
 
-Los operadores del tenant se autentican con email + contraseña (y TOTP cuando está habilitado), no con un magic link:
+`POST /auth/sign-out` no invalida nada en el servidor: el sitio borra su cookie y el token de acceso sigue vigente hasta que
+vence. `GET /me/sessions` lista los dispositivos del miembro, y `DELETE /me/sessions/{session_id}` o `DELETE /me/sessions`
+(todos menos el actual) los quitan de esa lista. Quitar un dispositivo **tampoco** invalida los tokens ya emitidos: siguen
+vigentes hasta que vencen. Trata la duración del token de acceso como el límite real de una credencial filtrada.
 
-```bash
-curl -s -X POST "$ATLAS_BASE/auth/admin/sign-in" \
-  -H "X-Tenant-Slug: $TENANT_SLUG" \
-  -H "Content-Type: application/json" \
-  -d '{ "email": "admin@example.com", "password": "<PASSWORD>", "totp_code": "123456" }'
-```
-
-Devuelve la misma forma `SessionOut` con roles elevados (`["admin", "operator", "fan"]`). Las
-credenciales incorrectas devuelven `401 { "code": "CREDENTIALS_INVALID" }`; una cuenta con TOTP habilitado que omite el
-código devuelve `401 { "code": "TOTP_REQUIRED" }`.
-
-## Cerrar sesión
-
-```bash
-curl -s -X POST "$ATLAS_BASE/auth/sign-out" -H "X-Tenant-Slug: $TENANT_SLUG"
-```
-
-El cierre de sesión es un asunto del lado del cliente: el dashboard borra su cookie, y el token de acceso simplemente
-expira por sí solo. Trata el TTL de acceso deslizante como el límite de la vida útil de la credencial.
-
-## Consulta también
-
-- [Claves de integración](/docs/saas/atlas-api/integration-keys) — credenciales de servicio de larga duración.
-- [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution) — cómo una solicitud se mapea a un tenant.
-- [Errores](/docs/saas/atlas-api/errors) — cada código de error de autenticación.
+Todas las operaciones de autenticación: [Referencia de API → auth](/api-reference/atlas-api#tag/auth).

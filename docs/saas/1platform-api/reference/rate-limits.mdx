@@ -1,34 +1,44 @@
 ---
 title: Límites de uso
-description: Límites de uso por endpoint, la estrategia de clave de límite y cómo manejar respuestas 429.
+description: Cómo se cuentan los límites por minuto de la 1Platform API, los valores por defecto y cómo manejar un 429.
 sidebar_position: 4
 ---
 
 # Límites de uso
 
-Los límites de uso se aplican mediante [slowapi](https://slowapi.readthedocs.io/) en
-cada endpoint protegido. Superar el límite devuelve `429 Too Many Requests`.
+Cada operación protegida tiene un límite de solicitudes por minuto. Superarlo devuelve `429 Too Many Requests`.
 
-## Clave de límite de uso
+## Cómo se cuenta
 
-La clave de límite de uso es el SHA-256 de `(header Authorization + header x-user-token)`.
-Cuando ambos headers están ausentes, la API recurre a la dirección IP del cliente.
+El límite se cuenta por **combinación de token de aplicación y token de usuario**. Las operaciones que se llaman sin
+tokens, como `GET /health/`, se cuentan por dirección IP.
 
-## Límites por endpoint
+Dos casos merecen atención:
 
-| Constante | Valor | Endpoints |
-|---|---|---|
-| `HEALTH_LIMIT` | 100 / min | `/health` |
-| `AUTH_LIMIT` | 10 / min | `POST /auth/token`, `POST /users/token` |
-| `READ_LIMIT` | 50 / min | Todos los endpoints `GET` |
-| `WRITE_LIMIT` | 20 / min | Todos los `POST`/`PUT`/`PATCH`/`DELETE` (excepto los especiales de abajo) |
-| `KEYWORD_LIMIT` | 10 / min | `/posts/keywords/*` |
-| `CONTENT_LIMIT` | 5 / min | `/posts/content/*` |
-| `INDEXING_LIMIT` | 20 / min | `/posts/indexing/*` |
+- **`POST /auth/token`**: 10 por minuto desde una misma dirección, y además un tope por clave de aplicación.
+- **`POST /users/token`**: 10 por minuto **por token de aplicación**. Ese cupo lo comparten todos los usuarios que
+  canjeas con el mismo token de aplicación.
 
-Los límites son idénticos en QA y producción.
+## Valores por defecto
 
-## Cómo manejar 429
+| Límite | Aplica a |
+|---|---|
+| 100 / min | `GET /health/` |
+| 10 / min | `POST /auth/token` y `POST /users/token` |
+| 50 / min | Lecturas sin un límite propio |
+| 20 / min | Escrituras sin un límite propio |
+
+Muchas familias tienen su propio límite, más alto o más bajo que estos (contenido, analítica, ingresos
+publicitarios, dominios, agentes, telemetría, entre otras). **Cada operación declara el suyo en su descripción** en la
+[Referencia de API](/api-reference/1platform-api): esa es la fuente de verdad.
+
+## Cómo manejar un 429
+
+`429` tiene dos causas, y el `msg` de la respuesta te dice cuál:
+
+- **Límite por minuto**: espera y reintenta. La API **no** envía el header `Retry-After`, así que espera al menos 60
+  segundos antes del siguiente intento.
+- **Cupo del plan agotado**: reintentar no sirve hasta que cambie el plan o empiece el período siguiente.
 
 ```python
 import time
@@ -39,14 +49,12 @@ def call_with_backoff(client: httpx.Client, *args, **kwargs) -> httpx.Response:
         r = client.request(*args, **kwargs)
         if r.status_code != 429:
             return r
-        retry_after = int(r.headers.get("Retry-After", "60"))
-        time.sleep(retry_after)
-    return r  # exhausted retries
+        time.sleep(60 * (attempt + 1))  # la API no envía Retry-After
+    return r  # se agotaron los intentos
 ```
 
-:::tip[Guarda los tokens en caché para no superar AUTH_LIMIT]
-El límite de 10 / min en `auth/token` y `users/token` es la razón más común
-para alcanzar un 429 durante el desarrollo. Guarda los tokens en caché por `expires_in - 60s` y solo
-genera uno nuevo cuando el valor en caché esté por expirar. Consulta el
-[patrón de caché de tokens](../journeys/cobros-y-saldo).
+:::tip[Guarda los tokens en caché]
+El límite de 10 por minuto de los canjes es la causa más común de un `429` durante el desarrollo. Reutiliza cada
+token mientras le quede más de un minuto de vida y renuévalo antes de que venza. El patrón está en
+[Autenticación → Mantener los tokens vigentes](/docs/saas/1platform-api/plataforma/autenticacion#cache-de-tokens).
 :::

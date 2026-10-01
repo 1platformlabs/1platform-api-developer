@@ -143,6 +143,19 @@ const PRODUCT_PAGES = [
   'dashboard/transactions',
 ];
 
+// journeys/<slug> → <product>/<page>, one per page that existed under journeys/.
+const JOURNEY_MOVES: Array<[string, string]> = [
+  ['autenticacion', 'plataforma/autenticacion'],
+  ['webhooks', 'plataforma/webhooks'],
+  ['cobros-y-saldo', 'pagos-en-linea/cobrar-y-conciliar'],
+  ['facturacion', 'facturacion-electronica/emitir-una-factura'],
+  ['generar-contenido', 'sitios-web-y-contenido/generar-contenido'],
+  ['google-analytics', 'analitica/google-analytics'],
+  ['google-adsense', 'analitica/google-adsense'],
+  ['telemetria', 'telemetria/integrar-telemetria'],
+  ['agentes', 'agentes-de-ia/crear-un-agente'],
+];
+
 const config: Config = {
   title: 'Documentación para desarrolladores de 1Platform',
   tagline: 'Integre los servicios de 1Platform en su producto',
@@ -276,43 +289,51 @@ const config: Config = {
           // Entry points that already 404 today, referenced 4× across the
           // ecosystem (transactional emails and the dashboard onboarding
           // wizard). Broken before this epic; the cut is when they get fixed.
-          {from: '/docs/quick-start', to: '/docs/saas/1platform-api/getting-started'},
-          {from: '/docs/flows', to: '/docs/saas/1platform-api/journeys/autenticacion'},
+          {from: '/docs/quick-start', to: GUIDE},
+          {from: '/docs/flows', to: '/docs/saas/1platform-api/plataforma/autenticacion'},
+
+          // ── Organización por producto (portada-por-productos) ────────────
+          // The journeys moved into the product they belong to, the capability
+          // index was replaced by the products themselves, and the "which API"
+          // page by the home. Every old URL lands on its successor.
+          ...JOURNEY_MOVES.map(([from, to]) => ({from: `/docs/saas/1platform-api/journeys/${from}`, to: `/docs/saas/1platform-api/${to}`})),
+          {from: '/docs/saas/1platform-api/capacidades', to: GUIDE},
+          {from: '/docs/saas/api-reference-index', to: GUIDE},
 
           // ── Flows absorbed by a journey → the journey that replaced them ──
-          ...flowRedirects('magic-link-authentication', 'journeys/autenticacion'),
-          ...flowRedirects('user-onboarding', 'journeys/autenticacion'),
-          ...flowRedirects('generate-ai-content', 'journeys/generar-contenido'),
-          ...flowRedirects('ai-generations', 'journeys/generar-contenido'),
-          ...flowRedirects('payments-and-subscriptions', 'journeys/cobros-y-saldo'),
-          ...flowRedirects('billing-holds-and-captures', 'journeys/cobros-y-saldo'),
-          ...flowRedirects('paid-onboarding', 'journeys/cobros-y-saldo'),
-          ...flowRedirects('generate-invoice', 'journeys/facturacion'),
-          ...flowRedirects('webhook-configuration', 'journeys/webhooks'),
-          ...flowRedirects('ai-agents', 'journeys/agentes'),
+          ...flowRedirects('magic-link-authentication', 'plataforma/autenticacion'),
+          ...flowRedirects('user-onboarding', 'plataforma/autenticacion'),
+          ...flowRedirects('generate-ai-content', 'sitios-web-y-contenido/generar-contenido'),
+          ...flowRedirects('ai-generations', 'sitios-web-y-contenido/generar-contenido'),
+          ...flowRedirects('payments-and-subscriptions', 'pagos-en-linea/cobrar-y-conciliar'),
+          ...flowRedirects('billing-holds-and-captures', 'pagos-en-linea/cobrar-y-conciliar'),
+          ...flowRedirects('paid-onboarding', 'pagos-en-linea/cobrar-y-conciliar'),
+          ...flowRedirects('generate-invoice', 'facturacion-electronica/emitir-una-factura'),
+          ...flowRedirects('webhook-configuration', 'plataforma/webhooks'),
+          ...flowRedirects('ai-agents', 'agentes-de-ia/crear-un-agente'),
 
           // ── Flows that kept a journey of their own ───────────────────────
-          ...flowRedirects('google-analytics', 'journeys/google-analytics'),
-          ...flowRedirects('google-adsense', 'journeys/google-adsense'),
+          ...flowRedirects('google-analytics', 'analitica/google-analytics'),
+          ...flowRedirects('google-adsense', 'analitica/google-adsense'),
 
-          // ── Flows withdrawn without a successor → the capability index, ──
-          // which names their tag and links into the reference.
-          ...flowRedirects('activity-logs', 'capacidades'),
-          ...flowRedirects('admin-operations', 'capacidades'),
-          ...flowRedirects('dashboard-overview', 'capacidades'),
-          ...flowRedirects('dashboard-settings', 'capacidades'),
-          ...flowRedirects('domain-management', 'capacidades'),
-          ...flowRedirects('external-integrations', 'capacidades'),
-          ...flowRedirects('manage-websites', 'capacidades'),
-          ...flowRedirects('notifications', 'capacidades'),
-          ...flowRedirects('referrals', 'capacidades'),
-          ...flowRedirects('support', 'capacidades'),
-          ...flowRedirects('tasks', 'capacidades'),
+          // ── Flows withdrawn without a page of their own → the product (or
+          // Plataforma) whose overview names their tag and links the reference.
+          ...flowRedirects('activity-logs', 'plataforma'),
+          ...flowRedirects('admin-operations', 'plataforma'),
+          ...flowRedirects('dashboard-overview', 'plataforma'),
+          ...flowRedirects('dashboard-settings', 'plataforma'),
+          ...flowRedirects('domain-management', 'dominios-y-correo'),
+          ...flowRedirects('external-integrations', 'sitios-web-y-contenido'),
+          ...flowRedirects('manage-websites', 'sitios-web-y-contenido'),
+          ...flowRedirects('notifications', 'plataforma'),
+          ...flowRedirects('referrals', 'plataforma'),
+          ...flowRedirects('support', 'plataforma'),
+          ...flowRedirects('tasks', 'plataforma'),
 
           // ── Webhook pages: three folded into the journey, three moved to
           // the reference (the "why" the OpenAPI spec cannot carry). ────────
-          ...webhookRedirects('overview', 'journeys/webhooks'),
-          ...webhookRedirects('configuring-urls', 'journeys/webhooks'),
+          ...webhookRedirects('overview', 'plataforma/webhooks'),
+          ...webhookRedirects('configuring-urls', 'plataforma/webhooks'),
           ...webhookRedirects('receiving-notifications', 'reference/webhooks-payload'),
           ...webhookRedirects('security', 'reference/webhooks-security'),
           ...webhookRedirects('retry-and-delivery', 'reference/retry-and-delivery'),

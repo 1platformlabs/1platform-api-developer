@@ -1,0 +1,52 @@
+---
+title: Telemetría
+description: Detecta qué falla en tu software, cuánto tarda y si está en línea, y recibe avisos cuando algo cambia.
+sidebar_position: 1
+---
+
+# Telemetría
+
+<p className="lead">Responde cuatro preguntas sobre lo que tienes en producción: qué falla, cuánto tarda, si está en línea y qué se registró. Pegas una etiqueta en tu sitio o envías eventos desde tu servidor, y lees errores, rendimiento y registros por la API.</p>
+
+## Cómo funciona
+
+- **Un proyecto por cosa que mides.** Al crearlo recibes una dirección estable y **dos credenciales**: una pública, que viaja dentro de la etiqueta del sitio, y una secreta, para tus servidores. La secreta se muestra **una sola vez**, en la respuesta del alta; si la pierdes, rótala. Rotar una credencial no cambia la dirección, así que la etiqueta ya pegada sigue sirviendo.
+- **La etiqueta la arma el servidor.** La lectura del proyecto trae `tag_snippet`, la línea exacta para el `<head>`.
+- **Los eventos entran por un origen aparte**, separado de esta API, para que una ráfaga de errores en un sitio no frene el resto. Cada evento aceptado se cobra del saldo y lo que se rechaza (por tipo, tamaño o cuota) no se cobra. Los datos personales se eliminan antes de guardar nada.
+- **Las lecturas son del dueño del proyecto.** Un proyecto, issue o regla de otra cuenta responde `404`.
+- **Errores, rendimiento y registros.** Los errores se agrupan en issues con un id propio (`tlm_…`). Rendimiento y registros se piden en días hacia atrás, con un máximo de 30 y 6 días respectivamente.
+- **Avisos.** Una regla de alerta vigila una condición (`new_issue`, `event_burst` o `monitor_down`) y avisa al dueño, a las direcciones que confirmaron un doble opt-in y, si la configuras, a un webhook verificado. Los monitores de disponibilidad comprueban una URL aunque no haya visitas.
+
+## Qué necesitas
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Telemetría **encendida para tu espacio de trabajo**. Viene apagada y la enciende el equipo de la plataforma; mientras tanto, todas las operaciones responden `403`.
+- **Saldo** para los eventos aceptados. Cada proyecto tiene cuota mensual y tope de gasto propios. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `POST /users/telemetry/projects` | Crear un proyecto y recibir sus dos credenciales |
+| `POST /users/telemetry/projects/for-website/{website_id}` | Encender telemetría para una tienda propia (idempotente) |
+| `GET /users/telemetry/projects/{project_id}` | Leer el proyecto, incluida la etiqueta para el sitio |
+| `GET /users/telemetry/projects/{project_id}/install-status` | Saber si la etiqueta está reportando y, si no, por qué |
+| `GET /users/telemetry/projects/{project_id}/issues` | Listar errores agrupados |
+| `PATCH /users/telemetry/projects/{project_id}/issues/{issue_id}` | Resolver, ignorar o reabrir un issue |
+| `GET /users/telemetry/projects/{project_id}/performance` | Transacciones más lentas (hasta 30 días) |
+| `GET /users/telemetry/projects/{project_id}/logs` | Registros estructurados (hasta 6 días) |
+| `POST /users/telemetry/projects/{project_id}/monitors` | Crear un monitor de disponibilidad |
+| `POST /users/telemetry/projects/{project_id}/alert-rules` | Crear una regla de alerta |
+| `POST /users/telemetry/recipients` | Agregar un destinatario de avisos (doble opt-in) |
+| `GET /users/telemetry/projects/{project_id}/usage` | Consumo, cuota, gasto y huecos de recepción del mes |
+| `POST /users/telemetry/projects/{project_id}/credentials/{kind}/rotate` | Rotar una credencial |
+
+Todas las operaciones: [Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry).
+
+## Eventos
+
+Una regla de alerta con `webhook_url` envía sus avisos a ese webhook, firmados en el header `x-1platform-signature` con el secreto de la regla. Ese secreto se devuelve una sola vez, al crear la regla. Antes de recibir avisos, el destino debe superar un desafío: responder con el valor de `challenge` que recibe. Es independiente de los [webhooks de la plataforma](/docs/saas/1platform-api/plataforma/webhooks).
+
+## Guías
+
+- [Integrar telemetría](/docs/saas/1platform-api/telemetria/integrar-telemetria): crear el proyecto, instalar la etiqueta, comprobar que reporta, leer errores y configurar avisos.

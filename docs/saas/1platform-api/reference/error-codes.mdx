@@ -1,41 +1,63 @@
 ---
-title: Referencia de códigos de error
-description: Catálogo unificado de cada `data.code` legible por máquina que devuelve la 1Platform API, con el comportamiento recomendado del cliente.
+title: Códigos de error
+description: Los errores que tu cliente tiene que distinguir en la 1Platform API — su `data.code` cuando lo hay, qué significan y qué hacer.
 sidebar_position: 3
 ---
 
-# Referencia de códigos de error
+# Códigos de error
 
-La mayoría de las respuestas de fallo siguen el envoltorio estándar `{ success: false, data: { code }, msg }`.
-Esta página lista cada valor de `data.code`, lo que significa y lo que el cliente
-debe hacer.
+Los errores de negocio llegan en el sobre `{ success: false, data, msg }`. Cuando la operación necesita que tu
+cliente distinga el **tipo** de fallo, `data.code` trae un código legible por máquina; si no, `data` es `null` y el
+código de estado HTTP es la información. Los errores de validación y la falta de credenciales usan otra forma: ver
+[Formato de respuesta](/docs/saas/1platform-api/reference/response-format).
 
-| Endpoint(s) | HTTP | `data.code` | Significado | Comportamiento recomendado del cliente |
+Cada operación declara sus códigos en la [Referencia de API](/api-reference/1platform-api) (en sus respuestas y, cuando
+existen, en `x-error-codes`). Esta página reúne los que más integraciones encuentran.
+
+## Errores generales
+
+| HTTP | `data.code` | Significado | Qué hacer |
+|---|---|---|---|
+| 401 | (forma `detail`) | Falta un token, venció o no es válido | Canjea de nuevo el token que corresponda y reintenta **una vez** |
+| 402 | (sin código) | El saldo no alcanza el costo de la operación | Pide al usuario que recargue. **No reintentes** sin recargar |
+| 403 | `module_disabled` | El módulo está apagado para el espacio de trabajo o no está asignado a este usuario | Pide a un administrador del espacio de trabajo que lo habilite. **No reintentes** |
+| 403 | (sin código) | El usuario no tiene el rol que exige la operación (por ejemplo, no es administrador del espacio de trabajo) | Usa el token de un usuario con ese rol |
+| 422 | (forma `detail`) | La solicitud no cumple el esquema (falta un campo, tipo incorrecto) | Corrige la solicitud. **Nunca reintentes** igual |
+| 429 | (sin código) | Superaste el límite por minuto de la operación o el cupo de tu plan | Ver [Límites de uso](/docs/saas/1platform-api/reference/rate-limits) |
+
+## Pagos en línea
+
+| Operación | HTTP | `data.code` | Significado | Qué hacer |
 |---|---|---|---|---|
-| `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El tenant no tiene una pasarela activa configurada. | Muestra un CTA de configuración al operador. **No reintentes.** |
-| `POST /users/transactions` | 422 | `CURRENCY_NOT_SUPPORTED` | La pasarela no admite la moneda solicitada. | Rechaza la solicitud en el cliente; muestra la lista de monedas admitidas de la pasarela. **No reintentes.** |
-| `POST /users/transactions` | 502 | `PAYMENT_PROVIDER_TIMEOUT` | El proveedor de pagos upstream agotó el tiempo de espera. | Reintenta con retroceso exponencial (máx. 3, base 30s). |
-| `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | La API de reembolsos aún no está implementada; usa el dashboard del operador. | **No reintentes.** Emite los reembolsos fuera de banda. |
-| `POST /webhooks/config/domains` | 409 | (sin código; solo `msg`) | El dominio ya está en `allowed_domains`. | Trátalo como éxito o llama primero a DELETE. |
-| `PUT /webhooks/config/events` | 400 | (sin código; solo `msg`) | El host de la URL no está en `allowed_domains`. | Registra el dominio mediante el [flujo de configuración de webhooks](../journeys/webhooks). |
-| (cualquiera) | 401 | (sin código; solo `msg`) | Token expirado o inválido. | Genera un token nuevo y reintenta **una vez**. |
-| (cualquiera) | 422 | (sin código; `detail` de Pydantic) | Error de validación de esquema. | Corrige en el cliente — nunca reintentes. |
-| (cualquiera) | 429 | (sin código; solo `msg`) | Límite de uso superado. | Respeta el header `Retry-After` (o usa 60s por defecto). |
-| `POST /users/transactions` | 502 | (sin código; `msg` genérico) | Proveedor de pagos upstream inaccesible / agotó el tiempo de espera. | Reintenta con retroceso exponencial (máx. 3 intentos, base 30s). |
+| `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El espacio de trabajo no tiene una pasarela de cobro activa | Un administrador la configura en el Panel. **No reintentes** |
+| `POST /users/transactions` | 422 | `PLATFORM_GATEWAY_REQUIRED` | El espacio de trabajo tiene pasarela, pero liquida directo al comercio y este cobro lo recauda la plataforma | No hay nada que configurar; contacta a soporte. **No reintentes** |
+| `POST /users/transactions` | 409 | `business_archived` | El comercio dueño de la sucursal indicada en `branch_id` está archivado | Usa una sucursal de un comercio activo |
+| `POST /users/transactions` | 403 | (sin código) | Tu rol en la sucursal indicada no permite cobrar | Usa un usuario con un rol que cobre en esa sucursal |
+| `POST /users/transactions` | 503 | (sin código) | El servicio de pagos no está disponible temporalmente | Comprueba que el cobro no se creó (ver [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar)) antes de reintentar |
+| `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | La API todavía no emite reembolsos | **No reintentes**. El reembolso de un pago aprobado te llega como evento `on_refunded` |
 
-## Convenciones
+## Autenticación
 
-- **Endpoints que devuelven `data.code`** — cualquiera donde el cliente necesite
-  ramificar según el *tipo* de fallo. Revisa siempre `data.code` antes de leer
-  `msg`, ya que `msg` es texto orientado a humanos que puede cambiar.
-- **Endpoints que devuelven solo `msg`** — 4xx/5xx genéricos donde el código de
-  estado HTTP lleva suficiente información.
-- **Pydantic 422** — los fallos de validación a nivel de esquema usan la forma por
-  defecto de FastAPI `{ detail: [...], message: "Validation error" }` en lugar del
-  ResponseWrapper. Consulta [formato de respuesta](./response-format).
+| Operación | HTTP | `data.code` | Significado | Qué hacer |
+|---|---|---|---|---|
+| `POST /auth/user/magic-link/verify` | 403 | `account_inactive` | Un administrador desactivó la cuenta | No reintentes; la cuenta debe reactivarse |
+| `POST /auth/user/magic-link/verify` | 410 | (sin código) | El enlace ya se usó o venció | Pide un enlace nuevo |
+| `POST /auth/user/refresh` | 409 | (sin código) | Se presentó un `refresh_token` ya usado | Trátalo como posible robo de sesión: vuelve a autenticar |
+| `POST /me/api-credentials/{credential_id}/reveal` | 409 | `credential_already_revealed` | Esa clave ya se mostró una vez | Crea una clave nueva |
 
-## Agregar nuevos códigos
+## Webhooks
 
-Cuando la API agrega un nuevo `data.code`, esta página se actualiza en el mismo cambio
-que despliega el código. Si encuentras un valor aquí sin una entrada correspondiente,
-es un error de documentación — por favor repórtalo.
+| Operación | HTTP | `data.code` | Significado | Qué hacer |
+|---|---|---|---|---|
+| `POST /webhooks/config/domains` | 400 | (sin código) | El dominio no es válido | Envía sólo el host, sin esquema, puerto ni ruta |
+| `POST /webhooks/config/domains` | 409 | (sin código) | El dominio ya está registrado | Trátalo como éxito |
+| `POST /webhooks/config/domains` | 422 | (sin código) | Se alcanzó el máximo de dominios del espacio de trabajo | Elimina uno que ya no uses |
+| `PUT /webhooks/config/events` | 422 | (sin código) | El host de la URL no está registrado, la URL no es `https://` o un header usa un nombre reservado | Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks) |
+| `POST /webhooks/config/rotate-secret` | 404 | (sin código) | Todavía no hay secreto de firma | Registra un dominio primero |
+
+## Cómo leer un error
+
+- Ramifica por `data.code` cuando está presente. `msg` es texto para personas y puede cambiar.
+- Cuando no hay `data.code`, el código de estado HTTP es la fuente de verdad.
+- Si encuentras un `data.code` que no está en la Referencia de API ni aquí, es un error de documentación:
+  repórtalo junto con el `x-request-id` de la respuesta.

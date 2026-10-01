@@ -1,0 +1,118 @@
+---
+title: Cobrar y conciliar
+description: Crear un cobro a un tercero, llevar al comprador al checkout, esperar el webhook y conciliar sin crear cobros duplicados.
+sidebar_position: 2
+---
+
+# Cobrar y conciliar
+
+Con esta guía cobras a un comprador desde tu backend y dejas el pedido conciliado. El orden importa por dos
+razones. Primero, el resultado del pago llega por webhook y no en la respuesta de creación. Segundo,
+`POST /users/transactions` **no es idempotente**: si lo repites a ciegas después de un error, puedes cobrar
+dos veces.
+
+Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN`, definidos en
+[Convenciones](/docs/saas/1platform-api/reference/convenciones).
+
+## Paso 1 — Deja lista la recepción del resultado
+
+Antes del primer cobro, un administrador del espacio de trabajo registra en la
+[configuración de webhooks](/docs/saas/1platform-api/plataforma/webhooks) dos cosas: el dominio de tu
+`return_url` y la URL que recibe cada evento. Va primero porque, sin el dominio registrado, la creación
+del cobro responde `400`. Y sin los eventos mapeados, te quedas sin la única señal que liquida un pedido.
+
+Mapea los siete eventos. `on_refunded` y `on_reversed` llegan después de un `on_approved`, cuando un pago
+aprobado se reembolsa o se revierte (por ejemplo, por un contracargo).
+
+## Paso 2 — Guarda tu referencia y crea el cobro
+
+Antes de llamar, guarda en tu base de datos el pedido con su `merchant_reference`. Es lo que te permite
+reconocer el cobro en el webhook y en la conciliación (paso 5).
+
+```bash
+curl -X POST "$BASE_URL/users/transactions" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 25.00, "merchant_reference": "order_abc123", "return_url": "https://tu-sitio.com/checkout/resultado?order={{merchant_reference}}", "customer_email": "ana@ejemplo.com"}'
+```
+
+Guarda `data.id` como `$TRANSACTION_ID` junto al pedido. Si operas más de una sucursal, envía `branch_id`
+para cobrar en la moneda de ese comercio. Si mandas `customer_email`, el comprador recibe el comprobante
+cuando el pago se aprueba.
+
+| Código | Causa |
+|---|---|
+| 400 | Datos inválidos, `customer_email` mal formado, o el host de `return_url` no está registrado (paso 1) |
+| 403 | Tu rol en el comercio de `branch_id` no permite cobrar, o tu cuenta no tiene un módulo de comercio (`module_disabled`) |
+| 404 | Tu cuenta no tiene saldo en esa moneda, o `branch_id` no corresponde a una sucursal tuya |
+| 409 | El comercio de `branch_id` está archivado (`data.code` = `business_archived`) |
+| 422 | Validación, o no hay pasarela utilizable (`data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED` o `PLATFORM_GATEWAY_REQUIRED`) |
+| 429 | Superaste el límite de 20 solicitudes por minuto |
+| 503 | El servicio de pago no está disponible por ahora |
+
+:::warning[No reintentes a ciegas]
+Si la llamada expira o responde `5xx`, **no la repitas** hasta comprobar si el cobro se creó (paso 5).
+Este endpoint no acepta clave de idempotencia. Cada intento puede crear una transacción y un checkout
+nuevos.
+:::
+
+[Referencia de API → Payments](/api-reference/1platform-api#tag/payments)
+
+## Paso 3 — Lleva al comprador al checkout
+
+Redirige al comprador a `data.payment_url` de inmediato. Cuando termina, su navegador vuelve a tu
+`return_url`. Ahí ya se reemplazaron `{{transaction_id}}` y `{{merchant_reference}}` si los usaste.
+
+La vuelta a `return_url` sirve para mostrarle al comprador una pantalla de "estamos confirmando tu pago".
+No confirma nada: el comprador puede cerrar la pestaña o abrir la URL a mano. No marques el pedido como
+pagado en este punto.
+
+## Paso 4 — Liquida el pedido con el webhook
+
+El webhook es lo que cambia el estado del pedido. Antes de confiar en el cuerpo,
+[verifica la firma](/docs/saas/1platform-api/reference/webhooks-security). Después, busca el pedido por
+`merchant_reference` o por `transaction_id`.
+
+- `approved`: el pago está hecho y puedes entregar.
+- `denied`, `cancelled`, `expired` o `dismiss`: el pago no se completó. Puedes ofrecer un cobro nuevo.
+- `refunded` o `reversed`: el dinero de un pago aprobado volvió al comprador. Revierte la entrega
+  según tu negocio.
+
+El mismo evento puede llegarte más de una vez. Procésalo de forma idempotente, con la clave
+`transaction_id` + `status`. El cuerpo completo está en
+[Webhooks: payload saliente](/docs/saas/1platform-api/reference/webhooks-payload).
+
+## Paso 5 — Concilia lo que no llegó o quedó en duda
+
+Hay dos casos que el webhook no resuelve: una entrega que se perdió y una creación que expiró en el
+paso 2. En los dos, consulta la transacción por su id:
+
+```bash
+curl "$BASE_URL/users/transactions/$TRANSACTION_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+El detalle trae `status`, `merchant_reference`, `completed_at` y `balance_effect`, que dice qué hizo el
+cobro con tus saldos.
+
+Si la creación expiró, no tienes `$TRANSACTION_ID`. Llama a `GET /users/transactions?limit=100&skip=0`:
+el listado viene del más reciente al más antiguo y sólo admite `limit` y `skip`, sin filtro por
+referencia. Además, cada fila del listado **no** trae `merchant_reference`. Toma las transacciones
+creadas desde tu intento, abre el detalle de cada una y compara su `merchant_reference` con la tuya.
+Sólo si no aparece, vuelve a crear el cobro.
+
+[Referencia de API → Payments](/api-reference/1platform-api#tag/payments)
+
+## Paso 6 — Comprobante y reembolsos
+
+Si el comprador no recibió el comprobante, `POST /users/transactions/{transaction_id}/receipt` lo
+reenvía al `customer_email` original. No se puede cambiar el destinatario. Si necesitas el PDF,
+`GET /users/transactions/{transaction_id}/receipt.pdf` lo descarga.
+
+Los reembolsos todavía no se emiten por la API: `POST /users/transactions/{transaction_id}/refund`
+responde `501`. Si la pasarela reporta un reembolso o una reversión de un pago aprobado, te llega como
+`on_refunded` u `on_reversed` (paso 4).
+
+[Referencia de API → Payments](/api-reference/1platform-api#tag/payments)

@@ -1,76 +1,88 @@
 ---
 title: Convenciones
-description: Lo que vale para todas las llamadas a la 1Platform API — autenticación, variables de los ejemplos, prerrequisitos, idempotencia y reintentos.
+description: Lo que vale para todas las llamadas a la 1Platform API — credenciales, quién llama, variables de los ejemplos, formato de respuesta, reintentos y operaciones asíncronas.
 sidebar_position: 0
 ---
 
 # Convenciones
 
-Todo lo que se repite en cada recorrido vive acá, una sola vez. Los [Recorridos](../journeys/autenticacion) dan por
-sentado lo de esta página y no lo redefinen.
+Lo que se repite en todas las llamadas vive aquí, una sola vez. Las guías de cada producto dan por sentado lo de
+esta página y no lo repiten. Los términos (espacio de trabajo, clave, token, comercio, sucursal) están definidos en
+el [Glosario](/docs/saas/1platform-api/reference/glossary).
 
-## Autenticación — dos tokens
+## Autenticación: dos tokens
 
-Las llamadas protegidas por el modelo Core usan **dos JWT**, que identifican cosas distintas. La referencia declara los requisitos de cada operación:
+Las operaciones protegidas llevan **dos JWT** que identifican cosas distintas. La Referencia de API declara lo que
+exige cada operación.
 
 | Token | Header | Identifica |
 |---|---|---|
-| **JWT de aplicación** | `Authorization: Bearer $APP_TOKEN` | Su aplicación |
-| **JWT de usuario** | `x-user-token: $USER_TOKEN` | El usuario final en cuyo nombre actúa |
+| **Token de aplicación** | `Authorization: Bearer $APP_TOKEN` | Tu espacio de trabajo |
+| **Token de usuario** | `x-user-token: $USER_TOKEN` | La persona en cuyo nombre actúas |
 
-Las claves API (`ak-…` de aplicación y `sk-…` de usuario) se canjean por estos JWT; no son los valores de los headers anteriores. Los JWT son de corta duración y se obtienen en el recorrido de
-[Autenticación](../journeys/autenticacion), que es el único que hay que hacer antes que cualquier otro.
+Las claves (`ak-…` de aplicación y `sk-…` de usuario) se **canjean** por estos tokens; nunca van en esos headers.
+De dónde salen las claves está en [Inicio rápido](/docs/saas/1platform-api/inicio-rapido#claves), y el canje y la
+renovación, en [Autenticación](/docs/saas/1platform-api/plataforma/autenticacion).
 
-```
-Authorization: Bearer $APP_TOKEN
-x-user-token: $USER_TOKEN
-Content-Type: application/json
-```
+## Quién llama
 
-## Variables usadas en los ejemplos
+No todas las operaciones aceptan a cualquier usuario. Antes de integrar un paso, confirma qué credencial pide:
 
-Los `curl` de los recorridos asumen estas variables. Exportalas una vez en tu terminal:
+| Quién | Credenciales | Ejemplos |
+|---|---|---|
+| Sólo la aplicación | Token de aplicación | Alta de usuarios, canje del token de usuario, enlace mágico |
+| Un usuario | Token de aplicación + token de usuario | Cobros, contenido, facturas, consultas propias |
+| Un administrador del espacio de trabajo | Token de aplicación + token de usuario de un administrador | Webhooks, dominios de retorno, solicitudes de acceso, usuarios del espacio de trabajo |
+| Un rol en la sucursal | Token de aplicación + token de usuario con ese rol en la sucursal | Cobrar o facturar desde una sucursal concreta |
+
+Además, cada producto depende de que su módulo esté habilitado para el espacio de trabajo y para el usuario: si no
+lo está, la operación responde `403` con `data.code` `module_disabled`.
+
+## Variables de los ejemplos
+
+Los `curl` de las guías usan estas variables:
 
 ```bash
-BASE_URL="https://api-qa.1platform.pro/api/v1"   # QA; producción: https://api.1platform.pro/api/v1
-APP_API_KEY="ak-your-app-api-key"
-USER_API_KEY="sk-user-abc123"
-APP_TOKEN=""     # lo devuelve el recorrido de Autenticación
-USER_TOKEN=""    # lo devuelve el recorrido de Autenticación
+BASE_URL="https://api.1platform.pro/api/v1"   # QA: https://api-qa.1platform.pro/api/v1
+APP_API_KEY="ak-tu-clave-de-aplicacion"
+USER_API_KEY="sk-tu-clave-de-usuario"
+APP_TOKEN=""     # lo devuelve POST /auth/token
+USER_TOKEN=""    # lo devuelve POST /users/token
 ```
 
-Las URLs base completas están en [Entornos](./environments).
+Las diferencias entre entornos están en [Entornos](/docs/saas/1platform-api/reference/environments).
 
 ## Prerrequisito: el sitio web (`website_id`)
 
-Varias capacidades trabajan **sobre un sitio**, no sobre la cuenta: Analytics, AdSense, Search Console
-y publicación de enlaces. Todas necesitan un `website_id` que se obtiene una sola vez registrando el
-sitio con `POST /users/websites`, y que después se reutiliza en todos esos recorridos.
-
-Si un recorrido empieza pidiéndote `$WEBSITE_ID` y no tenés ninguno, ese es el paso que falta. La
-gestión completa de sitios (alta, listado, baja) está en la referencia —
-[Websites →](/api-reference/1platform-api#tag/websites).
+Varias capacidades trabajan **sobre un sitio** y no sobre la cuenta: analítica, ingresos publicitarios, Search
+Console y publicación de enlaces. Todas necesitan un `website_id`, que obtienes una vez al registrar el sitio con
+`POST /users/websites` y reutilizas después. Si una guía te pide `$WEBSITE_ID` y no tienes ninguno, ese es el paso
+que falta: [Referencia de API → Websites](/api-reference/1platform-api#tag/websites).
 
 ## Formato de las respuestas
 
-Todas las respuestas usan el mismo sobre, y los errores el mismo catálogo de códigos. La forma exacta
-está documentada una sola vez en [Formato de respuesta](./response-format) y
-[Códigos de error](./error-codes) — los recorridos nombran el campo que hace falta para el paso
-siguiente, pero no reproducen el cuerpo.
+Las respuestas usan el sobre `{success, data, msg}`, salvo los errores de validación (`422`) y la falta de
+credenciales (`401` sin token), que responden con un objeto `detail`. Las formas están en
+[Formato de respuesta](/docs/saas/1platform-api/reference/response-format) y los códigos legibles por máquina, en
+[Códigos de error](/docs/saas/1platform-api/reference/error-codes). Las guías nombran el campo que necesita el
+paso siguiente; no reproducen el cuerpo.
 
-## Idempotencia y reintentos
+Cada respuesta trae un header `x-request-id`. Inclúyelo cuando pidas soporte: identifica tu llamada.
 
-- **Repetir una operación de escritura es seguro** cuando el endpoint acepta una clave de idempotencia;
-  la referencia lo indica por operación.
-- **`402 Payment Required`** significa saldo insuficiente: no reintentes sin recargar, el resultado no
-  va a cambiar.
-- **`429 Too Many Requests`** significa que superaste un límite de uso: reintentá con retroceso
-  exponencial. Los límites por familia de endpoint están en [Límites de uso](./rate-limits).
-- **`5xx`** es del lado del servidor: reintentá con retroceso exponencial, máximo 3 intentos.
+## Reintentos e idempotencia
 
-## Tiempos de espera
+- **Lecturas (`GET`)**: puedes reintentarlas con retroceso exponencial.
+- **Escrituras**: sólo son seguras de repetir cuando la operación declara el header `Idempotency-Key` en la
+  Referencia de API. Una escritura que mueve dinero o crea un recurso y falló con `5xx` o por tiempo agotado se
+  **verifica antes de reintentar**: puede haberse completado.
+- **`402 Payment Required`**: el saldo no alcanza. No reintentes sin recargar; el resultado no va a cambiar.
+- **`429 Too Many Requests`**: superaste el límite por minuto de la operación o el cupo de tu plan. Ver
+  [Límites de uso](/docs/saas/1platform-api/reference/rate-limits).
+- **`5xx`**: error del lado del servidor. Aplica las dos reglas anteriores según sea lectura o escritura.
 
-Las operaciones que llaman a servicios externos (generación de contenido, aprovisionamiento de
-propiedades, emisión fiscal) son **asíncronas**: devuelven un identificador de trabajo y hay que
-sondear su estado. Ningún recorrido asume que una de esas llamadas termina dentro de la petición HTTP
-— el sondeo es parte del recorrido, y por eso esos recorridos existen.
+## Operaciones asíncronas
+
+Algunas operaciones largas son asíncronas —la generación de contenido, el aprovisionamiento de analítica y las
+ejecuciones de agentes, entre otras—: responden `202` con un identificador que consultas hasta que el trabajo
+termina. La guía de cada producto incluye ese sondeo como un paso. La emisión de facturas, en cambio, responde en la
+misma llamada.

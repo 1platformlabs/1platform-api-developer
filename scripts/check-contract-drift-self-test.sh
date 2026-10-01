@@ -302,10 +302,10 @@ title: t
 Llamá a \`GET /public/suggest\` para autocompletar.
 EOF"
 
-# El límite de alcance de la regla de cuerpos pegados, declarado como caso: si
-# alguien la vuelve a extender a Atlas sin reescribir esas 20 páginas, CI se
-# pone rojo en cada PR y este caso lo dice antes de que pase.
-expect_clean "el árbol de Atlas queda fuera de la regla de cuerpos pegados" \
+# Atlas ya no queda fuera de la regla de cuerpos pegados: sus páginas se
+# reescribieron a ella (portada-por-productos). Si alguien vuelve a excluir el
+# árbol, este caso se pone rojo.
+expect_caught "response body pasted" "el árbol de Atlas también cae en la regla de cuerpos pegados" \
   "$(declare -f write_subject); rm -f $SUBJECT; cat > $ATLAS_DIR/_selftest.mdx <<'EOF'
 ---
 title: t

@@ -92,19 +92,10 @@ EXEMPT_RE='docs/saas/1platform-api/reference/(response-format|error-codes|webhoo
 DOC_FILES=$(find docs -name '*.mdx' 2>/dev/null | sort)
 SCAN_FILES=$(printf '%s\n' "$DOC_FILES" | grep -vE "$EXEMPT_RE" || true)
 
-# Rule 1 (a response body pasted into the prose) is the rule the `journeys/`
-# rewrite was built to satisfy, and it is enforced over every page of the tree
-# this epic reworked — including any file added later, since the surface is
-# discovered, not listed. The Atlas tree has NOT been rewritten to it: 20 of its
-# pages still paste a body, so enforcing it there today would fail every future
-# PR on prose no one in this epic wrote or reviewed. That is a scope boundary,
-# not an exemption — rule 2 (a citation naming an operation that does not exist)
-# still covers the Atlas pages, against the Atlas spec.
-#
-# When the Atlas tree gets the same treatment, delete this and the count below.
-BODY_SCOPE_OUT_RE='^docs/saas/atlas-api/'
-BODY_FILES=$(printf '%s\n' "$SCAN_FILES" | grep -vE "$BODY_SCOPE_OUT_RE" || true)
-body_skipped=$(printf '%s\n' "$SCAN_FILES" | grep -cE "$BODY_SCOPE_OUT_RE" || true)
+# Rule 1 (a response body pasted into the prose) covers EVERY page, Atlas
+# included. The Atlas tree was scoped out until its rewrite to this rule
+# (portada-por-productos); it no longer is, so there is no scope boundary left.
+BODY_FILES="$SCAN_FILES"
 
 # ── D-7: a check with nothing to check must fail, not pass ───────────────────
 # This is the defect that retired check-provider-leak.mjs: once its subject was
@@ -267,5 +258,5 @@ if [ "$FAILED" -ne 0 ]; then
   printf '%sContract-drift check failed.%s See the findings above.\n' "$RED" "$RESET"
   exit 1
 fi
-printf '%sAll contract-drift checks passed.%s (%s files scanned; %s outside the body rule)\n' \
-  "$GREEN" "$RESET" "$(printf '%s\n' "$SCAN_FILES" | grep -c . || true)" "${body_skipped:-0}"
+printf '%sAll contract-drift checks passed.%s (%s files scanned)\n' \
+  "$GREEN" "$RESET" "$(printf '%s\n' "$SCAN_FILES" | grep -c . || true)"

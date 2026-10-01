@@ -1,0 +1,183 @@
+---
+title: Emitir una factura
+description: Del comercio nuevo a la factura FEL certificada, en el orden que exige el ente tributario — comercio, activación, sucursal y emisión.
+sidebar_position: 2
+---
+
+# Emitir una factura
+
+Con esta guía llegas de un comercio que todavía no existe a una factura FEL certificada. El orden no es
+opcional:
+
+- La factura se certifica con el NIT del comercio, así que primero existe el comercio.
+- Sólo se puede facturar con la facturación electrónica activa, así que después se activa.
+- La factura queda registrada bajo el establecimiento de una sucursal, así que antes de emitir se resuelve
+  la sucursal.
+
+Si te saltas un paso, la emisión responde `409` o `422`.
+
+Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN`, definidos en
+[Convenciones](/docs/saas/1platform-api/reference/convenciones).
+
+## Paso 1 — Crea el comercio con su primera sucursal
+
+Todo lo demás cuelga del comercio y de su NIT (`documentNumber`). Un comercio nunca se crea sin
+sucursal: la mandas en el mismo cuerpo y quedas como su administrador. `currency` también es
+obligatoria, no se puede cambiar después y tiene que ser una de las monedas de tu saldo (las ves en
+`billings` de `GET /users/billing`).
+
+```bash
+curl -X POST "$BASE_URL/businesses" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Mi Empresa S.A.", "documentType": "NIT", "documentNumber": "12345678", "address": "Zona 10, Ciudad de Guatemala", "currency": "GTQ", "branch": {"name": "Casa matriz"}}'
+```
+
+Guarda `data.id` como `$BUSINESS_ID`.
+
+| Código | Causa |
+|---|---|
+| 403 | El módulo de comercios no está disponible para tu cuenta (`module_disabled`) |
+| 409 | Ya existe un comercio con ese NIT |
+| 422 | Falta un campo obligatorio: `name`, `documentType`, `documentNumber`, `address`, `currency` o `branch.name` |
+
+[Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)
+
+## Paso 2 — Activa la facturación electrónica
+
+Sin activación, `POST /businesses/{businessId}/invoices` responde `409`. Este camino usa las credenciales
+del portal tributario del comercio. Así no le pides un archivo de certificado `.pfx` que casi nunca tiene
+a mano. Si lo tiene, `POST /businesses/{businessId}/invoicing/activation` acepta el archivo.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/activation/sat" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"satUser": "12345678", "satPassword": "contrasena-del-portal", "telefono": "50212345678"}'
+```
+
+- Las credenciales se usan sólo en esta llamada y no se guardan.
+- La respuesta trae `signaturePassword`, la contraseña del certificado nuevo. Llega **una sola vez**:
+  guárdala ahora o no podrás recuperarla.
+- El estado pasa a `otp_pending` y el comercio recibe un código por WhatsApp.
+- La llamada conversa con el portal en varios pasos. Dale a tu cliente HTTP un tiempo de espera amplio.
+
+Si el comercio ya tiene un certificado, la llamada se rechaza salvo que envíes `force: true`. Emitir uno
+nuevo **invalida el anterior**, incluida cualquier copia que se use fuera de 1Platform.
+
+| Código | Causa |
+|---|---|
+| 400 | El portal tributario rechazó las credenciales o pidió un código adicional |
+| 403 | Tu rol en la sucursal no es administrador |
+| 409 | El comercio no es elegible o ya tiene un certificado |
+
+[Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Paso 3 — Verifica el código y espera a que quede lista
+
+El certificado ya existe, pero hasta confirmar el código el comercio se queda en `otp_pending`.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/activation/verify" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "745631"}'
+```
+
+El estado pasa a `activating`. La activación tarda: no es inmediata. Consulta
+`GET /businesses/{businessId}/invoicing/activation` hasta que `display_status` sea `active` y `ready` sea
+`true`. Un código inválido o vencido responde `422`, y `409` significa que no hay una activación pendiente.
+
+[Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Paso 4 — Sincroniza los establecimientos y elige la sucursal
+
+El ente tributario certifica bajo un **establecimiento**, y ese código vive en la sucursal. La
+sincronización trae los establecimientos del registro tributario:
+
+- La sucursal que creaste en el paso 1 recibe el establecimiento preferido.
+- Cada establecimiento activo que sobra recibe una sucursal propia.
+- No borra nada. Puedes repetirla sin crear duplicados.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/establishments/sync" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Después lista las sucursales con `GET /businesses/{businessId}/branches` y guarda como `$BRANCH_ID` el
+`id` de la que va a emitir. Si la respuesta de la sincronización avisa que hay varias sucursales con
+establecimiento, toda emisión tiene que nombrar su `branchId`.
+
+| Código | Causa |
+|---|---|
+| 409 | La activación no terminó (`establishment_sync_not_activated`), ya hay una sincronización en curso (`establishment_sync_in_progress`), el contribuyente no aprobó la integración (`fel_integration_not_approved`) o el comercio está archivado (`business_archived`) |
+| 503 | El registro de establecimientos no responde (`establishment_catalog_unavailable`) o la sincronización no está habilitada (`establishment_sync_disabled`) |
+
+[Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)
+
+## Paso 5 — Emite la factura
+
+Ahora ya tienes el NIT, la activación lista y la sucursal resuelta. Por defecto la factura se emite en
+esta misma llamada.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"branchId": "'"$BRANCH_ID"'", "items": [{"description": "Servicio de consultoría", "unit_price": 1000.00, "quantity": 1}], "receptorInfo": {"name": "Cliente S.A.", "documentType": "NIT", "documentNumber": "98765432", "email": "cliente@ejemplo.com"}}'
+```
+
+Guarda `data.id` como `$INVOICE_ID`. Si facturas a una persona y no a una empresa, `POST /identify`
+busca sus datos por CUI/DPI y te ayuda a llenar `receptorInfo`. Sólo consulta, no emite nada.
+
+| Código | Causa |
+|---|---|
+| 404 | El comercio no existe, o el `branchId` no corresponde a una sucursal suya |
+| 409 | La facturación electrónica del comercio todavía no está lista (pasos 2 y 3) |
+| 422 `branch_selection_required` | Hay varias sucursales con establecimiento y no nombraste ninguna. `data.branches` trae las opciones. No se emitió nada ni se consumió correlativo: reintenta con `branchId` |
+| 422 | Datos inválidos o rechazo de la certificación. Revisa el NIT del receptor y los ítems |
+
+[Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Paso 6 — Consulta el resultado certificado
+
+La consulta confirma el estado real sin volver a emitir, así no arriesgas una factura duplicada.
+
+```bash
+curl "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Guarda `uid`, `serieFEL` y `numeroFEL`: identifican la factura ante el ente tributario. Si `fel_synced`
+es `false`, faltan los datos extendidos del reporte FEL, pero esos tres campos ya son válidos. El PDF y
+el XML certificados se descargan con `GET /businesses/{businessId}/invoices/{invoiceId}/pdf` y
+`GET /businesses/{businessId}/invoices/{invoiceId}/xml`.
+
+[Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
+
+## Paso 7 — Anula la factura si hace falta
+
+Anular no es un cambio de estado local: anula el documento ante el ente tributario. Por eso hazlo sólo
+después de confirmar en el paso 6 que la factura se certificó.
+
+```bash
+curl -X DELETE "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Error en los datos del receptor"}'
+```
+
+| Código | Causa |
+|---|---|
+| 400 | La factura ya está anulada |
+| 404 | El comercio o la factura no existen |
+| 422 | La anulación falló en la certificación |
+
+[Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)

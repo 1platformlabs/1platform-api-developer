@@ -1,0 +1,51 @@
+---
+title: Retiros
+description: Consulta tu saldo retirable, registra dónde quieres recibir el dinero y pide la transferencia de lo cobrado.
+sidebar_position: 1
+---
+
+# Retiros
+
+<p className="lead">Recibe el dinero que cobraste. Consultas tu saldo retirable, registras a qué cuenta quieres que te paguen y pides un retiro. Una persona hace la transferencia y registra su referencia.</p>
+
+## Cómo funciona
+
+- **Saldo retirable.** Se forma con lo que cobras con [Links de pago](/docs/saas/1platform-api/links-de-pago) y, cuando la plataforma lleva esa cuenta, con los cobros de tu propia integración. Es una cifra **distinta** del saldo prepagado de [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo). Los dos nunca se suman, y el saldo prepagado no se convierte en efectivo. Se lleva por moneda.
+- **Método de pago.** Es el destino donde quieres recibir el dinero. Se guarda cifrado y nunca se edita: un destino distinto es un método nuevo. Un método nuevo, o uno que acabas de marcar como predeterminado, no puede recibir dinero hasta que pasa un periodo de espera.
+- **Cotización.** Antes de pedir, el servidor te dice cuánto recibirías: la comisión, el neto, los montos mínimo y máximo, y quién liberará el pago.
+- **Retiro.** Pedirlo descuenta el saldo retirable y deja el retiro esperando liberación. También puedes fijar un periodo para que los retiros se generen solos.
+- **Quién transfiere.** Nadie libera su propio retiro.
+  - Si el dinero se cobró en la cuenta de cobro propia de tu espacio de trabajo, lo libera un **administrador del espacio de trabajo**.
+  - En los demás casos, lo libera la plataforma.
+
+  Si la transferencia falla, el monto completo vuelve a tu saldo retirable.
+
+## Qué necesitas
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Retiros encendido para tu espacio de trabajo: viene apagado por defecto. Si no está encendido, recibes `403` con `code` = `CASH_OUT_DISABLED`. Además, el módulo tiene que estar asignado a tu cuenta; si no, recibes `403` `module_disabled`.
+- **Para cambiar algo, una sesión iniciada por una persona.** Registrar o borrar métodos, cambiar el periodo y pedir un retiro exige un token de usuario obtenido con el [enlace mágico](/docs/saas/1platform-api/plataforma/autenticacion) (`POST /auth/user/magic-link/verify`). Un token de usuario canjeado desde una clave `sk-…` sólo puede leer. Con él, las escrituras responden `403` `CASH_OUT_SESSION_REQUIRED`. `GET /users/cash-out/summary` te lo anticipa en `writes_require_sign_in`.
+- En esta superficie, el código de error viaja en `code`, en la raíz de la respuesta, no dentro de `data`.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `GET /users/cash-out/summary` | Saldo retirable por moneda, periodo vigente y si hay un método listo para recibir |
+| `GET /users/cash-out/movements` | Estado de cuenta del saldo retirable, del movimiento más reciente al más antiguo |
+| `GET /users/cash-out/methods` | Tus métodos de pago, con el destino enmascarado |
+| `POST /users/cash-out/methods` | Registrar un método |
+| `PATCH /users/cash-out/methods/{method_id}` | Cambiar la etiqueta o marcarlo como predeterminado |
+| `DELETE /users/cash-out/methods/{method_id}` | Dar de baja un método |
+| `PUT /users/cash-out/settings` | Fijar cada cuánto se genera un retiro automático (`null` = seguir al espacio de trabajo) |
+| `POST /users/cash-out/quote` | Cotizar un retiro |
+| `POST /users/cash-out/payouts` | Pedir un retiro |
+| `GET /users/cash-out/payouts` | Tus retiros, del más reciente al más antiguo, con filtro por `status` |
+
+Si un `POST /users/cash-out/payouts` expira, reintenta con el mismo `idempotency_key` y los mismos datos: te devuelve el retiro que ya existe. Si cambias los datos con la misma clave, la llamada se rechaza.
+
+### Si administras el espacio de trabajo
+
+Si tu espacio de trabajo cobra con su propia cuenta de cobro, sus administradores liberan los retiros de sus comercios. Ven la cola, revelan el destino (cada revelación queda auditada), hacen la transferencia y la registran como pagada o fallida. Para esto se usan las operaciones `/admin/cash-out/payouts…` del mismo tag, con el token de usuario de un administrador.
+
+Todas las operaciones: [Referencia de API → Cash Out](/api-reference/1platform-api#tag/cash-out).

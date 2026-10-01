@@ -1,53 +1,30 @@
 ---
-title: Primeros pasos
-description: Realice su primera llamada autenticada a la API de 1Platform con el modelo de dos tokens
+title: Documentación para desarrolladores de 1Platform
+sidebar_label: Inicio
+description: Integra los productos de 1Platform en tu aplicación — cobros, facturación electrónica, envíos, sitios, analítica, agentes de IA — con una sola API REST.
 sidebar_position: 1
+sidebar_custom_props:
+  icon: home
+  description: Productos y accesos rápidos
 hide_title: true
+hide_table_of_contents: true
 ---
 
-<p className="lead">Esta guía le lleva desde cero hasta su primera respuesta autenticada contra la <strong>1Platform API</strong></p>
+import Link from '@docusaurus/Link';
+import {ProductCards, QuickCards} from '@site/src/components/HomeCards';
 
-<span id="1-obtén-tus-tokens" />
-## 1. Obtenga sus tokens {#tokens}
+<h2 id="productos" className="docs-home__title">Productos disponibles</h2>
 
-La 1Platform API usa un modelo de **dos tokens**:
-
-- **Token de aplicación** — canjee su clave de aplicación en `POST /api/v1/auth/token`. El JWT recibido se envía como `Authorization: Bearer $APP_TOKEN`
-- **Token de usuario** — canjee la clave del usuario en `POST /api/v1/users/token`, usando el token de aplicación. El JWT recibido se envía como `x-user-token: $USER_TOKEN`
-
-Las claves de aplicación se gestionan desde el Panel de su espacio de trabajo. Las claves API y los JWT son credenciales distintas: envíe los JWT en los headers de las llamadas protegidas. El recorrido completo está en [Autenticación](./journeys/autenticacion).
-
-<span id="2-elige-un-entorno" />
-## 2. Elija un entorno {#entornos}
-
-<div className="table-scroll" role="region" aria-label="Entornos de la API" tabIndex={0}>
-
-| Entorno | URL base |
-|---|---|
-| Producción | `https://api.1platform.pro/api/v1` |
-| QA / sandbox | `https://api-qa.1platform.pro/api/v1` |
-
+<div className="docs-home">
+  <section className="docs-home__products" aria-labelledby="productos">
+    <ProductCards />
+  </section>
+  <aside className="docs-home__quick" aria-label="Accesos rápidos">
+    <QuickCards />
+  </aside>
 </div>
 
-Consulte los detalles completos en [Entornos](./reference/environments).
-
-<span id="3-realiza-tu-primera-llamada" />
-## 3. Realice su primera llamada {#primera-llamada}
-
-```bash
-curl https://api-qa.1platform.pro/api/v1/users/profile \
-  -H "Authorization: Bearer $APP_TOKEN" \
-  -H "x-user-token: $USER_TOKEN"
-```
-
-Toda respuesta llega dentro del mismo sobre: lo que solicitó viaja en `data`, y `success` indica el resultado de la operación. La forma exacta está en [Formato de respuestas](./reference/response-format).
-
-Si una llamada requiere créditos que no tiene, recibirá `402 Payment Required`; si supera un límite de uso, `429 Too Many Requests`. Consulte los [Códigos de error](./reference/error-codes) y los [Límites de uso](./reference/rate-limits).
-
-<span id="4-siguientes-pasos" />
-## 4. Siguientes pasos {#siguientes-pasos}
-
-<div className="docs-actions">
-  <a href="/api-reference/1platform-api">Referencia interactiva de la API</a>
-  <a href="/docs/saas/1platform-api/journeys/autenticacion">Recorridos de integración</a>
-</div>
+<section className="docs-home__more" aria-labelledby="otra-api">
+  <h2 id="otra-api">¿Construyes una plataforma de contenido?</h2>
+  <p>La <Link to="/docs/saas/atlas-api/overview">Atlas API</Link> es un producto independiente para catálogos, derechos de acceso y entrega de contenido multitenant. Tiene su propia autenticación y su propia <Link to="/api-reference/atlas-api">referencia</Link>.</p>
+</section>

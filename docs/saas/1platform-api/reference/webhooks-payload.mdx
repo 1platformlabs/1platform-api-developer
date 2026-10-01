@@ -1,118 +1,108 @@
 ---
 title: Webhooks — payload saliente
-description: El cuerpo que 1Platform envía a tu endpoint cuando una transacción cambia de estado, con el enum de status y el mapeo a una máquina de estados propia.
+description: El cuerpo que 1Platform envía a tu endpoint cuando una transacción cambia de estado, los valores de status y cómo llevarlos a tu propia máquina de estados.
 sidebar_position: 8
 ---
 
 # Webhooks — payload saliente
 
-Esta página documenta lo que **1Platform te envía a vos**, no lo que vos le pedís a 1Platform. Por eso
-no vive en la [referencia interactiva](/api-reference/1platform-api): la especificación OpenAPI
-describe operaciones que un cliente invoca, y aquí el cliente es nuestro servidor llamando al tuyo.
-Es el único cuerpo de mensaje que esta documentación reproduce, y por esa razón.
+Esta página documenta lo que **1Platform te envía a ti**, no lo que tú le pides a 1Platform. Por eso no vive en la
+[Referencia de API](/api-reference/1platform-api): la especificación OpenAPI describe operaciones que un cliente
+invoca, y aquí el cliente es nuestro servidor llamando al tuyo.
 
-El recorrido que lo pone en contexto — registrar la URL, verificar la firma, responder — es
-[Webhooks](../journeys/webhooks).
+La guía que lo pone en contexto —registrar la URL, verificar la firma, responder— es
+[Webhooks](/docs/saas/1platform-api/plataforma/webhooks).
 
 ## Payload canónico {#canonical-payload}
 
-Si configuraste el manejador de eventos **sin** un `body_template`, el cuerpo tiene esta forma:
+Si configuraste el evento **sin** `body_template`, el cuerpo tiene esta forma:
 
 ```json
 {
   "event": "on_approved",
   "transaction_id": "65a1b2c3d4e5f6789abcdef0",
-  "external_transaction_id": "MIGOGT123456",
+  "external_transaction_id": "PGT123456",
   "status": "approved",
   "amount": 78.00,
   "currency": "GTQ",
   "merchant_amount": 10.00,
   "merchant_currency": "USD",
-  "metadata": { "order_id": "...", "campaign_id": "..." },
-  "merchant_reference": "bower_order_xyz",
+  "metadata": { "order_id": "..." },
+  "merchant_reference": "pedido-1042",
   "reference": "GT123456",
   "timestamp": "2026-04-29T10:35:00+00:00"
 }
 ```
 
-Si configuraste un `body_template`, el dispatcher emite lo que vos definiste — el cuerpo canónico es el
-**valor por defecto** cuando renunciás a las plantillas.
+Si configuraste un `body_template`, recibes lo que definiste en él: el cuerpo canónico es lo que llega cuando no hay
+plantilla.
 
-:::info[`status` y `event` dicen lo mismo, siempre]
-`status` es el estado **al que acaba de transicionar** la transacción, y siempre concuerda con `event`:
-`on_approved` viaja con `"status": "approved"`, `on_denied` con `"denied"`, y así con los cinco. Podés
-enrutar por cualquiera de los dos.
+`status` es el estado **al que acaba de pasar** la transacción y siempre concuerda con `event`: `on_approved` viaja
+con `"status": "approved"`, `on_refunded` con `"refunded"`, y así con los siete. Puedes enrutar por cualquiera de
+los dos.
 
-**Corregido el 2026-08-18.** Hasta esa fecha `status` traía el estado que la transacción tenía **al
-crearse** —normalmente `"created"`— junto al `event` correcto. Un manejador que enrutaba por `status`
-registraba como pendientes pagos realmente aprobados, sin ningún error visible en ninguna de las dos
-partes. Si escribiste una defensa contra eso (por ejemplo, ignorar `status` y enrutar sólo por
-`event`), sigue siendo válida: `event` no cambió y las dos lecturas coinciden ahora.
-:::
-
-## Referencia de campos
+## Campos
 
 | Campo | Origen | Úsalo para |
 |---|---|---|
-| `event` | 1Platform | Enrutamiento dentro de tu manejador cuando una URL atiende los cinco eventos |
-| `transaction_id` | 1Platform | Correlacionar con el identificador que almacenaste al momento de crear |
-| `external_transaction_id` | proveedor upstream | Tickets de soporte del operador — el valor que muestra el panel del proveedor |
-| `status` | 1Platform | Estado final de la transacción. Ver el enum más abajo |
-| `amount` | moneda del proveedor | Solo informativo — el monto que cobró el proveedor upstream |
-| `currency` | moneda del proveedor | El código de moneda del proveedor (p. ej. `GTQ`) |
-| `merchant_amount` | **tu** moneda | **Úsalo para el ledger**. El monto que cotizaste originalmente |
-| `merchant_currency` | tu moneda | P. ej. `USD` |
-| `metadata` | reflejado | El objeto de forma libre que enviaste al momento de crear |
-| `merchant_reference` | reflejado | El identificador de forma libre que enviaste al crear. Úsalo como clave determinista para idempotencia |
-| `reference` | proveedor upstream | Referencia interna del proveedor (p. ej. ID de autorización de la tarjeta) |
-| `timestamp` | 1Platform | Hora de la última actualización de la transacción (ISO 8601 con offset) |
+| `event` | 1Platform | Enrutar dentro de tu receptor cuando una URL atiende varios eventos |
+| `transaction_id` | 1Platform | Correlacionar con el identificador que guardaste al crear la transacción |
+| `external_transaction_id` | Pasarela | Tickets de soporte. Puede venir vacío |
+| `status` | 1Platform | Estado al que pasó la transacción. Ver la tabla de abajo |
+| `amount` | Pasarela | Sólo informativo: el monto que cobró la pasarela, en su moneda |
+| `currency` | Pasarela | La moneda de la pasarela (p. ej. `GTQ`) |
+| `merchant_amount` | Tu moneda | **Úsalo para tu contabilidad**: el monto que cotizaste |
+| `merchant_currency` | Tu moneda | P. ej. `USD` |
+| `metadata` | Reflejado | El objeto libre que enviaste al crear la transacción |
+| `merchant_reference` | Reflejado | El identificador libre que enviaste al crear. Úsalo como clave para deduplicar |
+| `reference` | Pasarela | Referencia de la pasarela (p. ej. la autorización de la tarjeta) |
+| `timestamp` | 1Platform | Hora de la última actualización de la transacción (ISO 8601 con zona horaria) |
 
-:::warning[amount vs merchant_amount]
-El campo `amount` está en la moneda del **proveedor** (a menudo GTQ) porque el procesador de pagos
-upstream convierte USD a GTQ al momento del cobro. **Nunca acredites a un vendedor usando `amount`** —
-usá `merchant_amount` + `merchant_currency`. El `amount` es informativo; el tipo de cambio es opaco
-para el comercio.
+:::warning[`currency` cambia de sentido entre la respuesta y el webhook]
+En la respuesta de `POST /users/transactions`, `currency` es **tu** moneda (y `currency_provider`, la de la
+pasarela). En el webhook es al revés: `currency` es la de la pasarela y la tuya viaja en `merchant_currency`. Nunca
+acredites usando `amount`: usa `merchant_amount` y `merchant_currency`.
 :::
 
-## Enum de status
+## Valores de `status`
 
-| `status` entrante | ¿Final? | Significado |
-|---|---|---|
-| `created` | No | Transacción creada, el comprador aún no pagó. **Nunca llega en una notificación**: si lo ves, es el defecto corregido el 2026-08-18 descrito arriba |
-| `approved` | Sí | El comprador pagó; los fondos se liquidaron |
-| `denied` | Sí | Tarjeta rechazada |
-| `cancelled` | Sí | El comprador canceló antes de pagar |
-| `expired` | Sí | La URL de pago expiró |
-| `dismiss` | Sí | El comprador cerró la ventana de pago |
-
-## Mapeo a tu máquina de estados
-
-La mayoría de los marketplaces sólo necesitan tres estados (`pending`, `paid`, `failed`). Mapeá los
-cinco valores terminales así:
-
-| `status` entrante | Estado de tu máquina |
+| `status` | Significado |
 |---|---|
-| `approved` | `paid` (y procedé al cumplimiento) |
-| `denied` | `failed` |
-| `cancelled` | `failed` |
-| `expired` | `failed` |
-| `dismiss` | `failed` |
+| `approved` | El comprador pagó |
+| `denied` | El pago fue rechazado |
+| `cancelled` | El comprador canceló antes de pagar |
+| `expired` | La URL de pago venció sin que se pagara |
+| `dismiss` | El comprador cerró la ventana de pago |
+| `refunded` | Un pago aprobado fue reembolsado |
+| `reversed` | Un pago aprobado fue revertido, por ejemplo por un contracargo |
 
-Si implementás reembolsos fuera de banda (vía el panel del operador), exponelos como un estado
-adicional `refunded`; aún no hay un webhook automático para reembolsos.
+El estado inicial `created` nunca llega en un webhook. `refunded` y `reversed` sólo pueden llegar después de
+`approved`.
 
-## El sobre de respuesta no aplica acá
+## Llevarlo a tu máquina de estados
 
-Los payloads salientes **no** se envuelven en `{ success, data, msg }`. Son objetos planos (canónicos o
-con plantilla). Esto es lo que la mayoría de los integradores espera de un receptor de webhooks, y es
-lo que mantiene la firma HMAC calculable sobre el cuerpo crudo. La regla completa está en
-[Formato de respuesta](./response-format).
+Si tu sistema maneja pocos estados (por ejemplo `pending`, `paid`, `failed`, `refunded`), este es un mapeo
+razonable:
+
+| `status` | Estado en tu sistema |
+|---|---|
+| `approved` | `paid` (y procede a cumplir el pedido) |
+| `denied`, `cancelled`, `expired`, `dismiss` | `failed` |
+| `refunded`, `reversed` | `refunded` (revierte el cumplimiento y el registro contable) |
+
+La API todavía no permite **emitir** reembolsos (`POST /users/transactions/{id}/refund` responde `501`). Un
+reembolso o una reversión hechos por otra vía te llegan igualmente como `on_refunded` u `on_reversed`.
+
+## Sin sobre de respuesta
+
+Los webhooks **no** vienen en `{ success, data, msg }`: son objetos planos, canónicos o con plantilla. Eso es lo
+que permite calcular la firma sobre el cuerpo crudo. Ver
+[Formato de respuesta](/docs/saas/1platform-api/reference/response-format).
 
 ## Idempotencia de tu lado {#idempotency-on-the-merchant-side}
 
-1Platform entrega los webhooks **at-least-once** con reintentos — ver
-[Reintentos y entrega](./retry-and-delivery). Tu manejador **debe** deduplicar.
+La entrega es **al menos una vez**, con reintentos; ver
+[Reintentos y entrega](/docs/saas/1platform-api/reference/retry-and-delivery). Tu receptor **debe** deduplicar.
 
-La clave recomendada es `(transaction_id, event)`. Si fijás `merchant_reference` al momento de crear,
-también podés deduplicar por `(merchant_reference, event)` para alinearte con tus propios
-identificadores de pedido.
+La clave recomendada es `(transaction_id, event)`. Si envías `merchant_reference` al crear la transacción, también
+puedes deduplicar por `(merchant_reference, event)` para alinearte con tus propios identificadores de pedido.

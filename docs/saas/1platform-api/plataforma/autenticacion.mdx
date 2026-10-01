@@ -1,0 +1,153 @@
+---
+title: Autenticación
+description: Cómo se encadenan las credenciales de la 1Platform API — token de aplicación, alta de usuario, token de usuario y enlace mágico — y cómo mantenerlas vigentes.
+sidebar_position: 2
+---
+
+# Autenticación
+
+Toda llamada protegida lleva dos tokens: el **token de aplicación** (`Authorization: Bearer $APP_TOKEN`), que
+identifica a tu espacio de trabajo, y el **token de usuario** (`x-user-token: $USER_TOKEN`), que identifica a la
+persona en cuyo nombre actúas. Los dos son JWT de corta duración y se obtienen canjeando claves de larga vida: la
+clave de aplicación (`ak-…`) y la clave de usuario (`sk-…`). Cada paso necesita el resultado del anterior, y por eso
+el orden importa.
+
+Hay dos caminos hacia el token de usuario: **servidor a servidor** (tu backend da de alta al usuario y guarda su
+clave) y **enlace mágico** (la persona entra con un enlace que recibe por correo). De dónde sale tu clave de
+aplicación está en [Inicio rápido → Consigue tus claves](/docs/saas/1platform-api/inicio-rapido#claves).
+
+## Paso 1 — Token de aplicación
+
+Sin token de aplicación no hay nada más: ni alta de usuario ni token de usuario. Canjea tu clave de aplicación:
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'"$APP_API_KEY"'"}'
+```
+
+Guarda `data.access_token` como `$APP_TOKEN` y `data.expires_in` (segundos) para saber cuándo renovarlo. Un `401`
+indica que la clave no es válida, fue revocada o pertenece al otro entorno. Un `429` indica que superaste el límite de
+este canje: 10 solicitudes por minuto desde una misma dirección, y además un tope por clave.
+
+[Referencia de API → Get App Token](/api-reference/1platform-api#tag/get-app-token)
+
+## Paso 2 — Alta del usuario desde tu backend
+
+Si tu backend es quien conoce a sus usuarios, dalos de alta con el token de aplicación. La respuesta trae la clave
+de usuario (`sk-…`) que el paso siguiente necesita. La misma llamada deja creado el registro de saldo y la
+suscripción del usuario: no hay un paso aparte para eso.
+
+```bash
+curl -X POST "$BASE_URL/users" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "carlos.mendez@example.com"}'
+```
+
+Guarda `data.api_key` como `$USER_API_KEY` en un lugar seguro: es la credencial de ese usuario en este flujo.
+`currency` es opcional; si la omites, el saldo principal del usuario usa la primera moneda del catálogo de tu
+espacio de trabajo. Un `409` indica que ese correo ya tiene cuenta: la API no devuelve la clave de un usuario
+existente, así que pídele que entre por enlace mágico (paso 4) o que cree su propia clave de usuario desde la
+sección **API** del Panel. Un `400` indica que el correo no tiene un formato válido.
+
+[Referencia de API → Users & Tokens](/api-reference/1platform-api#tag/users-tokens)
+
+## Paso 3 — Token de usuario
+
+Canjea la clave de usuario por un token de usuario. Este es el valor que viaja en `x-user-token` junto al token de
+aplicación del paso 1.
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'"$USER_API_KEY"'"}'
+```
+
+Guarda `data.access_token` como `$USER_TOKEN`. La clave de usuario es reutilizable: cada vez que necesites un token
+nuevo vuelves a este canje, nunca a crear el usuario. El límite de este canje es de 10 por minuto **por token de
+aplicación**, y lo comparten todos los usuarios que canjeas con ese mismo token: canjea una vez por usuario y
+reutiliza el resultado (ver [Mantener los tokens vigentes](#cache-de-tokens)).
+
+[Referencia de API → Users & Tokens](/api-reference/1platform-api#tag/users-tokens)
+
+## Paso 4 — Alternativa: enlace mágico
+
+Los pasos 2 y 3 sirven cuando tu backend actúa en nombre de usuarios que ya conoce. Cuando quien entra es una
+persona frente a una pantalla y no quieres manejar contraseñas, usa el enlace mágico: un correo con un enlace de un
+solo uso.
+
+```bash
+curl -X POST "$BASE_URL/auth/user/magic-link/request" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "'"$USER_EMAIL"'"}'
+```
+
+La respuesta es siempre `200` y no confirma si el correo existe, para que nadie pueda averiguar qué cuentas hay. El
+enlace del correo abre la ruta `/auth/verify?token=…` del panel de tu espacio de trabajo y vence a los 10 minutos.
+La página que recibe ese `token` lo canjea con `POST /auth/user/magic-link/verify` (token de aplicación, cuerpo
+`{"token": "…"}`), que devuelve un `access_token` —se usa como token de usuario— y un `refresh_token`.
+
+- `410`: el enlace ya se usó o venció. Pide uno nuevo; no repitas la verificación.
+- `403` con `data.code` `account_inactive`: un administrador desactivó la cuenta.
+- `429` en la solicitud: superaste 10 solicitudes por minuto desde tu servidor. Aparte, cada dirección recibe como
+  máximo 3 enlaces cada 10 minutos; pasado ese tope la llamada sigue respondiendo `200` pero el correo no sale, así
+  que no reintentes en bucle.
+
+[Referencia de API → User Authentication](/api-reference/1platform-api#tag/user-authentication)
+
+## Paso 5 — Primera llamada autenticada
+
+Con `$APP_TOKEN` y `$USER_TOKEN` (o el `access_token` del enlace mágico) ya puedes llamar a cualquier operación
+protegida. Esta confirma que los dos tokens funcionan juntos:
+
+```bash
+curl "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Un `401` indica que alguno de los dos tokens falta, venció o no es válido: repite el paso que lo generó. A partir
+de aquí, todas las operaciones protegidas se llaman con estos mismos dos headers.
+
+[Referencia de API → My Profile](/api-reference/1platform-api#tag/my-profile)
+
+## Paso 6 — Renovar y cerrar la sesión
+
+Cómo se termina una sesión depende del camino que usaste. Si entraste por enlace mágico, renueva el par antes de
+que venza el token de acceso con `POST /auth/user/refresh`:
+
+```bash
+curl -X POST "$BASE_URL/auth/user/refresh" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "'"$REFRESH_TOKEN"'"}'
+```
+
+Cada renovación invalida el `refresh_token` anterior. Un `409` indica que se presentó uno ya usado: trátalo como un
+posible robo de sesión y vuelve a autenticar a la persona. Un `401` indica que el `refresh_token` venció. Para cerrar
+la sesión, llama a `POST /auth/user/logout` con los dos tokens en los headers y, en el cuerpo, el token que quieres
+revocar (`{"token": "…"}`).
+
+En el camino servidor a servidor (pasos 2 y 3) no hay nada que renovar: para cortar todas las sesiones de un
+usuario llama a `POST /users/revoke-tokens` con sus dos tokens. Todo token de usuario emitido hasta ese momento deja
+de valer y hace falta un canje nuevo (paso 3).
+
+Guarda los `refresh_token` en cookies `httpOnly` seguras o en el almacenamiento seguro del sistema (Keychain,
+Keystore), nunca en `localStorage`, que cualquier script de la página puede leer.
+
+[Referencia de API → User Authentication](/api-reference/1platform-api#tag/user-authentication) ·
+[Referencia de API → Users & Tokens](/api-reference/1platform-api#tag/users-tokens)
+
+## Mantener los tokens vigentes {#cache-de-tokens}
+
+Los canjes de los pasos 1 y 3 están limitados a 10 por minuto, así que pedir un token por llamada es la causa más
+común de un `429` durante el desarrollo. El patrón que evita el problema:
+
+1. Guarda cada token junto con su vencimiento: el momento del canje más `expires_in`.
+2. Reutilízalo en todas las llamadas mientras le quede más de un minuto de vida (`expires_in − 60` segundos).
+3. Renuévalo antes de que venza, no después de recibir un `401`. Si aun así llega un `401`, canjea de nuevo una
+   sola vez y repite la llamada; si vuelve a fallar, el problema es la clave, no el token.
+4. En un proceso con varios hilos o instancias, comparte la caché entre ellos para que no canjeen todos a la vez.

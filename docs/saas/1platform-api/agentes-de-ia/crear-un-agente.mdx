@@ -1,0 +1,83 @@
+---
+title: Crear un agente
+description: Instala un agente desde el catálogo, fija su tope de gasto, dispara una ejecución, consúltala y atiende la acción que deja para una persona.
+sidebar_position: 2
+---
+
+# Crear un agente
+
+El orden de esta guía viene de dos cosas: una ejecución es **asíncrona**, así que no termina en la misma llamada que la dispara, y algunas decisiones las deja el agente **para una persona**. El resto (listar, editar o borrar agentes) no tiene orden y está en la Referencia de API. Los ejemplos usan las variables de [Convenciones](/docs/saas/1platform-api/reference/convenciones); `$WEBSITE_ID` sale de [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
+
+## Paso 1 — Elegir una plantilla
+
+Cada plantilla trae sus herramientas, su cadencia y su nivel de modelo. Partir de una evita escribir esa configuración desde cero.
+
+```bash
+curl "$BASE_URL/agents/catalog" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Cada plantilla trae su `slug`, su descripción, las herramientas que necesita y su cadencia por defecto (`default_schedule`). Guarda el `slug` elegido como `$TEMPLATE_SLUG`.
+
+[Referencia de API → Agents Catalog](/api-reference/1platform-api#tag/agents-catalog)
+
+## Paso 2 — Instalar el agente
+
+Al instalar defines lo que la plantilla no puede saber: qué sitios atiende y cuánto puede gastar. Se hace en la misma llamada porque un agente sin sitios no vigila nada.
+
+```bash
+curl -X POST "$BASE_URL/agents/catalog/$TEMPLATE_SLUG/install" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"website_ids": ["'"$WEBSITE_ID"'"], "monthly_budget_usd": "25.00"}'
+```
+
+Guarda `data.agent.id` como `$AGENT_ID`. El agente nace **activo** y con la cadencia de la plantilla. Para crear uno que sólo corra cuando lo disparas, envía `"schedule": ""`. Si el plan no incluye alguna herramienta de la plantilla, la instalación la omite y la informa en `data.skipped_tools`. `409` significa que otro agente con el mismo objetivo ya vigila uno de esos sitios.
+
+`monthly_budget_usd` es el tope de gasto **por ciclo**, aunque el nombre del campo diga mensual. Si lo omites, el agente no tiene gasto ilimitado: queda en modo propuesta y no recibe las herramientas que cuestan dinero hasta que le fijes un tope con `PUT /agents/{agent_id}/budget`.
+
+[Referencia de API → Agents Catalog](/api-reference/1platform-api#tag/agents-catalog)
+
+## Paso 3 — Disparar una ejecución
+
+Además de su cadencia, puedes disparar una ejecución a mano, por ejemplo para probar la configuración antes de dejarlo solo.
+
+```bash
+curl -X POST "$BASE_URL/agents/$AGENT_ID/run" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input_message": "Revisa los artículos publicados hoy y marca los que tengan enlaces rotos"}'
+```
+
+La respuesta es `202`: la ejecución quedó registrada en `pending` y todavía no corrió. Guarda `data.id` como `$RUN_ID`. `409` significa que el agente ya tiene el máximo de ejecuciones simultáneas; espera a que termine alguna. `503` significa que el agente está inactivo o que la plataforma no tiene capacidad en ese momento.
+
+[Referencia de API → Agents Execution](/api-reference/1platform-api#tag/agents-execution)
+
+## Paso 4 — Consultar la ejecución
+
+```bash
+curl "$BASE_URL/agents/$AGENT_ID/runs/$RUN_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.status` pasa de `pending` a `running` y termina en `completed`, `failed` o `stopped`. Con `completed`, `data.result` resume lo que hizo el agente y `data.total_tokens` dice cuánto consumió. Para cortar una ejecución pendiente o en curso, usa `POST /agents/{agent_id}/runs/{run_id}/stop`.
+
+[Referencia de API → Agents Execution](/api-reference/1platform-api#tag/agents-execution)
+
+## Paso 5 — Atender una acción pendiente
+
+Cuando el agente encuentra algo que no debe decidir solo, como publicar un contenido o enviar un correo, crea una acción y la deja `pending` hasta que una persona la resuelva.
+
+```bash
+curl "$BASE_URL/agent-actions?agent_id=$AGENT_ID&status=pending" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Cada acción trae su `type`, el `run_id` que la generó y un `payload` con lo que la persona necesita para decidir. Con la decisión tomada, resuélvela con `PATCH /agent-actions/{action_id}/consume`, enviando la decisión en `result` y, si quieres registrar quién decidió, `consumed_by`. `409` significa que la acción ya se resolvió en otra llamada: trátalo como estado final y no reintentes.
+
+[Referencia de API → Agents Actions](/api-reference/1platform-api#tag/agents-actions)

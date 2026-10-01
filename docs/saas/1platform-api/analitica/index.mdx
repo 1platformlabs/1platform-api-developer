@@ -1,0 +1,54 @@
+---
+title: Analítica
+description: Conecta Google Analytics y AdSense a un sitio, y mide con mapas de calor dónde hacen clic los visitantes y hasta dónde bajan.
+sidebar_position: 1
+---
+
+# Analítica
+
+<p className="lead">Tres formas de medir un sitio: Google Analytics para visitas y conversiones, AdSense para los ingresos por anuncios y mapas de calor para los clics y el desplazamiento. Las dos primeras usan la cuenta de Google del propio usuario; los mapas de calor los mide la plataforma con una etiqueta que pegas en el sitio.</p>
+
+## Cómo funciona
+
+- **Todo cuelga de un sitio.** Analytics y AdSense reciben `website_id` en cada llamada. Primero se registra el sitio en [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
+- **Google Analytics:** el usuario autoriza su cuenta de Google en una ventana de consentimiento, la API crea la propiedad en segundo plano y te entrega la etiqueta para el sitio. Luego consultas métricas y puedes enviar eventos desde tu servidor. Hay dos esperas distintas: la autorización del usuario y la creación de la propiedad.
+- **AdSense:** el usuario autoriza su cuenta, vinculas el sitio y consultas ingresos, alertas y problemas de políticas. El estado de aprobación del sitio cambia en Google; para traerlo, sincronízalo. El plan gratuito ve los últimos 7 días; los períodos largos, el desglose por página, el reporte a medida, las alertas y los problemas de políticas requieren plan Pro (`403` sin él).
+- **Mapas de calor:**
+  1. Registras el sitio con su `host` y los patrones de ruta que quieres medir (`page_keys`, por ejemplo `/productos/[slug]`). Una lista vacía no mide nada: no funciona como comodín.
+  2. La respuesta trae la etiqueta exacta para pegar en el `<head>`. El recolector que carga esa etiqueta toma las muestras y las envía solo. Las muestras se agregan al escribirse: no se guarda nada en bruto.
+  3. Lees los mapas por ruta: `clicks` (una cuadrícula) o `scroll` (bandas de profundidad).
+  4. Para dibujar el calor sobre la página, guarda una copia de la ruta. La plataforma la descarga de forma anónima desde su dirección pública y le quita los scripts.
+
+## Qué necesitas
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Un `website_id` del usuario para Analytics y AdSense. En los mapas de calor es opcional.
+- Para Analytics y AdSense, una cuenta de Google del usuario con acceso a Analytics o a AdSense. La autorización la da el usuario en el navegador; tu backend no la puede dar por él.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `GET /analytics/oauth/authorize` | URL de consentimiento de Google para Analytics |
+| `GET /analytics/oauth/status` | Saber si el usuario ya autorizó |
+| `POST /analytics/setup` | Crear la propiedad (asíncrono, `202`) |
+| `GET /analytics/status` | Seguir la creación hasta `active` |
+| `GET /analytics/streams/tag` | La etiqueta para el `<head>` del sitio |
+| `GET /analytics/overview` | Sesiones, usuarios, páginas vistas y fuentes de un período |
+| `GET /adsense/oauth/authorize` | URL de consentimiento de Google para AdSense |
+| `POST /adsense/connect` | Vincular el sitio a la cuenta de AdSense ya autorizada |
+| `GET /adsense/earnings/overview` | Ingresos, clics e impresiones de un período |
+| `POST /users/heatmap/sites` | Registrar un sitio a medir y obtener su etiqueta |
+| `GET /users/heatmap/sites/{site_id}/pages` | Rutas con datos, de la más visitada a la menos |
+| `GET /users/heatmap/sites/{site_id}/maps/{kind}` | Leer el mapa de clics o de desplazamiento de una ruta |
+| `POST /users/heatmap/sites/{site_id}/snapshot` | Guardar la copia de la página sobre la que se dibuja el mapa |
+| `POST /users/heatmap/sites/{site_id}/rotate-token` | Rotar el token de captura sin cambiar la etiqueta |
+
+Todas las operaciones: [Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics) · [Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense) · [Referencia de API → Heatmaps](/api-reference/1platform-api#tag/heatmaps).
+
+Las rutas `GET /heatmap/t/{public_id}.js`, `POST /heatmap/{token}/samples` y `GET /heatmap/p/{public_id}.html` son públicas y las llaman el navegador del visitante y tu panel, no tu backend. Las devoluciones de llamada OAuth (`GET /analytics/oauth/callback`, `GET /adsense/oauth/callback`) las llama Google.
+
+## Guías
+
+- [Google Analytics](/docs/saas/1platform-api/analitica/google-analytics): autorizar, crear la propiedad, instalar la etiqueta y enviar eventos de servidor.
+- [Google AdSense](/docs/saas/1platform-api/analitica/google-adsense): autorizar, vincular el sitio, sincronizar su estado y leer ingresos y alertas.

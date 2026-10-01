@@ -1,0 +1,51 @@
+---
+title: Terminal de tarjetas
+description: Solicita una terminal para cobrar con tarjeta presente, adjunta los documentos y sigue la solicitud hasta recibir el código de activación.
+sidebar_position: 1
+---
+
+# Terminal de tarjetas
+
+<p className="lead">Pide una terminal para que tu comercio cobre con tarjeta presente. Por la API llenas la solicitud, adjuntas los documentos, la envías y sigues su estado hasta recibir el código que activa la app de la terminal.</p>
+
+## Cómo funciona
+
+1. Abres una **solicitud** para un comercio con los datos del solicitante. El NIT y la razón social los toma el servidor del comercio: no los envías.
+2. Adjuntas los documentos que pide tu espacio de trabajo, uno por cada `kind`. Si vuelves a adjuntar el mismo `kind`, reemplazas el archivo anterior.
+3. Envías la solicitud. Si falta algo, la llamada responde `422` con la lista de lo pendiente.
+4. La solicitud avanza por estos estados:
+   - `draft`: la estás editando.
+   - `submitted`: ya está en manos del proveedor.
+   - `submit_failed`: el envío falló. Puedes reintentarlo.
+   - `needs_info`: piden correcciones. Vuelve a ser editable.
+   - Estados finales: `approved`, `rejected` o `cancelled` (la retiraste tú).
+5. Cuando la solicitud llega a `approved`, el detalle trae el **código de activación**. El comercio instala la app de la terminal desde el enlace a la tienda y la activa con ese código.
+
+Un administrador del espacio de trabajo registra el resultado de cada solicitud enviada. Lo hace con las operaciones `/admin/terminal-requests` del mismo tag. Si tu integración es el comercio, no las necesitas: consultas el estado de tu solicitud.
+
+## Qué necesitas
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Un **comercio** con NIT (`documentNumber`) y rol de **administrador** en su sucursal ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si falta el NIT, la creación responde `409` con lo que falta.
+- El módulo de Terminal de tarjetas encendido para tu espacio de trabajo y asignado a tu cuenta. Si falta, recibes `403` con `data.code` = `module_disabled`.
+- No necesitas tener activa la [Facturación electrónica](/docs/saas/1platform-api/facturacion-electronica) para solicitar la terminal.
+- Sólo puede haber una solicitud abierta por comercio. Si ya hay una, la creación responde `409`.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `POST /businesses/{businessId}/terminal-requests` | Abrir la solicitud |
+| `PATCH /businesses/{businessId}/terminal-requests/{requestId}` | Corregir los datos mientras está en `draft` o `needs_info` |
+| `POST /businesses/{businessId}/terminal-requests/{requestId}/documents` | Adjuntar un documento (`multipart/form-data` con `kind` y `file`) |
+| `POST /businesses/{businessId}/terminal-requests/{requestId}/submit` | Enviar la solicitud completa |
+| `GET /businesses/{businessId}/terminal-requests/{requestId}` | Ver el estado, lo que falta y, si se aprobó, el código de activación |
+| `GET /businesses/{businessId}/terminal-requests` | Listar las solicitudes del comercio |
+| `POST /businesses/{businessId}/terminal-requests/{requestId}/cancel` | Retirar una solicitud que todavía no se resolvió |
+| `GET /terminal-app/{platform}` | Enlace público a la app de la terminal en la tienda |
+
+Todas las operaciones, incluidas las del administrador del espacio de trabajo: [Referencia de API → Payment Terminals](/api-reference/1platform-api#tag/payment-terminals).
+
+## Guías
+
+- Para crear el comercio y su sucursal, sigue el paso 1 de [Emitir una factura](/docs/saas/1platform-api/facturacion-electronica/emitir-una-factura).

@@ -1,0 +1,123 @@
+---
+title: Inicio rápido
+description: Consigue tus claves, canjéalas por los dos tokens y haz tu primera llamada autenticada a la 1Platform API.
+sidebar_position: 2
+sidebar_label: Inicio rápido
+sidebar_custom_props:
+  icon: launch
+  description: Credenciales y primera llamada
+---
+
+<p className="lead">Esta guía te lleva desde cero hasta tu primera respuesta autenticada de la <strong>1Platform API</strong>: de dónde salen tus claves, cómo se canjean por tokens, contra qué entorno llamar y qué esperar de la respuesta.</p>
+
+La API usa **dos credenciales a la vez**. El token de aplicación identifica a tu espacio de trabajo y viaja en
+`Authorization: Bearer $APP_TOKEN`; el token de usuario identifica a la persona en cuyo nombre actúas y viaja en
+`x-user-token: $USER_TOKEN`. Ninguno de los dos se crea a mano: cada uno se obtiene canjeando una **clave** de larga
+vida (`ak-…` o `sk-…`). Por eso el orden es siempre el mismo: claves, tokens, llamadas.
+
+## 1. Consigue tus claves {#claves}
+
+Las claves se piden desde el **Panel** de tu espacio de trabajo, en la sección **API** de la configuración:
+
+1. **Pide el acceso de desarrollador.** Pulsa «Solicitar acceso» (por API, `POST /api-access/requests`). La solicitud
+   le llega a los administradores del espacio de trabajo; si ya tienes una pendiente, no se crea otra.
+2. **Un administrador la aprueba.** Desde la misma sección del Panel (por API,
+   `POST /admin/api-access/requests/{request_id}/approve`). Al aprobar se crea tu clave de aplicación, pero vacía: el
+   administrador nunca ve su valor.
+3. **Revela tu clave de aplicación (`ak-…`).** El valor se genera en el momento en que lo pides y se muestra **una
+   sola vez** (por API, `POST /me/api-credentials/{credential_id}/reveal`). Guárdalo en tu gestor de secretos antes
+   de cerrar la pantalla: no hay forma de volver a leerlo.
+4. **Crea tu clave de usuario (`sk-…`).** Con el acceso concedido, cada usuario crea las suyas (por API,
+   `POST /me/api-credentials`). También se muestra una sola vez; si la pierdes, creas otra y eliminas la anterior.
+
+Si tu backend da de alta a sus propios usuarios, la clave de usuario de cada uno la devuelve el alta
+(`POST /users`); ese camino está en [Autenticación](/docs/saas/1platform-api/plataforma/autenticacion). Si quieres
+que el alta incluya una primera recarga pagada, usa `POST /onboarding/`: devuelve una URL de pago, la cuenta se crea
+cuando el pago se confirma y la clave de usuario se obtiene **una sola vez** consultando
+`GET /onboarding/status/{session_id}` hasta que el estado sea `completed` o `failed`.
+
+:::info[Requisito: el módulo de API]
+Si la sección **API** no aparece en tu Panel, o las llamadas anteriores responden `403` con `data.code`
+`module_disabled`, el módulo de desarrollador no está habilitado para tu cuenta. Pídeselo a un administrador de tu
+espacio de trabajo.
+:::
+
+Las claves de QA y las de producción son distintas y no se cruzan: cada entorno tiene sus propias cuentas. Para
+obtener acceso a QA, pídelo a tu contacto comercial.
+
+<span id="1-obtén-tus-tokens" />
+## 2. Canjea las claves por tokens {#tokens}
+
+Primero, la clave de aplicación por el **token de aplicación**:
+
+```bash
+curl -X POST "$BASE_URL/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'"$APP_API_KEY"'"}'
+```
+
+Guarda `data.access_token` como `$APP_TOKEN`. Con él, canjea la clave de usuario por el **token de usuario**:
+
+```bash
+curl -X POST "$BASE_URL/users/token" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "'"$USER_API_KEY"'"}'
+```
+
+Guarda `data.access_token` como `$USER_TOKEN`. Los dos tokens vencen a los `expires_in` segundos (hoy, 30 minutos):
+reutilízalos hasta entonces en vez de pedir uno por llamada, porque estos canjes tienen un límite de 10 por minuto.
+El patrón está en [Autenticación → Mantener los tokens vigentes](/docs/saas/1platform-api/plataforma/autenticacion#cache-de-tokens).
+
+<span id="2-elige-un-entorno" />
+## 3. Elige un entorno {#entornos}
+
+<div className="table-scroll" role="region" aria-label="Entornos de la API" tabIndex={0}>
+
+| Entorno | URL base (`$BASE_URL`) |
+|---|---|
+| Producción | `https://api.1platform.pro/api/v1` |
+| QA | `https://api-qa.1platform.pro/api/v1` |
+
+</div>
+
+**QA no es un entorno de pruebas estable.** Es el entorno de integración de la plataforma: recibe los cambios antes
+que producción, puede tener operaciones que producción todavía no tiene y puede cambiar sin aviso. La
+[Referencia de API](/api-reference/1platform-api) describe **producción**. Usa QA para probar tu integración sin
+datos reales, pero valida contra producción lo que vayas a publicar. Los detalles están en
+[Entornos](/docs/saas/1platform-api/reference/environments).
+
+<span id="3-realiza-tu-primera-llamada" />
+## 4. Haz tu primera llamada {#primera-llamada}
+
+`GET /api/v1/users/profile` devuelve el perfil del usuario dueño del token. Es la forma más corta de comprobar que
+los dos tokens funcionan juntos:
+
+```bash
+curl "$BASE_URL/users/profile" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Las respuestas de la API usan el sobre `{success, data, msg}`: lo que pediste viaja en `data`. Hay dos excepciones
+que tu cliente debe tolerar: un error de validación (`422`) y la falta de credenciales (`401` sin token) responden
+con un objeto `detail` en lugar del sobre. Las formas exactas están en
+[Formato de respuesta](/docs/saas/1platform-api/reference/response-format).
+
+Un `401` indica que alguno de los dos tokens falta, venció o no es válido: vuelve a canjear el que corresponda. Un
+`402` en una operación con costo indica que el saldo no alcanza, y un `429`, que superaste un límite de uso o el cupo
+de tu plan. Consulta los [Códigos de error](/docs/saas/1platform-api/reference/error-codes) y los
+[Límites de uso](/docs/saas/1platform-api/reference/rate-limits).
+
+<span id="4-siguientes-pasos" />
+## 5. Siguientes pasos {#siguientes-pasos}
+
+- Elige el producto que vas a integrar en el [Inicio de la documentación](/docs/saas/1platform-api/getting-started):
+  cada uno tiene su vista general y sus guías.
+- Repasa lo que comparten todos los productos (autenticación, webhooks, saldo, comercios) en
+  [Plataforma](/docs/saas/1platform-api/plataforma).
+
+<div className="docs-actions">
+  <a href="/docs/saas/1platform-api/getting-started">Ver los productos</a>
+  <a href="/api-reference/1platform-api">Referencia de API</a>
+</div>

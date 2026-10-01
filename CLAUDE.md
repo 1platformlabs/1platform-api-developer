@@ -1,9 +1,11 @@
 # 1Platform API Developer
 
 Portal técnico de una sola identidad pública: **1Platform**. No resuelve tenants
-ni permite elegir marca. La guía de entrada es
-`/docs/saas/1platform-api/getting-started`; las guías de Atlas describen un producto
-independiente de 1Platform Labs y conservan sus rutas técnicas.
+ni permite elegir marca. La entrada es la **portada (Inicio)** en
+`/docs/saas/1platform-api/getting-started` —la URL histórica se conserva porque la
+raíz, `/docs`, los 301 del servidor y los healthchecks apuntan ahí—; las guías de
+Atlas describen un producto independiente de 1Platform Labs y conservan sus rutas
+técnicas.
 
 ## Entorno y comandos
 
@@ -50,8 +52,11 @@ roles de marca no llevan hex repetidos en los componentes.
 - Navbar navy OPACO, lectura clara, código navy uniforme; colores HTTP funcionales
 - Navegación: Soluciones, Infraestructura, IA, Blog, Documentación, Contacto
 - CTA: Hablemos de su proyecto, `https://wa.me/50253946564`
-- Documentación abre Primeros pasos, sin portada intermedia
-- Copy comercial formal, sin punto final en títulos y subtítulos
+- Documentación abre la portada por productos (decisión del usuario 2026-10-01,
+  modelo: portal de pagos con hero + «Productos disponibles» + accesos rápidos)
+- El chrome compartido con el website (navbar, footer, CTA) usa el trato formal del
+  website; el CONTENIDO técnico usa **tú**, sin voseo ni usted. Sin punto final en
+  títulos y subtítulos
 
 Mantener navbar y footer coordinados con el website. Conservar búsqueda local,
 skip link, foco visible, menús técnicos y drawer nativo; targets de al menos 44 px.
@@ -107,11 +112,42 @@ inmutabilidad y preservación de type/scheme/bearerFormat/in/name/security/opera
 un cambio estructural aguas arriba exige revisar la adaptación, no reconstruir el
 esquema. No se modificó el backend.
 
+## Organización por producto
+
+El portal se organiza por los productos que vende 1Platform, no por API ni por
+tipo de página. `docs/saas/1platform-api/`:
+
+- `getting-started.mdx` (Inicio, portada) e `inicio-rapido.mdx` (credenciales,
+  canje por JWT, entornos, primera llamada)
+- una carpeta por producto con `_category_.json` (`customProps.{kind:'product',
+  icon, description}`) e `index.mdx` (vista general: cómo funciona, qué necesitas,
+  operaciones, eventos, guías). Las guías con orden real (ex `journeys/`, máx. 7
+  pasos) viven dentro del producto al que pertenecen
+- `plataforma/` (autenticación, webhooks, saldo y consumo, comercios, administración)
+  y `reference/` (rotulado «Convenciones»)
+
+La cuadrícula de la portada (`src/components/HomeCards`) **lee el sidebar**: un
+producto nuevo es una carpeta con `kind: 'product'`, sin tocar el componente. Una
+carpeta con una sola página la colapsa Docusaurus en un enlace con el título del
+documento: no pongas `sidebar_label: Vista general` en un `index.mdx` de producto.
+Las 60 etiquetas del contrato tienen su producto asignado; las de staff/internas
+(`/platform/*`, Platform Admin, Staff Authentication, Internal Webhooks, Payment
+Notifications, Activation, Trading Agent, Sites, Agents Metrics) no se documentan.
+Cada URL movida tiene su redirect en `docusaurus.config.ts` (`JOURNEY_MOVES`).
+
+Términos canónicos (uno por concepto, definidos en `reference/glossary.mdx`):
+**espacio de trabajo** (`App`), **clave de aplicación** `ak-…` / **clave de
+usuario** `sk-…` (se canjean), **token de aplicación** / **token de usuario**
+(JWT en `Authorization` / `x-user-token`), **comercio** y **sucursal**,
+«Referencia de API» como único rótulo del enlace a Scalar. En Atlas: **tenant**,
+**clave de integración** `ak-int-…`, **derecho de acceso** (entitlement).
+
 ## Contenido, autenticación y compatibilidad
 
 El contrato OpenAPI es fuente de requests/responses/esquemas. La prosa explica
 orden y motivo, y enlaza las operaciones. Conservar el guard de drift y sus
-excepciones existentes para formatos comunes y webhooks salientes.
+excepciones existentes para formatos comunes y webhooks salientes. Desde la
+reorganización por productos la regla de cuerpos pegados cubre también Atlas.
 
 Las claves API NO son los JWT de headers: canjear la clave de aplicación por JWT
 en `POST /api/v1/auth/token` y la del usuario en `POST /api/v1/users/token` con el
@@ -120,7 +156,7 @@ y `x-user-token: $USER_TOKEN`. La primera consulta es `/api/v1/users/profile`;
 `/users/me` no existe en el contrato verificado.
 
 Raíz, `/docs`, `/docs/quick-start` y la antigua vista general Core redirigen a
-Primeros pasos. `/api-docs` redirige a la referencia Core. Mantener aliases de
+la portada (Inicio). Credenciales y primera llamada viven en `inicio-rapido`. `/api-docs` redirige a la referencia Core. Mantener aliases de
 flows/webhooks/productos retirados y rutas técnicas de Atlas. Las entradas públicas
 tienen también 301 en el `.htaccess` de QA y el nginx activo de PROD, conservando
 query. `pnpm check:serving` usa Docker/nginx 1.27 local para comprobar ambas

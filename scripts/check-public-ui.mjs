@@ -97,8 +97,8 @@ function audit({docsHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimen
   requireText('API_SHELL', apiHtml, 'plugin-@scalar/docusaurus plugin-id-1platform-api');
   requireText('API_SEARCH', apiHtml, 'class="navbar__search-input');
   requireText('GUIDE_PROFILE', docsHtml, '/api/v1/users/profile');
-  requireText('GUIDE_APP_JWT', docsHtml.replace(/<[^>]*>/g, ''), 'Bearer $APP_TOKEN');
-  requireText('GUIDE_USER_JWT', docsHtml.replace(/<[^>]*>/g, ''), 'x-user-token: $USER_TOKEN');
+  requireText('GUIDE_APP_JWT', docsHtml, '<code>Authorization: Bearer $APP_TOKEN</code>');
+  requireText('GUIDE_USER_JWT', docsHtml, '<code>x-user-token: $USER_TOKEN</code>');
   for (const [kind, html] of [['DOC', docsHtml], ['API', apiHtml]]) {
     // This is the SSR host. Scalar later renders the native headings contained
     // in the contract; this assertion does not count or approve runtime headings.

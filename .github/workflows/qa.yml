@@ -173,6 +173,15 @@ jobs:
         shell: bash
         run: sudo apt-get update && sudo apt-get install -y lftp
 
+      - name: Diagnose and migrate the QA root health redirect
+        if: steps.ftps.outputs.configured == 'true'
+        env:
+          CPANEL_FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          CPANEL_FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          CPANEL_FTP_PASS: ${{ secrets.CPANEL_FTP_PASS }}
+        shell: bash
+        run: bash deploy/cpanel/qa-health-config.sh
+
       - name: Upload via FTPS (atomic)
         if: steps.ftps.outputs.configured == 'true'
         env:
@@ -234,30 +243,7 @@ jobs:
           # bytes assemble.sh fingerprints, without following that redirect.
           ENTRY_PATH: '/index.html'
         shell: bash
-        run: |
-          set -euo pipefail
-          WANT="$(grep -m1 '^index_sha=' cpanel-dist/BUNDLE_INFO | cut -d= -f2-)"
-          URL="${SITE_URL%/}${ENTRY_PATH}"
-          echo "esperando el fingerprint ${WANT:0:16}… en ${URL}"
-
-          H="$(mktemp)"; B="$(mktemp)"
-          DEADLINE=$(( SECONDS + 720 )); GOT=""
-          while [[ "$SECONDS" -lt "$DEADLINE" ]]; do
-            curl -sSL --max-time 20 -o "$B" -D "$H" "$URL" >/dev/null 2>&1 || true
-            GOT="$(sha256sum "$B" | awk '{print $1}')"
-            [[ "$GOT" == "$WANT" ]] && break
-            echo "  … todavía no (servido ${GOT:0:16}…)"
-            sleep 20
-          done
-          if [[ "$GOT" != "$WANT" ]]; then
-            echo "::error::el cron no activó este release en 12 min (servido ${GOT:0:16}…, esperado ${WANT:0:16}…). El bundle está en .deploy/incoming; mirá .deploy/logs/activate.log."
-            exit 1
-          fi
-          if ! grep -qi '^x-turbo-charged-by:[[:space:]]*litespeed' "$H"; then
-            echo "::error::el fingerprint coincide pero la respuesta no salió del origen cPanel"
-            exit 1
-          fi
-          echo "QA sirve ESTE build, desde cPanel"
+        run: node deploy/cpanel/verify-release.mjs
 
       - name: Note the activation delay
         if: steps.ftps.outputs.configured == 'true'

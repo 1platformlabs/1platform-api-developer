@@ -39,13 +39,32 @@ release anterior sirviendo. Una subida rota no puede publicar un sitio roto.
 ## Un job verde NO significa que el release esté vivo
 
 La activación la hace un cron, minutos después de que CI termina. El paso
-`Verify the release actually activated` es lo que lo prueba: consulta la home
-hasta que el `sha256` del documento servido coincida con el `index_sha` del
-bundle, y además exige que la respuesta traiga `x-turbo-charged-by: litespeed`
-(o sea, que salió del origen cPanel y no de otro lado).
+`Verify the release actually activated` consulta `/index.html`, cuyos bytes
+ensambla y firma el bundle. La raíz pública conserva su redirección HTTP 301 a
+Primeros pasos. `verify-release.mjs` exige que el `sha256` servido coincida con
+`index_sha`, HTTP 200 y `x-turbo-charged-by: litespeed`, durante al menos 45 s
+consecutivos. Una coincidencia durante el swap inicial no basta: el activador
+todavía puede revertir durante sus seis comprobaciones de salud de 5 s.
 
 El health check anterior —esperar un `200` en la home— **no distinguía el build
 nuevo del viejo**: habría dado verde sirviendo todavía la versión anterior.
+
+### Salud de QA tras la redirección de la raíz
+
+`qa-health-config.sh` descarga `.health_url`, `.health_marker`, `.failed_version`
+y el log del activador a temporales privados del runner, sin publicarlos como
+artifacts ni imprimir sus contenidos. `health_config.py` sólo permite migrar
+el docroot de `developer-qa.1platform.pro` cuando confirma la raíz configurada,
+el HTTP 301 hacia la guía y un rollback 301 de la versión en cuarentena en su
+log. Cambia la salud a `/index.html`, preservando el marker si todavía figura
+en el build; si el título anterior quedó obsoleto, utiliza el canonical exacto
+del portal. Conserva la exigencia de HTTP 200 + marker del activador.
+
+No modifica cron, `activate.sh`, otros docroots ni la configuración real de
+PROD. Antes de desplegar allí, su salud por docroot debe apuntar a una página
+sin redirección y un marker vigente; el probe de estabilidad del workflow de
+PROD también rechaza una activación transitoria. Los tests del diagnóstico y
+del probe simulan fallos de estado, origen, checksum y rollback, sin red.
 
 ## El contrato de servido vive en `htaccess/docs.htaccess`
 

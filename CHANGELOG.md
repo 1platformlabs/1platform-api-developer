@@ -24,6 +24,10 @@ All notable changes to the 1Platform API Developer Docs will be documented in th
 - Guards de anclas, credenciales ilustrativas y aliases, más contraste de sintaxis
   de código y revisión del HTML construido. Las capturas, CI y el banco E2E real
   se registran por separado; un guard verde no declara aprobación visual.
+- Tablas nativas de Scalar desplazables dentro de la columna a 360 px, con
+  navegación por teclado y sin desbordamiento de la página.
+- Probe cPanel sobre `/index.html` con checksum y origen estables durante 45 s,
+  más diagnóstico privado de salud QA para la nueva redirección de la raíz.
 
 ## [Unreleased]
 

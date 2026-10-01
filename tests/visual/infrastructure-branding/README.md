@@ -18,6 +18,13 @@ mismo contenido, ruta, estado y viewport; registrar geometría, tipografía y co
 La tolerancia de geometría comparable es ±2 px. Preservar búsqueda y funciones
 nativas de Scalar, aunque el prototipo sólo simule su interacción.
 
+Regresión adicional del 1 de octubre de 2026, comprobada personalmente por el
+coordinador a 360 px: la tabla nativa de autenticación usa scroll horizontal
+interno (ancho 324 px, contenido 367 px); el documento conserva 360 px sin
+overflow. Tab enfoca la tabla y Flecha derecha desplaza 40 px, con foco visible
+y semántica de tabla preservada. La captura `table360.jpg` está en la evidencia
+visual de la épica. No se modifica el DOM ni el contrato de Scalar.
+
 Diferencia deliberada: Scalar conserva el título nativo y el título Markdown
 del contrato. Junto con el masthead, la referencia Core tiene tres `h1` visibles
 en runtime; el anfitrión SSR tiene uno. No modificar el contrato ni parchear

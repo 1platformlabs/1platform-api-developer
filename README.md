@@ -55,3 +55,7 @@ públicos actuales. `pnpm check:scalar-environment` verifica estas reglas sin re
 
 Los PRs ejecutan CI y el canal QA automáticamente. El merge despliega producción;
 la épica de branding entrega PR para revisión, sin merge ni despliegue productivo.
+QA usa cPanel y exige checksum + estado terminal del activador. Producción usa
+nginx; su canal cPanel permanece deshabilitado. `pnpm check:serving` requiere
+Docker y prueba la configuración real de nginx 1.27 con el build local, en un
+puerto loopback efímero. No es una ejecución del banco de APIs ni de producción.

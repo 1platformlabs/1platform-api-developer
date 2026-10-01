@@ -24,7 +24,28 @@ for (const sample of [
   if (sample(30).status === 0) {
     assert.deepEqual(await simulate(sample), {time: 90, probes: 10});
   } else {
-    await assert.rejects(simulate(sample), /no sostuvo el checksum|revirtió a otro checksum/);
+    await assert.rejects(simulate(sample), /no confirmó checksum|revirtió a otro checksum/);
   }
 }
-console.log('release verification: 7 stability/checksum/status/origin/rollback cases passed; no network');
+let clock = 0;
+await assert.rejects(waitForRelease({want: 'expected', maxWaitMs: 180_000, pollMs: 10_000,
+  now: () => clock, sleep: async (ms) => { clock += ms; },
+  probe: async () => clock < 90_000 ? good : {...good, sha: 'late-rollback'},
+}), /revirtió/);
+assert.equal(clock, 90_000);
+clock = 0;
+await waitForRelease({want: 'expected', maxWaitMs: 180_000, pollMs: 10_000,
+  now: () => clock, sleep: async (ms) => { clock += ms; }, probe: async () => good,
+});
+assert.equal(clock, 130_000);
+for (const state of [{available: true, deployed: false, failed: true}, {available: false, deployed: false, failed: false}]) {
+  clock = 0;
+  await assert.rejects(waitForRelease({want: 'expected', maxWaitMs: 100, pollMs: 10,
+    now: () => clock, sleep: async (ms) => { clock += ms; }, probe: async () => good,
+    terminalState: async () => state,
+  }), /cuarentena|no confirmó/);
+}
+await waitForRelease({want: 'expected', probe: async () => good,
+  terminalState: async () => ({available: true, deployed: true, failed: false}),
+});
+console.log('release verification: 12 checksum/origin/late-rollback/terminal-state cases passed; no network');

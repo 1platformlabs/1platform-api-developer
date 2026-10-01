@@ -14,7 +14,11 @@ ROOT_RULE = 'RewriteRule ^$ ' + GUIDE + ' [R=301,L]'
 
 def plan(health_url, marker, failed_version, log, index_html, server_rules):
     if health_url == QA_ORIGIN + "/index.html":
-        return "already_migrated", None
+        if marker and marker in index_html:
+            return "already_migrated", None
+        if ROOT_RULE in server_rules and CANONICAL in index_html:
+            return "index_marker_refresh", (QA_ORIGIN + "/index.html", CANONICAL)
+        return "index_marker_not_confirmed", None
     if health_url not in (QA_ORIGIN, QA_ORIGIN + "/"):
         return "health_url_not_qa_root", None
     if ROOT_RULE not in server_rules:
@@ -66,8 +70,13 @@ def self_test():
     assert plan(*later)[1] is None
     migrated = args.copy()
     migrated[0] = QA_ORIGIN + "/index.html"
+    migrated[1] = CANONICAL
     assert plan(*migrated) == ("already_migrated", None)
-    print("health config: 14 positive/negative/idempotency cases passed; no network")
+    migrated[1] = "old title"
+    assert plan(*migrated)[1] == (QA_ORIGIN + "/index.html", CANONICAL)
+    migrated[4] = "other site"
+    assert plan(*migrated)[1] is None
+    print("health config: 16 positive/negative/idempotency cases passed; no network")
 
 
 if __name__ == "__main__":

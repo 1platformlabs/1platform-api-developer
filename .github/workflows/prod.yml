@@ -596,7 +596,18 @@ jobs:
               return 1
             }
 
-            probe / 12 200
+            probe / 12 301
+            ROOT_HEADERS="$(mktemp)"
+            curl -sS -D "$ROOT_HEADERS" -o /dev/null --max-time 10 \
+              -H "Host: ${HOST_HDR}" "http://127.0.0.1:${PORT}/"
+            if ! tr -d '\r' < "$ROOT_HEADERS" | grep -Eqi '^Location: /docs/saas/1platform-api/getting-started$'; then
+              rm -f "$ROOT_HEADERS"
+              echo "::error::la raíz no redirige a Primeros pasos"
+              exit 1
+            fi
+            rm -f "$ROOT_HEADERS"
+            probe /index.html 1 200
+            probe /docs/saas/1platform-api/getting-started 1 200
             # Control negativo EN LA MISMA CORRIDA: sin esto el probe de arriba
             # mediría "el puerto responde", no "el sitio se sirve".
             probe /__ruta-que-no-existe__ 1 404
@@ -795,6 +806,9 @@ jobs:
           # The public root redirects to the guide. Probe the exact file whose
           # bytes assemble.sh fingerprints, without following that redirect.
           ENTRY_PATH: '/index.html'
+          CPANEL_FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          CPANEL_FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          CPANEL_FTP_PASS: ${{ secrets.CPANEL_FTP_PASS }}
           ACTIVATION_TIMEOUT_SECONDS: '600'
         shell: bash
         run: node deploy/cpanel/verify-release.mjs

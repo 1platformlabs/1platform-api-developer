@@ -26,8 +26,11 @@ All notable changes to the 1Platform API Developer Docs will be documented in th
   se registran por separado; un guard verde no declara aprobación visual.
 - Tablas nativas de Scalar desplazables dentro de la columna a 360 px, con
   navegación por teclado y sin desbordamiento de la página.
-- Probe cPanel sobre `/index.html` con checksum y origen estables durante 45 s,
-  más diagnóstico privado de salud QA para la nueva redirección de la raíz.
+- Contrato nginx activo con redirecciones HTTP301, query preservada y health de
+  índice explícito, probado en un contenedor local de su versión fijada.
+- Probe QA con checksum, origen y versión terminal exacta del activador. Adaptador
+  del docroot con backup verificado, sin alterar cron ni el core de activación;
+  fallback público de 130 s con regresión de rollback tardío a 90 s.
 
 ## [Unreleased]
 

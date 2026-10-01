@@ -138,8 +138,10 @@ jobs:
       - name: cPanel health migration and activation stability
         run: |
           python3 deploy/cpanel/health_config.py --self-test
+          python3 scripts/check-health-adapter.py
           node deploy/cpanel/verify-release.test.mjs
           bash -n deploy/cpanel/qa-health-config.sh
+          bash -n deploy/cpanel/activate-docs.sh
 
       # onBrokenLinks:'throw' — a bad internal link fails here.
       - name: Build
@@ -163,6 +165,9 @@ jobs:
         run: |
           set -euo pipefail
           pnpm check:public-ui
+
+      - name: Production nginx routing (isolated local container)
+        run: pnpm check:serving
 
   # ---------------------------------------------------------------------------
   # SonarCloud — SOLO en pull requests (epica `sonar-solo-en-pr`).

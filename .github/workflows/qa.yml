@@ -182,6 +182,15 @@ jobs:
         shell: bash
         run: bash deploy/cpanel/qa-health-config.sh
 
+      - name: Apply the verified QA health adapter
+        if: steps.ftps.outputs.configured == 'true'
+        env:
+          CPANEL_FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          CPANEL_FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          CPANEL_FTP_PASS: ${{ secrets.CPANEL_FTP_PASS }}
+        shell: bash
+        run: python3 deploy/cpanel/health_adapter.py
+
       - name: Upload via FTPS (atomic)
         if: steps.ftps.outputs.configured == 'true'
         env:
@@ -242,6 +251,9 @@ jobs:
           # The public root redirects to the guide. Probe the exact file whose
           # bytes assemble.sh fingerprints, without following that redirect.
           ENTRY_PATH: '/index.html'
+          CPANEL_FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          CPANEL_FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          CPANEL_FTP_PASS: ${{ secrets.CPANEL_FTP_PASS }}
         shell: bash
         run: node deploy/cpanel/verify-release.mjs
 

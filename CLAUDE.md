@@ -122,7 +122,10 @@ y `x-user-token: $USER_TOKEN`. La primera consulta es `/api/v1/users/profile`;
 Raíz, `/docs`, `/docs/quick-start` y la antigua vista general Core redirigen a
 Primeros pasos. `/api-docs` redirige a la referencia Core. Mantener aliases de
 flows/webhooks/productos retirados y rutas técnicas de Atlas. Las entradas públicas
-tienen también 301 en el `.htaccess` empaquetado de cPanel. No copiar noindex del
+tienen también 301 en el `.htaccess` de QA y el nginx activo de PROD, conservando
+query. `pnpm check:serving` usa Docker/nginx 1.27 local para comprobar ambas
+formas de los aliases, destinos, rutas reales, 404 y aislamiento por Host.
+No copiar noindex del
 prototipo. Mantener canonical/hreflang/sitemap; fuente española única, sin selector
 de idioma porque no existe una segunda traducción.
 
@@ -133,9 +136,15 @@ también dispara build/deploy de QA (`developer-qa.1platform.pro`) automáticame
 El merge a main dispara producción: no mergear como parte de implementación.
 La versión de publicación se calcula desde tags en el pipeline productivo, sin
 reescribir `package.json`; no adelantar ese bump en un PR de implementación.
-Los probes de activación comparan `index_sha` contra `/index.html` explícitamente;
+QA usa cPanel. PROD usa nginx/SSH; el job cPanel productivo tiene `if: false`.
+El probe de QA compara `index_sha` contra `/index.html` explícitamente y exige
+`.deployed_version` exacta, sin cuarentena de esa versión. El adaptador propio
+de QA hace efectiva su configuración y conserva el core original como backup;
+ver `deploy/cpanel/README.md`. La comprobación productiva valida root301 con
+Location exacta, index/guía200 y negativos404, y su healthcheck usa `/index.html`.
 la raíz pública `/` ahora responde 301 hacia la guía y devuelve otros bytes al
-seguir ese redirect. No reemplazar el fingerprint por un mero HTTP 200.
+seguir ese redirect. No reemplazar el fingerprint por un mero HTTP 200 ni una
+coincidencia temporal anterior al estado terminal.
 
 `check:public-ui` lee HTML real, metadatos, CTA, búsqueda, accesibilidad y budgets.
 Sus capturas son evidencia de revisión separada: comprobar dimensiones no acredita el

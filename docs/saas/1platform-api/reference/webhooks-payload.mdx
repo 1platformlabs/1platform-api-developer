@@ -1,10 +1,10 @@
 ---
-title: Webhooks — payload saliente
+title: Webhooks — cuerpo saliente
 description: El cuerpo que 1Platform envía a tu endpoint cuando una transacción cambia de estado, los valores de status y cómo llevarlos a tu propia máquina de estados.
 sidebar_position: 8
 ---
 
-# Webhooks — payload saliente
+# Webhooks — cuerpo saliente
 
 Esta página documenta lo que **1Platform te envía a ti**, no lo que tú le pides a 1Platform. Por eso no vive en la
 [Referencia de API](/api-reference/1platform-api): la especificación OpenAPI describe operaciones que un cliente
@@ -13,7 +13,7 @@ invoca, y aquí el cliente es nuestro servidor llamando al tuyo.
 La guía que lo pone en contexto —registrar la URL, verificar la firma, responder— es
 [Webhooks](/docs/saas/1platform-api/plataforma/webhooks).
 
-## Payload canónico {#canonical-payload}
+## Cuerpo canónico {#canonical-payload}
 
 Si configuraste el evento **sin** `body_template`, el cuerpo tiene esta forma:
 
@@ -37,9 +37,10 @@ Si configuraste el evento **sin** `body_template`, el cuerpo tiene esta forma:
 Si configuraste un `body_template`, recibes lo que definiste en él: el cuerpo canónico es lo que llega cuando no hay
 plantilla.
 
-`status` es el estado **al que acaba de pasar** la transacción y siempre concuerda con `event`: `on_approved` viaja
-con `"status": "approved"`, `on_refunded` con `"refunded"`, y así con los siete. Puedes enrutar por cualquiera de
-los dos.
+`status` es el estado de la transacción en el momento del envío y normalmente coincide con `event`: `on_approved`
+viaja con `"status": "approved"`, `on_refunded` con `"refunded"`, y así con los siete. Si la transacción cambia dos
+veces en pocos segundos (aprobada y luego reembolsada), un reintento del primer evento puede traer ya el estado
+nuevo. Enruta por `event`.
 
 ## Campos
 
@@ -54,7 +55,7 @@ los dos.
 | `merchant_amount` | Tu moneda | **Úsalo para tu contabilidad**: el monto que cotizaste |
 | `merchant_currency` | Tu moneda | P. ej. `USD` |
 | `metadata` | Reflejado | El objeto libre que enviaste al crear la transacción |
-| `merchant_reference` | Reflejado | El identificador libre que enviaste al crear. Úsalo como clave para deduplicar |
+| `merchant_reference` | Reflejado | El identificador libre que enviaste al crear. Úsalo para encontrar **tu** pedido; para deduplicar, ver abajo |
 | `reference` | Pasarela | Referencia de la pasarela (p. ej. la autorización de la tarjeta) |
 | `timestamp` | 1Platform | Hora de la última actualización de la transacción (ISO 8601 con zona horaria) |
 
@@ -104,5 +105,5 @@ que permite calcular la firma sobre el cuerpo crudo. Ver
 La entrega es **al menos una vez**, con reintentos; ver
 [Reintentos y entrega](/docs/saas/1platform-api/reference/retry-and-delivery). Tu receptor **debe** deduplicar.
 
-La clave recomendada es `(transaction_id, event)`. Si envías `merchant_reference` al crear la transacción, también
-puedes deduplicar por `(merchant_reference, event)` para alinearte con tus propios identificadores de pedido.
+Deduplica siempre por `(transaction_id, event)`. `merchant_reference` sirve para encontrar tu pedido, no para
+deduplicar: una misma transacción emite varios eventos con la misma referencia.

@@ -34,11 +34,13 @@ publicitarios, dominios, agentes, telemetría, entre otras). **Cada operación d
 
 ## Cómo manejar un 429
 
-`429` tiene dos causas, y el `msg` de la respuesta te dice cuál:
+`429` significa que la operación no acepta más solicitudes por ahora:
 
-- **Límite por minuto**: espera y reintenta. La API **no** envía el header `Retry-After`, así que espera al menos 60
-  segundos antes del siguiente intento.
-- **Cupo del plan agotado**: reintentar no sirve hasta que cambie el plan o empiece el período siguiente.
+- **Límite por minuto** (lo más común): espera y reintenta. La API **no** envía el header `Retry-After`, así que
+  espera al menos 60 segundos antes del siguiente intento.
+- **Otras causas**: algunas operaciones lo usan también cuando se agotó el cupo de tu plan o cuando ya hay un trabajo
+  igual en curso. Su descripción en la Referencia de API dice cuál, y en esos casos reintentar no sirve hasta que
+  cambie la condición.
 
 ```python
 import time

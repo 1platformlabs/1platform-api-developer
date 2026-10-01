@@ -14,7 +14,7 @@ sidebar_position: 1
 2. Si envías `customer_email`, el link se le manda por correo a ese cliente en cuanto se crea. Esa misma dirección recibe después el comprobante.
 3. El cliente abre el enlace. Si el link está activo, lo redirige al checkout. Si ya está pagado, cancelado o vencido, ve una página con ese estado.
 4. El link vive en uno de cuatro estados. Mientras no lo pagan está `active`. Después termina en `paid`, `cancelled` (lo cancelaste tú) o `expired` (pasó su vigencia, que fijas en días u horas). Los tres son finales.
-5. Lo cobrado con un link suma a tu **saldo retirable**, que puedes transferir con [Retiros](/docs/saas/1platform-api/retiros).
+5. Lo cobrado con un link se acredita a tu **saldo retirable** cuando la plataforma confirma el pago. Mientras no lo confirma, el monto puede aparecer en `pending_verification` de `GET /users/cash-out/summary` y todavía no puedes retirarlo; si no se confirma a tiempo, se acredita como saldo prepagado, que no se retira (lo cuenta `frozen_collections`). Ver [Retiros](/docs/saas/1platform-api/retiros).
 
 Los pagos con link **no** disparan los webhooks de transacción de [Pagos en línea](/docs/saas/1platform-api/pagos-en-linea). Para saber si un link se pagó, consulta su estado o el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros).
 
@@ -24,7 +24,7 @@ Los pagos con link **no** disparan los webhooks de transacción de [Pagos en lí
 - Un **comercio** con su sucursal, donde seas dueño o administrador ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si sólo tienes rol de lectura en la sucursal, crear o cancelar responde `403`.
 - El módulo de Links de pago encendido para tu espacio de trabajo y asignado a tu cuenta. Si falta, recibes `403` con `data.code` = `module_disabled`.
 - Una pasarela de pago activa. Si no la hay, la creación responde `422`.
-- No necesitas tener activa la [Facturación electrónica](/docs/saas/1platform-api/facturacion-electronica) para cobrar con links.
+- No necesitas tener activa la [Facturación electrónica](/docs/saas/1platform-api/facturacion-electronica) para cobrar con links. Si la Referencia de API todavía lista un `409` `business_not_activated` en la creación del link, ya no se produce.
 
 ## Operaciones
 

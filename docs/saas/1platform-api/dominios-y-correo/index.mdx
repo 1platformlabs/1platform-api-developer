@@ -23,7 +23,7 @@ sidebar_position: 1
 ### Correo del negocio
 
 1. Crea una dirección sobre un dominio de la cuenta (`local_part@dominio`). La plataforma publica los registros que necesita. Si el dominio ya recibe correo en otro servidor, la respuesta es `409` `mail_foreign_mx` y no se escribe nada en el DNS, para no interceptar el correo que el comercio ya usa. Un dominio externo todavía sin delegar queda en `awaiting_delegation`, que es un estado y no un error.
-2. Cada dirección tiene dos verificaciones independientes: recibir y enviar. Hasta que la de envío esté lista, iniciar o responder una conversación responde `409` `mail_send_not_verified`.
+2. Cada dirección tiene dos verificaciones independientes: recibir y enviar. Hasta que la de envío esté lista, iniciar o responder una conversación responde `409` `mail_send_not_verified`. En Correo, el código de error viaja en `code`, en la raíz de la respuesta, no dentro de `data`.
 3. Los correos entrantes forman **conversaciones** (`/mail/threads`), que lees, marcas como leídas o archivas, y respondes desde la dirección del comercio. Un mensaje enviado nace en `sent` y sólo pasa a entregado cuando el servidor de destino lo confirma.
 4. **Iniciar una conversación exige `Idempotency-Key`**, porque envía correo real a un cliente real. Si repites la clave, recibes la misma conversación y no se envía otro correo.
 5. Los adjuntos se suben primero con `POST /mail/attachments` (multipart) y en el envío se nombra la `key` que devuelve esa subida.

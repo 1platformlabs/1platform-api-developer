@@ -31,8 +31,22 @@ En un error, `success` es `false` y `data` es `null` o trae un código legible p
 }
 ```
 
-Cuando `data.code` está presente, ramifica por él. Cuando falta, el código de estado HTTP es la fuente de verdad y
-`msg` es lo que puedes mostrar.
+El código legible por máquina viaja en `data.code` en la mayoría de las operaciones. Algunas familias lo envían en la
+**raíz** de la respuesta (`code`, con `data: null`): Retiros, Correo, 1Trade y, en Facturación electrónica y en
+comercios y sucursales, los errores de activación, de selección de sucursal y de comercio archivado. Lee los dos
+lugares: usa `data.code` y, si falta, `code`.
+
+```json
+{
+  "success": false,
+  "data": null,
+  "msg": "Cash out is not available for this workspace",
+  "code": "CASH_OUT_DISABLED"
+}
+```
+
+Cuando no hay código en ninguno de los dos lugares, el código de estado HTTP es la fuente de verdad y `msg` es lo que
+puedes mostrar.
 
 ## Excepción 1: errores de validación (`422`)
 
@@ -49,21 +63,22 @@ Cuando la solicitud no cumple el esquema (falta un campo, un tipo no corresponde
 
 `detail[].loc` dice qué campo falló. Corrige la solicitud; no la reintentes igual.
 
-## Excepción 2: credenciales ausentes o inválidas (`401`)
+## Excepción 2: autenticación y permisos (`401`, algunos `403` y `404`)
 
-Cuando falta un token o no es válido, la respuesta es un objeto con `detail`:
+Cuando falta un token, venció, fue revocado o el usuario no tiene el rol que exige la operación, la respuesta es un
+objeto con `detail`. También usan esta forma los `404` de un recurso que no pertenece a tu espacio de trabajo:
 
 ```json
 { "detail": "Not authenticated" }
 ```
 
-El texto de `detail` varía según qué token falló. Trátalo como informativo y canjea de nuevo el token que
-corresponda.
+El texto de `detail` varía según la causa. Trátalo como informativo: ante un `401`, canjea de nuevo el token que
+corresponda; ante un `403` de rol, usa el token de un usuario con ese rol.
 
 ## Webhooks salientes: sin sobre
 
 Los webhooks que 1Platform envía a tu backend no usan ninguna de estas formas: son un objeto plano. Ver
-[Webhooks — payload saliente](/docs/saas/1platform-api/reference/webhooks-payload#canonical-payload).
+[Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload#canonical-payload).
 
 ## Qué leer
 
@@ -71,7 +86,7 @@ Los webhooks que 1Platform envía a tu backend no usan ninguna de estas formas: 
 |---|---|
 | ¿La solicitud tuvo éxito? | El código de estado HTTP (`2xx` = sí) |
 | ¿La respuesta viene en el sobre? | Si existe el campo `success` |
-| ¿Qué tipo de fallo de negocio? | `data.code`, si está presente |
+| ¿Qué tipo de fallo de negocio? | `data.code` o, si falta, `code` |
 | ¿Qué mostrar a una persona? | `msg` |
 | ¿Qué campo de mi solicitud está mal? | `detail[].loc` (sólo en `422`) |
 

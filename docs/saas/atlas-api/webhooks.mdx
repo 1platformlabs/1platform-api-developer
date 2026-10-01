@@ -15,8 +15,8 @@ reenvíos y escribe o borra el [derecho de acceso](/docs/saas/atlas-api/entitlem
 
 ## Paso 1 — Firma con el secreto de tu tenant
 
-Cada tenant tiene **su propio secreto de webhook**. Atlas elige con qué secreto verificar leyendo `data.tenant_id` del
-cuerpo, así que ese campo es obligatorio: sin él, o con el identificador de otro tenant, la firma no verifica.
+Cada tenant tiene **su propio secreto de webhook**. Incluye siempre `data.tenant_id`: Atlas lo usa para elegir el
+secreto de tu tenant, y un evento sin él o con el de otro tenant no verifica con ese secreto.
 
 La firma es un HMAC-SHA256 en hexadecimal sobre el timestamp, un punto y los **bytes exactos** del cuerpo. Fírmalo antes de
 enviarlo y no lo vuelvas a serializar: cualquier cambio de espacios u orden rompe la firma.
@@ -50,8 +50,8 @@ Una firma o un timestamp ausente o incorrecto responde `401 WEBHOOK_SIGNATURE_IN
 | `access.revoked`, `subscription.cancelled`, `rental.expired` | Revocan el derecho de acceso de `data.scope_ref` (y de `data.scope`, si lo envías). |
 | `subscription.renewed`, `subscription.payment_failed`, `rental.started` | No cambian derechos de acceso; algunos disparan un correo al miembro. |
 
-Envía sólo estos siete tipos. Cualquier otro valor de `type`, o un cuerpo que no sea JSON, se rechaza con un error del
-servidor (`5xx`) y no se registra: reintentarlo no lo arregla.
+Envía sólo estos siete tipos. Atlas no procesa otro valor de `type` ni un cuerpo que no sea JSON, y no lo registra: no lo
+reintentes, corrige el origen.
 
 ## Qué garantiza Atlas
 

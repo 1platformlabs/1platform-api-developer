@@ -10,7 +10,7 @@ sidebar_position: 1
 
 ## Cómo funciona
 
-- **Saldo retirable.** Se forma con lo que cobras con [Links de pago](/docs/saas/1platform-api/links-de-pago) y, cuando la plataforma lleva esa cuenta, con los cobros de tu propia integración. Es una cifra **distinta** del saldo prepagado de [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo). Los dos nunca se suman, y el saldo prepagado no se convierte en efectivo. Se lleva por moneda.
+- **Saldo retirable.** Se forma con lo que cobras con [Links de pago](/docs/saas/1platform-api/links-de-pago) una vez confirmado el pago (lo pendiente de confirmar se ve en `pending_verification` del resumen, y lo que terminó como saldo prepagado, en `frozen_collections`) y, cuando la plataforma lleva esa cuenta, con los cobros de tu propia integración. Es una cifra **distinta** del saldo prepagado de [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo). Los dos nunca se suman, y el saldo prepagado no se convierte en efectivo. Se lleva por moneda.
 - **Método de pago.** Es el destino donde quieres recibir el dinero. Se guarda cifrado y nunca se edita: un destino distinto es un método nuevo. Un método nuevo, o uno que acabas de marcar como predeterminado, no puede recibir dinero hasta que pasa un periodo de espera.
 - **Cotización.** Antes de pedir, el servidor te dice cuánto recibirías: la comisión, el neto, los montos mínimo y máximo, y quién liberará el pago.
 - **Retiro.** Pedirlo descuenta el saldo retirable y deja el retiro esperando liberación. También puedes fijar un periodo para que los retiros se generen solos.
@@ -25,7 +25,7 @@ sidebar_position: 1
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
 - Retiros encendido para tu espacio de trabajo: viene apagado por defecto. Si no está encendido, recibes `403` con `code` = `CASH_OUT_DISABLED`. Además, el módulo tiene que estar asignado a tu cuenta; si no, recibes `403` `module_disabled`.
 - **Para cambiar algo, una sesión iniciada por una persona.** Registrar o borrar métodos, cambiar el periodo y pedir un retiro exige un token de usuario obtenido con el [enlace mágico](/docs/saas/1platform-api/plataforma/autenticacion) (`POST /auth/user/magic-link/verify`). Un token de usuario canjeado desde una clave `sk-…` sólo puede leer. Con él, las escrituras responden `403` `CASH_OUT_SESSION_REQUIRED`. `GET /users/cash-out/summary` te lo anticipa en `writes_require_sign_in`.
-- En esta superficie, el código de error viaja en `code`, en la raíz de la respuesta, no dentro de `data`.
+- En esta superficie, el código de error viaja en `code`, en la raíz de la respuesta, no dentro de `data` (salvo `module_disabled`, que va en `data.code` como en el resto de la API). Ver [Formato de respuesta](/docs/saas/1platform-api/reference/response-format).
 
 ## Operaciones
 

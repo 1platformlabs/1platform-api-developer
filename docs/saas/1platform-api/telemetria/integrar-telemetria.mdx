@@ -58,7 +58,7 @@ curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/install-status" \
 - `waiting_first_event`: el sitio pidió la etiqueta y todavía no llegó ningún evento. Si tu sitio no tuvo errores, es lo esperable.
 - `never_requested`: nadie pidió la etiqueta. Puede no estar pegada, tener mal la dirección o estar bloqueada por la política de seguridad de contenido del sitio.
 - `rejecting`: la etiqueta corre, pero se rechaza todo lo que envía. Revisa que el dominio del sitio esté en `hosts`.
-- `throttled`: el proyecto está limitado. Estás perdiendo parte de los eventos y desde el sitio no se nota, porque un script limitado no llega a ejecutarse.
+- `throttled`: el proyecto está limitado. Estás perdiendo parte de los eventos y desde el sitio no se nota, porque un script limitado no llega a ejecutarse. Si envías eventos desde un servidor, el origen de recepción sí manda `Retry-After`: respétalo.
 - `blocked`: superaste la cuota o el tope de gasto. Sólo entra una muestra reservada hasta el mes siguiente, salvo que subas el tope.
 - `disabled`: apagaste el proyecto.
 
@@ -72,9 +72,9 @@ curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/issues" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-El id de cada issue (`tlm_…`) lo genera la API y es estable, así que puedes guardar enlaces a él. La paginación usa un cursor opaco y firmado, atado al proyecto: devuelve `next_cursor` tal como llegó. Un cursor modificado, o de otro proyecto, responde `422`.
+El id de cada grupo de errores (*issue*) (`tlm_…`) lo genera la API y es estable, así que puedes guardar enlaces a él. La paginación usa un cursor opaco y firmado, atado al proyecto: devuelve `next_cursor` tal como llegó. Un cursor modificado, o de otro proyecto, responde `422`.
 
-El último evento de un issue sale de `GET /users/telemetry/projects/{project_id}/issues/{issue_id}/events/latest`. Si su campo `opaque` es `true`, el navegador no describió el error porque tus scripts se sirven desde otro origen sin `crossorigin`; se corrige en la etiqueta del paso 2. Rendimiento y registros se piden en días hacia atrás (`days`): hasta 30 en `GET /users/telemetry/projects/{project_id}/performance` y hasta 6 en `GET /users/telemetry/projects/{project_id}/logs`. Pedir más responde `422`.
+El último evento de un grupo de errores sale de `GET /users/telemetry/projects/{project_id}/issues/{issue_id}/events/latest`. Si su campo `opaque` es `true`, el navegador no describió el error porque tus scripts se sirven desde otro origen sin `crossorigin`; se corrige en la etiqueta del paso 2. Rendimiento y registros se piden en días hacia atrás (`days`): hasta 30 en `GET /users/telemetry/projects/{project_id}/performance` y hasta 6 en `GET /users/telemetry/projects/{project_id}/logs`. Pedir más responde `422`.
 
 [Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
 
@@ -92,7 +92,7 @@ curl -X POST "$BASE_URL/users/telemetry/projects/$PROJECT_ID/alert-rules" \
 
 Las condiciones son `new_issue` (un error nunca visto), `event_burst` (N eventos en M minutos) y `monitor_down` (un monitor de disponibilidad caído, que creas con `POST /users/telemetry/projects/{project_id}/monitors`). `cooldown_minutes` evita que una condición sostenida envíe un aviso en cada evaluación.
 
-Los avisos llegan al dueño y a las direcciones que **aceptaron**. Una dirección nueva se agrega con `POST /users/telemetry/recipients`, recibe un correo de confirmación y no recibe nada hasta confirmar. Un aviso nunca incluye el cuerpo del evento, su URL ni su traza: sólo conteos, etiquetas de la plataforma y el título recortado del issue. Si la recepción del proyecto está limitada o interrumpida, un incidente abierto no se declara recuperado hasta tener dos evaluaciones seguidas con recepción normal.
+Los avisos llegan al dueño y a las direcciones que **aceptaron**. Una dirección nueva se agrega con `POST /users/telemetry/recipients`, recibe un correo de confirmación y no recibe nada hasta confirmar. Un aviso nunca incluye el cuerpo del evento, su URL ni su traza: sólo conteos, etiquetas de la plataforma y el título recortado del grupo de errores. Si la recepción del proyecto está limitada o interrumpida, un incidente abierto no se declara recuperado hasta tener dos evaluaciones seguidas con recepción normal.
 
 [Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
 

@@ -109,8 +109,9 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/establishments/sync" \
 ```
 
 Después lista las sucursales con `GET /businesses/{businessId}/branches` y guarda como `$BRANCH_ID` el
-`id` de la que va a emitir. Si la respuesta de la sincronización avisa que hay varias sucursales con
-establecimiento, toda emisión tiene que nombrar su `branchId`.
+`id` de la que va a emitir. Si el comercio queda con varias sucursales con
+establecimiento, cada emisión tiene que decir de cuál sale: envía `branchId` o designa una sucursal por defecto con
+`defaultBranchId` en `PATCH /businesses/{businessId}`.
 
 | Código | Causa |
 |---|---|
@@ -139,7 +140,7 @@ busca sus datos por CUI/DPI y te ayuda a llenar `receptorInfo`. Sólo consulta, 
 |---|---|
 | 404 | El comercio no existe, o el `branchId` no corresponde a una sucursal suya |
 | 409 | La facturación electrónica del comercio todavía no está lista (pasos 2 y 3) |
-| 422 `branch_selection_required` | Hay varias sucursales con establecimiento y no nombraste ninguna. `data.branches` trae las opciones. No se emitió nada ni se consumió correlativo: reintenta con `branchId` |
+| 422 `branch_selection_required` | Hay varias sucursales con establecimiento, no nombraste ninguna y el comercio no tiene una por defecto. El código viaja en `code`, en la raíz, y `data.branches` trae las opciones. No se emitió nada ni se consumió correlativo: reintenta con `branchId` |
 | 422 | Datos inválidos o rechazo de la certificación. Revisa el NIT del receptor y los ítems |
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)

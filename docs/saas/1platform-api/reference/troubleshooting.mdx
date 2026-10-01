@@ -54,13 +54,14 @@ Lo más probable es que estés canjeando un token nuevo en cada solicitud. Los c
 (en `POST /users/token`, compartidos por todos los usuarios del mismo token de aplicación). Guarda los tokens en
 caché; ver
 [Autenticación → Mantener los tokens vigentes](/docs/saas/1platform-api/plataforma/autenticacion#cache-de-tokens).
-Si el `429` aparece en otra operación, puede ser el cupo de tu plan: ver
+Si el `429` aparece en otra operación, puede ser su límite por minuto, el cupo de tu plan o un trabajo igual ya en
+curso: ver
 [Límites de uso](/docs/saas/1platform-api/reference/rate-limits).
 
 ## «El webhook llegó y mi receptor lo procesó dos veces»
 
 Los webhooks se entregan **al menos una vez**. Deduplica por `(transaction_id, event)`; ver
-[Webhooks — payload saliente → Idempotencia de tu lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
+[Webhooks — cuerpo saliente → Idempotencia de tu lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
 
 ## «Roté el secreto y ahora fallan webhooks legítimos»
 
@@ -73,4 +74,4 @@ minuto. Acepta los dos secretos durante unos minutos después de rotar. Ver
 
 En el webhook, `amount` y `currency` están en la moneda de la pasarela, que puede ser distinta de la tuya. Lo que
 cotizaste está en `merchant_amount` y `merchant_currency`: **acredita siempre con esos dos**. Ver
-[Webhooks — payload saliente](/docs/saas/1platform-api/reference/webhooks-payload).
+[Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).

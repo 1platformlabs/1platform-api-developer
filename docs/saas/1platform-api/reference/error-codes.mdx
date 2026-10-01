@@ -1,33 +1,36 @@
 ---
 title: Códigos de error
-description: Los errores que tu cliente tiene que distinguir en la 1Platform API — su `data.code` cuando lo hay, qué significan y qué hacer.
+description: Los errores que tu cliente tiene que distinguir en la 1Platform API — su código cuando lo hay, qué significan y qué hacer.
 sidebar_position: 3
 ---
 
 # Códigos de error
 
 Los errores de negocio llegan en el sobre `{ success: false, data, msg }`. Cuando la operación necesita que tu
-cliente distinga el **tipo** de fallo, `data.code` trae un código legible por máquina; si no, `data` es `null` y el
-código de estado HTTP es la información. Los errores de validación y la falta de credenciales usan otra forma: ver
-[Formato de respuesta](/docs/saas/1platform-api/reference/response-format).
+cliente distinga el **tipo** de fallo, trae un código legible por máquina: casi siempre en `data.code`, y en algunas
+familias (Retiros, Correo, 1Trade, y la activación, la selección de sucursal y el comercio archivado en Facturación
+electrónica y en comercios) en `code`, en la raíz. Si no hay código, el código de estado HTTP es la información. Los
+errores de validación, de autenticación y de rol usan otra forma (`detail`): ver
+[Formato de respuesta](/docs/saas/1platform-api/reference/response-format). En las tablas, la columna «Código» vale
+para los dos lugares.
 
 Cada operación declara sus códigos en la [Referencia de API](/api-reference/1platform-api) (en sus respuestas y, cuando
 existen, en `x-error-codes`). Esta página reúne los que más integraciones encuentran.
 
 ## Errores generales
 
-| HTTP | `data.code` | Significado | Qué hacer |
+| HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|
 | 401 | (forma `detail`) | Falta un token, venció o no es válido | Canjea de nuevo el token que corresponda y reintenta **una vez** |
 | 402 | (sin código) | El saldo no alcanza el costo de la operación | Pide al usuario que recargue. **No reintentes** sin recargar |
 | 403 | `module_disabled` | El módulo está apagado para el espacio de trabajo o no está asignado a este usuario | Pide a un administrador del espacio de trabajo que lo habilite. **No reintentes** |
-| 403 | (sin código) | El usuario no tiene el rol que exige la operación (por ejemplo, no es administrador del espacio de trabajo) | Usa el token de un usuario con ese rol |
+| 403 | (forma `detail`) | El usuario no tiene el rol que exige la operación (por ejemplo, no es administrador del espacio de trabajo) | Usa el token de un usuario con ese rol |
 | 422 | (forma `detail`) | La solicitud no cumple el esquema (falta un campo, tipo incorrecto) | Corrige la solicitud. **Nunca reintentes** igual |
-| 429 | (sin código) | Superaste el límite por minuto de la operación o el cupo de tu plan | Ver [Límites de uso](/docs/saas/1platform-api/reference/rate-limits) |
+| 429 | (sin código, salvo excepciones) | La operación no acepta más solicitudes por ahora: casi siempre, el límite por minuto | Ver [Límites de uso](/docs/saas/1platform-api/reference/rate-limits) |
 
 ## Pagos en línea
 
-| Operación | HTTP | `data.code` | Significado | Qué hacer |
+| Operación | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|---|
 | `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El espacio de trabajo no tiene una pasarela de cobro activa | Un administrador la configura en el Panel. **No reintentes** |
 | `POST /users/transactions` | 422 | `PLATFORM_GATEWAY_REQUIRED` | El espacio de trabajo tiene pasarela, pero liquida directo al comercio y este cobro lo recauda la plataforma | No hay nada que configurar; contacta a soporte. **No reintentes** |
@@ -38,7 +41,7 @@ existen, en `x-error-codes`). Esta página reúne los que más integraciones enc
 
 ## Autenticación
 
-| Operación | HTTP | `data.code` | Significado | Qué hacer |
+| Operación | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|---|
 | `POST /auth/user/magic-link/verify` | 403 | `account_inactive` | Un administrador desactivó la cuenta | No reintentes; la cuenta debe reactivarse |
 | `POST /auth/user/magic-link/verify` | 410 | (sin código) | El enlace ya se usó o venció | Pide un enlace nuevo |
@@ -47,17 +50,19 @@ existen, en `x-error-codes`). Esta página reúne los que más integraciones enc
 
 ## Webhooks
 
-| Operación | HTTP | `data.code` | Significado | Qué hacer |
+| Operación | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|---|
 | `POST /webhooks/config/domains` | 400 | (sin código) | El dominio no es válido | Envía sólo el host, sin esquema, puerto ni ruta |
 | `POST /webhooks/config/domains` | 409 | (sin código) | El dominio ya está registrado | Trátalo como éxito |
 | `POST /webhooks/config/domains` | 422 | (sin código) | Se alcanzó el máximo de dominios del espacio de trabajo | Elimina uno que ya no uses |
-| `PUT /webhooks/config/events` | 422 | (sin código) | El host de la URL no está registrado, la URL no es `https://` o un header usa un nombre reservado | Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks) |
+| `PUT /webhooks/config/events` | 400 | (sin código) | La URL o su dominio no son válidos | Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks) |
+| `PUT /webhooks/config/events` | 422 | (sin código) | El host de la URL no está registrado. Si la URL no es `https://` o un header usa un nombre reservado, la respuesta usa la forma `detail` | Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks) |
 | `POST /webhooks/config/rotate-secret` | 404 | (sin código) | Todavía no hay secreto de firma | Registra un dominio primero |
 
 ## Cómo leer un error
 
-- Ramifica por `data.code` cuando está presente. `msg` es texto para personas y puede cambiar.
-- Cuando no hay `data.code`, el código de estado HTTP es la fuente de verdad.
-- Si encuentras un `data.code` que no está en la Referencia de API ni aquí, es un error de documentación:
+- Ramifica por el código: lee `data.code` y, si falta, `code` en la raíz. `msg` es texto para personas y puede
+  cambiar.
+- Cuando no hay código en ninguno de los dos lugares, el código de estado HTTP es la fuente de verdad.
+- Si encuentras un código que no está en la Referencia de API ni aquí, es un error de documentación:
   repórtalo junto con el `x-request-id` de la respuesta.

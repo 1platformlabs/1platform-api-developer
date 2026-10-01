@@ -66,11 +66,13 @@ Sólo cambian los eventos que envías: los que omites conservan su configuració
 Repetir la misma llamada deja el mismo estado. La URL debe ser `https://` y se usa tal cual, con su query string;
 de ella sólo se compara el host con los dominios registrados. El objeto opcional `headers` viaja en cada intento
 de entrega (hasta 20 por evento) y sirve para atravesar una protección de acceso delante de tu receptor; los nombres
-reservados, como `Authorization`, `Content-Type`, `Host` o `X-Webhook-*`, se rechazan al guardar.
+reservados, como `Authorization`, `Content-Type`, `Host`, `X-Webhook-Signature` o `X-Webhook-Timestamp`, se rechazan
+al guardar.
 
 | Código | Causa |
 |---|---|
-| 422 | El host de la URL no está registrado (regístralo en el paso 1), la URL no es `https://` o un header usa un nombre reservado |
+| 400 | La URL o su dominio no son válidos |
+| 422 | El host de la URL no está registrado (regístralo en el paso 1). Si la URL no es `https://` o un header usa un nombre reservado, el `422` llega con la forma `detail` |
 
 [Referencia de API → Webhook Configuration](/api-reference/1platform-api#tag/webhook-configuration)
 
@@ -80,7 +82,7 @@ Con dominio y eventos configurados, tu endpoint recibe un POST firmado cada vez 
 estado final, o cuando un pago aprobado se reembolsa o se revierte. El estado inicial `created` nunca se notifica.
 El cuerpo **no** viene en el sobre `{success, data, msg}` del resto de la API: es un objeto plano, el cuerpo
 canónico o el que definiste con `body_template`. Su forma, los estados y cómo llevarlos a tu propia máquina de
-estados están en [Webhooks — payload saliente](/docs/saas/1platform-api/reference/webhooks-payload).
+estados están en [Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).
 
 ## Paso 4 — Verificar la firma antes de confiar en el contenido
 

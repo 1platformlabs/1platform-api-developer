@@ -16,7 +16,7 @@ sidebar_position: 1
    - `own_fleet`: asignas a uno de tus repartidores (`assignee`). Funciona de punta a punta sin terceros, y tú avanzas el estado a `picked_up`, `delivered` o `failed`.
    - `courier`: primero pides una **cotización** a la mensajería configurada. La cotización queda guardada en el servidor y el despacho la confirma, así que nunca envías el precio. Si una dirección no se puede cotizar, devuelve el envío a `draft`, corrígela y vuelve a cotizar.
 4. Puedes cancelar cualquier envío que todavía no se entregó, incluso uno ya recogido. Si lo despachó una mensajería, la cancelación se pide primero a ella: si falla, el envío **no** se cancela y recibes el error.
-5. Para el destinatario existe un **rastreo público**: `GET /deliveries/tracking/{handle}` no lleva credenciales. El `handle` viene en el envío (`tracking_handle`) y es una derivación firmada, no el número de guía. La respuesta muestra sólo lo que el destinatario puede ver: estado y nombre de pila, sin dirección, teléfono ni precio. Cuando el envío termina, el enlace caduca y responde `410`.
+5. Para el destinatario existe un **rastreo público**: `GET /deliveries/tracking/{handle}` no lleva credenciales. El `handle` viene en el envío (`tracking_handle`) y es una derivación firmada, no el número de guía. La respuesta muestra sólo lo que el destinatario puede ver: estado y nombre de pila, sin dirección, teléfono ni precio. Cuando el envío termina, la respuesta trae `expires_at`; el enlace sigue funcionando hasta ese momento y después responde `410`.
 
 Estados: `draft`, `quoted`, `dispatched`, `picked_up`, `delivered`, `failed`, `cancelled`. El campo `fee` es una referencia informativa y no genera ningún cobro.
 

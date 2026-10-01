@@ -18,8 +18,8 @@ Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN`, definidos en
 
 Antes del primer cobro, un administrador del espacio de trabajo registra en la
 [configuración de webhooks](/docs/saas/1platform-api/plataforma/webhooks) dos cosas: el dominio de tu
-`return_url` y la URL que recibe cada evento. Va primero porque, sin el dominio registrado, la creación
-del cobro responde `400`. Y sin los eventos mapeados, te quedas sin la única señal que liquida un pedido.
+`return_url` y la URL que recibe cada evento. Va primero porque, si envías `return_url` y su dominio no
+está registrado, la creación del cobro responde `400`. Y sin los eventos mapeados, te quedas sin la única señal que liquida un pedido.
 
 Mapea los siete eventos. `on_refunded` y `on_reversed` llegan después de un `on_approved`, cuando un pago
 aprobado se reembolsa o se revierte (por ejemplo, por un contracargo).
@@ -80,8 +80,8 @@ El webhook es lo que cambia el estado del pedido. Antes de confiar en el cuerpo,
   según tu negocio.
 
 El mismo evento puede llegarte más de una vez. Procésalo de forma idempotente, con la clave
-`transaction_id` + `status`. El cuerpo completo está en
-[Webhooks: payload saliente](/docs/saas/1platform-api/reference/webhooks-payload).
+`(transaction_id, event)`. El cuerpo completo está en
+[Webhooks: cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).
 
 ## Paso 5 — Concilia lo que no llegó o quedó en duda
 

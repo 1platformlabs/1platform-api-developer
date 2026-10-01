@@ -133,6 +133,9 @@ también dispara build/deploy de QA (`developer-qa.1platform.pro`) automáticame
 El merge a main dispara producción: no mergear como parte de implementación.
 La versión de publicación se calcula desde tags en el pipeline productivo, sin
 reescribir `package.json`; no adelantar ese bump en un PR de implementación.
+Los probes de activación comparan `index_sha` contra `/index.html` explícitamente;
+la raíz pública `/` ahora responde 301 hacia la guía y devuelve otros bytes al
+seguir ese redirect. No reemplazar el fingerprint por un mero HTTP 200.
 
 `check:public-ui` lee HTML real, metadatos, CTA, búsqueda, accesibilidad y budgets.
 Sus capturas son evidencia de revisión separada: comprobar dimensiones no acredita el

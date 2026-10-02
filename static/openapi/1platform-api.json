@@ -45495,7 +45495,7 @@
           "Trading Agent"
         ],
         "summary": "Cycles the monitor should watch",
-        "description": "Everything currently waiting on a market condition, across every tenant.\n\nThe payload carries **no identity and no money**: cycle ids, a market, an operator and threshold prices. The monitor decides *when* to call `execute`; the server decides what, how much and whether.\n\n**Auth:** `Authorization: Bearer APP_API_KEY_EXAMPLE` with capability `trade.execute` and platform scope.",
+        "description": "Everything currently waiting on a market condition, across every tenant.\n\nThe payload carries **no identity and no money**: cycle ids, a market, an operator and threshold prices. The monitor decides *when* to call `execute`; the server decides what, how much and whether.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `trade.execute` and platform scope.",
         "operationId": "listActionableCycles",
         "parameters": [
           {
@@ -45541,10 +45541,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Service credential: `Bearer APP_API_KEY_EXAMPLE`",
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
               "title": "Authorization"
             },
-            "description": "Service credential: `Bearer APP_API_KEY_EXAMPLE`"
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
           }
         ],
         "responses": {
@@ -45622,7 +45622,7 @@
           "Trading Agent"
         ],
         "summary": "Ask the server to act on one cycle",
-        "description": "The server derives the action from the cycle's **state** (waiting → buy, holding → sell), re-reads the price itself, and re-checks the trigger. A trigger that does not hold answers `409` and costs the cycle nothing.\n\nThe body carries only `observed_price`, as telemetry. It has no `action` and no `reason` field, and an unknown field is rejected rather than ignored.\n\n**Auth:** `Authorization: Bearer APP_API_KEY_EXAMPLE` with capability `trade.execute` and platform scope.",
+        "description": "The server derives the action from the cycle's **state** (waiting → buy, holding → sell), re-reads the price itself, and re-checks the trigger. A trigger that does not hold answers `409` and costs the cycle nothing.\n\nThe body carries only `observed_price`, as telemetry. It has no `action` and no `reason` field, and an unknown field is rejected rather than ignored.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `trade.execute` and platform scope.",
         "operationId": "executeTradeCycle",
         "parameters": [
           {
@@ -45652,10 +45652,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Service credential: `Bearer APP_API_KEY_EXAMPLE`",
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
               "title": "Authorization"
             },
-            "description": "Service credential: `Bearer APP_API_KEY_EXAMPLE`"
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
           }
         ],
         "requestBody": {
@@ -45770,7 +45770,7 @@
           "Notifications"
         ],
         "summary": "Ask the server to send one operations notification",
-        "description": "The caller names an **event** from a closed enum and supplies its typed parameters. The server resolves the template, its language and the recipients from configuration, renders every parameter itself, and asks the provider to accept the message.\n\n**`202` does not mean delivered.** The provider confirms that it validated the request's structure; delivery is only ever reported through a webhook, which this surface does not have. `accept_status` is the provider's own word, verbatim.\n\nThe body carries no recipient, no scope, no template and no free text — each of those is resolved server-side on purpose.\n\nSend the same `idempotency_key` twice and the second call answers `202` with `accept_status: \"duplicate\"` and sends nothing. Derive the key from the caller's **spacing window**, never from the instant.\n\n**Auth:** `Authorization: Bearer APP_API_KEY_EXAMPLE` with capability `whatsapp.send` and platform scope.",
+        "description": "The caller names an **event** from a closed enum and supplies its typed parameters. The server resolves the template, its language and the recipients from configuration, renders every parameter itself, and asks the provider to accept the message.\n\n**`202` does not mean delivered.** The provider confirms that it validated the request's structure; delivery is only ever reported through a webhook, which this surface does not have. `accept_status` is the provider's own word, verbatim.\n\nThe body carries no recipient, no scope, no template and no free text — each of those is resolved server-side on purpose.\n\nSend the same `idempotency_key` twice and the second call answers `202` with `accept_status: \"duplicate\"` and sends nothing. Derive the key from the caller's **spacing window**, never from the instant.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `whatsapp.send` and platform scope.",
         "operationId": "sendWhatsAppNotification",
         "parameters": [
           {
@@ -45786,10 +45786,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Service credential: `Bearer APP_API_KEY_EXAMPLE`",
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
               "title": "Authorization"
             },
-            "description": "Service credential: `Bearer APP_API_KEY_EXAMPLE`"
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
           }
         ],
         "requestBody": {
@@ -82751,7 +82751,7 @@
           "Tasks"
         ],
         "summary": "Create a new task",
-        "description": "Creates a new task, unstarted. Requires the `task_manager` skill (humans) OR a `ServiceKey` with the `tasks.write` capability, scope `tenant` (agents, TSK-08).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (human) **or** `Authorization: Bearer APP_API_KEY_EXAMPLE` (agent)\n\n**Rate limit:** 20 req/min",
+        "description": "Creates a new task, unstarted. Requires the `task_manager` skill (humans) OR a `ServiceKey` with the `tasks.write` capability, scope `tenant` (agents, TSK-08).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (human) **or** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` (agent)\n\n**Rate limit:** 20 req/min",
         "operationId": "createTask",
         "parameters": [
           {
@@ -83382,7 +83382,7 @@
           "Tasks"
         ],
         "summary": "Create a subtask with a required skill",
-        "description": "Creates a subtask under a task. `order` is assigned server-side by an atomic counter (D-16) — never accepted from the client. Requires `task_manager` (humans) OR a `ServiceKey` with `tasks.write` (agents, TSK-08).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (human) **or** `Authorization: Bearer APP_API_KEY_EXAMPLE` (agent)\n\n**Rate limit:** 20 req/min",
+        "description": "Creates a subtask under a task. `order` is assigned server-side by an atomic counter (D-16) — never accepted from the client. Requires `task_manager` (humans) OR a `ServiceKey` with `tasks.write` (agents, TSK-08).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (human) **or** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` (agent)\n\n**Rate limit:** 20 req/min",
         "operationId": "createSubtask",
         "parameters": [
           {
@@ -132597,7 +132597,7 @@
     },
     {
       "name": "Trading Agent",
-      "description": "The surface a 1Trade monitor uses. Authenticated with a service credential alone (`Authorization: Bearer APP_API_KEY_EXAMPLE`) carrying the `trade.execute` capability and platform scope — no app token and no user token.\n\nThe monitor decides **when** to look at a cycle. The server decides what, how much and whether: it derives the action from the cycle's own state, re-reads the price itself, and re-checks the trigger. The request body carries no action, no reason and no amount."
+      "description": "The surface a 1Trade monitor uses. Authenticated with a service credential alone (`Authorization: Bearer SERVICE_API_KEY_EXAMPLE`) carrying the `trade.execute` capability and platform scope — no app token and no user token.\n\nThe monitor decides **when** to look at a cycle. The server decides what, how much and whether: it derives the action from the cycle's own state, re-reads the price itself, and re-checks the trigger. The request body carries no action, no reason and no amount."
     },
     {
       "name": "Heatmaps",

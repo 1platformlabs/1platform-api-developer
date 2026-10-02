@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {sanitizeOpenApiExamples} from './openapi-examples.mjs';
 import {correctAuthDescriptions} from './openapi-auth-descriptions.mjs';
+import {checkOpenApiPublication, checkServiceExamples} from './openapi-publication-check.mjs';
 
 // Independent of the sanitizer's matching rules: a shortened regression must
 // not make both the transform and its guard silently ignore the same value.
@@ -56,6 +57,11 @@ if (process.argv.includes('--self-test')) {
     assert.deepEqual(sanitizeOpenApiExamples({description: value}), {spec: {description: value}, changed: 0});
     assert.equal(illustrativePrefixes({description: value}), 0);
   }
+  for (const value of ['ak-xé', 'ak-x𐐀']) {
+    assert.deepEqual(sanitizeOpenApiExamples({description: value}), {spec: {description: value}, changed: 0}, 'Unicode word boundaries cannot truncate a word');
+  }
+  assert.equal(sanitizeOpenApiExamples({description: 'Use ak-x. Then sk-y, or ak-int-<prefix><secret>.'}).spec.description,
+    'Use APP_API_KEY_EXAMPLE. Then USER_API_KEY_EXAMPLE, or INTEGRATION_API_KEY_EXAMPLE.', 'Surrounding punctuation is preserved');
   assert.equal(illustrativePrefixes({description: 'sk-x'}), 1);
   assert.equal(illustrativePrefixes({description: 'ak-'}), 1);
   assert.equal(illustrativePrefixes({bearerFormat: 'ak-int-<prefix><secret>'}), 0, 'Structural format is not prose');
@@ -73,11 +79,13 @@ if (process.argv.includes('--self-test')) {
   assert.equal(correctAuthDescriptions(correctAuthDescriptions(authContract, '1platform-api').spec, '1platform-api').changed, 0);
   assert.deepEqual(correctAuthDescriptions(authContract, 'atlas-api'), {spec: authContract, changed: 0});
   assert.throws(() => correctAuthDescriptions({components: {}}, '1platform-api'), /metadata changed/);
+  checkOpenApiPublication();
   console.log('ok   example sanitation preserves contract, original input and idempotency');
 } else {
   for (const api of ['1platform-api', 'atlas-api']) {
     const path = `static/openapi/${api}.json`;
     const source = JSON.parse(readFileSync(path, 'utf8'));
+    if (api === '1platform-api') checkServiceExamples(source);
     assert.equal(illustrativePrefixes(source), 0, `${path}: illustrative key prefixes remain; values withheld`);
     const {changed} = sanitizeOpenApiExamples(source);
     assert.equal(changed, 0, `${path}: ${changed} illustrative credential value(s) require sanitation; values withheld`);

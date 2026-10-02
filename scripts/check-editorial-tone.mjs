@@ -10,7 +10,8 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 function files(path, accept) {
   return readdirSync(path, {withFileTypes: true}).flatMap((entry) => {
     const next = join(path, entry.name);
-    return entry.isDirectory() ? files(next, accept) : accept(next) ? [next] : [];
+    if (entry.isDirectory()) return files(next, accept);
+    return accept(next) ? [next] : [];
   });
 }
 
@@ -25,6 +26,12 @@ if (process.argv.includes('--self-test')) {
   assert.deepEqual(informalForms(markdownProse('<p className="lead">Use su clave</p>')), []);
   assert.ok(informalForms(markdownProse('<p>Use tus claves</p>')).length, 'JSX content is editorial');
   assert.ok(informalForms(markdownProse('````js\n```\ntu clave\n````\nTus datos')).length, 'Long fences preserve following prose');
+  assert.deepEqual(informalForms(markdownProse('<script>const copy = "tu clave"</script><style>.tu {}</style><p>Use su clave</p>')), []);
+  assert.ok(informalForms(markdownProse('<p title="a > b">Tus datos</p>')).length, 'A > in an attribute cannot hide editorial text');
+  assert.ok(informalForms(markdownProse('<p><em>Tus datos</p>')).length, 'Malformed nested markup still exposes rendered prose');
+  assert.ok(informalForms(markdownProse('`unclosed Tus datos')).length, 'An unmatched inline delimiter cannot hide prose');
+  assert.deepEqual(informalForms(markdownProse('``const sample = `tu clave` `` Use su clave')), []);
+  assert.deepEqual(informalForms('tu_variable pre-tu-variable añotuyo'), [], 'Technical compound words are not pronouns');
   console.log('ok   editorial tone positive/negative controls, code fences, inline literals, links and noun context');
 } else {
   const sources = files(join(root, 'docs'), (path) => /\.(?:mdx?|json)$/.test(path));

@@ -1,28 +1,28 @@
 ---
 title: Agentes de IA
-description: Crea agentes que trabajan sobre tus sitios con un tope de gasto, y atiende las acciones que dejan para que una persona decida.
+description: Cree agentes que trabajan sobre sus sitios con un tope de gasto, y atienda las acciones que dejan para que una persona decida.
 sidebar_position: 1
 ---
 
 # Agentes de IA
 
-<p className="lead">Un agente ejecuta una tarea por su cuenta, usa herramientas y, cuando algo requiere criterio humano, deja una acción pendiente en lugar de resolverla solo. Se instala desde un catálogo de plantillas, corre según una cadencia o cuando lo disparas, y nunca gasta más del tope que le fijas.</p>
+<p className="lead">Un agente ejecuta una tarea por su cuenta, usa herramientas y, cuando algo requiere criterio humano, deja una acción pendiente en lugar de resolverla solo. Se instala desde un catálogo de plantillas, corre según una cadencia o cuando lo dispara, y nunca gasta más del tope que le fija.</p>
 
 ## Cómo funciona
 
-- **Plantillas.** El catálogo trae agentes listos, con sus herramientas, su cadencia y su nivel de modelo. `POST /agents/catalog/{slug}/install` crea el agente **ya activo**. Es la vía recomendada: `POST /agents` exige la definición completa de cada herramienta, que ningún cliente tiene, y un agente sin herramientas corre y gasta sin poder terminar su tarea. Si prefieres una conversación guiada, el asistente (`/agents/wizard/...`) arma la configuración y la confirmas al final.
-- **Sitios.** Un agente sólo trabaja sobre los sitios que le asignas. Sin sitios asignados no vigila ninguno: la lista no es un filtro sobre todo lo del usuario, es todo su alcance. Un sitio sólo admite un agente por objetivo; un segundo responde `409`.
+- **Plantillas.** El catálogo trae agentes listos, con sus herramientas, su cadencia y su nivel de modelo. `POST /agents/catalog/{slug}/install` crea el agente **ya activo**. Es la vía recomendada: `POST /agents` exige la definición completa de cada herramienta, que ningún cliente tiene, y un agente sin herramientas corre y gasta sin poder terminar su tarea. Si prefiere una conversación guiada, el asistente (`/agents/wizard/...`) arma la configuración y la confirma al final.
+- **Sitios.** Un agente sólo trabaja sobre los sitios que le asigna. Sin sitios asignados no vigila ninguno: la lista no es un filtro sobre todo lo del usuario, es todo su alcance. Un sitio sólo admite un agente por objetivo; un segundo responde `409`.
 - **Tope de gasto.** El tope es por ciclo y lo aplica el servidor antes de cada iteración. Un agente **sin tope no tiene gasto ilimitado**: queda en modo propuesta, en el que razona y registra lo que haría, pero no recibe las herramientas que cuestan dinero. Bajar el tope por debajo de lo ya consumido lo pasa a ese modo de inmediato.
 - **Ejecuciones.** Una ejecución se dispara a mano o por la cadencia (`schedule`, en formato cron, con intervalos de al menos 15 minutos). Es asíncrona: devuelve `202` y se consulta hasta que termina en `completed`, `failed` o `stopped`.
 - **Acciones pendientes.** Cuando el agente necesita una decisión humana, crea una acción (por ejemplo `publish_content`, `review_invoice` o `send_email`) que queda `pending` hasta que alguien la consume con su decisión.
 - **Memoria.** El agente recuerda lo que hizo entre ejecuciones. El dueño puede cerrar o hacer olvidar un recuerdo, y dejarle instrucciones permanentes que el agente lee al empezar cada ejecución y no puede modificar.
 
-## Qué necesitas
+## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido). Un agente siempre pertenece a un usuario, así que crear uno exige el token de usuario.
 - Los sitios del usuario que el agente va a vigilar. Ver [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
 - **Saldo** para lo que consume el agente. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
-- Las herramientas que el plan de tu espacio de trabajo no incluye se omiten al instalar y se informan en `skipped_tools`. `GET /agents/tools` lista todas y dice por qué una no está disponible. El máximo es de 50 agentes por espacio de trabajo.
+- Las herramientas que el plan de su espacio de trabajo no incluye se omiten al instalar y se informan en `skipped_tools`. `GET /agents/tools` lista todas y dice por qué una no está disponible. El máximo es de 50 agentes por espacio de trabajo.
 
 ## Operaciones
 
@@ -52,7 +52,7 @@ Todas las operaciones, en la Referencia de API:
 
 ### 1Trade
 
-1Trade convierte parte del saldo en una posición automática: compra a precio de mercado y vende cuando el precio llega al monto de salida que fijaste, y puede repetirse y reinvertir lo obtenido. Las cinco operaciones usan los dos tokens y requieren el módulo de 1Trade en la cuenta. Sus errores traen el código en `code`, en la raíz de la respuesta.
+1Trade convierte parte del saldo en una posición automática: compra a precio de mercado y vende cuando el precio llega al monto de salida que fijó, y puede repetirse y reinvertir lo obtenido. Las cinco operaciones usan los dos tokens y requieren el módulo de 1Trade en la cuenta. Sus errores traen el código en `code`, en la raíz de la respuesta.
 
 - Abrir un 1Trade **reserva** el monto de entrada; el saldo sólo se mueve cuando se confirma una compra o una venta.
 - Lo que vuelve es lo realmente recibido, descontadas comisiones, y se acredita como saldo de 1Platform **no retirable**.
@@ -62,7 +62,7 @@ Todas las operaciones, en la Referencia de API:
 |---|---|
 | `GET /users/trades/markets` | Mercados disponibles |
 | `POST /users/trades` | Abrir un 1Trade (reserva el monto de entrada) |
-| `GET /users/trades` | Listar tus 1Trades |
+| `GET /users/trades` | Listar sus 1Trades |
 | `GET /users/trades/{trade_id}` | Un 1Trade con sus ciclos |
 | `POST /users/trades/{trade_id}/cancel` | Cancelar |
 

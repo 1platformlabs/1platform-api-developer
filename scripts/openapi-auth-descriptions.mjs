@@ -3,8 +3,8 @@
  * userToken apiKey type describes a custom header, not the value's token format.
  * Never rewrite type, scheme, bearerFormat, in, name, security or operations. */
 const descriptions = {
-  bearerAuth: 'JWT de aplicación obtenido al canjear su clave API en POST /api/v1/auth/token. Envíelo como Authorization: Bearer <APP_TOKEN>. La clave API de aplicación (ak-...) no se envía en este header.',
-  userToken: 'JWT de usuario obtenido al canjear su clave API en POST /api/v1/users/token, con el JWT de aplicación. Envíelo en x-user-token. La clave API de usuario (sk-...) no se envía en este header.',
+  bearerAuth: 'JWT de aplicación obtenido al canjear su clave API en POST /api/v1/auth/token. Envíelo como Authorization: Bearer <APP_TOKEN>. La clave API de aplicación (APP_API_KEY_EXAMPLE) no se envía en este header.',
+  userToken: 'JWT de usuario obtenido al canjear su clave API en POST /api/v1/users/token, con el JWT de aplicación. Envíelo en x-user-token. La clave API de usuario (USER_API_KEY_EXAMPLE) no se envía en este header.',
 };
 
 export function correctAuthDescriptions(source, apiId) {

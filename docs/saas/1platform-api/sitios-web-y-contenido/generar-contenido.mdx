@@ -1,6 +1,6 @@
 ---
 title: Generar contenido con IA
-description: Investiga keywords, encola la generación de un artículo, consúltala hasta que termine y pide la indexación de la página publicada.
+description: Investigue keywords, encole la generación de un artículo, consúltela hasta que termine y pida la indexación de la página publicada.
 sidebar_position: 2
 ---
 
@@ -10,7 +10,7 @@ Un artículo no se genera en la misma petición HTTP: se encola un trabajo y se 
 
 ## Paso 1 — Investigar keywords
 
-Antes de generar, elige una keyword con volumen de búsqueda real. Si el sitio ya existe, extrae keywords analizando su dominio:
+Antes de generar, elija una keyword con volumen de búsqueda real. Si el sitio ya existe, extraiga keywords analizando su dominio:
 
 ```bash
 curl -X POST "$BASE_URL/posts/keywords/" \
@@ -20,13 +20,13 @@ curl -X POST "$BASE_URL/posts/keywords/" \
   -d '{"domain": "example.com", "country": "es", "lang": "es"}'
 ```
 
-Si el sitio todavía no existe o buscas un nicho nuevo, usa `POST /posts/keywords/topic/` con un `topic` en lugar de `domain`. Las dos responden en la misma llamada con keywords y su volumen estimado. Cada consulta se cobra del saldo del usuario: `402` significa saldo insuficiente.
+Si el sitio todavía no existe o busca un nicho nuevo, use `POST /posts/keywords/topic/` con un `topic` en lugar de `domain`. Las dos responden en la misma llamada con keywords y su volumen estimado. Cada consulta se cobra del saldo del usuario: `402` significa saldo insuficiente.
 
 [Referencia de API → Keywords Content & Indexing](/api-reference/1platform-api#tag/keywords-content-indexing)
 
 ## Paso 2 — Encolar el trabajo
 
-Envía la keyword elegida. La respuesta llega con `202` antes de que el artículo exista: la redacción, las imágenes y el slug se hacen dentro del trabajo, no en llamadas tuyas.
+Envíe la keyword elegida. La respuesta llega con `202` antes de que el artículo exista: la redacción, las imágenes y el slug se hacen dentro del trabajo, no en llamadas suyas.
 
 ```bash
 curl -X POST "$BASE_URL/posts/content/" \
@@ -36,9 +36,9 @@ curl -X POST "$BASE_URL/posts/content/" \
   -d '{"keyword": "consejos de jardinería sostenible", "lang": "es", "country": "es", "image_provider": "default"}'
 ```
 
-Guarda `data.job_id` como `$JOB_ID`. El costo se **cobra al aceptar el trabajo**: la respuesta trae el monto en el header `X-Operation-Cost` y el saldo que queda en `X-Balance-Remaining`. Si después el trabajo termina en `failed`, ese cobro no se devuelve automáticamente.
+Guarde `data.job_id` como `$JOB_ID`. El costo se **cobra al aceptar el trabajo**: la respuesta trae el monto en el header `X-Operation-Cost` y el saldo que queda en `X-Balance-Remaining`. Si después el trabajo termina en `failed`, ese cobro no se devuelve automáticamente.
 
-Esta operación **no es idempotente**. Cada llamada encola un trabajo nuevo y vuelve a cobrar. Enviar `X-Idempotency-Key` no lo evita: ese header no forma parte del contrato y, aun cuando se lee, cada llamada crea otro trabajo. Si una llamada se corta antes de recibir la respuesta, no la repitas a ciegas: el trabajo pudo haberse creado y cobrado igual.
+Esta operación **no es idempotente**. Cada llamada encola un trabajo nuevo y vuelve a cobrar. Enviar `X-Idempotency-Key` no lo evita: ese header no forma parte del contrato y, aun cuando se lee, cada llamada crea otro trabajo. Si una llamada se corta antes de recibir la respuesta, no la repita a ciegas: el trabajo pudo haberse creado y cobrado igual.
 
 El límite es de 5 solicitudes por minuto, más bajo que en el resto de la API. `429` también puede indicar que se agotó el cupo del plan.
 
@@ -52,17 +52,17 @@ curl "$BASE_URL/posts/content/jobs/$JOB_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-`data.status` pasa de `pending` a `processing` y termina en `completed` o `failed`. Consulta cada 5 segundos, que es el intervalo que recomienda la referencia. Si termina en `failed`, el motivo está en `data.error`. Antes de reintentar, revisa ese motivo: cada reintento es un trabajo nuevo y se cobra otra vez.
+`data.status` pasa de `pending` a `processing` y termina en `completed` o `failed`. Consulte cada 5 segundos, que es el intervalo que recomienda la referencia. Si termina en `failed`, el motivo está en `data.error`. Antes de reintentar, revise ese motivo: cada reintento es un trabajo nuevo y se cobra otra vez.
 
 [Referencia de API → Keywords Content & Indexing](/api-reference/1platform-api#tag/keywords-content-indexing)
 
 ## Paso 4 — Publicar el resultado
 
-Con `completed`, la misma respuesta trae `data.result` con el título, el contenido en HTML y el slug. La publicación ocurre en tu sitio o CMS, no en 1Platform. Si perdiste el `job_id`, `GET /posts` lista los artículos completados del usuario, del más reciente al más antiguo, con su id y fecha. Con ese id vuelves a consultar el trabajo del paso 3.
+Con `completed`, la misma respuesta trae `data.result` con el título, el contenido en HTML y el slug. La publicación ocurre en su sitio o CMS, no en 1Platform. Si perdió el `job_id`, `GET /posts` lista los artículos completados del usuario, del más reciente al más antiguo, con su id y fecha. Con ese id vuelve a consultar el trabajo del paso 3.
 
 ## Paso 5 — Pedir la indexación (opcional)
 
-Con la página ya publicada, puedes pedirle a Google que la rastree antes. La URL tiene que ser pública y pertenecer a un sitio verificado en Search Console. La verificación se hace en [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
+Con la página ya publicada, puede pedirle a Google que la rastree antes. La URL tiene que ser pública y pertenecer a un sitio verificado en Search Console. La verificación se hace en [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
 
 ```bash
 curl -X POST "$BASE_URL/posts/indexing/" \
@@ -72,6 +72,6 @@ curl -X POST "$BASE_URL/posts/indexing/" \
   -d '{"url": "https://example.com/consejos-de-jardineria-sostenible"}'
 ```
 
-`400` indica una URL con formato inválido o que todavía no es accesible: confirma que la publicación del paso 4 ya está en línea. `500` es un error del servicio de indexación. Esta llamada también se cobra y es independiente de las anteriores: puedes hacerla días después de publicar.
+`400` indica una URL con formato inválido o que todavía no es accesible: confirme que la publicación del paso 4 ya está en línea. `500` es un error del servicio de indexación. Esta llamada también se cobra y es independiente de las anteriores: puede hacerla días después de publicar.
 
 [Referencia de API → Keywords Content & Indexing](/api-reference/1platform-api#tag/keywords-content-indexing)

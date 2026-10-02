@@ -13,23 +13,23 @@ reenvíos y escribe o borra el [derecho de acceso](/docs/saas/atlas-api/entitlem
 > No es un endpoint para integradores en general: sólo lo usa quien opera la integración de pagos de un tenant. El secreto
 > de firma lo entrega el equipo de 1Platform Labs ([Referencia de API → webhooks](/api-reference/atlas-api#tag/webhooks)).
 
-## Paso 1 — Firma con el secreto de tu tenant
+## Paso 1 — Firme con el secreto de su tenant {#paso-1--firma-con-el-secreto-de-tu-tenant}
 
-Cada tenant tiene **su propio secreto de webhook**. Incluye siempre `data.tenant_id`: Atlas lo usa para elegir el
-secreto de tu tenant, y un evento sin él o con el de otro tenant no verifica con ese secreto.
+Cada tenant tiene **su propio secreto de webhook**. Incluya siempre `data.tenant_id`: Atlas lo usa para elegir el
+secreto de su tenant, y un evento sin él o con el de otro tenant no verifica con ese secreto.
 
-La firma es un HMAC-SHA256 en hexadecimal sobre el timestamp, un punto y los **bytes exactos** del cuerpo. Fírmalo antes de
-enviarlo y no lo vuelvas a serializar: cualquier cambio de espacios u orden rompe la firma.
+La firma es un HMAC-SHA256 en hexadecimal sobre el timestamp, un punto y los **bytes exactos** del cuerpo. Fírmelo antes de
+enviarlo y no lo vuelva a serializar: cualquier cambio de espacios u orden rompe la firma.
 
 ```text
 firma = hex( HMAC_SHA256(secreto_del_tenant, "{timestamp}." + cuerpo_crudo) )
 ```
 
-## Paso 2 — Envía el evento
+## Paso 2 — Envíe el evento {#paso-2--envía-el-evento}
 
 La firma va en `x-bowerbird-signature` (con o sin el prefijo `sha256=`), el timestamp en `x-bowerbird-timestamp` y,
 opcionalmente, el identificador del evento en `x-bowerbird-event-id`. Son los nombres por defecto; un despliegue puede
-configurar otros, así que confírmalos con el equipo de 1Platform Labs.
+configurar otros, así que confírmelos con el equipo de 1Platform Labs.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/webhooks/entitlement" \
@@ -47,20 +47,20 @@ Una firma o un timestamp ausente o incorrecto responde `401 WEBHOOK_SIGNATURE_IN
 | `type` | Efecto en Atlas |
 |---|---|
 | `access.granted` | Concede el derecho de acceso de `data.scope` y `data.scope_ref`. |
-| `access.revoked`, `subscription.cancelled`, `rental.expired` | Revocan el derecho de acceso de `data.scope_ref` (y de `data.scope`, si lo envías). |
+| `access.revoked`, `subscription.cancelled`, `rental.expired` | Revocan el derecho de acceso de `data.scope_ref` (y de `data.scope`, si lo envía). |
 | `subscription.renewed`, `subscription.payment_failed`, `rental.started` | No cambian derechos de acceso; algunos disparan un correo al miembro. |
 
-Envía sólo estos siete tipos. Atlas no procesa otro valor de `type` ni un cuerpo que no sea JSON, y no lo registra: no lo
-reintentes, corrige el origen.
+Envíe sólo estos siete tipos. Atlas no procesa otro valor de `type` ni un cuerpo que no sea JSON, y no lo registra: no lo
+reintente, corrija el origen.
 
 ## Qué garantiza Atlas
 
-- **Deduplicación.** Atlas registra cada evento por su identificador: el header de id de evento si lo envías y, si no, el
+- **Deduplicación.** Atlas registra cada evento por su identificador: el header de id de evento si lo envía y, si no, el
   `id` del cuerpo. Un reenvío del mismo identificador responde `2xx` con `deduplicated: true` sin volver a aplicar el
-  cambio. Usa un identificador estable por evento lógico para que tus reintentos sean seguros.
+  cambio. Use un identificador estable por evento lógico para que sus reintentos sean seguros.
 - **Sin control de antigüedad.** Atlas no rechaza timestamps viejos; la protección contra reenvíos es la deduplicación.
-- **Un `2xx` significa que Atlas tiene el evento.** Reintenta sólo ante `5xx` o un fallo de red. Los correos al miembro se
+- **Un `2xx` significa que Atlas tiene el evento.** Reintente sólo ante `5xx` o un fallo de red. Los correos al miembro se
   envían después de guardar el cambio y su fallo nunca convierte el webhook en un error.
 - **Los datos incompletos no se reprocesan.** Un evento sin `tenant_id` o `member_id`, una concesión sin `scope` o
   `scope_ref`, o una revocación sin `scope_ref` se registra y responde `2xx` sin efecto. Como ya quedó registrado, reenviarlo
-  con el mismo identificador tampoco tendrá efecto: corrige el origen y envía un evento nuevo.
+  con el mismo identificador tampoco tendrá efecto: corrija el origen y envíe un evento nuevo.

@@ -1,26 +1,26 @@
 ---
 title: Ventas
-description: Define qué vendes, atiende a cada prospecto por el canal en el que escribe y cierra la venta cobrando la reserva.
+description: Defina qué vende, atienda a cada prospecto por el canal en el que escribe y cierre la venta cobrando la reserva.
 sidebar_position: 1
 ---
 
 # Ventas
 
-<p className="lead">Un embudo de ventas por canales: configuras una oferta, los prospectos que escriben por tus cuentas de mensajería entran como leads, los atiende el agente de tu espacio de trabajo o una persona, y la venta se cierra cuando se acredita el pago de la reserva.</p>
+<p className="lead">Un embudo de ventas por canales: configura una oferta, los prospectos que escriben por sus cuentas de mensajería entran como leads, los atiende el agente de su espacio de trabajo o una persona, y la venta se cierra cuando se acredita el pago de la reserva.</p>
 
 ## Cómo funciona
 
 1. Un administrador crea una **oferta** (`offer`): define las etapas del embudo, las preguntas que hace el agente y la reserva que se cobra. Puede partir de una plantilla de `GET /sales/offers/presets`.
-2. Conecta un **canal**, la cuenta de mensajería por la que escriben tus clientes. Lo normal es el diálogo asistido (`GET /sales/channels/connect/config` y luego `POST /sales/channels/connect/exchange`). Pegar las credenciales con `POST /sales/channels` sólo sirve si tu espacio de trabajo usa su propia aplicación de mensajería.
-3. Cada prospecto que escribe se convierte en un **lead**, con una identidad sin duplicados. También puedes crear uno a mano para quien llamó o llegó en persona. Si la misma persona escribe desde otro canal, vincula esa identidad al lead existente para que no se abra un segundo lead.
-4. El agente responde por su cuenta. Si una persona toma la conversación (`PATCH /sales/leads/{leadId}/control` con `manual`), el agente deja de responder a ese lead hasta que se la devuelvas. Sin ese control manual, escribirle al prospecto responde `409`. Fuera de la ventana de respuesta del canal se envía la plantilla aprobada; si no hay ninguna configurada, la respuesta es `409` `outside_conversation_window` y no se envía nada.
-5. Para cerrar, creas la **reserva** del lead. El monto, la moneda y el concepto salen de la oferta: el cuerpo va vacío y nadie puede cambiar el precio. La respuesta trae un enlace de cobro para compartir. Es idempotente por lead: si la pides varias veces, recibes el mismo enlace y se crea un solo cobro.
+2. Conecte un **canal**, la cuenta de mensajería por la que escriben sus clientes. Lo normal es el diálogo asistido (`GET /sales/channels/connect/config` y luego `POST /sales/channels/connect/exchange`). Pegar las credenciales con `POST /sales/channels` sólo sirve si su espacio de trabajo usa su propia aplicación de mensajería.
+3. Cada prospecto que escribe se convierte en un **lead**, con una identidad sin duplicados. También puede crear uno a mano para quien llamó o llegó en persona. Si la misma persona escribe desde otro canal, vincule esa identidad al lead existente para que no se abra un segundo lead.
+4. El agente responde por su cuenta. Si una persona toma la conversación (`PATCH /sales/leads/{leadId}/control` con `manual`), el agente deja de responder a ese lead hasta que se la devuelva. Sin ese control manual, escribirle al prospecto responde `409`. Fuera de la ventana de respuesta del canal se envía la plantilla aprobada; si no hay ninguna configurada, la respuesta es `409` `outside_conversation_window` y no se envía nada.
+5. Para cerrar, cree la **reserva** del lead. El monto, la moneda y el concepto salen de la oferta: el cuerpo va vacío y nadie puede cambiar el precio. La respuesta trae un enlace de cobro para compartir. Es idempotente por lead: si la pide varias veces, recibe el mismo enlace y se crea un solo cobro.
 6. El lead pasa a **ganado** cuando se acredita el pago de su reserva. `PATCH /sales/leads/{leadId}` rechaza mover un lead a la etapa ganadora. Para declarar a mano una venta cerrada fuera de la plataforma hay que enviar `won_source: manual` y un `won_reason`. El reporte separa esas ventas de las que se comprobaron con un pago.
 
-## Qué necesitas
+## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
-- El módulo de Ventas encendido en tu espacio de trabajo. Lo enciende el equipo de la plataforma. Mientras esté apagado, todas las operaciones responden `403`.
+- El módulo de Ventas encendido en su espacio de trabajo. Lo enciende el equipo de la plataforma. Mientras esté apagado, todas las operaciones responden `403`.
 - Un **administrador del espacio de trabajo** para escribir la configuración: ofertas y canales. Atender leads no lo requiere.
 
 ## Operaciones
@@ -44,4 +44,4 @@ sidebar_position: 1
 
 Todas las operaciones: [Referencia de API → Sales](/api-reference/1platform-api#tag/sales).
 
-Dos operaciones del tag no las llamas tú: `GET` y `POST /channels/inbound/{inbound_token}` son la URL de entrada que se pega en la consola del proveedor de mensajería, y es el proveedor quien las llama.
+Dos operaciones del tag no las llama usted: `GET` y `POST /channels/inbound/{inbound_token}` son la URL de entrada que se pega en la consola del proveedor de mensajería, y es el proveedor quien las llama.

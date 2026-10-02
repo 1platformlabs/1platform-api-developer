@@ -6,8 +6,8 @@ sidebar_position: 2
 
 # Seguridad de webhooks
 
-Cada webhook se firma con HMAC-SHA256 usando el `webhook_secret` de tu espacio de
-trabajo, que se entrega una sola vez: al registrar el primer dominio o al rotarlo. Verifica la firma **antes** de confiar en el contenido.
+Cada webhook se firma con HMAC-SHA256 usando el `webhook_secret` de su espacio de
+trabajo, que se entrega una sola vez: al registrar el primer dominio o al rotarlo. Verifique la firma **antes** de confiar en el contenido.
 
 ## Esquema de firma
 
@@ -19,11 +19,11 @@ trabajo, que se entrega una sola vez: al registrar el primer dominio o al rotarl
 | Algoritmo | `HMAC-SHA256` |
 | Material firmado | `"{X-Webhook-Timestamp}." + cuerpo`, sobre los **mismos bytes** que viajan en la solicitud (JSON compacto, UTF-8) |
 | Cálculo | Una vez por evento: los reintentos llevan la misma firma y el mismo timestamp |
-| Ventana de repetición | 5 minutos de desfase máximo de `X-Webhook-Timestamp`, comprobados por tu verificador |
+| Ventana de repetición | 5 minutos de desfase máximo de `X-Webhook-Timestamp`, comprobados por su verificador |
 
-:::warning[Verifica sobre los bytes que recibes]
-Lo que firmamos es exactamente el cuerpo que te llega. Calcula el HMAC sobre esos bytes crudos, antes de
-parsearlos. No intentes reconstruir el JSON: cualquier re-serialización (orden de las claves, espacios, escape de
+:::warning[Verifique sobre los bytes que recibe]
+Lo que firmamos es exactamente el cuerpo que le llega. Calcule el HMAC sobre esos bytes crudos, antes de
+parsearlos. No intente reconstruir el JSON: cualquier re-serialización (orden de las claves, espacios, escape de
 caracteres no ASCII) rompe la firma.
 :::
 
@@ -116,28 +116,28 @@ function verifyWebhook(string $rawBody, string $signatureHeader, string $timesta
 
 ## Modos de falla comunes
 
-- **Re-stringificar el cuerpo antes de verificar** — consulta la advertencia de arriba.
-- **Recortar el prefijo `sha256=` en el lugar equivocado** — quítalo de
+- **Re-stringificar el cuerpo antes de verificar** — consulte la advertencia de arriba.
+- **Recortar el prefijo `sha256=` en el lugar equivocado** — quítelo de
   `signature_header`, no del valor calculado.
 - **Sin ventana de repetición** — sin una comprobación de timestamp, un atacante
   puede repetir indefinidamente una entrega capturada.
-- **Comparación de strings en lugar de comparación de tiempo constante** — usa
+- **Comparación de strings en lugar de comparación de tiempo constante** — use
   `hmac.compare_digest`, `timingSafeEqual`, `hash_equals`.
 
 ## Rotación del secreto {#secret-rotation}
 
 :::danger[El secreto se muestra una sola vez]
 `POST /webhooks/config/rotate-secret` devuelve el nuevo `webhook_secret` una sola vez y no hay forma de volver a
-leerlo. Si pierdes la respuesta, tienes que rotar de nuevo. Guarda la respuesta en tu gestor de secretos antes de
+leerlo. Si pierde la respuesta, tiene que rotar de nuevo. Guarde la respuesta en su gestor de secretos antes de
 cualquier otra acción.
 :::
 
 La rotación la hace un administrador del espacio de trabajo (ver
 [Webhooks → Paso 7](/docs/saas/1platform-api/plataforma/webhooks)). Un procedimiento seguro:
 
-1. Llama a `POST /webhooks/config/rotate-secret` desde un script que escriba la respuesta directamente en tu gestor
+1. Llame a `POST /webhooks/config/rotate-secret` desde un script que escriba la respuesta directamente en su gestor
    de secretos.
-2. Despliega el secreto nuevo en tu verificador y **conserva el anterior unos minutos** (acepta cualquiera de los
+2. Despliegue el secreto nuevo en su verificador y **conserve el anterior unos minutos** (acepte cualquiera de los
    dos). Los eventos firmados antes de la rotación siguen reintentándose con la firma vieja durante alrededor de un
    minuto.
-3. Pasados esos minutos, elimina el secreto anterior del verificador.
+3. Pasados esos minutos, elimine el secreto anterior del verificador.

@@ -31,11 +31,11 @@ que identifica qué cubre: un ítem, una serie, un plan o una emisión en vivo.
   solo la entrega de un ítem.
 - Un derecho de acceso sin fecha de vencimiento es permanente; con `expires_at` sirve para alquileres o pruebas.
 
-## Paso 1 — Vende el acceso
+## Paso 1 — Venda el acceso {#paso-1--vende-el-acceso}
 
 Un miembro con sesión pide un enlace de pago con `POST /entitlements/checkout`; un comprador sin sesión, con
 `POST /entitlements/guest-checkout`, que sólo pide su correo (crea o reutiliza al miembro y responde igual en los dos casos,
-para no revelar qué correos existen). En ambos casos redirige al comprador a la `url` que devuelve.
+para no revelar qué correos existen). En ambos casos redirija al comprador a la `url` que devuelve.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/entitlements/checkout" -H "X-Tenant-Slug: $TENANT_SLUG" \
@@ -43,15 +43,15 @@ curl -s -X POST "$ATLAS_BASE/entitlements/checkout" -H "X-Tenant-Slug: $TENANT_S
   -d '{ "plan_ref": "anual", "return_url": "/cuenta?refreshed=1", "scope": "plan", "scope_ref": "anual" }'
 ```
 
-Usa como `return_url` una ruta del sitio o una URL `https`; `guest-checkout` rechaza cualquier otra con
+Use como `return_url` una ruta del sitio o una URL `https`; `guest-checkout` rechaza cualquier otra con
 `422 INVALID_RETURN_URL`. Estas operaciones **no**
 conceden el acceso: lo concede el webhook del proveedor cuando el pago se confirma.
 
-## Paso 2 — Reconcilia al volver del pago
+## Paso 2 — Reconcilie al volver del pago {#paso-2--reconcilia-al-volver-del-pago}
 
-El comprador suele volver antes de que llegue el webhook. Al volver, llama **una vez** a `POST /entitlements/refresh` con el
+El comprador suele volver antes de que llegue el webhook. Al volver, llame **una vez** a `POST /entitlements/refresh` con el
 mismo alcance: Atlas consulta al proveedor y, si el pago está confirmado, guarda el derecho de acceso de inmediato.
-`refreshed` es `true` sólo si esta llamada lo escribió. Es idempotente; no lo llames en un bucle.
+`refreshed` es `true` sólo si esta llamada lo escribió. Es idempotente; no lo llame en un bucle.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/entitlements/refresh" -H "X-Tenant-Slug: $TENANT_SLUG" \
@@ -59,23 +59,23 @@ curl -s -X POST "$ATLAS_BASE/entitlements/refresh" -H "X-Tenant-Slug: $TENANT_SL
   -d '{ "scope": "plan", "scope_ref": "anual" }'
 ```
 
-Si el proveedor no responde, recibes `503 PROVIDER_UNAVAILABLE`: muestra un estado de «procesando tu compra» y deja que el
+Si el proveedor no responde, recibe `503 PROVIDER_UNAVAILABLE`: muestre un estado de «procesando su compra» y deje que el
 webhook complete el acceso.
 
-## Paso 3 — Consulta el acceso de un miembro
+## Paso 3 — Consulte el acceso de un miembro {#paso-3--consulta-el-acceso-de-un-miembro}
 
 `GET /entitlements/check` responde si un miembro tiene un derecho de alcance `item` sobre un ítem (incluido el comodín);
 no tiene en cuenta planes ni series. `GET /entitlements/by-member/{member_id}` lista todos sus derechos de acceso.
 
 Las dos exigen el JWT. Un miembro sólo puede consultarse a sí mismo: con otro `member_id` recibe `403 MEMBER_MISMATCH`.
 Un operador puede consultar a cualquier miembro de su tenant. Para decidir si mostrar el muro de pago, no hace falta
-consultar antes: pide el ticket de entrega y reacciona a `ENTITLEMENT_DENIED` o `FREEMIUM_GATE_BLOCKED`.
+consultar antes: pida el ticket de entrega y reaccione a `ENTITLEMENT_DENIED` o `FREEMIUM_GATE_BLOCKED`.
 
-## Paso 4 — Concede o revoca a mano (operador)
+## Paso 4 — Conceda o revoque a mano (operador) {#paso-4--concede-o-revoca-a-mano-operador}
 
 Con un JWT de operador, `POST /entitlements` concede un derecho de acceso a un miembro existente (`404 MEMBER_NOT_FOUND` si no
 existe) y `DELETE /entitlements/{entitlement_id}` lo revoca (`404 ENTITLEMENT_NOT_FOUND` si no es de este tenant).
-`granted_by` es un texto libre para tu auditoría; si no lo envías, queda `webhook`, así que envía un valor propio
+`granted_by` es un texto libre para su auditoría; si no lo envía, queda `webhook`, así que envíe un valor propio
 (por ejemplo, `operator`) para distinguir las concesiones manuales.
 
 ```bash

@@ -1,6 +1,6 @@
 ---
 title: Crear un agente
-description: Instala un agente desde el catálogo, fija su tope de gasto, dispara una ejecución, consúltala y atiende la acción que deja para una persona.
+description: Instale un agente desde el catálogo, fije su tope de gasto, dispare una ejecución, consúltela y atienda la acción que deja para una persona.
 sidebar_position: 2
 ---
 
@@ -18,13 +18,13 @@ curl "$BASE_URL/agents/catalog" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-Cada plantilla trae su `slug`, su descripción, las herramientas que necesita y su cadencia por defecto (`default_schedule`). Guarda el `slug` elegido como `$TEMPLATE_SLUG`.
+Cada plantilla trae su `slug`, su descripción, las herramientas que necesita y su cadencia por defecto (`default_schedule`). Guarde el `slug` elegido como `$TEMPLATE_SLUG`.
 
 [Referencia de API → Agents Catalog](/api-reference/1platform-api#tag/agents-catalog)
 
 ## Paso 2 — Instalar el agente
 
-Al instalar defines lo que la plantilla no puede saber: qué sitios atiende y cuánto puede gastar. Se hace en la misma llamada porque un agente sin sitios no vigila nada.
+Al instalar, defina lo que la plantilla no puede saber: qué sitios atiende y cuánto puede gastar. Se hace en la misma llamada porque un agente sin sitios no vigila nada.
 
 ```bash
 curl -X POST "$BASE_URL/agents/catalog/$TEMPLATE_SLUG/install" \
@@ -34,15 +34,15 @@ curl -X POST "$BASE_URL/agents/catalog/$TEMPLATE_SLUG/install" \
   -d '{"website_ids": ["'"$WEBSITE_ID"'"], "monthly_budget_usd": "25.00"}'
 ```
 
-Guarda `data.agent.id` como `$AGENT_ID`. El agente nace **activo** y con la cadencia de la plantilla. Para crear uno que sólo corra cuando lo disparas, envía `"schedule": ""`. Si el plan no incluye alguna herramienta de la plantilla, la instalación la omite y la informa en `data.skipped_tools`. `409` significa que otro agente con el mismo objetivo ya vigila uno de esos sitios.
+Guarde `data.agent.id` como `$AGENT_ID`. El agente nace **activo** y con la cadencia de la plantilla. Para crear uno que sólo corra cuando lo dispara, envíe `"schedule": ""`. Si el plan no incluye alguna herramienta de la plantilla, la instalación la omite y la informa en `data.skipped_tools`. `409` significa que otro agente con el mismo objetivo ya vigila uno de esos sitios.
 
-`monthly_budget_usd` es el tope de gasto **por ciclo**, aunque el nombre del campo diga mensual. Si lo omites, el agente no tiene gasto ilimitado: queda en modo propuesta y no recibe las herramientas que cuestan dinero hasta que le fijes un tope con `PUT /agents/{agent_id}/budget`.
+`monthly_budget_usd` es el tope de gasto **por ciclo**, aunque el nombre del campo diga mensual. Si lo omite, el agente no tiene gasto ilimitado: queda en modo propuesta y no recibe las herramientas que cuestan dinero hasta que le fije un tope con `PUT /agents/{agent_id}/budget`.
 
 [Referencia de API → Agents Catalog](/api-reference/1platform-api#tag/agents-catalog)
 
 ## Paso 3 — Disparar una ejecución
 
-Además de su cadencia, puedes disparar una ejecución a mano, por ejemplo para probar la configuración antes de dejarlo solo.
+Además de su cadencia, puede disparar una ejecución a mano, por ejemplo para probar la configuración antes de dejarlo solo.
 
 ```bash
 curl -X POST "$BASE_URL/agents/$AGENT_ID/run" \
@@ -52,7 +52,7 @@ curl -X POST "$BASE_URL/agents/$AGENT_ID/run" \
   -d '{"input_message": "Revisa los artículos publicados hoy y marca los que tengan enlaces rotos"}'
 ```
 
-La respuesta es `202`: la ejecución quedó registrada en `pending` y todavía no corrió. Guarda `data.id` como `$RUN_ID`. `409` significa que el agente ya tiene el máximo de ejecuciones simultáneas; espera a que termine alguna. `503` significa que el agente está inactivo o que la plataforma no tiene capacidad en ese momento.
+La respuesta es `202`: la ejecución quedó registrada en `pending` y todavía no corrió. Guarde `data.id` como `$RUN_ID`. `409` significa que el agente ya tiene el máximo de ejecuciones simultáneas; espere a que termine alguna. `503` significa que el agente está inactivo o que la plataforma no tiene capacidad en ese momento.
 
 [Referencia de API → Agents Execution](/api-reference/1platform-api#tag/agents-execution)
 
@@ -64,7 +64,7 @@ curl "$BASE_URL/agents/$AGENT_ID/runs/$RUN_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-`data.status` pasa de `pending` a `running` y termina en `completed`, `failed` o `stopped`. Con `completed`, `data.result` resume lo que hizo el agente y `data.total_tokens` dice cuánto consumió. Para cortar una ejecución pendiente o en curso, usa `POST /agents/{agent_id}/runs/{run_id}/stop`.
+`data.status` pasa de `pending` a `running` y termina en `completed`, `failed` o `stopped`. Con `completed`, `data.result` resume lo que hizo el agente y `data.total_tokens` dice cuánto consumió. Para cortar una ejecución pendiente o en curso, use `POST /agents/{agent_id}/runs/{run_id}/stop`.
 
 [Referencia de API → Agents Execution](/api-reference/1platform-api#tag/agents-execution)
 
@@ -78,6 +78,6 @@ curl "$BASE_URL/agent-actions?agent_id=$AGENT_ID&status=pending" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-Cada acción trae su `type`, el `run_id` que la generó y un `payload` con lo que la persona necesita para decidir. Con la decisión tomada, resuélvela con `PATCH /agent-actions/{action_id}/consume`, enviando la decisión en `result` y, si quieres registrar quién decidió, `consumed_by`. `409` significa que la acción ya se resolvió en otra llamada: trátalo como estado final y no reintentes.
+Cada acción trae su `type`, el `run_id` que la generó y un `payload` con lo que la persona necesita para decidir. Con la decisión tomada, resuélvala con `PATCH /agent-actions/{action_id}/consume`, enviando la decisión en `result` y, si quiere registrar quién decidió, `consumed_by`. `409` significa que la acción ya se resolvió en otra llamada: trátelo como estado final y no reintente.
 
 [Referencia de API → Agents Actions](/api-reference/1platform-api#tag/agents-actions)

@@ -1,39 +1,39 @@
 ---
 title: Dominios y correo
-description: Registra o conecta dominios, administra su DNS y usa el correo del negocio sobre ellos.
+description: Registre o conecte dominios, administre su DNS y use el correo del negocio sobre ellos.
 sidebar_position: 1
 ---
 
 # Dominios y correo
 
-<p className="lead">Registra dominios con el saldo de la cuenta o conecta uno que el usuario ya tiene, administra sus DNS y, sobre ese dominio, crea direcciones de correo del negocio para recibir y responder conversaciones con los clientes.</p>
+<p className="lead">Registre dominios con el saldo de la cuenta o conecte uno que el usuario ya tiene, administre sus DNS y, sobre ese dominio, cree direcciones de correo del negocio para recibir y responder conversaciones con los clientes.</p>
 
 ## Cómo funciona
 
 ### Dominios
 
 1. **Consulta y precio.** `GET /domains/check` dice si un nombre está libre y cuánto cuesta. `GET /domains/pricing` da los precios por terminación.
-2. **Contacto WHOIS.** Registrar exige un perfil de contacto. Si no existe, el registro responde `404`. Créalo una sola vez con `PUT /domains/contact`.
+2. **Contacto WHOIS.** Registrar exige un perfil de contacto. Si no existe, el registro responde `404`. Créelo una sola vez con `PUT /domains/contact`.
 3. **Registrar, transferir o conectar.**
    - `POST /domains` registra el dominio y lo cobra del saldo del usuario (`402` si no alcanza).
-   - `POST /domains/transfer` lo trae desde otro registrador con su código EPP. Responde `202` y sigues el avance con `GET /domains/{domain_id}/transfer/status`.
-   - `POST /domains/external` conecta un dominio comprado en otro lado sin cobrar nada. Sólo se aceptan dominios raíz, no subdominios. La respuesta trae los nameservers que el usuario debe configurar en su proveedor actual. Cuando la delegación esté hecha, `POST /domains/{domain_id}/verify` la comprueba. Puedes repetirlo sin riesgo; un `503` significa que no se pudo comprobar, no que falló.
-4. **DNS.** `PUT /domains/{domain_id}/dns` **reemplaza todos** los registros: envía siempre la lista completa. Si el dominio usa otros nameservers o se conectó en lugar de registrarse aquí, sus registros se administran fuera y la respuesta es `409`.
+   - `POST /domains/transfer` lo trae desde otro registrador con su código EPP. Responde `202` y siga el avance con `GET /domains/{domain_id}/transfer/status`.
+   - `POST /domains/external` conecta un dominio comprado en otro lado sin cobrar nada. Sólo se aceptan dominios raíz, no subdominios. La respuesta trae los nameservers que el usuario debe configurar en su proveedor actual. Cuando la delegación esté hecha, `POST /domains/{domain_id}/verify` la comprueba. Puede repetirlo sin riesgo; un `503` significa que no se pudo comprobar, no que falló.
+4. **DNS.** `PUT /domains/{domain_id}/dns` **reemplaza todos** los registros: envíe siempre la lista completa. Si el dominio usa otros nameservers o se conectó en lugar de registrarse aquí, sus registros se administran fuera y la respuesta es `409`.
 
 ### Correo del negocio
 
-1. Crea una dirección sobre un dominio de la cuenta (`local_part@dominio`). La plataforma publica los registros que necesita. Si el dominio ya recibe correo en otro servidor, la respuesta es `409` `mail_foreign_mx` y no se escribe nada en el DNS, para no interceptar el correo que el comercio ya usa. Un dominio externo todavía sin delegar queda en `awaiting_delegation`, que es un estado y no un error.
+1. Cree una dirección sobre un dominio de la cuenta (`local_part@dominio`). La plataforma publica los registros que necesita. Si el dominio ya recibe correo en otro servidor, la respuesta es `409` `mail_foreign_mx` y no se escribe nada en el DNS, para no interceptar el correo que el comercio ya usa. Un dominio externo todavía sin delegar queda en `awaiting_delegation`, que es un estado y no un error.
 2. Cada dirección tiene dos verificaciones independientes: recibir y enviar. Hasta que la de envío esté lista, iniciar o responder una conversación responde `409` `mail_send_not_verified`. En Correo, el código de error viaja en `code`, en la raíz de la respuesta, no dentro de `data`.
-3. Los correos entrantes forman **conversaciones** (`/mail/threads`), que lees, marcas como leídas o archivas, y respondes desde la dirección del comercio. Un mensaje enviado nace en `sent` y sólo pasa a entregado cuando el servidor de destino lo confirma.
-4. **Iniciar una conversación exige `Idempotency-Key`**, porque envía correo real a un cliente real. Si repites la clave, recibes la misma conversación y no se envía otro correo.
+3. Los correos entrantes forman **conversaciones** (`/mail/threads`), que lee, marca como leídas o archiva, y responde desde la dirección del comercio. Un mensaje enviado nace en `sent` y sólo pasa a entregado cuando el servidor de destino lo confirma.
+4. **Iniciar una conversación exige `Idempotency-Key`**, porque envía correo real a un cliente real. Si repite la clave, recibe la misma conversación y no se envía otro correo.
 5. Los adjuntos se suben primero con `POST /mail/attachments` (multipart) y en el envío se nombra la `key` que devuelve esa subida.
 6. Apagar el correo de un dominio entero (`DELETE /domains/{domain_id}/mail`) primero retira el registro de correo entrante, luego congela las conversaciones en sólo lectura y luego retira las direcciones. Las conversaciones no se borran.
 
-## Qué necesitas
+## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido). Dominios y direcciones son del usuario del token de usuario: el dominio de otro usuario responde `404`.
 - **Saldo** para registrar, transferir y renovar. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
-- Los módulos de Dominios y de Correo encendidos en tu espacio de trabajo. Si están apagados, la respuesta es `403` o `503`.
+- Los módulos de Dominios y de Correo encendidos en su espacio de trabajo. Si están apagados, la respuesta es `403` o `503`.
 
 ## Operaciones
 
@@ -56,4 +56,4 @@ sidebar_position: 1
 
 Todas las operaciones: [Referencia de API → Domains](/api-reference/1platform-api#tag/domains) · [Referencia de API → Mail](/api-reference/1platform-api#tag/mail).
 
-El tag Mail incluye dos rutas que no llamas tú: `POST /webhooks/mail/{route_token}` y `POST /webhooks/mail/{route_token}/delivery` son por donde el servicio de transporte entrega los mensajes entrantes y los avisos de entrega. `GET /mail/public/threads/{token}` abre en sólo lectura la conversación de un enlace de aviso, sin sesión.
+El tag Mail incluye dos rutas que no llama usted: `POST /webhooks/mail/{route_token}` y `POST /webhooks/mail/{route_token}/delivery` son por donde el servicio de transporte entrega los mensajes entrantes y los avisos de entrega. `GET /mail/public/threads/{token}` abre en sólo lectura la conversación de un enlace de aviso, sin sesión.

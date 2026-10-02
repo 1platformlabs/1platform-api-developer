@@ -6,32 +6,32 @@ sidebar_position: 7
 
 # Exploración del catálogo
 
-El catálogo público es **anónimo** y está acotado al tenant: puedes renderizarlo en páginas indexables o en el servidor sin
+El catálogo público es **anónimo** y está acotado al tenant: puede renderizarlo en páginas indexables o en el servidor sin
 sesión. La sesión y los [derechos de acceso](/docs/saas/atlas-api/entitlements) sólo controlan la
 [entrega](/docs/saas/atlas-api/content-delivery) del contenido.
 
-Envía `X-Tenant-Slug` en cada llamada. Con un slug mal escrito no recibes error sino el catálogo del tenant por defecto,
-normalmente vacío; si ves `total: 0` donde esperabas contenido, revisa primero el slug
+Envíe `X-Tenant-Slug` en cada llamada. Con un slug mal escrito no recibe error sino el catálogo del tenant por defecto,
+normalmente vacío; si ve `total: 0` donde esperaba contenido, revise primero el slug
 ([Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)).
 
-## Paso 1 — Lista el catálogo
+## Paso 1 — Liste el catálogo {#paso-1--lista-el-catálogo}
 
 `GET /public/catalog` devuelve una página de ítems publicados y el `total` de coincidencias. `total` cuenta siempre con los
-mismos filtros que la página, así que úsalo para paginar.
+mismos filtros que la página, así que úselo para paginar.
 
 ```bash
 curl -s "$ATLAS_BASE/public/catalog?page=1&page_size=20&sort=recent" -H "X-Tenant-Slug: $TENANT_SLUG"
 ```
 
-Puedes ordenar y filtrar por tipo de contenido, género, disponibilidad en web o app, contenido con audio y lanzamientos
+Puede ordenar y filtrar por tipo de contenido, género, disponibilidad en web o app, contenido con audio y lanzamientos
 próximos. El género coincide con las etiquetas **o** con los géneros que el operador cargó en los metadatos del ítem, con
-semántica «cualquiera de»: repite el parámetro para combinar varios. Los valores aceptados de cada parámetro están en
-[Referencia de API → public](/api-reference/atlas-api#tag/public); no los fijes en tu cliente sin consultarla.
+semántica «cualquiera de»: repita el parámetro para combinar varios. Los valores aceptados de cada parámetro están en
+[Referencia de API → public](/api-reference/atlas-api#tag/public); no los fije en su cliente sin consultarla.
 
-Si el catálogo está saturado, puede responder `503 CATALOG_BUSY` con un header `Retry-After`: espera ese intervalo y
-reintenta. Es una respuesta deliberada para proteger al resto de la API, no una caída.
+Si el catálogo está saturado, puede responder `503 CATALOG_BUSY` con un header `Retry-After`: espere ese intervalo y
+reintente. Es una respuesta deliberada para proteger al resto de la API, no una caída.
 
-## Paso 2 — Abre el detalle por slug
+## Paso 2 — Abra el detalle por slug {#paso-2--abre-el-detalle-por-slug}
 
 Las páginas de detalle se identifican por el slug legible del ítem, el mismo que aparece en el listado:
 
@@ -40,9 +40,9 @@ curl -s "$ATLAS_BASE/public/items/la-maquina-del-tiempo" -H "X-Tenant-Slug: $TEN
 ```
 
 Un slug que no existe en este tenant, o que no es visible públicamente, responde `404 CONTENT_NOT_FOUND`. Para la entrega
-necesitarás el `id` del ítem, no su slug.
+necesitará el `id` del ítem, no su slug.
 
-## Paso 3 — Busca
+## Paso 3 — Busque {#paso-3--busca}
 
 `GET /public/search` busca texto en el catálogo publicado y agrupa los resultados por tipo de contenido.
 
@@ -50,14 +50,14 @@ necesitarás el `id` del ítem, no su slug.
 curl -s "$ATLAS_BASE/public/search?q=maquina%20del%20tiempo" -H "X-Tenant-Slug: $TENANT_SLUG"
 ```
 
-Valida la consulta en tu cliente antes de enviarla: una consulta vacía o demasiado larga responde `422` con la lista de
+Valide la consulta en su cliente antes de enviarla: una consulta vacía o demasiado larga responde `422` con la lista de
 errores de validación. Una búsqueda que no puede completarse en el servidor no da error: devuelve cero resultados, así que
-muestra un estado de «sin resultados» y no un error.
+muestre un estado de «sin resultados» y no un error.
 
-## Paso 4 — Agrega autocompletado
+## Paso 4 — Agregue autocompletado {#paso-4--agrega-autocompletado}
 
-Para una caja de búsqueda con sugerencias, usa `GET /public/search/suggest`, más liviano y con su propio límite de uso
-([Referencia de API → public-search](/api-reference/atlas-api#tag/public-search)). Espera una pausa en la escritura antes de
+Para una caja de búsqueda con sugerencias, use `GET /public/search/suggest`, más liviano y con su propio límite de uso
+([Referencia de API → public-search](/api-reference/atlas-api#tag/public-search)). Espere una pausa en la escritura antes de
 llamarlo.
 
 ```bash
@@ -65,7 +65,7 @@ curl -s "$ATLAS_BASE/public/search/suggest?q=maq" -H "X-Tenant-Slug: $TENANT_SLU
 ```
 
 Aquí los errores de entrada llegan como `400` con código (`SEARCH_QUERY_EMPTY`, `SEARCH_QUERY_TOO_LONG`) en lugar de `422`.
-Trata los dos formatos igual: son errores de tu entrada y no se reintentan.
+Trate los dos formatos igual: son errores de su entrada y no se reintentan.
 
 ## Otras lecturas públicas
 
@@ -73,5 +73,5 @@ Para armar la portada y las páginas de un sitio hay más operaciones públicas:
 relacionados (`GET /public/items/{slug}/related`), géneros (`GET /public/genres`), planes (`GET /public/plans`) y la
 portada completa (`GET /public/home`), entre otras. Todas: [Referencia de API → public](/api-reference/atlas-api#tag/public).
 
-Estas respuestas cambian poco. Guárdalas en caché de tu lado en lugar de pedirlas en cada vista de página
+Estas respuestas cambian poco. Guárdelas en caché de su lado en lugar de pedirlas en cada vista de página
 ([Límites de uso](/docs/saas/atlas-api/rate-limits)).

@@ -24,9 +24,9 @@ Un ítem está en uno de cuatro estados: `draft` (no visible), `scheduled` (anun
 entregable a quien tenga derecho de acceso) y `archived` (retirado, pero conservado). No hay borrado físico: borrar un ítem lo
 archiva, para que los enlaces, la auditoría y los derechos de acceso sigan siendo coherentes.
 
-## Paso 1 — Crea el ítem como borrador
+## Paso 1 — Cree el ítem como borrador {#paso-1--crea-el-ítem-como-borrador}
 
-`POST /content/items` crea el ítem. Créalo en `draft` (el valor por defecto) para que no aparezca en el catálogo antes de
+`POST /content/items` crea el ítem. Créelo en `draft` (el valor por defecto) para que no aparezca en el catálogo antes de
 tener archivo y portada. El slug es único por tenant; si ya existe, responde `409 CONTENT_SLUG_TAKEN`. Los tipos de contenido
 válidos (`kind`) están en la Referencia de API e incluyen `audio`.
 
@@ -37,14 +37,14 @@ curl -s -X POST "$ATLAS_BASE/content/items" -H "X-Tenant-Slug: $TENANT_SLUG" \
         "metadata": { "language": "es", "genres": ["ciencia-ficcion"] } }'
 ```
 
-Guarda el `id` que devuelve: todas las operaciones siguientes lo usan. Los metadatos son libres, pero algunas claves conocidas
+Guarde el `id` que devuelve: todas las operaciones siguientes lo usan. Los metadatos son libres, pero algunas claves conocidas
 (resumen, idioma, año, géneros, etiquetas, personas, banderas de acceso) se validan; sus límites están en la Referencia de API.
 El filtro de género del catálogo busca tanto en `genres` como en `tags`. Las banderas `metadata.access` son sólo una pista
 para la interfaz: el acceso real lo deciden los [derechos de acceso](/docs/saas/atlas-api/entitlements).
 
-## Paso 2 — Adjunta el archivo
+## Paso 2 — Adjunte el archivo {#paso-2--adjunta-el-archivo}
 
-Para tenants que entregan archivos, sube el binario con `POST /content/items/{item_id}/assets` (formulario multipart con el
+Para tenants que entregan archivos, suba el binario con `POST /content/items/{item_id}/assets` (formulario multipart con el
 formato y el archivo). Subir otra vez el mismo formato reemplaza el anterior; `DELETE /content/items/{item_id}/assets/{fmt}`
 lo quita. Para audiolibros, `PUT /content/items/{item_id}/audio` define narrador, idioma y capítulos.
 
@@ -55,24 +55,24 @@ curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/assets" -H "X-Tenant-Slug: $
 
 La subida valida antes de leer el archivo: un formato no admitido responde `400 ASSET_FORMAT_INVALID`, un formato que la
 forma de entrega del tenant no puede servir `400 ASSET_STRATEGY_MISMATCH`, un archivo demasiado grande `413 ASSET_TOO_LARGE`
-y un tenant sin almacenamiento configurado `409 ASSET_STORE_UNCONFIGURED` (avisa a 1Platform Labs). Si el almacenamiento
-falla, recibes `502 ASSET_STORAGE_FAILED` o `503 MEDIA_UNAVAILABLE`: reintenta más tarde.
+y un tenant sin almacenamiento configurado `409 ASSET_STORE_UNCONFIGURED` (avise a 1Platform Labs). Si el almacenamiento
+falla, recibe `502 ASSET_STORAGE_FAILED` o `503 MEDIA_UNAVAILABLE`: reintente más tarde.
 
-## Paso 3 — Sube la portada
+## Paso 3 — Suba la portada {#paso-3--sube-la-portada}
 
 `POST /content/items/{item_id}/cover-image` recibe una imagen JPEG, PNG o WebP y deja la URL pública en el ítem, así el
-catálogo la muestra sin firmar URLs en cada vista. Para quitarla usa `DELETE /content/items/{item_id}/cover-image`, que borra
-también el archivo; no envíes `null` en una edición.
+catálogo la muestra sin firmar URLs en cada vista. Para quitarla use `DELETE /content/items/{item_id}/cover-image`, que borra
+también el archivo; no envíe `null` en una edición.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/cover-image" -H "X-Tenant-Slug: $TENANT_SLUG" \
   -H "Authorization: Bearer $ATLAS_JWT" -F "file=@portada.jpg"
 ```
 
-## Paso 4 — Publica
+## Paso 4 — Publique {#paso-4--publica}
 
 `POST /content/items/{item_id}/publish` pasa el ítem a `published` desde borrador, programado o archivado. Si ya estaba
-publicado responde `409 CONTENT_ALREADY_PUBLISHED`, así que puedes tratar ese código como éxito al reintentar.
+publicado responde `409 CONTENT_ALREADY_PUBLISHED`, así que puede tratar ese código como éxito al reintentar.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/publish" -H "X-Tenant-Slug: $TENANT_SLUG" \
@@ -82,10 +82,10 @@ curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/publish" -H "X-Tenant-Slug: 
 Desde ese momento aparece en `GET /public/catalog` y los miembros con derecho de acceso pueden pedir su
 [ticket de entrega](/docs/saas/atlas-api/content-delivery).
 
-## Paso 5 — Edita o retira
+## Paso 5 — Edite o retire {#paso-5--edita-o-retira}
 
-- **Editar:** `PATCH /content/items/{item_id}` cambia sólo los campos que envías. `metadata` se **reemplaza** completo, no se
-  fusiona: envía el objeto entero. Cambiar el slug a uno ocupado responde `409 CONTENT_SLUG_TAKEN`.
+- **Editar:** `PATCH /content/items/{item_id}` cambia sólo los campos que envía. `metadata` se **reemplaza** completo, no se
+  fusiona: envíe el objeto entero. Cambiar el slug a uno ocupado responde `409 CONTENT_SLUG_TAKEN`.
 - **Retirar:** `POST /content/items/{item_id}/archive` o `DELETE /content/items/{item_id}` lo archivan. Ambas son
   idempotentes y seguras de reintentar.
 - **Leer:** `GET /content/items` lista todos los estados (a diferencia del catálogo público, que sólo muestra lo publicado);

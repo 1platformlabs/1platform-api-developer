@@ -64,10 +64,10 @@ export function QuickCards(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   const website = String(siteConfig.customFields?.websiteUrl ?? 'https://1platform.pro');
   const quick: Card[] = [
-    {icon: 'launch', title: 'Inicio rápido', desc: 'Tus credenciales y tu primera llamada autenticada.', href: '/docs/saas/1platform-api/inicio-rapido'},
-    {icon: 'code', title: 'Referencia de API', desc: 'Explora endpoints y esquemas, y pruébalos en vivo.', href: '/api-reference/1platform-api'},
+    {icon: 'launch', title: 'Inicio rápido', desc: 'Sus credenciales y su primera llamada autenticada.', href: '/docs/saas/1platform-api/inicio-rapido'},
+    {icon: 'code', title: 'Referencia de API', desc: 'Explore endpoints y esquemas, y pruébelos en vivo.', href: '/api-reference/1platform-api'},
     {icon: 'clock', title: 'Cambios', desc: 'Lanzamientos, cambios incompatibles y novedades.', href: `${website}/es/novedades/`},
-    {icon: 'support', title: 'Soporte', desc: 'Habla con el equipo de integraciones.', href: `${website}/es/contacto/`},
+    {icon: 'support', title: 'Soporte', desc: 'Hable con el equipo de integraciones.', href: `${website}/es/contacto/`},
   ];
   return (
     <div className={styles.quickList}>

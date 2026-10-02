@@ -6,7 +6,7 @@ sidebar_position: 2
 
 # Emitir una factura
 
-Con esta guía llegas de un comercio que todavía no existe a una factura FEL certificada. El orden no es
+Con esta guía llega de un comercio que todavía no existe a una factura FEL certificada. El orden no es
 opcional:
 
 - La factura se certifica con el NIT del comercio, así que primero existe el comercio.
@@ -14,16 +14,16 @@ opcional:
 - La factura queda registrada bajo el establecimiento de una sucursal, así que antes de emitir se resuelve
   la sucursal.
 
-Si te saltas un paso, la emisión responde `409` o `422`.
+Si se salta un paso, la emisión responde `409` o `422`.
 
 Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN`, definidos en
 [Convenciones](/docs/saas/1platform-api/reference/convenciones).
 
-## Paso 1 — Crea el comercio con su primera sucursal
+## Paso 1 — Cree el comercio con su primera sucursal {#paso-1--crea-el-comercio-con-su-primera-sucursal}
 
 Todo lo demás cuelga del comercio y de su NIT (`documentNumber`). Un comercio nunca se crea sin
-sucursal: la mandas en el mismo cuerpo y quedas como su administrador. `currency` también es
-obligatoria, no se puede cambiar después y tiene que ser una de las monedas de tu saldo (las ves en
+sucursal: la manda en el mismo cuerpo y queda como su administrador. `currency` también es
+obligatoria, no se puede cambiar después y tiene que ser una de las monedas de su saldo (las ve en
 `billings` de `GET /users/billing`).
 
 ```bash
@@ -34,20 +34,20 @@ curl -X POST "$BASE_URL/businesses" \
   -d '{"name": "Mi Empresa S.A.", "documentType": "NIT", "documentNumber": "12345678", "address": "Zona 10, Ciudad de Guatemala", "currency": "GTQ", "branch": {"name": "Casa matriz"}}'
 ```
 
-Guarda `data.id` como `$BUSINESS_ID`.
+Guarde `data.id` como `$BUSINESS_ID`.
 
 | Código | Causa |
 |---|---|
-| 403 | El módulo de comercios no está disponible para tu cuenta (`module_disabled`) |
+| 403 | El módulo de comercios no está disponible para su cuenta (`module_disabled`) |
 | 409 | Ya existe un comercio con ese NIT |
 | 422 | Falta un campo obligatorio: `name`, `documentType`, `documentNumber`, `address`, `currency` o `branch.name` |
 
 [Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)
 
-## Paso 2 — Activa la facturación electrónica
+## Paso 2 — Active la facturación electrónica {#paso-2--activa-la-facturación-electrónica}
 
 Sin activación, `POST /businesses/{businessId}/invoices` responde `409`. Este camino usa las credenciales
-del portal tributario del comercio. Así no le pides un archivo de certificado `.pfx` que casi nunca tiene
+del portal tributario del comercio. Así no le pide un archivo de certificado `.pfx` que casi nunca tiene
 a mano. Si lo tiene, `POST /businesses/{businessId}/invoicing/activation` acepta el archivo.
 
 ```bash
@@ -60,22 +60,22 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/activation/sat" \
 
 - Las credenciales se usan sólo en esta llamada y no se guardan.
 - La respuesta trae `signaturePassword`, la contraseña del certificado nuevo. Llega **una sola vez**:
-  guárdala ahora o no podrás recuperarla.
+  guárdela ahora o no podrá recuperarla.
 - El estado pasa a `otp_pending` y el comercio recibe un código por WhatsApp.
-- La llamada conversa con el portal en varios pasos. Dale a tu cliente HTTP un tiempo de espera amplio.
+- La llamada conversa con el portal en varios pasos. Dele a su cliente HTTP un tiempo de espera amplio.
 
-Si el comercio ya tiene un certificado, la llamada se rechaza salvo que envíes `force: true`. Emitir uno
+Si el comercio ya tiene un certificado, la llamada se rechaza salvo que envíe `force: true`. Emitir uno
 nuevo **invalida el anterior**, incluida cualquier copia que se use fuera de 1Platform.
 
 | Código | Causa |
 |---|---|
 | 400 | El portal tributario rechazó las credenciales o pidió un código adicional |
-| 403 | Tu rol en la sucursal no es administrador |
+| 403 | Su rol en la sucursal no es administrador |
 | 409 | El comercio no es elegible o ya tiene un certificado |
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
 
-## Paso 3 — Verifica el código y espera a que quede lista
+## Paso 3 — Verifique el código y espere a que quede lista {#paso-3--verifica-el-código-y-espera-a-que-quede-lista}
 
 El certificado ya existe, pero hasta confirmar el código el comercio se queda en `otp_pending`.
 
@@ -87,20 +87,20 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/activation/verify" \
   -d '{"code": "745631"}'
 ```
 
-El estado pasa a `activating`. La activación tarda: no es inmediata. Consulta
+El estado pasa a `activating`. La activación tarda: no es inmediata. Consulte
 `GET /businesses/{businessId}/invoicing/activation` hasta que `display_status` sea `active` y `ready` sea
 `true`. Un código inválido o vencido responde `422`, y `409` significa que no hay una activación pendiente.
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
 
-## Paso 4 — Sincroniza los establecimientos y elige la sucursal
+## Paso 4 — Sincronice los establecimientos y elija la sucursal {#paso-4--sincroniza-los-establecimientos-y-elige-la-sucursal}
 
 El ente tributario certifica bajo un **establecimiento**, y ese código vive en la sucursal. La
 sincronización trae los establecimientos del registro tributario:
 
-- La sucursal que creaste en el paso 1 recibe el establecimiento preferido.
+- La sucursal que creó en el paso 1 recibe el establecimiento preferido.
 - Cada establecimiento activo que sobra recibe una sucursal propia.
-- No borra nada. Puedes repetirla sin crear duplicados.
+- No borra nada. Puede repetirla sin crear duplicados.
 
 ```bash
 curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/establishments/sync" \
@@ -108,9 +108,9 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/establishments/sync" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-Después lista las sucursales con `GET /businesses/{businessId}/branches` y guarda como `$BRANCH_ID` el
+Después liste las sucursales con `GET /businesses/{businessId}/branches` y guarde como `$BRANCH_ID` el
 `id` de la que va a emitir. Si el comercio queda con varias sucursales con
-establecimiento, cada emisión tiene que decir de cuál sale: envía `branchId` o designa una sucursal por defecto con
+establecimiento, cada emisión tiene que decir de cuál sale: envíe `branchId` o designe una sucursal por defecto con
 `defaultBranchId` en `PATCH /businesses/{businessId}`.
 
 | Código | Causa |
@@ -120,9 +120,9 @@ establecimiento, cada emisión tiene que decir de cuál sale: envía `branchId` 
 
 [Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)
 
-## Paso 5 — Emite la factura
+## Paso 5 — Emita la factura {#paso-5--emite-la-factura}
 
-Ahora ya tienes el NIT, la activación lista y la sucursal resuelta. Por defecto la factura se emite en
+Ahora ya tiene el NIT, la activación lista y la sucursal resuelta. Por defecto la factura se emite en
 esta misma llamada.
 
 ```bash
@@ -133,21 +133,21 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
   -d '{"branchId": "'"$BRANCH_ID"'", "items": [{"description": "Servicio de consultoría", "unit_price": 1000.00, "quantity": 1}], "receptorInfo": {"name": "Cliente S.A.", "documentType": "NIT", "documentNumber": "98765432", "email": "cliente@ejemplo.com"}}'
 ```
 
-Guarda `data.id` como `$INVOICE_ID`. Si facturas a una persona y no a una empresa, `POST /identify`
-busca sus datos por CUI/DPI y te ayuda a llenar `receptorInfo`. Sólo consulta, no emite nada.
+Guarde `data.id` como `$INVOICE_ID`. Si facturas a una persona y no a una empresa, `POST /identify`
+busca sus datos por CUI/DPI y le ayuda a llenar `receptorInfo`. Sólo consulta, no emite nada.
 
 | Código | Causa |
 |---|---|
 | 404 | El comercio no existe, o el `branchId` no corresponde a una sucursal suya |
 | 409 | La facturación electrónica del comercio todavía no está lista (pasos 2 y 3) |
-| 422 `branch_selection_required` | Hay varias sucursales con establecimiento, no nombraste ninguna y el comercio no tiene una por defecto. El código viaja en `code`, en la raíz, y `data.branches` trae las opciones. No se emitió nada ni se consumió correlativo: reintenta con `branchId` |
-| 422 | Datos inválidos o rechazo de la certificación. Revisa el NIT del receptor y los ítems |
+| 422 `branch_selection_required` | Hay varias sucursales con establecimiento, no nombró ninguna y el comercio no tiene una por defecto. El código viaja en `code`, en la raíz, y `data.branches` trae las opciones. No se emitió nada ni se consumió correlativo: reintente con `branchId` |
+| 422 | Datos inválidos o rechazo de la certificación. Revise el NIT del receptor y los ítems |
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
 
-## Paso 6 — Consulta el resultado certificado
+## Paso 6 — Consulte el resultado certificado {#paso-6--consulta-el-resultado-certificado}
 
-La consulta confirma el estado real sin volver a emitir, así no arriesgas una factura duplicada.
+La consulta confirma el estado real sin volver a emitir, así no arriesga una factura duplicada.
 
 ```bash
 curl "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
@@ -155,16 +155,16 @@ curl "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-Guarda `uid`, `serieFEL` y `numeroFEL`: identifican la factura ante el ente tributario. Si `fel_synced`
+Guarde `uid`, `serieFEL` y `numeroFEL`: identifican la factura ante el ente tributario. Si `fel_synced`
 es `false`, faltan los datos extendidos del reporte FEL, pero esos tres campos ya son válidos. El PDF y
 el XML certificados se descargan con `GET /businesses/{businessId}/invoices/{invoiceId}/pdf` y
 `GET /businesses/{businessId}/invoices/{invoiceId}/xml`.
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
 
-## Paso 7 — Anula la factura si hace falta
+## Paso 7 — Anule la factura si hace falta {#paso-7--anula-la-factura-si-hace-falta}
 
-Anular no es un cambio de estado local: anula el documento ante el ente tributario. Por eso hazlo sólo
+Anular no es un cambio de estado local: anula el documento ante el ente tributario. Por eso hágalo sólo
 después de confirmar en el paso 6 que la factura se certificó.
 
 ```bash

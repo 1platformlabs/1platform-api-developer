@@ -10,49 +10,49 @@ Cada punto enlaza a la página que lo explica.
 
 ## Tenant
 
-- **Verifica tu slug antes de integrar** con `GET /tenants/by-host` y usa el `slug` que devuelve. Un slug mal escrito no da
+- **Verifique su slug antes de integrar** con `GET /tenants/by-host` y use el `slug` que devuelve. Un slug mal escrito no da
   error: cae en el tenant por defecto ([Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)).
-- **Envía `X-Tenant-Slug` en cada llamada con JWT o anónima.** No envíes tenant en el cuerpo, ni `X-Tenant-Slug` con una
+- **Envíe `X-Tenant-Slug` en cada llamada con JWT o anónima.** No envíe tenant en el cuerpo, ni `X-Tenant-Slug` con una
   clave de integración: ahí el tenant sale de la clave.
-- **Sospecha del slug ante un catálogo vacío** o un token que de pronto responde `TOKEN_INVALID`.
+- **Sospeche del slug ante un catálogo vacío** o un token que de pronto responde `TOKEN_INVALID`.
 
 ## Sesiones y credenciales
 
-- **Refresca la sesión del miembro** en lugar de pedir otro enlace de acceso; pide uno nuevo sólo si el refresco falla
+- **Refresque la sesión del miembro** en lugar de pedir otro enlace de acceso; pida uno nuevo sólo si el refresco falla
   ([Autenticación](/docs/saas/atlas-api/authentication)).
-- **No refresques sesiones de operador:** el refresco devuelve roles de miembro. Vuelve a iniciar sesión.
-- **Cerrar sesión no invalida el token.** Trata la duración del token de acceso como el límite de una credencial filtrada.
-- **Vigila `X-Atlas-Key-Expires-At`** y alerta cuando aparezca; distingue `INTEGRATION_KEY_EXPIRED` de
+- **No refresque sesiones de operador:** el refresco devuelve roles de miembro. Vuelva a iniciar sesión.
+- **Cerrar sesión no invalida el token.** Trate la duración del token de acceso como el límite de una credencial filtrada.
+- **Vigile `X-Atlas-Key-Expires-At`** y avise cuando aparezca; distinga `INTEGRATION_KEY_EXPIRED` de
   `INTEGRATION_KEY_INVALID` ([Claves de integración](/docs/saas/atlas-api/integration-keys)).
-- **Guarda las claves y secretos de webhook como secretos**, fuera del cliente, los registros y el control de versiones.
+- **Guarde las claves y secretos de webhook como secretos**, fuera del cliente, los registros y el control de versiones.
 
 ## Entrega y acceso
 
-- **Explora de forma anónima, entrega con sesión.** Sólo el ticket de entrega exige JWT y derecho de acceso.
-- **Pide el ticket justo antes de usarlo** y ramifica por `delivery_kind`, no por el tipo de tenant
+- **Explore de forma anónima, entregue con sesión.** Sólo el ticket de entrega exige JWT y derecho de acceso.
+- **Pida el ticket justo antes de usarlo** y ramifique por `delivery_kind`, no por el tipo de tenant
   ([Entrega de contenido](/docs/saas/atlas-api/content-delivery)).
-- **Muestra el muro de pago ante `ENTITLEMENT_DENIED` o `FREEMIUM_GATE_BLOCKED`**, no un mensaje de error.
-- **Al volver de un pago, llama una vez a `POST /entitlements/refresh`** en lugar de consultar en bucle
+- **Muestre el muro de pago ante `ENTITLEMENT_DENIED` o `FREEMIUM_GATE_BLOCKED`**, no un mensaje de error.
+- **Al volver de un pago, llame una vez a `POST /entitlements/refresh`** en lugar de consultar en bucle
   ([Derechos de acceso](/docs/saas/atlas-api/entitlements)).
 
 ## Webhooks
 
-- **Firma los bytes exactos del cuerpo con el secreto de tu tenant** e incluye siempre `data.tenant_id`
+- **Firme los bytes exactos del cuerpo con el secreto de su tenant** e incluya siempre `data.tenant_id`
   ([Webhooks](/docs/saas/atlas-api/webhooks)).
-- **Usa un identificador de evento estable**: los reenvíos con el mismo id no se vuelven a aplicar.
-- **Corrige los eventos incompletos en el origen** y envíalos con un id nuevo; el id ya registrado no se reprocesa.
+- **Use un identificador de evento estable**: los reenvíos con el mismo id no se vuelven a aplicar.
+- **Corrija los eventos incompletos en el origen** y envíelos con un id nuevo; el id ya registrado no se reprocesa.
 
 ## Errores y límites
 
-- **Lee el código en sus tres formas** (plano, anidado en `detail`, lista de validación) ([Errores](/docs/saas/atlas-api/errors)).
-- **Respeta `Retry-After`** en `429` y `503`, y reintenta sólo lecturas y operaciones idempotentes
+- **Lea el código en sus tres formas** (plano, anidado en `detail`, lista de validación) ([Errores](/docs/saas/atlas-api/errors)).
+- **Respete `Retry-After`** en `429` y `503`, y reintente sólo lecturas y operaciones idempotentes
   ([Límites de uso](/docs/saas/atlas-api/rate-limits)).
-- **Una búsqueda sin resultados puede ser una falla del servidor**: muestra «sin resultados», no un error.
+- **Una búsqueda sin resultados puede ser una falla del servidor**: muestre «sin resultados», no un error.
 
 ## Entornos
 
-- **Construye primero contra QA**, cuyos datos están separados de producción, pero prueba tu manejo del `429` con
+- **Construya primero contra QA**, cuyos datos están separados de producción, pero pruebe su manejo del `429` con
   simulaciones: en QA el `429` llega sin el código `RATE_LIMITED` (con `detail` de texto), así que no sirve para validar
-  tu lógica ([Entornos](/docs/saas/atlas-api/environments)).
-- **Genera tipos desde la especificación OpenAPI** en lugar de escribir las formas a mano
+  su lógica ([Entornos](/docs/saas/atlas-api/environments)).
+- **Genere tipos desde la especificación OpenAPI** en lugar de escribir las formas a mano
   ([Referencia de API](/api-reference/atlas-api)).

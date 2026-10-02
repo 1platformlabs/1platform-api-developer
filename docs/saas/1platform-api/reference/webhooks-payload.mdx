@@ -1,21 +1,21 @@
 ---
 title: Webhooks — cuerpo saliente
-description: El cuerpo que 1Platform envía a tu endpoint cuando una transacción cambia de estado, los valores de status y cómo llevarlos a tu propia máquina de estados.
+description: El cuerpo que 1Platform envía a su endpoint cuando una transacción cambia de estado, los valores de status y cómo llevarlos a su propia máquina de estados.
 sidebar_position: 8
 ---
 
 # Webhooks — cuerpo saliente
 
-Esta página documenta lo que **1Platform te envía a ti**, no lo que tú le pides a 1Platform. Por eso no vive en la
+Esta página documenta lo que **1Platform le envía a usted**, no lo que usted le pide a 1Platform. Por eso no vive en la
 [Referencia de API](/api-reference/1platform-api): la especificación OpenAPI describe operaciones que un cliente
-invoca, y aquí el cliente es nuestro servidor llamando al tuyo.
+invoca, y aquí el cliente es nuestro servidor llamando al suyo.
 
 La guía que lo pone en contexto —registrar la URL, verificar la firma, responder— es
 [Webhooks](/docs/saas/1platform-api/plataforma/webhooks).
 
 ## Cuerpo canónico {#canonical-payload}
 
-Si configuraste el evento **sin** `body_template`, el cuerpo tiene esta forma:
+Si configuró el evento **sin** `body_template`, el cuerpo tiene esta forma:
 
 ```json
 {
@@ -34,7 +34,7 @@ Si configuraste el evento **sin** `body_template`, el cuerpo tiene esta forma:
 }
 ```
 
-Si configuraste un `body_template`, recibes lo que definiste en él: el cuerpo canónico es lo que llega cuando no hay
+Si configuró un `body_template`, recibe lo que definió en él: el cuerpo canónico es lo que llega cuando no hay
 plantilla.
 
 `status` es el estado de la transacción en el momento del envío y normalmente coincide con `event`: `on_approved`
@@ -44,25 +44,25 @@ nuevo. Enruta por `event`.
 
 ## Campos
 
-| Campo | Origen | Úsalo para |
+| Campo | Origen | Úselo para |
 |---|---|---|
-| `event` | 1Platform | Enrutar dentro de tu receptor cuando una URL atiende varios eventos |
-| `transaction_id` | 1Platform | Correlacionar con el identificador que guardaste al crear la transacción |
+| `event` | 1Platform | Enrutar dentro de su receptor cuando una URL atiende varios eventos |
+| `transaction_id` | 1Platform | Correlacionar con el identificador que guardó al crear la transacción |
 | `external_transaction_id` | Pasarela | Tickets de soporte. Puede venir vacío |
 | `status` | 1Platform | Estado al que pasó la transacción. Ver la tabla de abajo |
 | `amount` | Pasarela | Sólo informativo: el monto que cobró la pasarela, en su moneda |
 | `currency` | Pasarela | La moneda de la pasarela (p. ej. `GTQ`) |
-| `merchant_amount` | Tu moneda | **Úsalo para tu contabilidad**: el monto que cotizaste |
-| `merchant_currency` | Tu moneda | P. ej. `USD` |
-| `metadata` | Reflejado | El objeto libre que enviaste al crear la transacción |
-| `merchant_reference` | Reflejado | El identificador libre que enviaste al crear. Úsalo para encontrar **tu** pedido; para deduplicar, ver abajo |
+| `merchant_amount` | Su moneda | **Úselo para su contabilidad**: el monto que cotizó |
+| `merchant_currency` | Su moneda | P. ej. `USD` |
+| `metadata` | Reflejado | El objeto libre que envió al crear la transacción |
+| `merchant_reference` | Reflejado | El identificador libre que envió al crear. Úselo para encontrar **su** pedido; para deduplicar, ver abajo |
 | `reference` | Pasarela | Referencia de la pasarela (p. ej. la autorización de la tarjeta) |
 | `timestamp` | 1Platform | Hora de la última actualización de la transacción (ISO 8601 con zona horaria) |
 
 :::warning[`currency` cambia de sentido entre la respuesta y el webhook]
-En la respuesta de `POST /users/transactions`, `currency` es **tu** moneda (y `currency_provider`, la de la
-pasarela). En el webhook es al revés: `currency` es la de la pasarela y la tuya viaja en `merchant_currency`. Nunca
-acredites usando `amount`: usa `merchant_amount` y `merchant_currency`.
+En la respuesta de `POST /users/transactions`, `currency` es **su** moneda (y `currency_provider`, la de la
+pasarela). En el webhook es al revés: `currency` es la de la pasarela y la suya viaja en `merchant_currency`. Nunca
+acredite usando `amount`: use `merchant_amount` y `merchant_currency`.
 :::
 
 ## Valores de `status`
@@ -80,19 +80,19 @@ acredites usando `amount`: usa `merchant_amount` y `merchant_currency`.
 El estado inicial `created` nunca llega en un webhook. `refunded` y `reversed` sólo pueden llegar después de
 `approved`.
 
-## Llevarlo a tu máquina de estados
+## Llevarlo a su máquina de estados {#llevarlo-a-tu-máquina-de-estados}
 
-Si tu sistema maneja pocos estados (por ejemplo `pending`, `paid`, `failed`, `refunded`), este es un mapeo
+Si su sistema maneja pocos estados (por ejemplo `pending`, `paid`, `failed`, `refunded`), este es un mapeo
 razonable:
 
-| `status` | Estado en tu sistema |
+| `status` | Estado en su sistema |
 |---|---|
 | `approved` | `paid` (y procede a cumplir el pedido) |
 | `denied`, `cancelled`, `expired`, `dismiss` | `failed` |
 | `refunded`, `reversed` | `refunded` (revierte el cumplimiento y el registro contable) |
 
 La API todavía no permite **emitir** reembolsos (`POST /users/transactions/{id}/refund` responde `501`). Un
-reembolso o una reversión hechos por otra vía te llegan igualmente como `on_refunded` u `on_reversed`.
+reembolso o una reversión hechos por otra vía le llegan igualmente como `on_refunded` u `on_reversed`.
 
 ## Sin sobre de respuesta
 
@@ -100,10 +100,10 @@ Los webhooks **no** vienen en `{ success, data, msg }`: son objetos planos, can�
 que permite calcular la firma sobre el cuerpo crudo. Ver
 [Formato de respuesta](/docs/saas/1platform-api/reference/response-format).
 
-## Idempotencia de tu lado {#idempotency-on-the-merchant-side}
+## Idempotencia de su lado {#idempotency-on-the-merchant-side}
 
 La entrega es **al menos una vez**, con reintentos; ver
-[Reintentos y entrega](/docs/saas/1platform-api/reference/retry-and-delivery). Tu receptor **debe** deduplicar.
+[Reintentos y entrega](/docs/saas/1platform-api/reference/retry-and-delivery). Su receptor **debe** deduplicar.
 
-Deduplica siempre por `(transaction_id, event)`. `merchant_reference` sirve para encontrar tu pedido, no para
+Deduplique siempre por `(transaction_id, event)`. `merchant_reference` sirve para encontrar su pedido, no para
 deduplicar: una misma transacción emite varios eventos con la misma referencia.

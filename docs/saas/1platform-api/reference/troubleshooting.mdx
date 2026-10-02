@@ -6,8 +6,8 @@ sidebar_position: 5
 
 # Solución de problemas
 
-Esta página está organizada por **síntoma**: busca el error que estás viendo en lugar de adivinar la causa. Si
-nada de esto lo explica, pide soporte con el `x-request-id` de la respuesta.
+Esta página está organizada por **síntoma**: busque el error que está viendo en lugar de adivinar la causa. Si
+nada de esto lo explica, pida soporte con el `x-request-id` de la respuesta.
 
 ## «Recibo `422` con `PAYMENT_GATEWAY_NOT_CONFIGURED` al crear una transacción»
 
@@ -17,15 +17,15 @@ liquida directo al comercio y este cobro lo recauda la plataforma: no hay nada q
 
 ## «`401` en todas las llamadas aunque mi clave es válida»
 
-1. **Entorno equivocado.** Las claves de QA no funcionan en producción, ni al revés. Revisa a qué host apunta tu
+1. **Entorno equivocado.** Las claves de QA no funcionan en producción, ni al revés. Revise a qué host apunta su
    cliente. Ver [Entornos](/docs/saas/1platform-api/reference/environments).
-2. **Clave en vez de token.** Los headers llevan los **tokens** (JWT), no las claves `ak-…`/`sk-…`. Canjéalas
+2. **Clave en vez de token.** Los headers llevan los **tokens** (JWT), no las claves `ak-…`/`sk-…`. Canjéelas
    primero; ver [Autenticación](/docs/saas/1platform-api/plataforma/autenticacion).
-3. **Clave incompleta.** Copia la clave entera, prefijo incluido.
+3. **Clave incompleta.** Copie la clave entera, prefijo incluido.
 
 ## «`403` con `module_disabled`»
 
-El módulo de esa operación está apagado para el espacio de trabajo o no está asignado a tu usuario. Pide a un
+El módulo de esa operación está apagado para el espacio de trabajo o no está asignado a su usuario. Pida a un
 administrador del espacio de trabajo que lo habilite.
 
 ## «`403` al configurar webhooks»
@@ -35,13 +35,13 @@ token de aplicación. Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhook
 
 ## «La verificación de firma de mi webhook falla siempre»
 
-1. **Re-serializar el cuerpo.** Lo que se firma son exactamente los bytes que te llegan. Calcula el HMAC sobre el
+1. **Re-serializar el cuerpo.** Lo que se firma son exactamente los bytes que le llegan. Calcule el HMAC sobre el
    cuerpo crudo (`request.body`, `php://input`, `express.raw()`), nunca sobre
    `JSON.stringify(JSON.parse(body))`: el orden de las claves, los espacios o el escape de caracteres no ASCII
    cambian los bytes.
-2. **Reloj desfasado.** El material firmado incluye `X-Webhook-Timestamp`, y tu verificador rechaza lo que tenga más
-   de 5 minutos. Sincroniza tus servidores por NTP.
-3. **El prefijo.** Quita `sha256=` de `X-Webhook-Signature` **antes** de comparar; no lo agregues al valor calculado.
+2. **Reloj desfasado.** El material firmado incluye `X-Webhook-Timestamp`, y su verificador rechaza lo que tenga más
+   de 5 minutos. Sincronice sus servidores por NTP.
+3. **El prefijo.** Quita `sha256=` de `X-Webhook-Signature` **antes** de comparar; no lo agregue al valor calculado.
 4. **Secreto equivocado.** Hay un solo secreto por espacio de trabajo y entorno. Si alguien lo rotó, el anterior ya
    no sirve.
 
@@ -50,28 +50,28 @@ lenguajes.
 
 ## «Recibo `429` durante el desarrollo»
 
-Lo más probable es que estés canjeando un token nuevo en cada solicitud. Los canjes están limitados a 10 por minuto
-(en `POST /users/token`, compartidos por todos los usuarios del mismo token de aplicación). Guarda los tokens en
+Lo más probable es que esté canjeando un token nuevo en cada solicitud. Los canjes están limitados a 10 por minuto
+(en `POST /users/token`, compartidos por todos los usuarios del mismo token de aplicación). Guarde los tokens en
 caché; ver
 [Autenticación → Mantener los tokens vigentes](/docs/saas/1platform-api/plataforma/autenticacion#cache-de-tokens).
-Si el `429` aparece en otra operación, puede ser su límite por minuto, el cupo de tu plan o un trabajo igual ya en
+Si el `429` aparece en otra operación, puede ser su límite por minuto, el cupo de su plan o un trabajo igual ya en
 curso: ver
 [Límites de uso](/docs/saas/1platform-api/reference/rate-limits).
 
 ## «El webhook llegó y mi receptor lo procesó dos veces»
 
-Los webhooks se entregan **al menos una vez**. Deduplica por `(transaction_id, event)`; ver
-[Webhooks — cuerpo saliente → Idempotencia de tu lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
+Los webhooks se entregan **al menos una vez**. Deduplique por `(transaction_id, event)`; ver
+[Webhooks — cuerpo saliente → Idempotencia de su lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
 
 ## «Roté el secreto y ahora fallan webhooks legítimos»
 
-El secreto anterior deja de usarse para firmar en cuanto llamas a `POST /webhooks/config/rotate-secret`, pero los
+El secreto anterior deja de usarse para firmar en cuanto llama a `POST /webhooks/config/rotate-secret`, pero los
 reintentos de eventos firmados antes de la rotación siguen llegando con la firma vieja durante alrededor de un
-minuto. Acepta los dos secretos durante unos minutos después de rotar. Ver
+minuto. Acepte los dos secretos durante unos minutos después de rotar. Ver
 [Seguridad de webhooks → Rotación del secreto](/docs/saas/1platform-api/reference/webhooks-security#secret-rotation).
 
 ## «El `amount` del webhook no coincide con lo que cobré»
 
-En el webhook, `amount` y `currency` están en la moneda de la pasarela, que puede ser distinta de la tuya. Lo que
-cotizaste está en `merchant_amount` y `merchant_currency`: **acredita siempre con esos dos**. Ver
+En el webhook, `amount` y `currency` están en la moneda de la pasarela, que puede ser distinta de la suya. Lo que
+cotizó está en `merchant_amount` y `merchant_currency`: **acredita siempre con esos dos**. Ver
 [Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).

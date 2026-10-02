@@ -1,6 +1,6 @@
 ---
 title: Resolución de tenant
-description: Cómo la Atlas API asigna cada solicitud a un tenant, por qué un slug mal escrito no da error y cómo verificar el tuyo antes de integrar.
+description: Cómo la Atlas API asigna cada solicitud a un tenant, por qué un slug mal escrito no da error y cómo verificar el suyo antes de integrar.
 sidebar_position: 6
 ---
 
@@ -8,7 +8,7 @@ sidebar_position: 6
 
 Cada catálogo, miembro, derecho de acceso y configuración pertenece a un tenant, y una solicitud sólo ve los datos del
 tenant al que se resuelve. Atlas lo resuelve **en el servidor, a partir de los headers**; nunca lo lee del cuerpo, así que
-no puedes cambiar de tenant editando un cuerpo de solicitud.
+no puede cambiar de tenant editando un cuerpo de solicitud.
 
 ## Orden de resolución
 
@@ -20,13 +20,13 @@ Atlas prueba, en este orden:
 
 :::danger Un slug mal escrito no devuelve error
 Si `X-Tenant-Slug` no existe (por un error de tipeo, o un slug de QA usado en producción), la solicitud **no falla**: cae
-en el tenant por defecto de la plataforma. Verás un catálogo vacío o ajeno, y podrías enviar enlaces de acceso desde el
-tenant equivocado sin recibir ningún error. Lo mismo ocurre si no envías el header.
+en el tenant por defecto de la plataforma. Verá un catálogo vacío o ajeno, y podría enviar enlaces de acceso desde el
+tenant equivocado sin recibir ningún error. Lo mismo ocurre si no envía el header.
 :::
 
-## Verifica tu slug antes de integrar
+## Verifique su slug antes de integrar {#verifica-tu-slug-antes-de-integrar}
 
-Pide a Atlas el tenant de tu dominio y usa el `slug` exacto que devuelve en todas tus llamadas
+Pida a Atlas el tenant de su dominio y use el `slug` exacto que devuelve en todas sus llamadas
 ([Referencia de API → tenants](/api-reference/atlas-api#tag/tenants)):
 
 ```bash
@@ -34,30 +34,30 @@ curl -s "$ATLAS_BASE/tenants/by-host?host=biblioteca.example.com"
 ```
 
 Si el dominio no corresponde a ningún tenant activo, responde `404 TENANT_UNRESOLVED`. Un slug que no existe no devuelve
-ese código en las demás operaciones: cae en el tenant por defecto. Sí lo recibes si corresponde a un tenant desactivado. Repite esta comprobación en tu
+ese código en las demás operaciones: cae en el tenant por defecto. Sí lo recibe si corresponde a un tenant desactivado. Repita esta comprobación en su
 proceso de despliegue o en una prueba de humo, por ejemplo comparando el nombre del tenant que devuelve con el esperado.
 
-## Usa siempre `X-Tenant-Slug` desde tu servidor
+## Use siempre `X-Tenant-Slug` desde su servidor {#usa-siempre-x-tenant-slug-desde-tu-servidor}
 
 ```bash
 curl -s "$ATLAS_BASE/public/catalog" -H "X-Tenant-Slug: $TENANT_SLUG"
 ```
 
-La resolución por `Host` es la que usan los frentes web de cada tenant. Tu integración no puede apoyarse en ella: el
+La resolución por `Host` es la que usan los frentes web de cada tenant. Su integración no puede apoyarse en ella: el
 dominio del tenant sirve su sitio, no la API, y el host compartido de la API (`atlas-api.1platform.pro`) no coincide con
-ningún tenant. Envía `X-Tenant-Slug` en cada llamada con JWT o anónima.
+ningún tenant. Envíe `X-Tenant-Slug` en cada llamada con JWT o anónima.
 
 Las llamadas con [clave de integración](/docs/saas/atlas-api/integration-keys) son la excepción: el tenant sale de la clave
-y no necesitas el header.
+y no necesita el header.
 
 ## El token y el tenant deben coincidir
 
 Un JWT lleva el tenant para el que se emitió. Presentarlo mientras la solicitud se resuelve a otro tenant se rechaza
-(por ejemplo, el refresco de sesión responde `401 TOKEN_INVALID`). Inicia sesión y llama siempre contra el **mismo**
+(por ejemplo, el refresco de sesión responde `401 TOKEN_INVALID`). Inicie sesión y llama siempre contra el **mismo**
 tenant; un slug que cae en silencio al tenant por defecto se manifiesta así, como un token que de pronto deja de servir.
 
 ## El arquetipo del tenant
 
 Cada tenant tiene un **arquetipo** (biblioteca, podcast, audio, streaming, etc.) que decide, entre otras cosas, cómo se
-entrega su contenido. No lo deduzcas tú: ramifica por el `delivery_kind` que devuelve la
+entrega su contenido. No lo deduzca usted: ramifique por el `delivery_kind` que devuelve la
 [entrega de contenido](/docs/saas/atlas-api/content-delivery).

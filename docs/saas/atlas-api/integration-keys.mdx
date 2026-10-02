@@ -1,31 +1,31 @@
 ---
 title: Claves de integración
-description: Credenciales de servicio a servicio de la Atlas API (ak-int-…) — para qué sirven, cómo vencen y cómo detectar el vencimiento antes de que corte tu integración.
+description: Credenciales de servicio a servicio de la Atlas API (ak-int-…) — para qué sirven, cómo vencen y cómo detectar el vencimiento antes de que corte su integración.
 sidebar_position: 4
 ---
 
 # Claves de integración
 
-Una **clave de integración** (`ak-int-…`) permite que un servidor tuyo actúe sobre un tenant sin la sesión de ninguna
+Una **clave de integración** (`ak-int-…`) permite que un servidor suyo actúe sobre un tenant sin la sesión de ninguna
 persona: por ejemplo, el sistema de ventas que, tras una compra, crea al comprador como miembro y le muestra un enlace de
 acceso. Es una credencial distinta del [JWT de miembro u operador](/docs/saas/atlas-api/authentication).
 
 ## Cómo se obtiene
 
 Las claves las emite el equipo de 1Platform Labs; ni el panel del tenant ni la API pública permiten crearlas. Al emitirla se
-fijan tres cosas que tú no puedes ampliar después:
+fijan tres cosas que usted no puede ampliar después:
 
 - **el tenant** al que pertenece (o toda la plataforma, para las integraciones internas de 1Platform Labs);
 - **las capacidades**: qué operaciones puede llamar;
 - **la fecha de vencimiento**: como máximo 365 días para una clave de tenant y 90 para una de plataforma.
 
 Hay como máximo **una clave activa por tenant e integración**: rotar una clave reemplaza a la anterior, no convive con ella.
-Guárdala como un secreto (fuera del código del cliente, de los registros y del control de versiones). Atlas no puede
-recuperarla: si se pierde o se filtra, pide una nueva.
+Guárdela como un secreto (fuera del código del cliente, de los registros y del control de versiones). Atlas no puede
+recuperarla: si se pierde o se filtra, pida una nueva.
 
 ## Cómo se usa
 
-Envía la clave como `Authorization: Bearer ak-int-…`. El tenant sale de la clave, así que **no** envíes `X-Tenant-Slug`.
+Envíe la clave como `Authorization: Bearer ak-int-…`. El tenant sale de la clave, así que **no** envíe `X-Tenant-Slug`.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
@@ -43,28 +43,28 @@ Las operaciones disponibles para un tenant son las de aprovisionamiento de miemb
 
 Las operaciones de gestión de contenido (`/content/*`), de derechos de acceso (`/entitlements/*`) y de administración
 (`/admin/*`) **no** aceptan una clave de integración: responden `401 UNAUTHORIZED` y exigen el JWT de un operador o miembro.
-Si tu caso necesita escribir catálogo desde un servidor, coordínalo con el equipo de 1Platform Labs.
+Si su caso necesita escribir catálogo desde un servidor, coordínelo con el equipo de 1Platform Labs.
 
 ## El orden de un aprovisionamiento
 
-1. Tras la compra, llama a `members/upsert`. Es idempotente por tenant y correo: repetirlo no duplica al miembro.
-2. Muestra el enlace de acceso que devuelve **en ese momento**. Es de un solo uso y vence en minutos.
-3. Si el comprador vuelve más tarde a la página de acceso, pide un enlace nuevo con `issue-magic-link`. Nunca guardes el
+1. Tras la compra, llame a `members/upsert`. Es idempotente por tenant y correo: repetirlo no duplica al miembro.
+2. Muestre el enlace de acceso que devuelve **en ese momento**. Es de un solo uso y vence en minutos.
+3. Si el comprador vuelve más tarde a la página de acceso, pida un enlace nuevo con `issue-magic-link`. Nunca guarde el
    enlace: un registro filtrado no debe servir para entrar.
 
-## Detecta el vencimiento antes del corte
+## Detecte el vencimiento antes del corte {#detecta-el-vencimiento-antes-del-corte}
 
-Una clave vencida deja de funcionar de golpe, y el día de vencimiento lo conoce quien la emitió, no tu integración. Atlas te
+Una clave vencida deja de funcionar de golpe, y el día de vencimiento lo conoce quien la emitió, no su integración. Atlas le
 avisa de dos maneras:
 
 - **Durante los últimos 14 días** de vida de la clave, cada respuesta exitosa trae el header `X-Atlas-Key-Expires-At` con
-  la fecha y hora de vencimiento (UTC). Vigílalo y alerta en cuanto aparezca: es la señal para pedir la renovación.
-- **Una vez vencida**, la clave responde `401 INTEGRATION_KEY_EXPIRED`, distinto de `INTEGRATION_KEY_INVALID`. No los trates
-  igual: uno pide renovar la clave; el otro, revisar cuál estás enviando.
+  la fecha y hora de vencimiento (UTC). Vigílelo y avise en cuanto aparezca: es la señal para pedir la renovación.
+- **Una vez vencida**, la clave responde `401 INTEGRATION_KEY_EXPIRED`, distinto de `INTEGRATION_KEY_INVALID`. No los trate
+  igual: uno pide renovar la clave; el otro, revisar cuál está enviando.
 
 ## Errores de la clave
 
-- `401 INTEGRATION_KEY_REQUIRED`: no enviaste una clave `ak-int-…`.
+- `401 INTEGRATION_KEY_REQUIRED`: no envió una clave `ak-int-…`.
 - `401 INTEGRATION_KEY_INVALID`: la clave no existe, fue revocada o el secreto no coincide.
 - `401 INTEGRATION_KEY_EXPIRED`: la clave venció.
 - `403 INTEGRATION_CAPABILITY_MISSING`: la clave es válida pero no tiene la capacidad que pide la operación; la respuesta
@@ -72,4 +72,4 @@ avisa de dos maneras:
 - `404 TENANT_NOT_FOUND` o `404 MEMBER_NOT_FOUND`: el tenant o el miembro ya no existe. Un miembro de otro tenant también
   responde `404`, para que una clave filtrada no pueda averiguar qué identificadores existen.
 
-Estos errores llegan anidados en `detail`; consulta [Errores](/docs/saas/atlas-api/errors).
+Estos errores llegan anidados en `detail`; consulte [Errores](/docs/saas/atlas-api/errors).

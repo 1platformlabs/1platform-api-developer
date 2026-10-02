@@ -14,6 +14,8 @@ import {join} from 'node:path';
 import {gzipSync} from 'node:zlib';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
+import {load} from 'cheerio';
+import {searchLabelFindings} from './search-label.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const BUILD = join(ROOT, 'build');
@@ -92,7 +94,7 @@ function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, sn
     docsHtml,
     'Referencia de API</a>',
   );
-  requireText('DOC_LEAD', docsHtml, 'Todo lo que necesitas para integrar 1Platform');
+  requireText('DOC_LEAD', docsHtml, 'Todo lo que necesita para integrar 1Platform');
   // The home is a product index; the credentials and the first call live on
   // Inicio rápido, which is where the guide checks below read.
   requireText('DOC_PRODUCTS', docsHtml, 'Productos disponibles');
@@ -108,6 +110,9 @@ function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, sn
   requireText('GUIDE_APP_JWT', quickHtml, '<code>Authorization: Bearer $APP_TOKEN</code>');
   requireText('GUIDE_USER_JWT', quickHtml, '<code>x-user-token: $USER_TOKEN</code>');
   for (const [kind, html] of [['DOC', docsHtml], ['API', apiHtml]]) {
+    const $ = load(html);
+    const labels = $('input.navbar__search-input').toArray().map((input) => $(input).attr('aria-label'));
+    for (const finding of searchLabelFindings(labels)) findings.push(`${kind}_SEARCH_LABEL_ES: ${finding}`);
     // This is the SSR host. Scalar later renders the native headings contained
     // in the contract; this assertion does not count or approve runtime headings.
     if (/<meta[^>]*name=["']robots["'][^>]*content=["'][^"']*noindex/i.test(html)) findings.push(`${kind}_INDEXABLE: noindex on public page`);
@@ -146,6 +151,17 @@ function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, sn
 }
 
 if (process.argv.includes('--self-test')) {
+  for (const input of [
+    '<input class="navbar__search-input" aria-label="Search">',
+    '<input class="navbar__search-input">',
+    '<input class="other" aria-label="Buscar">',
+  ]) {
+    const $ = load(`<button aria-label="Buscar"></button>${input}`);
+    const labels = $('input.navbar__search-input').toArray().map((element) => $(element).attr('aria-label'));
+    assert.ok(searchLabelFindings(labels).length, 'An unrelated Spanish button cannot hide a broken input');
+  }
+  assert.deepEqual(searchLabelFindings(['Buscar']), []);
+  assert.ok(searchLabelFindings(['Buscar', 'Search']).length, 'Every rendered search input needs a Spanish name');
   const jpeg = Buffer.from('ffd8ffe000044a46ffc0000b08034c018601011100ffd9', 'hex');
   assert.deepEqual(imageDimensions(jpeg), {width: 390, height: 844});
   const progressive = Buffer.from(jpeg);
@@ -174,7 +190,7 @@ if (process.argv.includes('--self-test')) {
   });
   const codes = new Set(findings.map((finding) => finding.split(':', 1)[0]));
   const expected = [
-    'DOC_LANG', 'DOC_CANONICAL', 'DOC_HREFLANG_ES', 'DOC_HREFLANG_DEFAULT',
+    'DOC_LANG', 'DOC_CANONICAL', 'DOC_HREFLANG_ES', 'DOC_HREFLANG_DEFAULT', 'DOC_SEARCH_LABEL_ES', 'API_SEARCH_LABEL_ES',
     'DOC_JSONLD', 'BRAND_RETURN', 'BLOG_LANGUAGE', 'SKIP_LINK', 'MOBILE_TOGGLE', 'SEARCH', 'NAV_CTA',
     'DOC_PRIMARY_CTA', 'DOC_API_CTA', 'DOC_CTA_SEMANTICS', 'DOC_LEAD', 'DOC_PRODUCTS', 'DOC_SECTIONS', 'API_LANG', 'API_CANONICAL',
     'API_HREFLANG_ES', 'API_HREFLANG_DEFAULT', 'API_SHELL', 'API_SEARCH',

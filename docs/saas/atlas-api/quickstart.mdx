@@ -1,18 +1,18 @@
 ---
 title: Inicio rápido
-description: Verifica el slug de tu tenant, inicia la sesión de un miembro, explora el catálogo y emite tu primer ticket de reproducción en la Atlas API.
+description: Verifique el slug de su tenant, inicie la sesión de un miembro, explore el catálogo y emita su primer ticket de reproducción en la Atlas API.
 sidebar_position: 2
 ---
 
 # Inicio rápido
 
 Este recorrido va de un slug verificado a un ticket de reproducción. El orden importa: si el slug está mal, todo lo que
-sigue funciona **contra otro tenant** sin darte ningún error.
+sigue funciona **contra otro tenant** sin darle ningún error.
 
-## Paso 1 — Define el entorno y verifica tu slug
+## Paso 1 — Defina el entorno y verifique su slug {#paso-1--define-el-entorno-y-verifica-tu-slug}
 
-Atlas no rechaza un `X-Tenant-Slug` desconocido: la solicitud cae en el tenant por defecto de la plataforma y verás, por
-ejemplo, un catálogo vacío. Por eso el primer paso es pedirle a Atlas el slug real de tu tenant a partir de su dominio
+Atlas no rechaza un `X-Tenant-Slug` desconocido: la solicitud cae en el tenant por defecto de la plataforma y verá, por
+ejemplo, un catálogo vacío. Por eso el primer paso es pedirle a Atlas el slug real de su tenant a partir de su dominio
 y usar exactamente el `slug` que devuelve
 ([Referencia de API → tenants](/api-reference/atlas-api#tag/tenants)).
 
@@ -22,25 +22,25 @@ curl -s "$ATLAS_BASE/tenants/by-host?host=biblioteca.example.com"
 export TENANT_SLUG="<slug-devuelto>"
 ```
 
-Si el dominio no corresponde a ningún tenant activo, recibes `404` con el código `TENANT_UNRESOLVED`. Los entornos tienen
-datos separados: consulta [Entornos](/docs/saas/atlas-api/environments).
+Si el dominio no corresponde a ningún tenant activo, recibe `404` con el código `TENANT_UNRESOLVED`. Los entornos tienen
+datos separados: consulte [Entornos](/docs/saas/atlas-api/environments).
 
-## Paso 2 — Explora el catálogo
+## Paso 2 — Explore el catálogo {#paso-2--explora-el-catálogo}
 
-El catálogo es público, así que puedes comprobar que ves el contenido esperado antes de tocar la autenticación. Usa el
+El catálogo es público, así que puede comprobar que ve el contenido esperado antes de tocar la autenticación. Use el
 `total` de la respuesta para paginar ([Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing)).
 
 ```bash
 curl -s "$ATLAS_BASE/public/catalog?page=1&page_size=20" -H "X-Tenant-Slug: $TENANT_SLUG"
 ```
 
-Guarda el `id` de un ítem: es el `content_id` del paso 5.
+Guarde el `id` de un ítem: es el `content_id` del paso 5.
 
-## Paso 3 — Envía un enlace de acceso
+## Paso 3 — Envíe un enlace de acceso {#paso-3--envía-un-enlace-de-acceso}
 
 Los miembros inician sesión sin contraseña. Atlas envía un correo con un enlace que aterriza en el **sitio del tenant**
-(`/auth/verify?token=…`), o en el puente hacia la app nativa si pides `surface: "app"`. Sólo quien opera ese frente
-recibe el token, así que tu frente debe leer el `token` de la URL y canjearlo en el paso 4
+(`/auth/verify?token=…`), o en el puente hacia la app nativa si pide `surface: "app"`. Sólo quien opera ese frente
+recibe el token, así que su frente debe leer el `token` de la URL y canjearlo en el paso 4
 ([Autenticación](/docs/saas/atlas-api/authentication)).
 
 ```bash
@@ -48,10 +48,10 @@ curl -s -X POST "$ATLAS_BASE/auth/magic-link" -H "X-Tenant-Slug: $TENANT_SLUG" \
   -H "Content-Type: application/json" -d '{ "email": "lector@example.com" }'
 ```
 
-## Paso 4 — Canjea el token por una sesión
+## Paso 4 — Canjee el token por una sesión {#paso-4--canjea-el-token-por-una-sesión}
 
 El canje crea el miembro la primera vez y devuelve un token de acceso (24 h por defecto) y uno de refresco (30 días).
-Envía el de acceso como `Authorization: Bearer` en las llamadas siguientes.
+Envíe el de acceso como `Authorization: Bearer` en las llamadas siguientes.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" -H "X-Tenant-Slug: $TENANT_SLUG" \
@@ -59,9 +59,9 @@ curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" -H "X-Tenant-Slug: $TENANT_
 export ATLAS_JWT="<access_token>"
 ```
 
-## Paso 5 — Emite un ticket de reproducción
+## Paso 5 — Emita un ticket de reproducción {#paso-5--emite-un-ticket-de-reproducción}
 
-Atlas comprueba el derecho de acceso del miembro y, si lo tiene, devuelve una URL de corta duración. Ramifica por el
+Atlas comprueba el derecho de acceso del miembro y, si lo tiene, devuelve una URL de corta duración. Ramifique por el
 `delivery_kind` de la respuesta, no por el tipo de tenant
 ([Entrega de contenido](/docs/saas/atlas-api/content-delivery)).
 
@@ -70,11 +70,11 @@ curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback" \
   -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
 ```
 
-Sin acceso recibes `403 ENTITLEMENT_DENIED` (muestra el muro de suscripción) o `402 FREEMIUM_GATE_BLOCKED` (el miembro
+Sin acceso recibe `403 ENTITLEMENT_DENIED` (muestre el muro de suscripción) o `402 FREEMIUM_GATE_BLOCKED` (el miembro
 gratuito agotó su cuota). Cómo se concede el acceso: [Derechos de acceso](/docs/saas/atlas-api/entitlements).
 
 ## Siguientes pasos
 
 - [Errores](/docs/saas/atlas-api/errors) — cómo leer el `code` en sus dos formas.
-- [Claves de integración](/docs/saas/atlas-api/integration-keys) — aprovisionar miembros desde tu servidor.
+- [Claves de integración](/docs/saas/atlas-api/integration-keys) — aprovisionar miembros desde su servidor.
 - [Referencia de API](/api-reference/atlas-api) — cada operación con su contrato.

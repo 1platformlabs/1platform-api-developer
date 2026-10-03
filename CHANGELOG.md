@@ -47,6 +47,12 @@ All notable changes to the 1Platform API Developer Docs will be documented in th
 
 ## [Unreleased]
 
+### Changed
+- **`journeys/autenticacion` — Paso 2 (`POST /users`)**: aviso de que la `api_key` del alta se rota en el
+  primer ingreso de la persona por enlace mágico (1platform-api#789). Todas las credenciales emitidas antes de
+  verificar el correo dejan de funcionar y `POST /users/token` con la clave vieja responde `401`. Sólo afecta al
+  flujo híbrido (alta servidor a servidor + la persona entra al panel con la misma cuenta).
+
 ### Added
 - **Cinco filas nuevas en `saas/1platform-api/capacidades`**: Envíos, Publicidad, Enlaces de cobro, Terminales de pago y Suscripciones — las capacidades que llevaban tiempo en producción y no estaban en el mapa. Sólo filas que enlazan a la referencia generada, sin prosa de contrato: ninguna de las cinco tiene un orden obligatorio que la referencia no pueda expresar, y un recorrido escrito a mano se desincroniza.
 - **`scripts/check-api-anchors.mjs`** — la tabla de capacidades es enteramente anclas a la referencia, y hasta ahora nada las verificaba. `onBrokenAnchors: 'throw'` era la respuesta obvia y se probó primero: sobre un árbol **sin una sola fila nueva** falla el build reportando **las 21 anclas existentes** como rotas, incluidas las que funcionan en el sitio en vivo. La causa es estructural — la referencia es un plugin de Scalar que renderiza en el navegador, así que en tiempo de build ninguno de sus `id` existe. Este chequeo mide en cambio la mitad que sí se rompe en silencio: que el slug nombre un tag que **existe en el mismo spec que la referencia renderiza**, que es lo que falla con un typo o con un renombre aguas arriba. Trae self-test (5 casos, dos de ellos negativos), un piso que revienta si el escáner deja de encontrar anclas, y queda cableado en `ci.yml` con su self-test delante. Medido: 70 anclas, todas válidas.

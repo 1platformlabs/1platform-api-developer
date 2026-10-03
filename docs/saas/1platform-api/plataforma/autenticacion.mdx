@@ -51,6 +51,19 @@ espacio de trabajo. Un `409` indica que ese correo ya tiene cuenta: la API no de
 existente, así que pídele que entre por enlace mágico (paso 4) o que cree su propia clave de usuario desde la
 sección **API** del Panel. Un `400` indica que el correo no tiene un formato válido.
 
+:::warning[La clave del alta se renueva cuando la persona verifica su correo]
+Si después la misma persona **entra al Panel con un enlace mágico** (es decir, verifica que el correo es
+suyo), en ese primer ingreso la plataforma desactiva todas las credenciales emitidas antes de la
+verificación —incluida la `api_key` que devolvió este paso y cualquier credencial creada con ella— y emite
+una nueva que no se entrega por la API. Desde ese momento `POST /users/token` con la clave anterior responde
+`401`.
+
+Es una protección: como el token de aplicación es público, cualquiera podría dar de alta el correo de otra
+persona y quedarse con su clave. Si su integración guarda la `api_key` del alta, no combine ese flujo con que
+la persona entre al Panel con la misma cuenta; si tiene que hacerlo, después de su primer ingreso la persona
+solicita acceso de desarrollador desde el Panel y un administrador del espacio de trabajo lo aprueba.
+:::
+
 [Referencia de API → Users & Tokens](/api-reference/1platform-api#tag/users-tokens)
 
 ## Paso 3 — Token de usuario

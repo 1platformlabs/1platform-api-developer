@@ -54,14 +54,21 @@ roles de marca no llevan hex repetidos en los componentes.
 - CTA: Hablemos de su proyecto, `https://wa.me/50253946564`
 - Documentación abre la portada por productos (decisión del usuario 2026-10-01,
   modelo: portal de pagos con hero + «Productos disponibles» + accesos rápidos)
-- El chrome compartido con el website (navbar, footer, CTA) usa el trato formal del
-  website; el CONTENIDO técnico usa **tú**, sin voseo ni usted. Sin punto final en
-  títulos y subtítulos
+- El chrome compartido con el website y todo el contenido editorial técnico usan
+  **usted**, sin tuteo ni voseo (issue #55, lote restado-v2-textos-accesibilidad).
+  Código, claves técnicas, endpoints y destinos de enlaces conservan sus literales.
+  Sin punto final en títulos y subtítulos
 
 Mantener navbar y footer coordinados con el website. Conservar búsqueda local,
 skip link, foco visible, menús técnicos y drawer nativo; targets de al menos 44 px.
 No swizzlear Navbar, Layout ni Root. El masthead usa un wrapper de DocRoot/Layout.
 No controles de animación nuevos, proveedores internos ni claims sin evidencia.
+La búsqueda local fija el nombre accesible con el parche versionado de
+`@easyops-cn/docusaurus-search-local@0.55.2` en `patches/`, aplicado por pnpm.
+Al actualizar el plugin, revise el parche y ejecute `check:public-ui` y
+`check:search-runtime` tras el build. `check:editorial-tone` cubre todo `docs/`;
+`check:editorial-tone:build` excluye sólo los literales de código renderizados.
+Los encabezados cuyo texto cambie conservan su ID histórico para no romper enlaces.
 El gradiente del token `--masthead-shade` sólo asegura contraste sobre la foto
 aprobada; no habilita gradientes decorativos arbitrarios.
 

@@ -1,13 +1,13 @@
 ---
 title: Límites de uso
-description: Cómo limita la Atlas API el ritmo de solicitudes, qué respuestas recibes al exceder un límite o cuando un servicio se protege, y cómo reintentar.
+description: Cómo limita la Atlas API el ritmo de solicitudes, qué respuestas recibe al exceder un límite o cuando un servicio se protege, y cómo reintentar.
 sidebar_position: 13
 ---
 
 # Límites de uso
 
 La Atlas API limita el ritmo **por operación**, no de forma uniforme: los límites se concentran en las superficies públicas
-y anónimas, y en las que pueden abusarse (sugerencias de búsqueda, enlaces de pago sin sesión, descargas). Construye tu
+y anónimas, y en las que pueden abusarse (sugerencias de búsqueda, enlaces de pago sin sesión, descargas). Construya su
 cliente para **reaccionar** a las respuestas de abajo en lugar de fijar umbrales: los valores pueden cambiar.
 
 ## Qué cuenta para el límite
@@ -16,26 +16,26 @@ La cuenta se lleva con claves distintas según la superficie: por cliente (direc
 por clave en las operaciones con clave de integración y por sesión en las escrituras de un miembro.
 
 Hay una excepción importante: `GET /tenants/by-host` cuenta por dirección de origen, y todo el tráfico que pasa por el
-proxy de entrada comparte esa dirección. Su límite es, en la práctica, **compartido entre todos los clientes**. Llámalo una
-vez al configurar tu integración (o en tu prueba de humo) y guarda el resultado; no lo llames en cada solicitud.
+proxy de entrada comparte esa dirección. Su límite es, en la práctica, **compartido entre todos los clientes**. Llámelo una
+vez al configurar su integración (o en su prueba de humo) y guarde el resultado; no lo llame en cada solicitud.
 
 ## Qué respuestas esperar
 
-- **`429 RATE_LIMITED`**: superaste el límite de la operación. Espera y reintenta con espera creciente.
+- **`429 RATE_LIMITED`**: superó el límite de la operación. Espere y reintente con espera creciente.
 - **`429 DOWNLOAD_RATE_LIMITED`**: demasiadas solicitudes de entrega seguidas; trae `Retry-After`.
 - **`503 CATALOG_BUSY`**: el catálogo está saturado y descarta solicitudes para proteger al resto de la API; trae
   `Retry-After`.
 
-Cuando la respuesta trae `Retry-After`, respétalo antes que tu propio cálculo.
+Cuando la respuesta trae `Retry-After`, respételo antes que su propio cálculo.
 
 :::note En QA el 429 no trae el cuerpo estándar
 El `429 RATE_LIMITED` con el cuerpo estándar sólo está activo en producción. En QA el límite también corta, pero el `429`
-llega con un `detail` de texto y sin código. No uses QA para probar tu manejo de límites: simúlalo en tus pruebas.
+llega con un `detail` de texto y sin código. No use QA para probar su manejo de límites: simúlelo en sus pruebas.
 :::
 
 ## Cómo reintentar
 
-Reintenta automáticamente sólo las lecturas y las operaciones idempotentes. Usa espera exponencial con variación aleatoria:
+Reintente automáticamente sólo las lecturas y las operaciones idempotentes. Use espera exponencial con variación aleatoria:
 
 ```javascript
 async function conReintento(url, init, { maxIntentos = 4 } = {}) {
@@ -51,7 +51,7 @@ async function conReintento(url, init, { maxIntentos = 4 } = {}) {
 
 ## Cómo no llegar al límite
 
-- **Guarda en caché las lecturas públicas** (catálogo, detalle, portada del sitio): cambian poco.
-- **Espera una pausa en la escritura** antes de llamar a `GET /public/search/suggest`.
-- **Tras un pago, llama a `POST /entitlements/refresh` una sola vez**, no consultes el acceso en un bucle.
-- **Reutiliza la sesión** del miembro durante toda su vida y refréscala; no pidas un enlace de acceso por solicitud.
+- **Guarde en caché las lecturas públicas** (catálogo, detalle, portada del sitio): cambian poco.
+- **Espere una pausa en la escritura** antes de llamar a `GET /public/search/suggest`.
+- **Tras un pago, llame a `POST /entitlements/refresh` una sola vez**, no consulte el acceso en un bucle.
+- **Reutilice la sesión** del miembro durante toda su vida y refrésquela; no pida un enlace de acceso por solicitud.

@@ -129,6 +129,11 @@ jobs:
       - name: OpenAPI illustrative credentials
         run: pnpm check:openapi-examples
 
+      - name: Editorial tone — negative controls and source corpus
+        run: |
+          pnpm check:editorial-tone:self-test
+          pnpm check:editorial-tone
+
       - name: Scalar deep-link compatibility
         run: pnpm check:reference
 
@@ -165,6 +170,15 @@ jobs:
         run: |
           set -euo pipefail
           pnpm check:public-ui
+
+      - name: Editorial tone in rendered documentation
+        run: pnpm check:editorial-tone:build
+
+      - name: Install browser for local search regression
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Spanish search name after hydration
+        run: pnpm check:search-runtime
 
       - name: Production nginx routing (isolated local container)
         run: pnpm check:serving

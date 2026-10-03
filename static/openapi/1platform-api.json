@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "1Platform API",
-    "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
+    "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
     "version": "PRODv5.67.0"
   },
   "servers": [
@@ -1071,7 +1071,7 @@
           "Users & Tokens"
         ],
         "summary": "Generate user token",
-        "description": "Authenticate with a user API key and receive a JWT user token.\n\n- **Auth:** `Authorization: Bearer <app_token>` only (no user token needed)\n- **Rate limit:** 10 req/min\n- The returned token must be sent as the `x-user-token` header on all user-scoped requests\n- Token expires after the time indicated in `expires_in` (seconds)\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"sk-user-api-key\"}'\n```",
+        "description": "Authenticate with a user API key and receive a JWT user token.\n\n- **Auth:** `Authorization: Bearer <app_token>` only (no user token needed)\n- **Rate limit:** 10 req/min\n- The returned token must be sent as the `x-user-token` header on all user-scoped requests\n- Token expires after the time indicated in `expires_in` (seconds)\n\n**cURL example:**\n```bash\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n```",
         "operationId": "getUserToken",
         "requestBody": {
           "content": {
@@ -1184,7 +1184,7 @@
                     "id": "507f1f77bcf86cd799439011",
                     "email": "user@example.com",
                     "username": "user_example",
-                    "api_key": "sk-abc123xyz",
+                    "api_key": "USER_API_KEY_EXAMPLE",
                     "is_active": true,
                     "billing_id": "507f1f77bcf86cd799439012",
                     "created_at": "2026-01-15T10:30:00"
@@ -4017,7 +4017,7 @@
           "Website Plugins"
         ],
         "summary": "Order an action on one of the site's plugins",
-        "description": "Dashboard-only (D-20): the `sk-` token installed on a site may list, claim and report its own orders, never create one. Repeating an identical live order is not an error — it returns the SAME order with 200 (WPG-05).\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` of a verified dashboard user\n- **Rate limit:** 20 req/min, keyed per (credential, website)",
+        "description": "Dashboard-only (D-20): the `USER_API_KEY_EXAMPLE` token installed on a site may list, claim and report its own orders, never create one. Repeating an identical live order is not an error — it returns the SAME order with 200 (WPG-05).\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` of a verified dashboard user\n- **Rate limit:** 20 req/min, keyed per (credential, website)",
         "operationId": "createSitePluginOrder",
         "security": [
           {
@@ -6829,7 +6829,7 @@
                         "id": "66b0f1a2c3d4e5f60718293a",
                         "kind": "user",
                         "name": "Production CI",
-                        "masked": "sk-…9A1C",
+                        "masked": "USER_API_KEY_EXAMPLE",
                         "status": "active",
                         "is_bootstrap": false,
                         "created_at": "2026-08-01T18:22:04Z"
@@ -6948,7 +6948,7 @@
                     "id": "66b0f1a2c3d4e5f60718293a",
                     "kind": "user",
                     "name": "Production CI",
-                    "masked": "sk-…9A1C",
+                    "masked": "USER_API_KEY_EXAMPLE",
                     "status": "active",
                     "is_bootstrap": false,
                     "created_at": "2026-08-01T18:22:04Z",
@@ -7011,7 +7011,7 @@
           "API Developer"
         ],
         "summary": "Show one of my tokens, once",
-        "description": "Shows the secret of one of the caller's own credentials for the only time it can be shown. The two kinds reach that promise by opposite routes, and the endpoint is the same:\n\n- **App token** (`ak-`): the secret is GENERATED here. It exists nowhere before this call, which is how the administrator who approved the grant is unable to have seen it, and only its hash exists after.\n- **User token** (`sk-`): the secret already exists and nothing is rotated — integrations presenting it keep working. Only available while nobody has looked yet AND the value is still recoverable, which is what `secret_recoverable` on the listing reports. A token minted through the panel handed its secret back at creation and kept only a SHA-256; it answers `credential_secret_unrecoverable` (409), and the way to get a usable one is to create a new token.\n\nOnly the owner can call this, and a second call is a 409.\n\n**Auth:** app token + user token.",
+        "description": "Shows the secret of one of the caller's own credentials for the only time it can be shown. The two kinds reach that promise by opposite routes, and the endpoint is the same:\n\n- **App token** (`APP_API_KEY_EXAMPLE`): the secret is GENERATED here. It exists nowhere before this call, which is how the administrator who approved the grant is unable to have seen it, and only its hash exists after.\n- **User token** (`USER_API_KEY_EXAMPLE`): the secret already exists and nothing is rotated — integrations presenting it keep working. Only available while nobody has looked yet AND the value is still recoverable, which is what `secret_recoverable` on the listing reports. A token minted through the panel handed its secret back at creation and kept only a SHA-256; it answers `credential_secret_unrecoverable` (409), and the way to get a usable one is to create a new token.\n\nOnly the owner can call this, and a second call is a 409.\n\n**Auth:** app token + user token.",
         "operationId": "revealMyApiCredential",
         "security": [
           {
@@ -7063,7 +7063,7 @@
                     "id": "66b0f1a2c3d4e5f60718293a",
                     "kind": "app",
                     "name": "Production CI",
-                    "masked": "ak-…X4F2",
+                    "masked": "APP_API_KEY_EXAMPLE",
                     "status": "active",
                     "is_bootstrap": false,
                     "created_at": "2026-08-01T18:22:04Z",
@@ -7201,7 +7201,7 @@
                     "id": "66b0f1a2c3d4e5f60718293a",
                     "kind": "user",
                     "name": "Production CI",
-                    "masked": "sk-…9A1C",
+                    "masked": "USER_API_KEY_EXAMPLE",
                     "status": "disabled",
                     "is_bootstrap": false,
                     "created_at": "2026-08-01T18:22:04Z"
@@ -7313,7 +7313,7 @@
                     "id": "66b0f1a2c3d4e5f60718293a",
                     "kind": "user",
                     "name": "Production CI",
-                    "masked": "sk-…9A1C",
+                    "masked": "USER_API_KEY_EXAMPLE",
                     "status": "active",
                     "is_bootstrap": false,
                     "created_at": "2026-08-01T18:22:04Z"
@@ -45495,7 +45495,7 @@
           "Trading Agent"
         ],
         "summary": "Cycles the monitor should watch",
-        "description": "Everything currently waiting on a market condition, across every tenant.\n\nThe payload carries **no identity and no money**: cycle ids, a market, an operator and threshold prices. The monitor decides *when* to call `execute`; the server decides what, how much and whether.\n\n**Auth:** `Authorization: Bearer ak-svc-…` with capability `trade.execute` and platform scope.",
+        "description": "Everything currently waiting on a market condition, across every tenant.\n\nThe payload carries **no identity and no money**: cycle ids, a market, an operator and threshold prices. The monitor decides *when* to call `execute`; the server decides what, how much and whether.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `trade.execute` and platform scope.",
         "operationId": "listActionableCycles",
         "parameters": [
           {
@@ -45541,10 +45541,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Service credential: `Bearer ak-svc-…`",
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
               "title": "Authorization"
             },
-            "description": "Service credential: `Bearer ak-svc-…`"
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
           }
         ],
         "responses": {
@@ -45622,7 +45622,7 @@
           "Trading Agent"
         ],
         "summary": "Ask the server to act on one cycle",
-        "description": "The server derives the action from the cycle's **state** (waiting → buy, holding → sell), re-reads the price itself, and re-checks the trigger. A trigger that does not hold answers `409` and costs the cycle nothing.\n\nThe body carries only `observed_price`, as telemetry. It has no `action` and no `reason` field, and an unknown field is rejected rather than ignored.\n\n**Auth:** `Authorization: Bearer ak-svc-…` with capability `trade.execute` and platform scope.",
+        "description": "The server derives the action from the cycle's **state** (waiting → buy, holding → sell), re-reads the price itself, and re-checks the trigger. A trigger that does not hold answers `409` and costs the cycle nothing.\n\nThe body carries only `observed_price`, as telemetry. It has no `action` and no `reason` field, and an unknown field is rejected rather than ignored.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `trade.execute` and platform scope.",
         "operationId": "executeTradeCycle",
         "parameters": [
           {
@@ -45652,10 +45652,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Service credential: `Bearer ak-svc-…`",
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
               "title": "Authorization"
             },
-            "description": "Service credential: `Bearer ak-svc-…`"
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
           }
         ],
         "requestBody": {
@@ -45770,7 +45770,7 @@
           "Notifications"
         ],
         "summary": "Ask the server to send one operations notification",
-        "description": "The caller names an **event** from a closed enum and supplies its typed parameters. The server resolves the template, its language and the recipients from configuration, renders every parameter itself, and asks the provider to accept the message.\n\n**`202` does not mean delivered.** The provider confirms that it validated the request's structure; delivery is only ever reported through a webhook, which this surface does not have. `accept_status` is the provider's own word, verbatim.\n\nThe body carries no recipient, no scope, no template and no free text — each of those is resolved server-side on purpose.\n\nSend the same `idempotency_key` twice and the second call answers `202` with `accept_status: \"duplicate\"` and sends nothing. Derive the key from the caller's **spacing window**, never from the instant.\n\n**Auth:** `Authorization: Bearer ak-svc-…` with capability `whatsapp.send` and platform scope.",
+        "description": "The caller names an **event** from a closed enum and supplies its typed parameters. The server resolves the template, its language and the recipients from configuration, renders every parameter itself, and asks the provider to accept the message.\n\n**`202` does not mean delivered.** The provider confirms that it validated the request's structure; delivery is only ever reported through a webhook, which this surface does not have. `accept_status` is the provider's own word, verbatim.\n\nThe body carries no recipient, no scope, no template and no free text — each of those is resolved server-side on purpose.\n\nSend the same `idempotency_key` twice and the second call answers `202` with `accept_status: \"duplicate\"` and sends nothing. Derive the key from the caller's **spacing window**, never from the instant.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `whatsapp.send` and platform scope.",
         "operationId": "sendWhatsAppNotification",
         "parameters": [
           {
@@ -45786,10 +45786,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Service credential: `Bearer ak-svc-…`",
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
               "title": "Authorization"
             },
-            "description": "Service credential: `Bearer ak-svc-…`"
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
           }
         ],
         "requestBody": {
@@ -49974,7 +49974,7 @@
                   "success": true,
                   "msg": "OK",
                   "data": {
-                    "api_key": "sk-…",
+                    "api_key": "USER_API_KEY_EXAMPLE",
                     "plugin_slug": "1platform-content-ai",
                     "config": {
                       "site_config": {
@@ -50851,7 +50851,7 @@
                   "success": true,
                   "data": {
                     "status": "completed",
-                    "api_key": "sk-abc123def456"
+                    "api_key": "USER_API_KEY_EXAMPLE"
                   },
                   "msg": "Account created successfully"
                 }
@@ -60081,7 +60081,7 @@
                 "example": {
                   "success": true,
                   "data": {
-                    "api_key": "ak-abc123def456"
+                    "api_key": "APP_API_KEY_EXAMPLE"
                   },
                   "msg": "Panel resolved"
                 }
@@ -72131,7 +72131,7 @@
                   "data": {
                     "app_id": "507f1f77bcf86cd799439011",
                     "slug": "acme-co",
-                    "api_key": "ak-NEW-SHOWN-ONCE-…",
+                    "api_key": "APP_API_KEY_EXAMPLE",
                     "rotated_at": "2026-08-16T04:00:00Z",
                     "previous_credential_revoked": true,
                     "audit_recorded": true
@@ -73423,7 +73423,7 @@
                         "id": "66b0f1a2c3d4e5f607182930",
                         "kind": "user",
                         "name": "User token",
-                        "masked": "sk-…9A1C",
+                        "masked": "USER_API_KEY_EXAMPLE",
                         "status": "active",
                         "is_bootstrap": false,
                         "owner": {
@@ -73557,7 +73557,7 @@
                     "id": "66b0f1a2c3d4e5f607182930",
                     "kind": "user",
                     "name": "User token",
-                    "masked": "sk-…9A1C",
+                    "masked": "USER_API_KEY_EXAMPLE",
                     "status": "active",
                     "is_bootstrap": false,
                     "owner": {
@@ -73566,7 +73566,7 @@
                     },
                     "created_at": "2026-08-01T18:04:55Z",
                     "secret_recoverable": false,
-                    "secret": "sk-SHOWN-ONCE-…"
+                    "secret": "USER_API_KEY_EXAMPLE"
                   },
                   "msg": "Credential revealed"
                 }
@@ -73698,7 +73698,7 @@
                     "id": "66b0f1a2c3d4e5f607182930",
                     "kind": "user",
                     "name": "User token",
-                    "masked": "sk-…9A1C",
+                    "masked": "USER_API_KEY_EXAMPLE",
                     "status": "active",
                     "is_bootstrap": false,
                     "owner": {
@@ -73707,7 +73707,7 @@
                     },
                     "created_at": "2026-08-01T18:04:55Z",
                     "secret_recoverable": false,
-                    "secret": "sk-NEW-SHOWN-ONCE-…"
+                    "secret": "USER_API_KEY_EXAMPLE"
                   },
                   "msg": "Credential re-issued"
                 }
@@ -77445,7 +77445,7 @@
                 "example": {
                   "success": true,
                   "data": {
-                    "api_key": "ak-NEW-SHOWN-ONCE-…",
+                    "api_key": "APP_API_KEY_EXAMPLE",
                     "rotated_at": "2026-05-26T12:00:00Z"
                   },
                   "msg": "App api_key rotated"
@@ -78215,7 +78215,7 @@
                         "id": "66b2f1a2c3d4e5f60718293b",
                         "kind": "app",
                         "name": "App token",
-                        "masked": "ak-…X4F2",
+                        "masked": "APP_API_KEY_EXAMPLE",
                         "status": "pending_reveal",
                         "is_bootstrap": false,
                         "owner": {
@@ -78338,7 +78338,7 @@
                     "id": "66b2f1a2c3d4e5f60718293b",
                     "kind": "app",
                     "name": "App token",
-                    "masked": "ak-…X4F2",
+                    "masked": "APP_API_KEY_EXAMPLE",
                     "status": "disabled",
                     "is_bootstrap": false,
                     "owner": {
@@ -78441,7 +78441,7 @@
                     "id": "66b2f1a2c3d4e5f60718293b",
                     "kind": "app",
                     "name": "App token",
-                    "masked": "ak-…X4F2",
+                    "masked": "APP_API_KEY_EXAMPLE",
                     "status": "pending_reveal",
                     "is_bootstrap": false,
                     "owner": {
@@ -82751,7 +82751,7 @@
           "Tasks"
         ],
         "summary": "Create a new task",
-        "description": "Creates a new task, unstarted. Requires the `task_manager` skill (humans) OR a `ServiceKey` with the `tasks.write` capability, scope `tenant` (agents, TSK-08).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (human) **or** `Authorization: Bearer ak-svc-…` (agent)\n\n**Rate limit:** 20 req/min",
+        "description": "Creates a new task, unstarted. Requires the `task_manager` skill (humans) OR a `ServiceKey` with the `tasks.write` capability, scope `tenant` (agents, TSK-08).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (human) **or** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` (agent)\n\n**Rate limit:** 20 req/min",
         "operationId": "createTask",
         "parameters": [
           {
@@ -83382,7 +83382,7 @@
           "Tasks"
         ],
         "summary": "Create a subtask with a required skill",
-        "description": "Creates a subtask under a task. `order` is assigned server-side by an atomic counter (D-16) — never accepted from the client. Requires `task_manager` (humans) OR a `ServiceKey` with `tasks.write` (agents, TSK-08).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (human) **or** `Authorization: Bearer ak-svc-…` (agent)\n\n**Rate limit:** 20 req/min",
+        "description": "Creates a subtask under a task. `order` is assigned server-side by an atomic counter (D-16) — never accepted from the client. Requires `task_manager` (humans) OR a `ServiceKey` with `tasks.write` (agents, TSK-08).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (human) **or** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` (agent)\n\n**Rate limit:** 20 req/min",
         "operationId": "createSubtask",
         "parameters": [
           {
@@ -85932,7 +85932,7 @@
             "title": "Masked",
             "description": "Prefix + last 4",
             "examples": [
-              "sk-…9A1C"
+              "USER_API_KEY_EXAMPLE"
             ]
           },
           "status": {
@@ -90593,7 +90593,7 @@
           "user"
         ],
         "title": "ApiCredentialKind",
-        "description": "Which of the two tokens of the dual-auth model this credential mints.\n\nThe exchange filters on it. Without that filter a user's ``sk-`` presented\nto ``POST /auth/token`` — an endpoint mounted with no dependencies at all —\nwould resolve a row, and \"the row decides\" would hand back an **app** token\nfor the tenant."
+        "description": "Which of the two tokens of the dual-auth model this credential mints.\n\nThe exchange filters on it. Without that filter a user's ``USER_API_KEY_EXAMPLE`` presented\nto ``POST /auth/token`` — an endpoint mounted with no dependencies at all —\nwould resolve a row, and \"the row decides\" would hand back an **app** token\nfor the tenant."
       },
       "ApiCredentialListOut": {
         "properties": {
@@ -90663,7 +90663,7 @@
             "title": "Masked",
             "description": "Prefix + last 4",
             "examples": [
-              "sk-…9A1C"
+              "USER_API_KEY_EXAMPLE"
             ]
           },
           "status": {
@@ -96337,7 +96337,7 @@
             "title": "Masked",
             "description": "Prefix + last 4",
             "examples": [
-              "sk-…9A1C"
+              "USER_API_KEY_EXAMPLE"
             ]
           },
           "status": {
@@ -100764,9 +100764,9 @@
           "api_key": {
             "type": "string",
             "title": "Api Key",
-            "description": "Public app identifier (`ak-…`) of the workspace whose panel answers for this host.",
+            "description": "Public app identifier (`APP_API_KEY_EXAMPLE`) of the workspace whose panel answers for this host.",
             "examples": [
-              "ak-abc123def456"
+              "APP_API_KEY_EXAMPLE"
             ]
           }
         },
@@ -108333,7 +108333,7 @@
             "title": "Api Key",
             "description": "Newly issued API key, returned only once when status is COMPLETED",
             "examples": [
-              "sk-abc123def456"
+              "USER_API_KEY_EXAMPLE"
             ]
           }
         },
@@ -111701,7 +111701,7 @@
           "action"
         ],
         "title": "SitePluginOrderCreateRequest",
-        "description": "``POST /users/websites/{website_id}/plugin-orders``. Requires a\ndashboard session (D-20) — the ``sk-`` token installed on a site may\nlist, claim and report its own orders, never create one.\n\nNo download URL field exists anywhere in this shape (D-10, restriction\n2): ``install`` only ever carries ``plugin_slug``, resolved against the\ndirectory server-side."
+        "description": "``POST /users/websites/{website_id}/plugin-orders``. Requires a\ndashboard session (D-20) — the ``USER_API_KEY_EXAMPLE`` token installed on a site may\nlist, claim and report its own orders, never create one.\n\nNo download URL field exists anywhere in this shape (D-10, restriction\n2): ``install`` only ever carries ``plugin_slug``, resolved against the\ndirectory server-side."
       },
       "SitePluginOrderListResponseData": {
         "properties": {
@@ -129345,7 +129345,7 @@
             "title": "Api Key",
             "description": "API key for authentication",
             "examples": [
-              "sk-abc123def456"
+              "USER_API_KEY_EXAMPLE"
             ]
           },
           "is_active": {
@@ -132364,13 +132364,13 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT de aplicación obtenido al canjear su clave API en POST /api/v1/auth/token. Envíelo como Authorization: Bearer <APP_TOKEN>. La clave API de aplicación (ak-...) no se envía en este header."
+        "description": "JWT de aplicación obtenido al canjear su clave API en POST /api/v1/auth/token. Envíelo como Authorization: Bearer <APP_TOKEN>. La clave API de aplicación (APP_API_KEY_EXAMPLE) no se envía en este header."
       },
       "userToken": {
         "type": "apiKey",
         "in": "header",
         "name": "x-user-token",
-        "description": "JWT de usuario obtenido al canjear su clave API en POST /api/v1/users/token, con el JWT de aplicación. Envíelo en x-user-token. La clave API de usuario (sk-...) no se envía en este header."
+        "description": "JWT de usuario obtenido al canjear su clave API en POST /api/v1/users/token, con el JWT de aplicación. Envíelo en x-user-token. La clave API de usuario (USER_API_KEY_EXAMPLE) no se envía en este header."
       }
     }
   },
@@ -132597,7 +132597,7 @@
     },
     {
       "name": "Trading Agent",
-      "description": "The surface a 1Trade monitor uses. Authenticated with a service credential alone (`Authorization: Bearer ak-svc-…`) carrying the `trade.execute` capability and platform scope — no app token and no user token.\n\nThe monitor decides **when** to look at a cycle. The server decides what, how much and whether: it derives the action from the cycle's own state, re-reads the price itself, and re-checks the trigger. The request body carries no action, no reason and no amount."
+      "description": "The surface a 1Trade monitor uses. Authenticated with a service credential alone (`Authorization: Bearer SERVICE_API_KEY_EXAMPLE`) carrying the `trade.execute` capability and platform scope — no app token and no user token.\n\nThe monitor decides **when** to look at a cycle. The server decides what, how much and whether: it derives the action from the cycle's own state, re-reads the price itself, and re-checks the trigger. The request body carries no action, no reason and no amount."
     },
     {
       "name": "Heatmaps",

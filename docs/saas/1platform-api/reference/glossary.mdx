@@ -12,9 +12,9 @@ Esta documentación usa cada término siempre con el mismo sentido. Si una pági
 
 | Término | Definición |
 |---|---|
-| **Espacio de trabajo** | Tu cuenta de integración en 1Platform. Agrupa usuarios, configuración, módulos y credenciales. En la Referencia de API aparece como `App` |
+| **Espacio de trabajo** | Su cuenta de integración en 1Platform. Agrupa usuarios, configuración, módulos y credenciales. En la Referencia de API aparece como `App` |
 | **Administrador del espacio de trabajo** | Usuario con el rol que gestiona el espacio de trabajo: usuarios, módulos, webhooks y solicitudes de acceso |
-| **Panel** | La interfaz web de tu espacio de trabajo, con tu marca |
+| **Panel** | La interfaz web de su espacio de trabajo, con su marca |
 | **Módulo** | Una capacidad que se habilita por espacio de trabajo y por usuario. Si está apagada, la operación responde `403` con `module_disabled` |
 | **Clave de aplicación** (`ak-…`) | Credencial de larga vida del espacio de trabajo. No va en ningún header: se canjea por un token de aplicación |
 | **Clave de usuario** (`sk-…`) | Credencial de larga vida de un usuario. Se canjea por un token de usuario. En la Referencia de API aparece como *user token* o `api_key` |
@@ -33,17 +33,17 @@ Varios identificadores viajan a lo largo de la vida de un pago. Se parecen, pero
 |---|---|---|
 | `transaction_id` | 1Platform | Identificador de la transacción. Es `data.id` al crearla con `POST /users/transactions` y `transaction_id` en el webhook |
 | `external_transaction_id` | La pasarela de cobro | El identificador que la pasarela le dio al cargo. Sirve para soporte; puede venir vacío |
-| `merchant_reference` | Tú | Texto libre que envías al crear la transacción. Vuelve sin cambios en el webhook |
-| `metadata` | Tú | Objeto JSON libre que envías al crear la transacción. Vuelve sin cambios en el webhook |
+| `merchant_reference` | Usted | Texto libre que envía al crear la transacción. Vuelve sin cambios en el webhook |
+| `metadata` | Usted | Objeto JSON libre que envía al crear la transacción. Vuelve sin cambios en el webhook |
 | `webhook_secret` | 1Platform | Secreto de firma de los webhooks, uno por espacio de trabajo. Se muestra una sola vez: al registrar el primer dominio o al rotarlo |
 
-### Cuál usar para encontrar tu pedido
+### Cuál usar para encontrar su pedido {#cuál-usar-para-encontrar-tu-pedido}
 
-1. **`merchant_reference`**: el tuyo. La mejor forma de encontrar tu pedido si lo envías al crear.
-2. **`transaction_id`**: siempre presente y único. El respaldo cuando no enviaste `merchant_reference`.
-3. **`external_transaction_id`**: útil para un ticket de soporte, pero no garantizado. No dependas de él.
+1. **`merchant_reference`**: el suyo. La mejor forma de encontrar su pedido si lo envía al crear.
+2. **`transaction_id`**: siempre presente y único. El respaldo cuando no envió `merchant_reference`.
+3. **`external_transaction_id`**: útil para un ticket de soporte, pero no garantizado. No dependa de él.
 
-Para deduplicar entregas de webhooks usa siempre `(transaction_id, event)`.
+Para deduplicar entregas de webhooks use siempre `(transaction_id, event)`.
 
 ## Formato de los identificadores
 
@@ -56,5 +56,5 @@ Para deduplicar entregas de webhooks usa siempre `(transaction_id, event)`.
 | Clave de usuario | `sk-` seguido de una cadena opaca | `sk-…` |
 | `webhook_secret` | Cadena hexadecimal opaca | `9f2c…` |
 
-No valides la longitud ni el alfabeto de las claves y del secreto: trátalos como cadenas opacas. Algunas claves
+No valide la longitud ni el alfabeto de las claves y del secreto: trátelos como cadenas opacas. Algunas claves
 antiguas no llevan prefijo y siguen funcionando.

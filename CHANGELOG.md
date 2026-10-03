@@ -2,6 +2,19 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Textos y accesibilidad del portal
+
+- Trato de usted en la documentación vigente de 1Platform y Atlas, las tarjetas
+  y sus descripciones, conservando ejemplos de código y destinos técnicos.
+- Nombre accesible «Buscar» en el input de búsqueda local mediante un parche
+  pnpm versionado. CI comprueba el control concreto en docs y referencia API,
+  tanto en HTML como tras hidratar e interactuar en escritorio y móvil.
+- Saneamiento de credenciales ilustrativas cortas y abreviadas en OpenAPI;
+  claves de aplicación, usuario, servicio e integración mantienen marcadores
+  distintos. Los contratos y sus formatos estructurales se preservan.
+- Guards de tono y credenciales con controles negativos, exclusiones de
+  literales y comprobación del corpus generado, ejecutados en CI.
+
 ## [Unreleased] — Infraestructura de 1Platform
 
 - Guía de primeros pasos con la composición aprobada, Manrope autoalojada,

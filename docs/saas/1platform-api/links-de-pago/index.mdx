@@ -1,36 +1,36 @@
 ---
 title: Links de pago
-description: Genera un enlace de cobro para un comercio y compártelo con un cliente que no tiene cuenta, sin integrar un checkout.
+description: Genere un enlace de cobro para un comercio y compártalo con un cliente que no tiene cuenta, sin integrar un checkout.
 sidebar_position: 1
 ---
 
 # Links de pago
 
-<p className="lead">Crea un enlace de cobro a nombre de tu comercio y compártelo por correo, chat o donde quieras. Quien lo abre paga en un checkout seguro, sin cuenta y sin que integres nada en tu sitio.</p>
+<p className="lead">Cree un enlace de cobro a nombre de su comercio y compártalo por correo, chat o donde quiera. Quien lo abre paga en un checkout seguro, sin cuenta y sin que integre nada en su sitio.</p>
 
 ## Cómo funciona
 
-1. Creas el link para un **comercio** con el monto y el concepto. La moneda la decide el servidor: es la del comercio. La respuesta trae `url`, el enlace público que compartes.
-2. Si envías `customer_email`, el link se le manda por correo a ese cliente en cuanto se crea. Esa misma dirección recibe después el comprobante.
+1. Cree el link para un **comercio** con el monto y el concepto. La moneda la decide el servidor: es la del comercio. La respuesta trae `url`, el enlace público que comparte.
+2. Si envía `customer_email`, el link se le manda por correo a ese cliente en cuanto se crea. Esa misma dirección recibe después el comprobante.
 3. El cliente abre el enlace. Si el link está activo, lo redirige al checkout. Si ya está pagado, cancelado o vencido, ve una página con ese estado.
-4. El link vive en uno de cuatro estados. Mientras no lo pagan está `active`. Después termina en `paid`, `cancelled` (lo cancelaste tú) o `expired` (pasó su vigencia, que fijas en días u horas). Los tres son finales.
-5. Lo cobrado con un link se acredita a tu **saldo retirable** cuando la plataforma confirma el pago. Mientras no lo confirma, el monto puede aparecer en `pending_verification` de `GET /users/cash-out/summary` y todavía no puedes retirarlo; si no se confirma a tiempo, se acredita como saldo prepagado, que no se retira (lo cuenta `frozen_collections`). Ver [Retiros](/docs/saas/1platform-api/retiros).
+4. El link vive en uno de cuatro estados. Mientras no lo pagan está `active`. Después termina en `paid`, `cancelled` (lo canceló usted) o `expired` (pasó su vigencia, que fija en días u horas). Los tres son finales.
+5. Lo cobrado con un link se acredita a su **saldo retirable** cuando la plataforma confirma el pago. Mientras no lo confirma, el monto puede aparecer en `pending_verification` de `GET /users/cash-out/summary` y todavía no puede retirarlo; si no se confirma a tiempo, se acredita como saldo prepagado, que no se retira (lo cuenta `frozen_collections`). Ver [Retiros](/docs/saas/1platform-api/retiros).
 
-Los pagos con link **no** disparan los webhooks de transacción de [Pagos en línea](/docs/saas/1platform-api/pagos-en-linea). Para saber si un link se pagó, consulta su estado o el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros).
+Los pagos con link **no** disparan los webhooks de transacción de [Pagos en línea](/docs/saas/1platform-api/pagos-en-linea). Para saber si un link se pagó, consulte su estado o el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros).
 
-## Qué necesitas
+## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
-- Un **comercio** con su sucursal, donde seas dueño o administrador ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si sólo tienes rol de lectura en la sucursal, crear o cancelar responde `403`.
-- El módulo de Links de pago encendido para tu espacio de trabajo y asignado a tu cuenta. Si falta, recibes `403` con `data.code` = `module_disabled`.
+- Un **comercio** con su sucursal, donde sea dueño o administrador ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si sólo tiene rol de lectura en la sucursal, crear o cancelar responde `403`.
+- El módulo de Links de pago encendido para su espacio de trabajo y asignado a su cuenta. Si falta, recibe `403` con `data.code` = `module_disabled`.
 - Una pasarela de pago activa. Si no la hay, la creación responde `422`.
-- No necesitas tener activa la [Facturación electrónica](/docs/saas/1platform-api/facturacion-electronica) para cobrar con links. Si la Referencia de API todavía lista un `409` `business_not_activated` en la creación del link, ya no se produce.
+- No necesita tener activa la [Facturación electrónica](/docs/saas/1platform-api/facturacion-electronica) para cobrar con links. Si la Referencia de API todavía lista un `409` `business_not_activated` en la creación del link, ya no se produce.
 
 ## Operaciones
 
 | Operación | Para qué |
 |---|---|
-| `POST /businesses/{businessId}/payment-links` | Crear el link (monto, concepto y, si quieres, vigencia, `merchant_reference` y `customer_email`) |
+| `POST /businesses/{businessId}/payment-links` | Crear el link (monto, concepto y, si quiere, vigencia, `merchant_reference` y `customer_email`) |
 | `GET /businesses/{businessId}/payment-links` | Listar los links del comercio, del más reciente al más antiguo, con filtro por `status` |
 | `GET /businesses/{businessId}/payment-links/{linkId}` | Consultar un link y su estado |
 | `POST /businesses/{businessId}/payment-links/{linkId}/cancel` | Cancelar un link activo para que deje de aceptar pagos |
@@ -38,9 +38,9 @@ Los pagos con link **no** disparan los webhooks de transacción de [Pagos en lí
 
 Todas las operaciones: [Referencia de API → Payment Links](/api-reference/1platform-api#tag/payment-links).
 
-Para ver cuánto cobraste por moneda, con lo pendiente y lo devuelto por separado, usa el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros) ([Referencia de API → Collections](/api-reference/1platform-api#tag/collections)).
+Para ver cuánto cobró por moneda, con lo pendiente y lo devuelto por separado, use el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros) ([Referencia de API → Collections](/api-reference/1platform-api#tag/collections)).
 
 ## Guías
 
-- Para cobrar de forma recurrente con un link de invitación, ve a [Suscripciones](/docs/saas/1platform-api/suscripciones).
-- Para transferir lo cobrado, ve a [Retiros](/docs/saas/1platform-api/retiros).
+- Para cobrar de forma recurrente con un link de invitación, vea a [Suscripciones](/docs/saas/1platform-api/suscripciones).
+- Para transferir lo cobrado, vea a [Retiros](/docs/saas/1platform-api/retiros).

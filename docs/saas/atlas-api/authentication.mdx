@@ -11,17 +11,17 @@ Atlas autentica a dos tipos de personas, siempre dentro de un tenant:
 - **Miembros** (lectores, oyentes, espectadores): inician sesión con un **enlace de acceso sin contraseña**.
 - **Operadores del tenant**: inician sesión con correo y contraseña (y un código TOTP si lo tienen activado).
 
-Ambos terminan con un **JWT** que envías como `Authorization: Bearer <token>`. Los servidores que aprovisionan miembros usan
+Ambos terminan con un **JWT** que envía como `Authorization: Bearer <token>`. Los servidores que aprovisionan miembros usan
 otra credencial, la [clave de integración](/docs/saas/atlas-api/integration-keys).
 
-> No es el modelo de dos tokens de la 1Platform API. Si ves un header `x-user-token` en la
-> [Referencia de API](/api-reference/atlas-api#tag/auth), ignóralo: Atlas no lo usa en QA ni en producción.
+> No es el modelo de dos tokens de la 1Platform API. Si ve un header `x-user-token` en la
+> [Referencia de API](/api-reference/atlas-api#tag/auth), ignórelo: Atlas no lo usa en QA ni en producción.
 
 Todas las operaciones de esta página van con `X-Tenant-Slug`. Antes de empezar,
-[verifica tu slug](/docs/saas/atlas-api/tenant-resolution#verifica-tu-slug-antes-de-integrar): un slug mal escrito enviaría
+[verifique su slug](/docs/saas/atlas-api/tenant-resolution#verifica-tu-slug-antes-de-integrar): un slug mal escrito enviaría
 el enlace de acceso desde otro tenant.
 
-## Paso 1 — Envía el enlace de acceso
+## Paso 1 — Envíe el enlace de acceso {#paso-1--envía-el-enlace-de-acceso}
 
 `POST /auth/magic-link` envía un correo al miembro (de registro si el correo es nuevo, de inicio de sesión si ya existe). El
 enlace dura 15 minutos por defecto; cada tenant puede ajustarlo.
@@ -34,13 +34,13 @@ curl -s -X POST "$ATLAS_BASE/auth/magic-link" -H "X-Tenant-Slug: $TENANT_SLUG" \
 
 **Dónde aterriza el enlace.** En el dominio principal del tenant, en `/auth/verify?token=…`. Con `surface: "app"` aterriza
 en una página puente que intenta abrir la app nativa del tenant. En los dos casos, quien opera ese frente es quien recibe el
-`token` y debe canjearlo en el paso 2. `return_url` es opcional: si lo envías (ruta relativa del sitio), el sitio vuelve ahí
+`token` y debe canjearlo en el paso 2. `return_url` es opcional: si lo envía (ruta relativa del sitio), el sitio vuelve ahí
 tras el canje; si no, no hay redirección posterior.
 
-Si el envío del correo falla, recibes `503 EMAIL_DELIVERY_FAILED`. El token ya se generó, así que puedes pedir un enlace
+Si el envío del correo falla, recibe `503 EMAIL_DELIVERY_FAILED`. El token ya se generó, así que puede pedir un enlace
 nuevo.
 
-## Paso 2 — Canjea el token por una sesión
+## Paso 2 — Canjee el token por una sesión {#paso-2--canjea-el-token-por-una-sesión}
 
 `POST /auth/magic-link/verify` canjea el token de un solo uso. El primer canje crea el miembro para ese tenant y correo; no
 hay un paso de registro aparte.
@@ -52,20 +52,20 @@ curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" -H "X-Tenant-Slug: $TENANT_
 
 La sesión trae un token de acceso (24 h por defecto, indicado en `expires_in`), un token de refresco (30 días) y los roles
 del miembro (`fan`). Un token ya usado, vencido o inválido responde `401` con `TOKEN_CONSUMED`, `TOKEN_EXPIRED` o
-`TOKEN_INVALID`. Si envías un identificador de dispositivo nuevo para el miembro, Atlas le manda un aviso de seguridad por
+`TOKEN_INVALID`. Si envía un identificador de dispositivo nuevo para el miembro, Atlas le manda un aviso de seguridad por
 correo; ese aviso nunca bloquea el inicio de sesión.
 
-## Paso 3 — Llama con el token de acceso
+## Paso 3 — Llame con el token de acceso {#paso-3--llama-con-el-token-de-acceso}
 
 ```bash
 curl -s "$ATLAS_BASE/me" -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
 ```
 
-Los navegadores del sitio del tenant usan la cookie `atlas_session`; desde tu servidor usa siempre el header `Authorization`.
+Los navegadores del sitio del tenant usan la cookie `atlas_session`; desde su servidor use siempre el header `Authorization`.
 Las operaciones del miembro (perfil, progreso, listas, sesiones) están en
 [Referencia de API → me](/api-reference/atlas-api#tag/me).
 
-## Paso 4 — Refresca antes de que venza
+## Paso 4 — Refresque antes de que venza {#paso-4--refresca-antes-de-que-venza}
 
 `POST /auth/refresh` cambia el token de refresco por una sesión nueva sin otro correo. Un token de refresco emitido para
 otro tenant responde `401 TOKEN_INVALID`.
@@ -77,7 +77,7 @@ curl -s -X POST "$ATLAS_BASE/auth/refresh" -H "X-Tenant-Slug: $TENANT_SLUG" \
 
 :::warning El refresco siempre emite roles de miembro
 La sesión que devuelve el refresco lleva sólo el rol `fan`, aunque la original fuera de operador. Para una sesión de
-operador, no refresques: vuelve a iniciar sesión con `POST /auth/admin/sign-in` cuando venza el token de acceso.
+operador, no refresque: vuelva a iniciar sesión con `POST /auth/admin/sign-in` cuando venza el token de acceso.
 :::
 
 ## Inicio de sesión de operador {#inicio-de-sesion-de-operador}
@@ -97,7 +97,7 @@ incorrecto: `401 TOTP_INVALID`. La cuenta de operador la crea el equipo de 1Plat
 
 Una cuenta de operador trabaja sobre su propio tenant. Sólo si tiene permiso explícito sobre otros tenants puede elegir uno
 con el header `X-Admin-Tenant-Slug` en las operaciones `/admin/*`. Con una cuenta sin ese permiso, el header responde
-`403 TENANT_SWITCH_FORBIDDEN`: no lo envíes.
+`403 TENANT_SWITCH_FORBIDDEN`: no lo envíe.
 
 ## Roles
 
@@ -110,6 +110,6 @@ porque son dueños del catálogo.
 `POST /auth/sign-out` no invalida nada en el servidor: el sitio borra su cookie y el token de acceso sigue vigente hasta que
 vence. `GET /me/sessions` lista los dispositivos del miembro, y `DELETE /me/sessions/{session_id}` o `DELETE /me/sessions`
 (todos menos el actual) los quitan de esa lista. Quitar un dispositivo **tampoco** invalida los tokens ya emitidos: siguen
-vigentes hasta que vencen. Trata la duración del token de acceso como el límite real de una credencial filtrada.
+vigentes hasta que vencen. Trate la duración del token de acceso como el límite real de una credencial filtrada.
 
 Todas las operaciones de autenticación: [Referencia de API → auth](/api-reference/atlas-api#tag/auth).

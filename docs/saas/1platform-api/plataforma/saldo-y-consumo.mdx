@@ -1,22 +1,22 @@
 ---
 title: Saldo y consumo
-description: El saldo con el que tu cuenta paga el uso de la plataforma, cómo se recarga, qué reserva una operación en curso y dónde ver qué se cobró.
+description: El saldo con el que su cuenta paga el uso de la plataforma, cómo se recarga, qué reserva una operación en curso y dónde ver qué se cobró.
 sidebar_position: 4
 ---
 
 # Saldo y consumo
 
-<p className="lead">Las operaciones de pago de la plataforma (generar contenido, imágenes, agentes y otras) se descuentan del **saldo** de tu cuenta. Esta página explica cómo leer ese saldo, recargarlo y auditar lo que consumiste.</p>
+<p className="lead">Las operaciones de pago de la plataforma (generar contenido, imágenes, agentes y otras) se descuentan del **saldo** de su cuenta. Esta página explica cómo leer ese saldo, recargarlo y auditar lo que consumió.</p>
 
-El saldo es dinero **prepagado para usar la plataforma**. No es lo que cobraste a tus clientes:
+El saldo es dinero **prepagado para usar la plataforma**. No es lo que cobró a sus clientes:
 
 - Los cobros a terceros son parte de [Pagos en línea](/docs/saas/1platform-api/pagos-en-linea), [Links de pago](/docs/saas/1platform-api/links-de-pago) y [Suscripciones](/docs/saas/1platform-api/suscripciones).
-- Lo que puedes transferir a tu cuenta bancaria es el saldo retirable de [Retiros](/docs/saas/1platform-api/retiros). Los dos saldos nunca se suman, y el saldo prepagado no se convierte en efectivo.
+- Lo que puede transferir a su cuenta bancaria es el saldo retirable de [Retiros](/docs/saas/1platform-api/retiros). Los dos saldos nunca se suman, y el saldo prepagado no se convierte en efectivo.
 
 ## Cómo funciona
 
-- **Saldo por moneda.** `GET /users/billing` devuelve tu saldo principal en `billing` y, en `billings`, un saldo por cada moneda que tienes, con `is_primary` en el principal. También trae tu suscripción a la plataforma, si tienes una.
-- **Recarga.** `POST /users/balance/topups` crea un cobro a tu propia cuenta y devuelve `payment_url`. El saldo sube cuando el pago se aprueba, no cuando la llamada responde `201`. Con `currency` eliges qué saldo recargas; si lo omites, se recarga el principal.
+- **Saldo por moneda.** `GET /users/billing` devuelve su saldo principal en `billing` y, en `billings`, un saldo por cada moneda que tiene, con `is_primary` en el principal. También trae su suscripción a la plataforma, si tiene una.
+- **Recarga.** `POST /users/balance/topups` crea un cobro a su propia cuenta y devuelve `payment_url`. El saldo sube cuando el pago se aprueba, no cuando la llamada responde `201`. Con `currency` elige qué saldo recarga; si lo omite, se recarga el principal.
 - **Cobro de una operación.** Una operación de pago descuenta su costo del saldo. Si el saldo no alcanza, responde `402`.
 - **Reservas (holds).** Una operación asíncrona puede **reservar** el costo al aceptar el trabajo, en vez de cobrarlo de inmediato. La reserva termina en uno de tres estados finales:
   - `captured`: el trabajo terminó bien y se cobró.
@@ -24,9 +24,9 @@ El saldo es dinero **prepagado para usar la plataforma**. No es lo que cobraste 
   - `expired`: nadie la resolvió en el plazo de la reserva (hoy, 15 minutos), así que venció y se liberó sin cobrar.
 
   Mientras está `active`, el monto reservado no está disponible para otras operaciones.
-- **Consumo.** Cada cobro de una operación queda registrado. Puedes listarlo evento por evento, resumirlo por tipo de operación y descargar su comprobante.
+- **Consumo.** Cada cobro de una operación queda registrado. Puede listarlo evento por evento, resumirlo por tipo de operación y descargar su comprobante.
 
-No uses `POST /users/transactions` para recargar tu saldo. Esa ruta registra el dinero como un cobro a un tercero, y la ruta decide en qué saldo cae.
+No use `POST /users/transactions` para recargar su saldo. Esa ruta registra el dinero como un cobro a un tercero, y la ruta decide en qué saldo cae.
 
 ## Recargar el saldo
 
@@ -38,18 +38,18 @@ curl -X POST "$BASE_URL/users/balance/topups" \
   -d '{"amount": 10.00, "currency": "GTQ"}'
 ```
 
-Lleva al usuario a `data.payment_url`. El resultado llega igual que el de cualquier transacción: por
+Lleve al usuario a `data.payment_url`. El resultado llega igual que el de cualquier transacción: por
 [webhook](/docs/saas/1platform-api/plataforma/webhooks) o consultando
 `GET /users/transactions/{transaction_id}`. La recarga no acepta `customer_email`, `merchant_reference`,
 `return_url` ni `branch_id`, porque no hay comprador ni pedido.
 
 | Código | Causa |
 |---|---|
-| 404 | No tienes saldo en la `currency` pedida, o tu cuenta no tiene registro de saldo |
+| 404 | No tiene saldo en la `currency` pedida, o su cuenta no tiene registro de saldo |
 | 422 | No hay pasarela utilizable (`data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED` o `PLATFORM_GATEWAY_REQUIRED`) |
 | 503 | El servicio de pago no está disponible por ahora |
 
-Como pasa con un cobro, no repitas a ciegas una recarga que expiró: revisa primero
+Como pasa con un cobro, no repita a ciegas una recarga que expiró: revise primero
 `GET /users/transactions`.
 
 ## Operaciones
@@ -57,15 +57,15 @@ Como pasa con un cobro, no repitas a ciegas una recarga que expiró: revisa prim
 | Operación | Para qué |
 |---|---|
 | `GET /users/billing` | Saldo por moneda y suscripción a la plataforma |
-| `POST /users/balance/topups` | Recargar tu propio saldo |
+| `POST /users/balance/topups` | Recargar su propio saldo |
 | `GET /users/balance-history` | Movimientos del saldo (créditos y débitos), con filtro por dirección y fechas |
-| `GET /holds` | Reservas de tu cuenta, de la más reciente a la más antigua; filtra con `status` (`active`, `captured`, `released`, `expired`) |
+| `GET /holds` | Reservas de su cuenta, de la más reciente a la más antigua; filtre con `status` (`active`, `captured`, `released`, `expired`) |
 | `GET /holds/{hold_id}` | Una reserva |
 | `GET /users/consumption` | Consumo evento por evento, con filtro por `operation` y fechas |
 | `GET /users/consumption/summary` | Consumo agrupado por tipo de operación en un rango |
 | `GET /users/consumption/{consumption_id}` | Un registro de consumo |
 | `GET /users/consumption/{consumption_id}/receipt.pdf` | Comprobante en PDF de un consumo |
 
-El plan de tu cuenta con la plataforma (`GET /plans`, `GET /users/subscriptions/{subscription_id}`) está en el tag Subscriptions. Ver [Suscripciones](/docs/saas/1platform-api/suscripciones#tu-propio-plan).
+El plan de su cuenta con la plataforma (`GET /plans`, `GET /users/subscriptions/{subscription_id}`) está en el tag Subscriptions. Ver [Suscripciones](/docs/saas/1platform-api/suscripciones#tu-propio-plan).
 
 Todas las operaciones: [Referencia de API → Balance & Billing](/api-reference/1platform-api#tag/balance-billing), [Referencia de API → Billing & Consumption](/api-reference/1platform-api#tag/billing-consumption) y, para la recarga, [Referencia de API → Payments](/api-reference/1platform-api#tag/payments).

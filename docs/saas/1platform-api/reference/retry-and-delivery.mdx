@@ -1,6 +1,6 @@
 ---
 title: Reintentos y entrega
-description: Cómo entrega 1Platform los webhooks — al menos una vez, 3 intentos en poco más de un minuto — y qué respuestas espera de tu receptor.
+description: Cómo entrega 1Platform los webhooks — al menos una vez, 3 intentos en poco más de un minuto — y qué respuestas espera de su receptor.
 sidebar_position: 5
 ---
 
@@ -8,25 +8,25 @@ sidebar_position: 5
 
 ## Garantía de entrega
 
-1Platform entrega los webhooks **al menos una vez**: el mismo evento puede llegarte más de una vez. Tu receptor
+1Platform entrega los webhooks **al menos una vez**: el mismo evento puede llegarle más de una vez. Su receptor
 tiene que deduplicar; ver
-[Webhooks — cuerpo saliente → Idempotencia de tu lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
+[Webhooks — cuerpo saliente → Idempotencia de su lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
 
 ## Calendario de reintentos
 
-Si tu receptor no responde `2xx`, o la solicitud falla por completo, el evento se reintenta:
+Si su receptor no responde `2xx`, o la solicitud falla por completo, el evento se reintenta:
 
-| Intento | Espera antes del intento | Tiempo acumulado (sin contar las respuestas) |
+| Intento | Espere antes del intento | Tiempo acumulado (sin contar las respuestas) |
 |---|---|---|
 | 1 | — | 0 s |
 | 2 | 5 s | 5 s |
 | 3 | 30 s | 35 s |
 
-Si el tercer intento falla, la entrega se da por agotada y no se vuelve a intentar. Cada intento espera tu
+Si el tercer intento falla, la entrega se da por agotada y no se vuelve a intentar. Cada intento espera su
 respuesta hasta 10 segundos, así que el ciclo completo dura como máximo unos 65 segundos.
 
 :::caution[Planifica para las caídas]
-Si tu receptor está caído más de un minuto, **pierdes ese evento**: no hay una cola de reenvío. Concilia
+Si su receptor está caído más de un minuto, **pierde ese evento**: no hay una cola de reenvío. Concilie
 periódicamente recorriendo `GET /users/transactions`; la forma de hacerlo está en
 [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar).
 :::
@@ -36,13 +36,13 @@ periódicamente recorriendo `GET /users/transactions`; la forma de hacerlo está
 | Status | Comportamiento |
 |---|---|
 | `2xx` | Entregado. **Sólo esto cuenta como entrega** |
-| `3xx` | Falla. La redirección no se sigue: tu receptor no debe redirigir, ni siquiera en duplicados |
+| `3xx` | Falla. La redirección no se sigue: su receptor no debe redirigir, ni siquiera en duplicados |
 | `4xx` | Falla, y se reintenta. Aunque el error sea de configuración (por ejemplo, un header de acceso equivocado), el evento no se descarta en el primer intento |
 | `5xx` | Falla, y se reintenta |
 | Conexión rechazada, error de DNS o tiempo agotado | Falla, y se reintenta |
 
-:::tip[Responde 200 cuanto antes]
-Responde `200` (o `202`) con un cuerpo mínimo **antes** de hacer el trabajo pesado y deja el procesamiento para
+:::tip[Responda 200 cuanto antes]
+Responda `200` (o `202`) con un cuerpo mínimo **antes** de hacer el trabajo pesado y deje el procesamiento para
 una cola en segundo plano. Un receptor lento consume los intentos aunque al final termine bien.
 :::
 
@@ -56,7 +56,7 @@ sin reintentos. Es otra razón para conciliar periódicamente en lugar de confia
 | Header | Notas |
 |---|---|
 | `X-Webhook-Signature` | Se calcula **una vez por evento**: los tres intentos llevan el mismo valor |
-| `X-Webhook-Timestamp` | También es el mismo en los tres intentos. Como el ciclo dura alrededor de un minuto, la ventana de 5 minutos de tu verificador alcanza para todos |
+| `X-Webhook-Timestamp` | También es el mismo en los tres intentos. Como el ciclo dura alrededor de un minuto, la ventana de 5 minutos de su verificador alcanza para todos |
 | `Content-Type: application/json` | Siempre |
-| `Authorization` | Sólo si se acordó con 1Platform un token para autenticarse ante tu receptor; viaja sólo a un dominio verificado |
-| Headers propios del evento | Los que configuraste en `headers`, en cada intento. Ver [Webhooks → Paso 2](/docs/saas/1platform-api/plataforma/webhooks#eventos) |
+| `Authorization` | Sólo si se acordó con 1Platform un token para autenticarse ante su receptor; viaja sólo a un dominio verificado |
+| Headers propios del evento | Los que configuró en `headers`, en cada intento. Ver [Webhooks → Paso 2](/docs/saas/1platform-api/plataforma/webhooks#eventos) |

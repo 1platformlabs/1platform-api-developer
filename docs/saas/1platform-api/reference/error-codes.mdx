@@ -1,12 +1,12 @@
 ---
 title: Códigos de error
-description: Los errores que tu cliente tiene que distinguir en la 1Platform API — su código cuando lo hay, qué significan y qué hacer.
+description: Los errores que su cliente tiene que distinguir en la 1Platform API — su código cuando lo hay, qué significan y qué hacer.
 sidebar_position: 3
 ---
 
 # Códigos de error
 
-Los errores de negocio llegan en el sobre `{ success: false, data, msg }`. Cuando la operación necesita que tu
+Los errores de negocio llegan en el sobre `{ success: false, data, msg }`. Cuando la operación necesita que su
 cliente distinga el **tipo** de fallo, trae un código legible por máquina: casi siempre en `data.code`, y en algunas
 familias (Retiros, Correo, 1Trade, y la activación, la selección de sucursal y el comercio archivado en Facturación
 electrónica y en comercios) en `code`, en la raíz. Si no hay código, el código de estado HTTP es la información. Los
@@ -21,48 +21,48 @@ existen, en `x-error-codes`). Esta página reúne los que más integraciones enc
 
 | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|
-| 401 | (forma `detail`) | Falta un token, venció o no es válido | Canjea de nuevo el token que corresponda y reintenta **una vez** |
-| 402 | (sin código) | El saldo no alcanza el costo de la operación | Pide al usuario que recargue. **No reintentes** sin recargar |
-| 403 | `module_disabled` | El módulo está apagado para el espacio de trabajo o no está asignado a este usuario | Pide a un administrador del espacio de trabajo que lo habilite. **No reintentes** |
-| 403 | (forma `detail`) | El usuario no tiene el rol que exige la operación (por ejemplo, no es administrador del espacio de trabajo) | Usa el token de un usuario con ese rol |
-| 422 | (forma `detail`) | La solicitud no cumple el esquema (falta un campo, tipo incorrecto) | Corrige la solicitud. **Nunca reintentes** igual |
+| 401 | (forma `detail`) | Falta un token, venció o no es válido | Canjee de nuevo el token que corresponda y reintente **una vez** |
+| 402 | (sin código) | El saldo no alcanza el costo de la operación | Pida al usuario que recargue. **No reintente** sin recargar |
+| 403 | `module_disabled` | El módulo está apagado para el espacio de trabajo o no está asignado a este usuario | Pida a un administrador del espacio de trabajo que lo habilite. **No reintente** |
+| 403 | (forma `detail`) | El usuario no tiene el rol que exige la operación (por ejemplo, no es administrador del espacio de trabajo) | Use el token de un usuario con ese rol |
+| 422 | (forma `detail`) | La solicitud no cumple el esquema (falta un campo, tipo incorrecto) | Corrija la solicitud. **Nunca reintente** igual |
 | 429 | (sin código, salvo excepciones) | La operación no acepta más solicitudes por ahora: casi siempre, el límite por minuto | Ver [Límites de uso](/docs/saas/1platform-api/reference/rate-limits) |
 
 ## Pagos en línea
 
 | Operación | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|---|
-| `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El espacio de trabajo no tiene una pasarela de cobro activa | Un administrador la configura en el Panel. **No reintentes** |
-| `POST /users/transactions` | 422 | `PLATFORM_GATEWAY_REQUIRED` | El espacio de trabajo tiene pasarela, pero liquida directo al comercio y este cobro lo recauda la plataforma | No hay nada que configurar; contacta a soporte. **No reintentes** |
-| `POST /users/transactions` | 409 | `business_archived` | El comercio dueño de la sucursal indicada en `branch_id` está archivado | Usa una sucursal de un comercio activo |
-| `POST /users/transactions` | 403 | (sin código) | Tu rol en la sucursal indicada no permite cobrar | Usa un usuario con un rol que cobre en esa sucursal |
-| `POST /users/transactions` | 503 | (sin código) | El servicio de pagos no está disponible temporalmente | Comprueba que el cobro no se creó (ver [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar)) antes de reintentar |
-| `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | La API todavía no emite reembolsos | **No reintentes**. El reembolso de un pago aprobado te llega como evento `on_refunded` |
+| `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El espacio de trabajo no tiene una pasarela de cobro activa | Un administrador la configura en el Panel. **No reintente** |
+| `POST /users/transactions` | 422 | `PLATFORM_GATEWAY_REQUIRED` | El espacio de trabajo tiene pasarela, pero liquida directo al comercio y este cobro lo recauda la plataforma | No hay nada que configurar; contacta a soporte. **No reintente** |
+| `POST /users/transactions` | 409 | `business_archived` | El comercio dueño de la sucursal indicada en `branch_id` está archivado | Use una sucursal de un comercio activo |
+| `POST /users/transactions` | 403 | (sin código) | Su rol en la sucursal indicada no permite cobrar | Use un usuario con un rol que cobre en esa sucursal |
+| `POST /users/transactions` | 503 | (sin código) | El servicio de pagos no está disponible temporalmente | Compruebe que el cobro no se creó (ver [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar)) antes de reintentar |
+| `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | La API todavía no emite reembolsos | **No reintente**. El reembolso de un pago aprobado le llega como evento `on_refunded` |
 
 ## Autenticación
 
 | Operación | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|---|
-| `POST /auth/user/magic-link/verify` | 403 | `account_inactive` | Un administrador desactivó la cuenta | No reintentes; la cuenta debe reactivarse |
-| `POST /auth/user/magic-link/verify` | 410 | (sin código) | El enlace ya se usó o venció | Pide un enlace nuevo |
-| `POST /auth/user/refresh` | 409 | (sin código) | Se presentó un `refresh_token` ya usado | Trátalo como posible robo de sesión: vuelve a autenticar |
-| `POST /me/api-credentials/{credential_id}/reveal` | 409 | `credential_already_revealed` | Esa clave ya se mostró una vez | Crea una clave nueva |
+| `POST /auth/user/magic-link/verify` | 403 | `account_inactive` | Un administrador desactivó la cuenta | No reintente; la cuenta debe reactivarse |
+| `POST /auth/user/magic-link/verify` | 410 | (sin código) | El enlace ya se usó o venció | Pida un enlace nuevo |
+| `POST /auth/user/refresh` | 409 | (sin código) | Se presentó un `refresh_token` ya usado | Trátelo como posible robo de sesión: vuelva a autenticar |
+| `POST /me/api-credentials/{credential_id}/reveal` | 409 | `credential_already_revealed` | Esa clave ya se mostró una vez | Cree una clave nueva |
 
 ## Webhooks
 
 | Operación | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|---|
-| `POST /webhooks/config/domains` | 400 | (sin código) | El dominio no es válido | Envía sólo el host, sin esquema, puerto ni ruta |
-| `POST /webhooks/config/domains` | 409 | (sin código) | El dominio ya está registrado | Trátalo como éxito |
-| `POST /webhooks/config/domains` | 422 | (sin código) | Se alcanzó el máximo de dominios del espacio de trabajo | Elimina uno que ya no uses |
+| `POST /webhooks/config/domains` | 400 | (sin código) | El dominio no es válido | Envíe sólo el host, sin esquema, puerto ni ruta |
+| `POST /webhooks/config/domains` | 409 | (sin código) | El dominio ya está registrado | Trátelo como éxito |
+| `POST /webhooks/config/domains` | 422 | (sin código) | Se alcanzó el máximo de dominios del espacio de trabajo | Elimine uno que ya no use |
 | `PUT /webhooks/config/events` | 400 | (sin código) | La URL o su dominio no son válidos | Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks) |
 | `PUT /webhooks/config/events` | 422 | (sin código) | El host de la URL no está registrado. Si la URL no es `https://` o un header usa un nombre reservado, la respuesta usa la forma `detail` | Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks) |
-| `POST /webhooks/config/rotate-secret` | 404 | (sin código) | Todavía no hay secreto de firma | Registra un dominio primero |
+| `POST /webhooks/config/rotate-secret` | 404 | (sin código) | Todavía no hay secreto de firma | Registre un dominio primero |
 
 ## Cómo leer un error
 
-- Ramifica por el código: lee `data.code` y, si falta, `code` en la raíz. `msg` es texto para personas y puede
+- Ramifique por el código: lea `data.code` y, si falta, `code` en la raíz. `msg` es texto para personas y puede
   cambiar.
 - Cuando no hay código en ninguno de los dos lugares, el código de estado HTTP es la fuente de verdad.
-- Si encuentras un código que no está en la Referencia de API ni aquí, es un error de documentación:
-  repórtalo junto con el `x-request-id` de la respuesta.
+- Si encuentra un código que no está en la Referencia de API ni aquí, es un error de documentación:
+  repórtelo junto con el `x-request-id` de la respuesta.

@@ -6,7 +6,7 @@ sidebar_position: 12
 
 # Errores
 
-Atlas devuelve un `code` estable en casi todos los errores. Ramifica tu lógica por ese código, nunca por el texto de
+Atlas devuelve un `code` estable en casi todos los errores. Ramifique su lógica por ese código, nunca por el texto de
 `message`, que puede cambiar.
 
 ## Las tres formas de un error
@@ -27,9 +27,9 @@ ejemplo, la capacidad que falta o la fecha de vencimiento de una clave). La form
 dominio, como los de búsqueda y algunos de entrega.
 
 La tercera forma son los **fallos de validación** (`422`) de parámetros o cuerpos mal formados: `detail` es una **lista** de
-errores por campo y no hay `code`. Corrígelos en tu cliente; no se reintentan.
+errores por campo y no hay `code`. Corríjalos en su cliente; no se reintentan.
 
-Lee el código cubriendo las tres:
+Lea el código cubriendo las tres:
 
 ```javascript
 async function atlasErrorCode(res) {
@@ -45,30 +45,30 @@ La Atlas API no usa el envoltorio `{ success, data, msg }` de la 1Platform API.
 
 | Código | HTTP | Qué hacer |
 |---|---|---|
-| `UNAUTHORIZED` | 401 | Falta una credencial válida: inicia sesión. |
-| `TOKEN_EXPIRED` | 401 | Refresca la sesión ([Autenticación](/docs/saas/atlas-api/authentication)); si falla, pide un enlace de acceso nuevo. |
-| `TOKEN_INVALID` / `TOKEN_CONSUMED` | 401 | Token mal formado, de otro tenant o ya usado: vuelve a iniciar sesión. |
+| `UNAUTHORIZED` | 401 | Falta una credencial válida: inicie sesión. |
+| `TOKEN_EXPIRED` | 401 | Refresque la sesión ([Autenticación](/docs/saas/atlas-api/authentication)); si falla, pida un enlace de acceso nuevo. |
+| `TOKEN_INVALID` / `TOKEN_CONSUMED` | 401 | Token mal formado, de otro tenant o ya usado: vuelva a iniciar sesión. |
 | `CREDENTIALS_INVALID` / `TOTP_REQUIRED` / `TOTP_INVALID` | 401 | Inicio de sesión de operador rechazado. |
 | `INSUFFICIENT_ROLE` / `INSUFFICIENT_PERMISSION` | 403 | La sesión no tiene el rol o permiso que pide la operación. |
-| `TENANT_SWITCH_FORBIDDEN` | 403 | No envíes `X-Admin-Tenant-Slug` con esa cuenta. |
-| `TENANT_MISMATCH` | 403 | La sesión es de otro tenant: revisa `X-Tenant-Slug`. |
+| `TENANT_SWITCH_FORBIDDEN` | 403 | No envíe `X-Admin-Tenant-Slug` con esa cuenta. |
+| `TENANT_MISMATCH` | 403 | La sesión es de otro tenant: revise `X-Tenant-Slug`. |
 | `MEMBER_MISMATCH` | 403 | Un miembro sólo puede consultar sus propios derechos de acceso. |
-| `TENANT_UNRESOLVED` | 404 | El dominio o el slug no corresponden a un tenant activo. En `GET /tenants/by-host`, tu dominio no está dado de alta; en otra operación, el tenant que enviaste está desactivado. |
-| `INTEGRATION_KEY_REQUIRED` / `INTEGRATION_KEY_INVALID` | 401 | Revisa qué clave envías. |
-| `INTEGRATION_KEY_EXPIRED` | 401 | La clave venció: pide una nueva ([Claves de integración](/docs/saas/atlas-api/integration-keys)). |
+| `TENANT_UNRESOLVED` | 404 | El dominio o el slug no corresponden a un tenant activo. En `GET /tenants/by-host`, su dominio no está dado de alta; en otra operación, el tenant que envió está desactivado. |
+| `INTEGRATION_KEY_REQUIRED` / `INTEGRATION_KEY_INVALID` | 401 | Revise qué clave envía. |
+| `INTEGRATION_KEY_EXPIRED` | 401 | La clave venció: pida una nueva ([Claves de integración](/docs/saas/atlas-api/integration-keys)). |
 | `INTEGRATION_CAPABILITY_MISSING` | 403 | La clave no tiene la capacidad que pide la operación. |
-| `ENTITLEMENT_DENIED` | 403 | Muestra el muro de suscripción o compra. |
-| `FREEMIUM_GATE_BLOCKED` | 402 | Miembro gratuito sin cuota o sin plan: muestra el muro de suscripción. |
-| `ACCOUNT_TEMPORARILY_BLOCKED` | 403 | Cuenta bloqueada temporalmente: no reintentes. |
+| `ENTITLEMENT_DENIED` | 403 | Muestre el muro de suscripción o compra. |
+| `FREEMIUM_GATE_BLOCKED` | 402 | Miembro gratuito sin cuota o sin plan: muestre el muro de suscripción. |
+| `ACCOUNT_TEMPORARILY_BLOCKED` | 403 | Cuenta bloqueada temporalmente: no reintente. |
 | `CONTENT_NOT_FOUND` / `ASSET_NOT_AVAILABLE` / `CHAPTER_NOT_FOUND` | 404 | El ítem, formato o capítulo no existe en este tenant. |
-| `CONTENT_SLUG_TAKEN` / `CONTENT_ALREADY_PUBLISHED` | 409 | Conflicto esperable: elige otro slug o trátalo como éxito. |
-| `OPTIMISTIC_LOCK_FAILED` | 409 | Alguien cambió el registro a la vez: vuelve a leerlo y reintenta. |
-| `SEARCH_QUERY_EMPTY` / `SEARCH_QUERY_TOO_LONG` | 400 | Corrige la consulta de autocompletado. |
-| `WEBHOOK_SIGNATURE_INVALID` | 401 | Revisa secreto, timestamp y bytes firmados ([Webhooks](/docs/saas/atlas-api/webhooks)). |
-| `RATE_LIMITED` / `DOWNLOAD_RATE_LIMITED` | 429 | Espera y reintenta ([Límites de uso](/docs/saas/atlas-api/rate-limits)). |
-| `CATALOG_BUSY` | 503 | Espera lo que indique `Retry-After` y reintenta. |
-| `EMAIL_DELIVERY_FAILED` | 503 | El correo no salió: pide un enlace nuevo. |
-| `PROVIDER_UNAVAILABLE` / `MEDIA_UNAVAILABLE` | 503 | Falla transitoria de un servicio externo: reintenta con espera creciente. |
+| `CONTENT_SLUG_TAKEN` / `CONTENT_ALREADY_PUBLISHED` | 409 | Conflicto esperable: elija otro slug o trátelo como éxito. |
+| `OPTIMISTIC_LOCK_FAILED` | 409 | Alguien cambió el registro a la vez: vuelva a leerlo y reintente. |
+| `SEARCH_QUERY_EMPTY` / `SEARCH_QUERY_TOO_LONG` | 400 | Corrija la consulta de autocompletado. |
+| `WEBHOOK_SIGNATURE_INVALID` | 401 | Revise secreto, timestamp y bytes firmados ([Webhooks](/docs/saas/atlas-api/webhooks)). |
+| `RATE_LIMITED` / `DOWNLOAD_RATE_LIMITED` | 429 | Espere y reintente ([Límites de uso](/docs/saas/atlas-api/rate-limits)). |
+| `CATALOG_BUSY` | 503 | Espere lo que indique `Retry-After` y reintente. |
+| `EMAIL_DELIVERY_FAILED` | 503 | El correo no salió: pida un enlace nuevo. |
+| `PROVIDER_UNAVAILABLE` / `MEDIA_UNAVAILABLE` | 503 | Falla transitoria de un servicio externo: reintente con espera creciente. |
 
-Cada operación declara sus códigos en la [Referencia de API](/api-reference/atlas-api); si recibes uno que no está aquí,
-trátalo por su estado HTTP.
+Cada operación declara sus códigos en la [Referencia de API](/api-reference/atlas-api); si recibe uno que no está aquí,
+trátelo por su estado HTTP.

@@ -1,28 +1,28 @@
 ---
 title: Pagos en línea
-description: Cobra a tus clientes con un checkout seguro, recibe el resultado por webhook y concilia lo que cobraste.
+description: Cobre a sus clientes con un checkout seguro, reciba el resultado por webhook y concilie lo que cobró.
 sidebar_position: 1
 ---
 
 # Pagos en línea
 
-<p className="lead">Cobra a un tercero desde tu propia integración: creas una transacción, llevas al comprador a un checkout seguro y te enteras del resultado por webhook. Es para el backend de una tienda, una plataforma de reservas o cualquier sistema que ya tiene su propio carrito.</p>
+<p className="lead">Cobre a un tercero desde su propia integración: crea una transacción, lleva al comprador a un checkout seguro y se entera del resultado por webhook. Es para el backend de una tienda, una plataforma de reservas o cualquier sistema que ya tiene su propio carrito.</p>
 
 ## Cómo funciona
 
-1. Tu backend crea una **transacción** con el monto y tu referencia de pedido (`merchant_reference`). La respuesta trae `payment_url`, la página de pago a la que rediriges al comprador.
+1. Su backend crea una **transacción** con el monto y su referencia de pedido (`merchant_reference`). La respuesta trae `payment_url`, la página de pago a la que redirige al comprador.
 2. La transacción nace en `created`. El comprador paga (o no) en el checkout.
-3. El resultado llega como **webhook** a la URL que configuraste: `approved`, `denied`, `cancelled`, `expired` o `dismiss`. Más tarde, un pago aprobado puede pasar a `refunded` o `reversed`. Sólo el webhook liquida un pedido: la redirección a `return_url` no es una confirmación de pago.
-4. Para conciliar, consultas la transacción por su id. El detalle trae tu `merchant_reference` y `balance_effect`, que dice qué hizo el cobro con tus saldos.
+3. El resultado llega como **webhook** a la URL que configuró: `approved`, `denied`, `cancelled`, `expired` o `dismiss`. Más tarde, un pago aprobado puede pasar a `refunded` o `reversed`. Sólo el webhook liquida un pedido: la redirección a `return_url` no es una confirmación de pago.
+4. Para conciliar, consulte la transacción por su id. El detalle trae su `merchant_reference` y `balance_effect`, que dice qué hizo el cobro con sus saldos.
 
-Este producto es para cobrar a **otros**. Para recargar el saldo de tu propia cuenta, usa `POST /users/balance/topups`, que se explica en [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo). La ruta decide en qué saldo cae el dinero, así que no las intercambies.
+Este producto es para cobrar a **otros**. Para recargar el saldo de su propia cuenta, use `POST /users/balance/topups`, que se explica en [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo). La ruta decide en qué saldo cae el dinero, así que no las intercambie.
 
-## Qué necesitas
+## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
-- Una pasarela de pago activa en tu espacio de trabajo. Sin ella, la creación responde `422` con `data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED`.
-- La [configuración de webhooks](/docs/saas/1platform-api/plataforma/webhooks), que hace un **administrador del espacio de trabajo**. Ahí se registra el dominio de tu `return_url` y se mapean los eventos a tus URLs.
-- **Opcional:** un comercio y una sucursal ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si envías `branch_id`, el cobro sale en la moneda de ese comercio. Para eso tu cuenta necesita alguno de los módulos de comercio; si no lo tiene, recibes `403` `module_disabled`.
+- Una pasarela de pago activa en su espacio de trabajo. Sin ella, la creación responde `422` con `data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED`.
+- La [configuración de webhooks](/docs/saas/1platform-api/plataforma/webhooks), que hace un **administrador del espacio de trabajo**. Ahí se registra el dominio de su `return_url` y se mapean los eventos a sus URLs.
+- **Opcional:** un comercio y una sucursal ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si envía `branch_id`, el cobro sale en la moneda de ese comercio. Para eso su cuenta necesita alguno de los módulos de comercio; si no lo tiene, recibe `403` `module_disabled`.
 
 ## Operaciones
 
@@ -30,7 +30,7 @@ Este producto es para cobrar a **otros**. Para recargar el saldo de tu propia cu
 |---|---|
 | `POST /users/transactions` | Crear el cobro y obtener `payment_url` |
 | `GET /users/transactions/{transaction_id}` | Consultar el estado y los datos de conciliación de un cobro |
-| `GET /users/transactions` | Listar tus cobros, del más reciente al más antiguo (`limit`, `skip`) |
+| `GET /users/transactions` | Listar sus cobros, del más reciente al más antiguo (`limit`, `skip`) |
 | `GET /users/transactions/{transaction_id}/receipt.pdf` | Descargar el comprobante en PDF |
 | `POST /users/transactions/{transaction_id}/receipt` | Reenviar el comprobante al `customer_email` del cobro |
 | `POST /users/transactions/{transaction_id}/refund` | Reservada: hoy responde `501`, los reembolsos no se emiten por la API |
@@ -39,7 +39,7 @@ Todas las operaciones: [Referencia de API → Payments](/api-reference/1platform
 
 ### Reporte de cobros
 
-El tag **Collections** es un reporte de solo lectura de lo que cobraron tus comercios con [Links de pago](/docs/saas/1platform-api/links-de-pago) y con las invitaciones de [Suscripciones](/docs/saas/1platform-api/suscripciones). Las transacciones que creas con `POST /users/transactions` no aparecen ahí: se concilian con las operaciones de la tabla anterior. Requiere el módulo de Links de pago o el de Terminal de tarjetas.
+El tag **Collections** es un reporte de solo lectura de lo que cobraron sus comercios con [Links de pago](/docs/saas/1platform-api/links-de-pago) y con las invitaciones de [Suscripciones](/docs/saas/1platform-api/suscripciones). Las transacciones que crea con `POST /users/transactions` no aparecen ahí: se concilian con las operaciones de la tabla anterior. Requiere el módulo de Links de pago o el de Terminal de tarjetas.
 
 | Operación | Para qué |
 |---|---|
@@ -52,8 +52,8 @@ Todas las operaciones: [Referencia de API → Collections](/api-reference/1platf
 
 ## Eventos
 
-Cada cambio de estado de una transacción puede enviarse a tu backend. Son siete eventos: `on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`, `on_refunded` y `on_reversed`. Para configurarlos, ve a [Webhooks](/docs/saas/1platform-api/plataforma/webhooks). El cuerpo que recibes se describe en [Webhooks: cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).
+Cada cambio de estado de una transacción puede enviarse a su backend. Son siete eventos: `on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`, `on_refunded` y `on_reversed`. Para configurarlos, vea [Webhooks](/docs/saas/1platform-api/plataforma/webhooks). El cuerpo que recibe se describe en [Webhooks: cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).
 
 ## Guías
 
-- [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar): crear el cobro, esperar el webhook y conciliar sin duplicar cobros.
+- [Cobrar y concilier](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar): crear el cobro, esperar el webhook y concilier sin duplicar cobros.

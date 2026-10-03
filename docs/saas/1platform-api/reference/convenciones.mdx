@@ -15,10 +15,10 @@ el [Glosario](/docs/saas/1platform-api/reference/glossary).
 Las operaciones protegidas llevan **dos JWT** que identifican cosas distintas. La Referencia de API declara lo que
 exige cada operación.
 
-| Token | Header | Identifica |
+| Token | Header | Identifique |
 |---|---|---|
-| **Token de aplicación** | `Authorization: Bearer $APP_TOKEN` | Tu espacio de trabajo |
-| **Token de usuario** | `x-user-token: $USER_TOKEN` | La persona en cuyo nombre actúas |
+| **Token de aplicación** | `Authorization: Bearer $APP_TOKEN` | Su espacio de trabajo |
+| **Token de usuario** | `x-user-token: $USER_TOKEN` | La persona en cuyo nombre actúa |
 
 Las claves (`ak-…` de aplicación y `sk-…` de usuario) se **canjean** por estos tokens; nunca van en esos headers.
 De dónde salen las claves está en [Inicio rápido](/docs/saas/1platform-api/inicio-rapido#claves), y el canje y la
@@ -26,7 +26,7 @@ renovación, en [Autenticación](/docs/saas/1platform-api/plataforma/autenticaci
 
 ## Quién llama
 
-No todas las operaciones aceptan a cualquier usuario. Antes de integrar un paso, confirma qué credencial pide:
+No todas las operaciones aceptan a cualquier usuario. Antes de integrar un paso, confirme qué credencial pide:
 
 | Quién | Credenciales | Ejemplos |
 |---|---|---|
@@ -55,36 +55,36 @@ Las diferencias entre entornos están en [Entornos](/docs/saas/1platform-api/ref
 ## Prerrequisito: el sitio web (`website_id`)
 
 Varias capacidades trabajan **sobre un sitio** y no sobre la cuenta: analítica, ingresos publicitarios, Search
-Console y publicación de enlaces. Todas necesitan un `website_id`, que obtienes una vez al registrar el sitio con
-`POST /users/websites` y reutilizas después. Si una guía te pide `$WEBSITE_ID` y no tienes ninguno, ese es el paso
+Console y publicación de enlaces. Todas necesitan un `website_id`, que obtiene una vez al registrar el sitio con
+`POST /users/websites` y reutiliza después. Si una guía le pide `$WEBSITE_ID` y no tiene ninguno, ese es el paso
 que falta: [Referencia de API → Websites](/api-reference/1platform-api#tag/websites).
 
 ## Formato de las respuestas
 
-Las respuestas usan el sobre `{success, data, msg}`, salvo dos casos que tu cliente debe tolerar: los errores de
+Las respuestas usan el sobre `{success, data, msg}`, salvo dos casos que su cliente debe tolerar: los errores de
 validación (`422`) y los rechazos de autenticación o de rol (todo `401` y algunos `403`), que responden con un
 objeto `detail` en lugar del sobre. El código de un error de negocio viaja en `data.code` o, en algunas familias, en
-`code` en la raíz: lee los dos. Las formas están en
+`code` en la raíz: lea los dos. Las formas están en
 [Formato de respuesta](/docs/saas/1platform-api/reference/response-format) y los códigos legibles por máquina, en
 [Códigos de error](/docs/saas/1platform-api/reference/error-codes). Las guías nombran el campo que necesita el
 paso siguiente; no reproducen el cuerpo.
 
-Cada respuesta trae un header `x-request-id`. Inclúyelo cuando pidas soporte: identifica tu llamada.
+Cada respuesta trae un header `x-request-id`. Inclúyalo cuando pida soporte: identifica su llamada.
 
 ## Reintentos e idempotencia
 
-- **Lecturas (`GET`)**: puedes reintentarlas con retroceso exponencial.
+- **Lecturas (`GET`)**: puede reintentarlas con retroceso exponencial.
 - **Escrituras**: sólo son seguras de repetir cuando la operación lo declara en la Referencia de API, con el header
   `Idempotency-Key` o con un campo `idempotency_key` en el cuerpo. Una escritura que mueve dinero o crea un recurso y falló con `5xx` o por tiempo agotado se
   **verifica antes de reintentar**: puede haberse completado.
-- **`402 Payment Required`**: el saldo no alcanza. No reintentes sin recargar; el resultado no va a cambiar.
+- **`402 Payment Required`**: el saldo no alcanza. No reintente sin recargar; el resultado no va a cambiar.
 - **`429 Too Many Requests`**: la operación no acepta más solicitudes por ahora; casi siempre es el límite por
   minuto. Ver [Límites de uso](/docs/saas/1platform-api/reference/rate-limits).
-- **`5xx`**: error del lado del servidor. Aplica las dos reglas anteriores según sea lectura o escritura.
+- **`5xx`**: error del lado del servidor. Aplique las dos reglas anteriores según sea lectura o escritura.
 
 ## Operaciones asíncronas
 
 Algunas operaciones largas son asíncronas —la generación de contenido, el aprovisionamiento de analítica y las
-ejecuciones de agentes, entre otras—: responden `202` con un identificador que consultas hasta que el trabajo
+ejecuciones de agentes, entre otras—: responden `202` con un identificador que consulta hasta que el trabajo
 termina. La guía de cada producto incluye ese sondeo como un paso. La emisión de facturas, en cambio, responde en la
 misma llamada.

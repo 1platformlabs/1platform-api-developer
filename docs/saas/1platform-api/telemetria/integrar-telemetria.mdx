@@ -1,6 +1,6 @@
 ---
 title: Integrar telemetría
-description: Crea un proyecto, instala la etiqueta, comprueba que reporta, lee los errores por la API y define cuándo te avisan.
+description: Cree un proyecto, instale la etiqueta, compruebe que reporta, lea los errores por la API y defina cuándo le avisan.
 sidebar_position: 2
 ---
 
@@ -20,13 +20,13 @@ curl -X POST "$BASE_URL/users/telemetry/projects" \
   -d '{"name": "Tienda", "hosts": ["tienda.example"]}'
 ```
 
-Guarda `data.id` como `$PROJECT_ID`. `data.public_credential` va en el navegador. `data.secret_credential` va en tus servidores, nunca en el navegador ni en un repositorio. La secreta **se muestra una sola vez**: ninguna lectura la vuelve a devolver y, si la pierdes, hay que rotarla.
+Guarde `data.id` como `$PROJECT_ID`. `data.public_credential` va en el navegador. `data.secret_credential` va en sus servidores, nunca en el navegador ni en un repositorio. La secreta **se muestra una sola vez**: ninguna lectura la vuelve a devolver y, si la pierde, hay que rotarla.
 
 `hosts` es opcional y limita desde qué sitios se aceptan eventos del navegador, incluidos sus subdominios. Sin él se aceptan de cualquier origen: es cómodo el primer día, pero conviene declararlo antes de publicar el sitio. No es una protección contra abusos, porque fuera de un navegador el origen lo escribe quien llama.
 
-`403` significa que Telemetría está apagada para tu espacio de trabajo. `409` significa que llegaste al tope de proyectos de tu cuenta o que ya tienes un proyecto que mide esos hosts.
+`403` significa que Telemetría está apagada para su espacio de trabajo. `409` significa que llegó al tope de proyectos de su cuenta o que ya tiene un proyecto que mide esos hosts.
 
-Si el sitio es una tienda tuya, `POST /users/telemetry/projects/for-website/{website_id}` hace lo mismo partiendo del sitio y es idempotente: si ya existe un proyecto propio que lo mide, lo reutiliza.
+Si el sitio es una tienda suya, `POST /users/telemetry/projects/for-website/{website_id}` hace lo mismo partiendo del sitio y es idempotente: si ya existe un proyecto propio que lo mide, lo reutiliza.
 
 [Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
 
@@ -38,7 +38,7 @@ curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-`data.tag_snippet` es la línea exacta que va en el `<head>`, armada por el servidor. No la compongas a mano: el origen de recepción cambia según el entorno. Conserva el atributo `crossorigin` que trae. Sin él, el navegador oculta el mensaje y la traza de los errores de scripts servidos desde otro dominio, que suele ser donde vive tu código.
+`data.tag_snippet` es la línea exacta que va en el `<head>`, armada por el servidor. No la componga a mano: el origen de recepción cambia según el entorno. Conserve el atributo `crossorigin` que trae. Sin él, el navegador oculta el mensaje y la traza de los errores de scripts servidos desde otro dominio, que suele ser donde vive su código.
 
 [Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
 
@@ -55,12 +55,12 @@ curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/install-status" \
 `data.verdict` tiene siete valores posibles, y cada uno pide algo distinto:
 
 - `receiving`: están llegando eventos. No hace falta nada.
-- `waiting_first_event`: el sitio pidió la etiqueta y todavía no llegó ningún evento. Si tu sitio no tuvo errores, es lo esperable.
+- `waiting_first_event`: el sitio pidió la etiqueta y todavía no llegó ningún evento. Si su sitio no tuvo errores, es lo esperable.
 - `never_requested`: nadie pidió la etiqueta. Puede no estar pegada, tener mal la dirección o estar bloqueada por la política de seguridad de contenido del sitio.
-- `rejecting`: la etiqueta corre, pero se rechaza todo lo que envía. Revisa que el dominio del sitio esté en `hosts`.
-- `throttled`: el proyecto está limitado. Estás perdiendo parte de los eventos y desde el sitio no se nota, porque un script limitado no llega a ejecutarse. Si envías eventos desde un servidor, el origen de recepción sí manda `Retry-After`: respétalo.
-- `blocked`: superaste la cuota o el tope de gasto. Sólo entra una muestra reservada hasta el mes siguiente, salvo que subas el tope.
-- `disabled`: apagaste el proyecto.
+- `rejecting`: la etiqueta corre, pero se rechaza todo lo que envía. Revise que el dominio del sitio esté en `hosts`.
+- `throttled`: el proyecto está limitado. Está perdiendo parte de los eventos y desde el sitio no se nota, porque un script limitado no llega a ejecutarse. Si envía eventos desde un servidor, el origen de recepción sí manda `Retry-After`: respételo.
+- `blocked`: superó la cuota o el tope de gasto. Sólo entra una muestra reservada hasta el mes siguiente, salvo que suba el tope.
+- `disabled`: apagó el proyecto.
 
 [Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
 
@@ -72,9 +72,9 @@ curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/issues" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-El id de cada grupo de errores (*issue*) (`tlm_…`) lo genera la API y es estable, así que puedes guardar enlaces a él. La paginación usa un cursor opaco y firmado, atado al proyecto: devuelve `next_cursor` tal como llegó. Un cursor modificado, o de otro proyecto, responde `422`.
+El id de cada grupo de errores (*issue*) (`tlm_…`) lo genera la API y es estable, así que puede guardar enlaces a él. La paginación usa un cursor opaco y firmado, atado al proyecto: devuelva `next_cursor` tal como llegó. Un cursor modificado, o de otro proyecto, responde `422`.
 
-El último evento de un grupo de errores sale de `GET /users/telemetry/projects/{project_id}/issues/{issue_id}/events/latest`. Si su campo `opaque` es `true`, el navegador no describió el error porque tus scripts se sirven desde otro origen sin `crossorigin`; se corrige en la etiqueta del paso 2. Rendimiento y registros se piden en días hacia atrás (`days`): hasta 30 en `GET /users/telemetry/projects/{project_id}/performance` y hasta 6 en `GET /users/telemetry/projects/{project_id}/logs`. Pedir más responde `422`.
+El último evento de un grupo de errores sale de `GET /users/telemetry/projects/{project_id}/issues/{issue_id}/events/latest`. Si su campo `opaque` es `true`, el navegador no describió el error porque sus scripts se sirven desde otro origen sin `crossorigin`; se corrige en la etiqueta del paso 2. Rendimiento y registros se piden en días hacia atrás (`days`): hasta 30 en `GET /users/telemetry/projects/{project_id}/performance` y hasta 6 en `GET /users/telemetry/projects/{project_id}/logs`. Pedir más responde `422`.
 
 [Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
 
@@ -90,7 +90,7 @@ curl -X POST "$BASE_URL/users/telemetry/projects/$PROJECT_ID/alert-rules" \
   -d '{"name": "Errores nuevos en la tienda", "condition": "new_issue", "cooldown_minutes": 60}'
 ```
 
-Las condiciones son `new_issue` (un error nunca visto), `event_burst` (N eventos en M minutos) y `monitor_down` (un monitor de disponibilidad caído, que creas con `POST /users/telemetry/projects/{project_id}/monitors`). `cooldown_minutes` evita que una condición sostenida envíe un aviso en cada evaluación.
+Las condiciones son `new_issue` (un error nunca visto), `event_burst` (N eventos en M minutos) y `monitor_down` (un monitor de disponibilidad caído, que crea con `POST /users/telemetry/projects/{project_id}/monitors`). `cooldown_minutes` evita que una condición sostenida envíe un aviso en cada evaluación.
 
 Los avisos llegan al dueño y a las direcciones que **aceptaron**. Una dirección nueva se agrega con `POST /users/telemetry/recipients`, recibe un correo de confirmación y no recibe nada hasta confirmar. Un aviso nunca incluye el cuerpo del evento, su URL ni su traza: sólo conteos, etiquetas de la plataforma y el título recortado del grupo de errores. Si la recepción del proyecto está limitada o interrumpida, un incidente abierto no se declara recuperado hasta tener dos evaluaciones seguidas con recepción normal.
 

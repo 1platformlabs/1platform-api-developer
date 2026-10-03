@@ -1,27 +1,27 @@
 ---
 title: Pruebas
-description: Cómo probar tu integración en QA, recibir webhooks en tu máquina local y repetir entregas capturadas.
+description: Cómo probar su integración en QA, recibir webhooks en su máquina local y repetir entregas capturadas.
 sidebar_position: 6
 ---
 
 # Pruebas
 
-Recetas para probar tu integración sin tocar datos reales.
+Recetas para probar su integración sin tocar datos reales.
 
 ## Probar en QA
 
-La URL base de QA es `https://api-qa.1platform.pro/api/v1`. Pide el acceso a tu contacto comercial: recibirás
-credenciales que sólo funcionan en QA. Ten en cuenta que QA **no es un entorno estable**: recibe los cambios antes
+La URL base de QA es `https://api-qa.1platform.pro/api/v1`. Pida el acceso a su contacto comercial: recibirá
+credenciales que sólo funcionan en QA. Tenga en cuenta que QA **no es un entorno estable**: recibe los cambios antes
 que producción y puede cambiar sin aviso. Ver [Entornos](/docs/saas/1platform-api/reference/environments).
 
-Los datos de pago de prueba de QA (tarjetas y condiciones) te los entrega tu contacto comercial junto con las
+Los datos de pago de prueba de QA (tarjetas y condiciones) se los entrega su contacto comercial junto con las
 credenciales.
 
-## Recibir webhooks en tu máquina local
+## Recibir webhooks en su máquina local {#recibir-webhooks-en-tu-máquina-local}
 
-1. **Expón tu receptor local con un túnel** (por ejemplo `ngrok http 3000`, `cloudflared` o similar) para tener una
+1. **Expón su receptor local con un túnel** (por ejemplo `ngrok http 3000`, `cloudflared` o similar) para tener una
    URL pública `https://`.
-2. **Registra el dominio del túnel y apunta un evento a él.** Las dos llamadas las hace un administrador del espacio
+2. **Registre el dominio del túnel y apunta un evento a él.** Las dos llamadas las hace un administrador del espacio
    de trabajo, con su token de usuario en `$USER_TOKEN`
    (ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks)):
    ```bash
@@ -31,13 +31,13 @@ credenciales.
      -H "Content-Type: application/json" \
      -d '{"domain": "abc123.ngrok-free.app"}'
    ```
-   Después, con `PUT /webhooks/config/events`, asigna a `on_approved` la URL
+   Después, con `PUT /webhooks/config/events`, asigne a `on_approved` la URL
    `https://abc123.ngrok-free.app/webhooks/payments`.
-3. **Crea una transacción en QA, págala con los datos de prueba** y observa la entrega en tu receptor local.
+3. **Cree una transacción en QA, páguela con los datos de prueba** y observe la entrega en su receptor local.
 
 ## Repetir una entrega capturada
 
-Una vez que capturaste una entrega real (headers y cuerpo), puedes repetirla contra tu receptor sin pasar por la
+Una vez que capturó una entrega real (headers y cuerpo), puede repetirla contra su receptor sin pasar por la
 API:
 
 ```bash
@@ -48,21 +48,21 @@ curl -X POST http://localhost:3000/webhooks/payments \
   --data-binary @captured.json
 ```
 
-Usa `--data-binary` para que el cuerpo viaje con los mismos bytes que se firmaron.
+Use `--data-binary` para que el cuerpo viaje con los mismos bytes que se firmaron.
 
 :::caution[Una entrega capturada vence a los 5 minutos]
-Pasada la ventana de 5 minutos, la firma ya no verifica. Si necesitas repetir la misma entrega muchas veces mientras
-depuras, amplía la ventana sólo en tu verificador de **pruebas**, nunca en producción.
+Pasada la ventana de 5 minutos, la firma ya no verifica. Si necesita repetir la misma entrega muchas veces mientras
+depura, amplía la ventana sólo en su verificador de **pruebas**, nunca en producción.
 :::
 
 ## Prueba de humo
 
 La prueba mínima de una integración nueva de cobros:
 
-1. Canjea tus claves por los dos tokens (`POST /auth/token`, `POST /users/token`).
-2. Crea una transacción con `POST /users/transactions` y un `merchant_reference` único.
-3. Abre la URL de pago que devuelve y págala con los datos de prueba de QA.
-4. Comprueba que tu receptor recibe `event: on_approved` con el mismo `merchant_reference`.
-5. Comprueba que la firma verifica y que tu receptor ignora la misma entrega repetida.
+1. Canjee sus claves por los dos tokens (`POST /auth/token`, `POST /users/token`).
+2. Cree una transacción con `POST /users/transactions` y un `merchant_reference` único.
+3. Abra la URL de pago que devuelve y páguela con los datos de prueba de QA.
+4. Compruebe que su receptor recibe `event: on_approved` con el mismo `merchant_reference`.
+5. Compruebe que la firma verifica y que su receptor ignora la misma entrega repetida.
 
-Si un paso falla, busca el síntoma en [Solución de problemas](/docs/saas/1platform-api/reference/troubleshooting).
+Si un paso falla, busque el síntoma en [Solución de problemas](/docs/saas/1platform-api/reference/troubleshooting).

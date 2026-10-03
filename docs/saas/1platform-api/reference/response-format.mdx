@@ -1,6 +1,6 @@
 ---
 title: Formato de respuesta
-description: El sobre estándar de las respuestas de la 1Platform API, las dos excepciones que tu cliente debe tolerar y cómo leer un error.
+description: El sobre estándar de las respuestas de la 1Platform API, las dos excepciones que su cliente debe tolerar y cómo leer un error.
 sidebar_position: 7
 ---
 
@@ -33,8 +33,8 @@ En un error, `success` es `false` y `data` es `null` o trae un código legible p
 
 El código legible por máquina viaja en `data.code` en la mayoría de las operaciones. Algunas familias lo envían en la
 **raíz** de la respuesta (`code`, con `data: null`): Retiros, Correo, 1Trade y, en Facturación electrónica y en
-comercios y sucursales, los errores de activación, de selección de sucursal y de comercio archivado. Lee los dos
-lugares: usa `data.code` y, si falta, `code`.
+comercios y sucursales, los errores de activación, de selección de sucursal y de comercio archivado. Lea los dos
+lugares: use `data.code` y, si falta, `code`.
 
 ```json
 {
@@ -46,7 +46,7 @@ lugares: usa `data.code` y, si falta, `code`.
 ```
 
 Cuando no hay código en ninguno de los dos lugares, el código de estado HTTP es la fuente de verdad y `msg` es lo que
-puedes mostrar.
+puede mostrar.
 
 ## Excepción 1: errores de validación (`422`)
 
@@ -61,28 +61,28 @@ Cuando la solicitud no cumple el esquema (falta un campo, un tipo no corresponde
 }
 ```
 
-`detail[].loc` dice qué campo falló. Corrige la solicitud; no la reintentes igual.
+`detail[].loc` dice qué campo falló. Corrija la solicitud; no la reintente igual.
 
 ## Excepción 2: autenticación y permisos (`401`, algunos `403` y `404`)
 
 Cuando falta un token, venció, fue revocado o el usuario no tiene el rol que exige la operación, la respuesta es un
-objeto con `detail`. También usan esta forma los `404` de un recurso que no pertenece a tu espacio de trabajo:
+objeto con `detail`. También usan esta forma los `404` de un recurso que no pertenece a su espacio de trabajo:
 
 ```json
 { "detail": "Not authenticated" }
 ```
 
-El texto de `detail` varía según la causa. Trátalo como informativo: ante un `401`, canjea de nuevo el token que
-corresponda; ante un `403` de rol, usa el token de un usuario con ese rol.
+El texto de `detail` varía según la causa. Trátelo como informativo: ante un `401`, canjee de nuevo el token que
+corresponda; ante un `403` de rol, use el token de un usuario con ese rol.
 
 ## Webhooks salientes: sin sobre
 
-Los webhooks que 1Platform envía a tu backend no usan ninguna de estas formas: son un objeto plano. Ver
+Los webhooks que 1Platform envía a su backend no usan ninguna de estas formas: son un objeto plano. Ver
 [Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload#canonical-payload).
 
 ## Qué leer
 
-| Quieres saber… | Lee |
+| Quiere saber… | Lea |
 |---|---|
 | ¿La solicitud tuvo éxito? | El código de estado HTTP (`2xx` = sí) |
 | ¿La respuesta viene en el sobre? | Si existe el campo `success` |

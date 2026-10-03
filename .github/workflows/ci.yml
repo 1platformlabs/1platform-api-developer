@@ -183,6 +183,13 @@ jobs:
       - name: Production nginx routing (isolated local container)
         run: pnpm check:serving
 
+      # La imagen de PROD instala con Node 20 y `--frozen-lockfile` DENTRO de
+      # Docker, con sólo lo que el Dockerfile copia. El build de arriba corre en
+      # el runner con el repo entero, así que no puede ver un insumo de la
+      # instalación que falte en la imagen (ddf0f7a: parche de pnpm sin copiar).
+      - name: Production image installs its dependencies
+        run: docker build --target deps .
+
   # ---------------------------------------------------------------------------
   # SonarCloud — SOLO en pull requests (epica `sonar-solo-en-pr`).
   #

@@ -26,7 +26,7 @@
 # divergencia es bajo, y el deploy no se cree el build — sondea el contenedor
 # recién levantado (`/`, una ruta inexistente y `/openapi/`) antes de darse por
 # bueno. El día que el dedicado suba de kernel, esto vuelve a 24.
-FROM node:20-alpine AS build
+FROM node:20-alpine AS deps
 
 WORKDIR /app
 
@@ -34,8 +34,18 @@ WORKDIR /app
 # la versión exacta que el repo declara, en vez de instalar "el último".
 RUN corepack enable
 
-COPY package.json pnpm-lock.yaml ./
+# TODO lo que `pnpm install --frozen-lockfile` lee, no sólo el manifiesto y el
+# lock: `pnpm-workspace.yaml` declara `patchedDependencies` y `patches/` trae
+# los parches. Sin ellos la configuración no coincide con el lock y la imagen
+# no se construye (ERR_PNPM_LOCKFILE_CONFIG_MISMATCH) — medido en el deploy de
+# PROD de ddf0f7a, el primero con un parche. El CI construye esta etapa
+# (`docker build --target deps`) porque el build de QA corre en el runner y no
+# pasa por acá.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN pnpm install --frozen-lockfile
+
+FROM deps AS build
 
 COPY . .
 

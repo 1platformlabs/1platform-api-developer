@@ -1,98 +1,63 @@
 ---
 title: Resolución de tenant
-description: Cómo la Atlas API mapea cada solicitud a un tenant — por header Host u override X-Tenant-Slug, resuelto del lado del servidor, nunca desde el cuerpo de la solicitud.
+description: Cómo la Atlas API asigna cada solicitud a un tenant, por qué un slug mal escrito no da error y cómo verificar el suyo antes de integrar.
 sidebar_position: 6
 ---
 
 # Resolución de tenant
 
-Atlas es **multitenant**: cada catálogo, miembro, entitlement y configuración de branding pertenece a un
-tenant, y una solicitud solo ve los datos del tenant al que se resuelve. La resolución ocurre
-**del lado del servidor** a partir de los headers de la solicitud — el tenant **nunca** se lee del cuerpo de la solicitud, así que un
-cliente no puede suplantar un tenant distinto editando un payload.
+Cada catálogo, miembro, derecho de acceso y configuración pertenece a un tenant, y una solicitud sólo ve los datos del
+tenant al que se resuelve. Atlas lo resuelve **en el servidor, a partir de los headers**; nunca lo lee del cuerpo, así que
+no puede cambiar de tenant editando un cuerpo de solicitud.
 
 ## Orden de resolución
 
-Atlas resuelve el tenant con esta prioridad:
+Atlas prueba, en este orden:
 
-1. **Header `X-Tenant-Slug`** — override explícito de slug. Usado por llamadores de servidor a servidor y proxies.
-2. **Header `Host`** — comparado con el `primary_domain` del tenant. Esto es lo que usa naturalmente el tráfico de navegador
-   a un dominio whitelabel.
-3. **Tenant por defecto** — un fallback configurado por la plataforma cuando ninguno coincide.
+1. **`X-Tenant-Slug`**, si coincide con el slug de un tenant.
+2. **`Host`**, si coincide con el dominio principal de un tenant.
+3. **El tenant por defecto de la plataforma**, si nada de lo anterior coincide.
 
-Si nada se resuelve a un tenant **activo**, la solicitud falla con:
+:::danger Un slug mal escrito no devuelve error
+Si `X-Tenant-Slug` no existe (por un error de tipeo, o un slug de QA usado en producción), la solicitud **no falla**: cae
+en el tenant por defecto de la plataforma. Verá un catálogo vacío o ajeno, y podría enviar enlaces de acceso desde el
+tenant equivocado sin recibir ningún error. Lo mismo ocurre si no envía el header.
+:::
 
-```json
-{ "code": "TENANT_UNRESOLVED" }
-```
+## Verifique su slug antes de integrar {#verifica-tu-slug-antes-de-integrar}
 
-(HTTP `404`.)
-
-## Elegir cómo acotar
-
-### En producción: apóyate en `Host`
-
-Cuando el navegador de un miembro (o tu servidor, proxeando su dominio) llega al propio dominio de un tenant, el
-header `Host` ya lleva el valor correcto — no se necesita un header adicional:
+Pida a Atlas el tenant de su dominio y use el `slug` exacto que devuelve en todas sus llamadas
+([Referencia de API → tenants](/api-reference/atlas-api#tag/tenants)):
 
 ```bash
-curl -s "https://library.example.com/api/v1/public/catalog"
-# Host: library.example.com  →  resuelve al tenant cuyo primary_domain es library.example.com
+curl -s "$ATLAS_BASE/tenants/by-host?host=biblioteca.example.com"
 ```
 
-### Para servidor a servidor: usa `X-Tenant-Slug`
+Si el dominio no corresponde a ningún tenant activo, responde `404 TENANT_UNRESOLVED`. Un slug que no existe no devuelve
+ese código en las demás operaciones: cae en el tenant por defecto. Sí lo recibe si corresponde a un tenant desactivado. Repita esta comprobación en su
+proceso de despliegue o en una prueba de humo, por ejemplo comparando el nombre del tenant que devuelve con el esperado.
 
-Cuando llamas directamente al host compartido de la API (p. ej., `atlas-api.1platform.pro`), el `Host` es el propio
-dominio de la API y no coincidirá con un tenant. Envía el slug explícitamente:
+## Use siempre `X-Tenant-Slug` desde su servidor {#usa-siempre-x-tenant-slug-desde-tu-servidor}
 
 ```bash
-curl -s "$ATLAS_BASE/public/catalog" \
-  -H "X-Tenant-Slug: your-tenant"
+curl -s "$ATLAS_BASE/public/catalog" -H "X-Tenant-Slug: $TENANT_SLUG"
 ```
 
-> `X-Tenant-Slug` gana sobre `Host`. Esto lo convierte en la opción confiable para scripts, backends y
-> pruebas donde el `Host` no es un dominio de tenant.
+La resolución por `Host` es la que usan los frentes web de cada tenant. Su integración no puede apoyarse en ella: el
+dominio del tenant sirve su sitio, no la API, y el host compartido de la API (`atlas-api.1platform.pro`) no coincide con
+ningún tenant. Envíe `X-Tenant-Slug` en cada llamada con JWT o anónima.
 
-## Confirmar que un tenant se resuelve
+Las llamadas con [clave de integración](/docs/saas/atlas-api/integration-keys) son la excepción: el tenant sale de la clave
+y no necesita el header.
 
-La búsqueda de branding público resuelve un tenant por su dominio y devuelve la porción segura y orientada al cliente
-de su configuración (branding/apariencia; los ids sensibles de medición se eliminan antes de que la respuesta
-salga del servidor):
+## El token y el tenant deben coincidir
 
-```bash
-curl -s "$ATLAS_BASE/tenants/by-host?host=library.example.com"
-```
+Un JWT lleva el tenant para el que se emitió. Presentarlo mientras la solicitud se resuelve a otro tenant se rechaza
+(por ejemplo, el refresco de sesión responde `401 TOKEN_INVALID`). Inicie sesión y llama siempre contra el **mismo**
+tenant; un slug que cae en silencio al tenant por defecto se manifiesta así, como un token que de pronto deja de servir.
 
-```json
-{
-  "id": "9d1c…",
-  "slug": "your-tenant",
-  "name": "Example Library",
-  "archetype": "library",
-  "primary_domain": "library.example.com",
-  "config": { "appearance": "light" },
-  "is_active": true
-}
-```
+## El arquetipo del tenant
 
-Un host sin tenant activo devuelve `404 { "code": "TENANT_UNRESOLVED" }`.
-
-## Arquetipos
-
-El tenant resuelto lleva un **arquetipo** (p. ej., `library`, `podcast`, `education`, `streaming`,
-`tv`, `live`, `events`). El arquetipo impulsa comportamientos como qué
-[estrategia de entrega](/docs/saas/atlas-api/content-delivery) usa Atlas — descargas con URL firmada para
-library/podcast/education, streaming HLS para video/live/tv/events.
-
-## Ligadura token ↔ tenant
-
-La autenticación también está ligada al tenant. Un [JWT](/docs/saas/atlas-api/authentication) de miembro y una
-[clave de integración](/docs/saas/atlas-api/integration-keys) llevan cada uno su tenant; presentar un token
-emitido para el tenant A mientras se resuelve al tenant B se rechaza. Inicia sesión y llama siempre contra el
-**mismo** tenant.
-
-## Consulta también
-
-- [Autenticación](/docs/saas/atlas-api/authentication) — los tokens están acotados al tenant.
-- [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing) — el tenant acota el catálogo.
-- [Errores](/docs/saas/atlas-api/errors) — `TENANT_UNRESOLVED` y códigos relacionados.
+Cada tenant tiene un **arquetipo** (biblioteca, podcast, audio, streaming, etc.) que decide, entre otras cosas, cómo se
+entrega su contenido. No lo deduzca usted: ramifique por el `delivery_kind` que devuelve la
+[entrega de contenido](/docs/saas/atlas-api/content-delivery).

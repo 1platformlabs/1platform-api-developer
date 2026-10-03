@@ -1,0 +1,59 @@
+---
+title: Sitios web y contenido
+description: Registre los sitios de sus usuarios, cree sitios servidos por la plataforma y genere contenido SEO con IA.
+sidebar_position: 1
+---
+
+# Sitios web y contenido
+
+<p className="lead">El sitio web es el recurso del que cuelga casi todo lo demás: el contenido generado con IA, Search Console, Analítica, AdSense y los agentes. Este producto registra sitios propios o crea sitios servidos por la plataforma, y genera el contenido que se publica en ellos.</p>
+
+## Cómo funciona
+
+- **Un sitio es de un usuario.** `POST /users/websites` registra un sitio (`url` y `site_name`) a nombre del usuario del token y devuelve su `website_id`. Ese id es el prerrequisito de [Analítica](/docs/saas/1platform-api/analitica), de AdSense, de Search Console y de los [Agentes de IA](/docs/saas/1platform-api/agentes-de-ia). Si un recorrido le pide `$WEBSITE_ID`, empiece aquí.
+- **Un sitio también lo puede crear la plataforma.** `POST /provisioning/tenants` arranca en segundo plano la creación de un sitio servido por 1Platform para un dominio: de contenido, tienda o WordPress (`kind`). Devuelve `202` y un trabajo que consulta hasta que termina. Los sitios servidos por la plataforma tienen además publicación automática, acceso al panel de su operador y, en el caso del sitio de marca, textos editables.
+- **El contenido se genera en segundo plano.** Primero investiga keywords, luego encola un artículo y lo consulta hasta que termina. Publicarlo en el sitio lo hace su integración. Luego puede pedir que se indexe. Cada operación de IA se cobra del saldo del usuario: con saldo insuficiente, la respuesta es `402`.
+- **Search Console se maneja por acciones.** `POST /users/websites/{website_id}/searchconsole` recibe `action`: `add`, `verify`, `delete`, `sitemaps`, `owners_add` u `owners_remove`. Las cuatro primeras se cobran. Los informes de rendimiento son gratis y exigen el sitio verificado (`409` si no lo está).
+- **Los plugins de WordPress se gestionan por órdenes.** El plugin instalado en el sitio publica su inventario y consulta las órdenes pendientes. Las órdenes (instalar, activar, desactivar, borrar o sincronizar) las crea un usuario con sesión verificada del panel; la credencial instalada en el sitio sólo puede leerlas y reportar su resultado.
+- **Generadores de IA sueltos.** Comentarios de ejemplo, imágenes y fichas de perfil, cada uno en una llamada síncrona.
+
+## Qué necesita {#qué-necesitas}
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido). Todo aquí actúa en nombre del usuario del token de usuario.
+- **Saldo** en la cuenta del usuario para las operaciones de IA, indexación y Search Console. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
+- Para crear un sitio a nombre de otro usuario del espacio de trabajo (`owner_user_id`), ser **administrador del espacio de trabajo**.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `POST /users/websites` | Registrar un sitio y obtener su `website_id` |
+| `GET /users/websites/mine` | Listar los sitios del usuario |
+| `GET /users/websites` | Buscar un sitio por `url` |
+| `PATCH /users/websites/{website_id}` | Cambiar nombre, descripción, categoría o idioma |
+| `GET /users/categories` | Categorías para clasificar sitios y artículos |
+| `POST /users/websites/{website_id}/legal` | Generar las páginas legales del sitio |
+| `POST /provisioning/tenants` | Crear un sitio servido por la plataforma (asíncrono) |
+| `GET /provisioning/tenants/{job_id}` | Consultar el avance de esa creación |
+| `POST /posts/keywords/` | Extraer keywords de un dominio |
+| `POST /posts/keywords/topic/` | Descubrir keywords de un tema |
+| `POST /posts/content/` | Encolar la generación de un artículo |
+| `GET /posts/content/jobs/{job_id}` | Consultar el trabajo hasta que termine |
+| `POST /posts/indexing/` | Pedir la indexación de una URL publicada |
+| `POST /users/websites/{website_id}/searchconsole` | Alta, verificación, sitemaps y propietarios en Search Console |
+| `GET /users/websites/{website_id}/searchconsole/performance` | Rendimiento de búsqueda de un sitio verificado |
+| `POST /users/websites/{website_id}/plugin-orders` | Ordenar una acción sobre un plugin del sitio |
+| `POST /users/generations/images` | Generar imágenes a partir de un texto |
+
+La publicación de enlaces patrocinados está en el mismo tag que Search Console. Todas las operaciones están en la Referencia de API:
+[Websites](/api-reference/1platform-api#tag/websites) ·
+[Content Categories](/api-reference/1platform-api#tag/content-categories) ·
+[Provisioning](/api-reference/1platform-api#tag/provisioning) ·
+[Keywords Content & Indexing](/api-reference/1platform-api#tag/keywords-content-indexing) ·
+[AI Generators](/api-reference/1platform-api#tag/ai-generators) ·
+[Link Building & Search Console](/api-reference/1platform-api#tag/link-building-search-console) ·
+[Website Plugins](/api-reference/1platform-api#tag/website-plugins).
+
+## Guías
+
+- [Generar contenido con IA](/docs/saas/1platform-api/sitios-web-y-contenido/generar-contenido): keywords, trabajo asíncrono, consulta del resultado e indexación.

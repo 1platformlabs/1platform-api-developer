@@ -1,110 +1,79 @@
 import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
-import {translate} from '@docusaurus/Translate';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import {useDocsSidebar} from '@docusaurus/plugin-content-docs/client';
+import type {PropSidebarItem} from '@docusaurus/plugin-content-docs';
 
-import Icon, {type IconName} from '@site/src/components/Icon';
+import Icon, {toIconName, type IconName} from '@site/src/components/Icon';
 import styles from './styles.module.css';
 
 /**
- * Card grid used on the docs landing page (docs/intro.mdx). Extracted from the
- * former standalone marketing homepage so the same product/API entry points now
- * live inside the documentation layout (sidebar + breadcrumb + TOC).
+ * The home (Inicio) grids, modelled on a payments developer portal: products on
+ * the left, shortcuts on the right.
  *
- * SOURCE OF TRUTH FOR THESE STRINGS: the `message` values below.
- *
- * `i18n/es/code.json` used to carry a copy of all thirteen of them. Because
- * Spanish is the default AND only locale, that copy is what actually rendered,
- * so editing this file changed nothing on the page — and the two had already
- * drifted (the shipped Dashboard blurb read "facturación, facturas", a
- * redundant pair, where the source read the better "cobros, facturación").
- * Those overrides are gone; `code.json` now holds only real `theme.*` UI
- * translations. If a second locale is ever added, translate via `code.json` for
- * THAT locale and leave these as the source.
+ * SINGLE SOURCE FOR THE PRODUCTS: the sidebar. Each product folder's
+ * `_category_.json` declares `customProps.{kind:'product', icon, description}`,
+ * and this grid reads exactly those categories, in sidebar order. A product
+ * added, renamed or re-described there shows up here with the same words — the
+ * grid cannot drift from the navigation because it has no copy of its own.
  */
-type Card = {
-  icon: IconName;
-  title: string;
-  desc: string;
-  href: string;
-};
+type Card = {icon: IconName; title: string; desc: string; href: string};
 
-// SaaS APIs. Developer audience — the portal's only audience since the
-// `docs-developer-minimalista` epic withdrew the per-tenant operator docs (D-1),
-// which is why the former TENANT_PRODUCTS grid and its `ProductCards` export are
-// gone: their 65 target pages no longer exist.
-const SAAS_PRODUCTS: Card[] = [
-  {
-    icon: 'code',
-    title: '1Platform API',
-    desc: translate({
-      id: 'home.saas.onepApi.desc',
-      message:
-        'La API REST principal: contenido con IA, pagos, facturación, dominios y agentes, con autenticación de dos tokens.',
-    }),
-    href: '/docs/saas/1platform-api/overview',
-  },
-  {
-    icon: 'globe',
-    title: 'Atlas API',
-    desc: translate({
-      id: 'home.saas.atlasApi.desc',
-      message:
-        'La API independiente y multitenant de entrega de contenido: catálogo, entitlements, entrega y webhooks.',
-    }),
-    href: '/docs/saas/atlas-api/overview',
-  },
-];
+function productsFrom(items: PropSidebarItem[]): Card[] {
+  const out: Card[] = [];
+  for (const item of items) {
+    // A product folder with a single page is collapsed by Docusaurus into a plain
+    // link (its index doc), keeping the category's customProps — so both shapes
+    // are products.
+    if ((item.type !== 'category' && item.type !== 'link') || !item.href) continue;
+    const cp = (item.customProps ?? {}) as Record<string, unknown>;
+    const icon = toIconName(cp.icon);
+    if (cp.kind !== 'product' || !icon) continue;
+    out.push({icon, title: item.label, desc: String(cp.description ?? ''), href: item.href});
+  }
+  return out;
+}
 
-const QUICKLINKS: Card[] = [
-  {
-    icon: 'console',
-    title: translate({id: 'home.quick.apiref.title', message: 'Referencia de la API'}),
-    desc: translate({id: 'home.quick.apiref.desc', message: 'Explora y prueba cada endpoint en vivo.'}),
-    href: '/docs/saas/api-reference-index',
-  },
-  {
-    icon: 'launch',
-    title: translate({id: 'home.quick.start.title', message: 'Primeros pasos'}),
-    desc: translate({id: 'home.quick.start.desc', message: 'Haz tu primera llamada autenticada.'}),
-    href: '/docs/saas/1platform-api/getting-started',
-  },
-  {
-    icon: 'share',
-    title: translate({id: 'home.quick.flows.title', message: 'Recorridos'}),
-    desc: translate({id: 'home.quick.flows.desc', message: 'Integraciones de punta a punta, en el orden en que se hacen.'}),
-    href: '/docs/saas/1platform-api/journeys/autenticacion',
-  },
-  {
-    icon: 'bell',
-    title: translate({id: 'home.quick.webhooks.title', message: 'Webhooks'}),
-    desc: translate({id: 'home.quick.webhooks.desc', message: 'Reacciona a los eventos en el momento en que ocurren.'}),
-    href: '/docs/saas/1platform-api/journeys/webhooks',
-  },
-];
-
-function CardGrid({cards, columns}: {cards: Card[]; columns: 2 | 3}): ReactNode {
+function CardLink({card, compact}: {card: Card; compact?: boolean}): ReactNode {
   return (
-    <div className={columns === 2 ? styles.grid2 : styles.grid3}>
-      {cards.map((c) => (
-        <Link key={c.href} className={`${styles.card} homeCard`} to={c.href}>
-          <span className={styles.cardIcon}>
-            <Icon name={c.icon} size={20} />
-          </span>
-          <div className={styles.cardTitle}>{c.title}</div>
-          <p className={styles.cardDesc}>{c.desc}</p>
-          <span className={styles.cardCue} aria-hidden="true">
-            <Icon name="arrow-right" size={14} />
-          </span>
-        </Link>
+    <Link className={`${compact ? styles.quick : styles.card} homeCard`} to={card.href}>
+      <span className={styles.cardIcon}>
+        <Icon name={card.icon} size={20} />
+      </span>
+      <span className={styles.cardText}>
+        <span className={styles.cardTitle}>{card.title}</span>
+        <span className={styles.cardDesc}>{card.desc}</span>
+      </span>
+    </Link>
+  );
+}
+
+export function ProductCards(): ReactNode {
+  const sidebar = useDocsSidebar();
+  const products = productsFrom(sidebar?.items ?? []);
+  return (
+    <div className={styles.products}>
+      {products.map((c) => (
+        <CardLink key={c.href} card={c} />
       ))}
     </div>
   );
 }
 
-export function SaasCards(): ReactNode {
-  return <CardGrid cards={SAAS_PRODUCTS} columns={2} />;
-}
-
 export function QuickCards(): ReactNode {
-  return <CardGrid cards={QUICKLINKS} columns={2} />;
+  const {siteConfig} = useDocusaurusContext();
+  const website = String(siteConfig.customFields?.websiteUrl ?? 'https://1platform.pro');
+  const quick: Card[] = [
+    {icon: 'launch', title: 'Inicio rápido', desc: 'Sus credenciales y su primera llamada autenticada.', href: '/docs/saas/1platform-api/inicio-rapido'},
+    {icon: 'code', title: 'Referencia de API', desc: 'Explore endpoints y esquemas, y pruébelos en vivo.', href: '/api-reference/1platform-api'},
+    {icon: 'clock', title: 'Cambios', desc: 'Lanzamientos, cambios incompatibles y novedades.', href: `${website}/es/novedades/`},
+    {icon: 'support', title: 'Soporte', desc: 'Hable con el equipo de integraciones.', href: `${website}/es/contacto/`},
+  ];
+  return (
+    <div className={styles.quickList}>
+      {quick.map((c) => (
+        <CardLink key={c.href} card={c} compact />
+      ))}
+    </div>
+  );
 }

@@ -1,6 +1,12 @@
-# Canal de deploy a cPanel — developer.1platform.pro
+# Canal cPanel — QA activo y fallback de producción
 
-Este sitio se despliega a la cuenta cPanel compartida **`mascehgw`** en
+El canal **activo de producción** desde el 14 de agosto de 2026 es
+`deploy_hetzner` en `prod.yml`: imagen `nginx:1.27-alpine`, configuración
+`deploy/docker/nginx.conf` y healthcheck de `docker-compose.prod.yml`. El job
+cPanel de producción conserva `if: false`. No habilitarlo para esta épica.
+QA sí utiliza este canal cPanel en `developer-qa.1platform.pro`.
+
+El fallback histórico de producción apunta a la cuenta compartida **`mascehgw`** en
 `business138.web-hosting.com` (origen `66.29.132.45`), la misma donde ya viven
 `1platform.pro`, `app.1platform.pro`, `bowerfans.com` y `adclicker.com`.
 
@@ -39,13 +45,57 @@ release anterior sirviendo. Una subida rota no puede publicar un sitio roto.
 ## Un job verde NO significa que el release esté vivo
 
 La activación la hace un cron, minutos después de que CI termina. El paso
-`Verify the release actually activated` es lo que lo prueba: consulta la home
-hasta que el `sha256` del documento servido coincida con el `index_sha` del
-bundle, y además exige que la respuesta traiga `x-turbo-charged-by: litespeed`
-(o sea, que salió del origen cPanel y no de otro lado).
+`Verify the release actually activated` consulta `/index.html`, cuyos bytes
+ensambla y firma el bundle. La raíz pública conserva su redirección HTTP 301 a
+Primeros pasos. `verify-release.mjs` exige que el `sha256` servido coincida con
+`index_sha`, HTTP 200 y `x-turbo-charged-by: litespeed`, además de una lectura
+FTPS privada: `.deployed_version` debe coincidir exactamente con la versión del
+bundle y `.failed_version` debe ser distinta. Una coincidencia durante el swap
+no basta. Sin acceso al estado privado, el probe exige 130 s consecutivos: los
+seis curls de hasta 15 s y seis pausas de 5 s permiten un rollback a los 120 s.
+El test de rollback a 90 s impide reintroducir la ventana insuficiente de 45 s.
 
 El health check anterior —esperar un `200` en la home— **no distinguía el build
 nuevo del viejo**: habría dado verde sirviendo todavía la versión anterior.
+
+### Salud de QA tras la redirección de la raíz
+
+`qa-health-config.sh` descarga `.health_url`, `.health_marker`, `.failed_version`
+y el log del activador a temporales privados del runner, sin publicarlos como
+artifacts ni imprimir sus contenidos. `health_config.py` sólo permite migrar
+el docroot de `developer-qa.1platform.pro` cuando confirma la raíz configurada,
+la regla HTTP 301 hacia la guía en el bundle y un rollback 301 de la versión en
+cuarentena en su log. No exige que la raíz revertida conserve el redirect de la
+versión fallida. Cambia la salud a `/index.html`, preservando el marker si todavía figura
+en el build; si el título anterior quedó obsoleto, utiliza el canonical exacto
+del portal. Conserva la exigencia de HTTP 200 + marker del activador.
+
+El diagnóstico demostró que el archivo migrado era válido y el activador remoto
+idéntico al original, pero seguía fallando con 301. `activate-docs.sh` es un
+adaptador **exclusivo de QA** que hace efectiva la configuración de ese docroot
+ante overrides heredados del cron. Valida el origen exacto, marker no vacío y
+que `CPANEL_DEPLOY_ROOT` sea su propio directorio. Sólo registra booleans sobre
+los overrides y propaga el exit status del activador original, incluido rollback.
+
+`health_adapter.py` sólo instala sobre el SHA normalizado ya verificado
+`fa5d955390006396e9070a4d653b83f3d9d5bc3536a4111b26d93f1b16524c83`, o reconoce
+el adaptador actual byte por byte. Guarda el original como
+`bin/activate-core.<sha>.sh`, verifica que el backup conserva exactamente sus
+bytes. Sube ambos archivos a `.part` y comprueba sus bytes por lectura FTPS
+**antes** de promoverlos; un upload truncado que reporte éxito preserva la entrada
+anterior. Publica primero el core verificado y después la entrada mediante rename.
+El core `activate.sh` del repo
+permanece idéntico a sus gemelos; no se cambia cron, Dashboard ni otros docroots.
+Una edición desconocida bloquea la instalación. Para actualizar el adaptador
+en otra revisión se debe inspeccionar y autorizar explícitamente su SHA anterior;
+no añadir aceptación por texto parcial. El backup permite restaurar la entrada
+original por FTPS si se revierte esta configuración.
+
+Los tests locales comprueban instalación, idempotencia, rechazo de cambios
+ajenos, límites del docroot, marker, estado terminal y propagación de errores,
+sin contactar el host. La lectura terminal sólo publica booleans. El test
+`pnpm check:serving` ejercita nginx real local, incluidos 301 y Location exactos,
+query conservada, rutas públicas, 404 y Host ajeno, sin ejecutar producción.
 
 ## El contrato de servido vive en `htaccess/docs.htaccess`
 

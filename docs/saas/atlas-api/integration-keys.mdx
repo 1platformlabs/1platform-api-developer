@@ -1,117 +1,75 @@
 ---
 title: Claves de integración
-description: Autenticación de servicio a servicio en la Atlas API usando claves de integración de larga duración y acotadas por capacidad (ak-int-…), separadas de los JWT de miembro.
+description: Credenciales de servicio a servicio de la Atlas API (ak-int-…) — para qué sirven, cómo vencen y cómo detectar el vencimiento antes de que corte su integración.
 sidebar_position: 4
 ---
 
 # Claves de integración
 
-Usa **claves de integración** para acceso de **servicio a servicio** — backends que aprovisionan miembros, emiten
-URLs de inicio de sesión o reaccionan a eventos de comercio en nombre de un tenant. Están completamente separadas del
-[flujo JWT](/docs/saas/atlas-api/authentication) de miembro: una clave es de larga duración, de un solo tenant y
-**acotada por capacidad**.
+Una **clave de integración** (`ak-int-…`) permite que un servidor suyo actúe sobre un tenant sin la sesión de ninguna
+persona: por ejemplo, el sistema de ventas que, tras una compra, crea al comprador como miembro y le muestra un enlace de
+acceso. Es una credencial distinta del [JWT de miembro u operador](/docs/saas/atlas-api/authentication).
 
-## Formato de la clave
+## Cómo se obtiene
 
-Las claves de integración usan el prefijo de esquema `ak-int-`:
+Las claves las emite el equipo de 1Platform Labs; ni el panel del tenant ni la API pública permiten crearlas. Al emitirla se
+fijan tres cosas que usted no puede ampliar después:
 
-```
-ak-int-<prefix><secret>
-```
+- **el tenant** al que pertenece (o toda la plataforma, para las integraciones internas de 1Platform Labs);
+- **las capacidades**: qué operaciones puede llamar;
+- **la fecha de vencimiento**: como máximo 365 días para una clave de tenant y 90 para una de plataforma.
 
-- `ak-int-` — prefijo de esquema fijo.
-- `<prefix>` — los primeros 8 caracteres del secreto, indexados para búsqueda rápida.
-- `<secret>` — hasheado en la emisión y nunca almacenado en texto plano.
+Hay como máximo **una clave activa por tenant e integración**: rotar una clave reemplaza a la anterior, no convive con ella.
+Guárdela como un secreto (fuera del código del cliente, de los registros y del control de versiones). Atlas no puede
+recuperarla: si se pierde o se filtra, pida una nueva.
 
-Cada clave está ligada a exactamente **un tenant**, lleva una etiqueta `vendor` y contiene una lista de
-**capacidades** que controlan qué endpoints puede llamar. Las claves se emiten fuera de banda por un operador
-del tenant; el paso de emisión decide la lista de capacidades — los endpoints nunca la amplían.
+## Cómo se usa
 
-> Guarda la clave como un secreto. Cualquiera que la posea puede actuar por ese tenant dentro de sus capacidades. Si una
-> clave se ve comprometida, rótala (revoca + reemite) — el secreto en sí nunca puede recuperarse de
-> Atlas.
-
-## Autenticación
-
-Envía la clave como un token bearer. Atlas distingue una clave de un JWT de miembro por el prefijo `ak-int-`:
+Envíe la clave como `Authorization: Bearer ak-int-…`. El tenant sale de la clave, así que **no** envíe `X-Tenant-Slug`.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
-  -H "Authorization: Bearer ak-int-<PREFIX><SECRET>" \
-  -H "Content-Type: application/json" \
-  -d '{ "email": "buyer@example.com", "display_name": "Buyer", "preferred_locale": "en" }'
+  -H "Authorization: Bearer $ATLAS_INTEGRATION_KEY" \
+  -H "Content-Type: application/json" -d '{ "email": "comprador@example.com" }'
 ```
 
-Como la clave ya codifica su tenant, los endpoints de integración resuelven el tenant **a partir de la
-clave**, no de un header `Host` / `X-Tenant-Slug`.
+Las operaciones disponibles para un tenant son las de aprovisionamiento de miembros
+([Referencia de API → integrations:bower](/api-reference/atlas-api#tag/integrations-bower)):
 
-## Capacidades
-
-Una capacidad es una cadena de permiso de grano fino verificada por endpoint. Capacidades actuales en la
-superficie de aprovisionamiento de miembros:
-
-| Capacidad | Concede |
+| Operación | Para qué |
 |---|---|
-| `members.upsert` | Crear o actualizar un miembro por email y devolver una URL de inicio de sesión nueva. |
-| `members.issue_magic_link` | Emitir una URL de inicio de sesión nueva de un solo uso para un miembro existente. |
+| `POST /integrations/bower/v1/members/upsert` | Crear o actualizar un miembro por correo y obtener un enlace de acceso. |
+| `POST /integrations/bower/v1/members/{member_id}/issue-magic-link` | Obtener un enlace de acceso nuevo para un miembro existente. |
 
-Si una clave llama a un endpoint cuya capacidad requerida no tiene, Atlas devuelve:
+Las operaciones de gestión de contenido (`/content/*`), de derechos de acceso (`/entitlements/*`) y de administración
+(`/admin/*`) **no** aceptan una clave de integración: responden `401 UNAUTHORIZED` y exigen el JWT de un operador o miembro.
+Si su caso necesita escribir catálogo desde un servidor, coordínelo con el equipo de 1Platform Labs.
 
-```json
-{ "code": "INTEGRATION_CAPABILITY_MISSING", "required": "members.upsert" }
-```
+## El orden de un aprovisionamiento
 
-## Códigos de error
+1. Tras la compra, llame a `members/upsert`. Es idempotente por tenant y correo: repetirlo no duplica al miembro.
+2. Muestre el enlace de acceso que devuelve **en ese momento**. Es de un solo uso y vence en minutos.
+3. Si el comprador vuelve más tarde a la página de acceso, pida un enlace nuevo con `issue-magic-link`. Nunca guarde el
+   enlace: un registro filtrado no debe servir para entrar.
 
-| HTTP | Code | Significado |
-|---|---|---|
-| 401 | `INTEGRATION_KEY_REQUIRED` | No hay token bearer `ak-int-…` presente. |
-| 401 | `INTEGRATION_KEY_INVALID` | Clave no encontrada, inactiva o secreto que no coincide. |
-| 403 | `INTEGRATION_CAPABILITY_MISSING` | La clave es válida pero carece de la capacidad que el endpoint necesita. |
-| 404 | `TENANT_NOT_FOUND` / `MEMBER_NOT_FOUND` | El tenant o miembro ligado a la clave ya no existe. |
+## Detecte el vencimiento antes del corte {#detecta-el-vencimiento-antes-del-corte}
 
-> Las búsquedas de miembros entre tenants devuelven `404` (no `403`) a propósito — una clave filtrada no puede enumerar
-> qué ids de miembro existen en otros tenants.
+Una clave vencida deja de funcionar de golpe, y el día de vencimiento lo conoce quien la emitió, no su integración. Atlas le
+avisa de dos maneras:
 
-## Ejemplo: aprovisionar un comprador y entregarle una URL de inicio de sesión
+- **Durante los últimos 14 días** de vida de la clave, cada respuesta exitosa trae el header `X-Atlas-Key-Expires-At` con
+  la fecha y hora de vencimiento (UTC). Vigílelo y avise en cuanto aparezca: es la señal para pedir la renovación.
+- **Una vez vencida**, la clave responde `401 INTEGRATION_KEY_EXPIRED`, distinto de `INTEGRATION_KEY_INVALID`. No los trate
+  igual: uno pide renovar la clave; el otro, revisar cuál está enviando.
 
-Un patrón común es un backend de storefront/checkout aprovisionando un miembro tras una compra exitosa,
-y luego mostrando al comprador un enlace de acceso de un clic:
+## Errores de la clave
 
-```bash
-# 1. Hacer upsert del miembro (idempotente en tenant + email)
-curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
-  -H "Authorization: Bearer ak-int-<PREFIX><SECRET>" \
-  -H "Content-Type: application/json" \
-  -d '{ "email": "buyer@example.com" }'
-```
+- `401 INTEGRATION_KEY_REQUIRED`: no envió una clave `ak-int-…`.
+- `401 INTEGRATION_KEY_INVALID`: la clave no existe, fue revocada o el secreto no coincide.
+- `401 INTEGRATION_KEY_EXPIRED`: la clave venció.
+- `403 INTEGRATION_CAPABILITY_MISSING`: la clave es válida pero no tiene la capacidad que pide la operación; la respuesta
+  nombra la capacidad requerida.
+- `404 TENANT_NOT_FOUND` o `404 MEMBER_NOT_FOUND`: el tenant o el miembro ya no existe. Un miembro de otro tenant también
+  responde `404`, para que una clave filtrada no pueda averiguar qué identificadores existen.
 
-```json
-{
-  "member_id": "7c8d…",
-  "email": "buyer@example.com",
-  "created": true,
-  "sign_in_url": "https://library.example.com/auth/verify?token=…",
-  "sign_in_expires_at": "2026-06-18T12:15:00Z"
-}
-```
-
-```bash
-# 2. Más tarde, renderiza la página de acceso con un enlace *nuevo* (nunca persistas la URL)
-curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/7c8d…/issue-magic-link" \
-  -H "Authorization: Bearer ak-int-<PREFIX><SECRET>"
-```
-
-```json
-{ "sign_in_url": "https://library.example.com/auth/verify?token=…", "expires_at": "2026-06-18T12:30:00Z" }
-```
-
-La flag `created` es informativa — trata el upsert como idempotente. Cada `sign_in_url` es de un solo uso
-y de corta duración (típicamente ~15 minutos); solicita una nueva por cada renderizado de la página de acceso en lugar de almacenarla,
-para que un registro de almacenamiento filtrado no pueda reutilizarse.
-
-## Consulta también
-
-- [Autenticación](/docs/saas/atlas-api/authentication) — el flujo JWT de miembro al que alimentan estas URLs.
-- [Webhooks](/docs/saas/atlas-api/webhooks) — el lado entrante de un proveedor de entitlements externo.
-- [Errores](/docs/saas/atlas-api/errors) — el contrato de errores global.
+Estos errores llegan anidados en `detail`; consulte [Errores](/docs/saas/atlas-api/errors).

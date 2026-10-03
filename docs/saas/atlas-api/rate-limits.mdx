@@ -1,70 +1,57 @@
 ---
 title: Límites de uso
-description: Cómo la Atlas API limita el uso de las solicitudes, el envoltorio 429 RATE_LIMITED, qué endpoints están limitados y una estrategia de backoff y reintento.
+description: Cómo limita la Atlas API el ritmo de solicitudes, qué respuestas recibe al exceder un límite o cuando un servicio se protege, y cómo reintentar.
 sidebar_position: 13
 ---
 
 # Límites de uso
 
-La **Atlas API** aplica límites de uso por cliente para proteger las superficies públicas compartidas. Cuando excedes
-un límite recibes un HTTP `429` con el envoltorio de error estándar:
+La Atlas API limita el ritmo **por operación**, no de forma uniforme: los límites se concentran en las superficies públicas
+y anónimas, y en las que pueden abusarse (sugerencias de búsqueda, enlaces de pago sin sesión, descargas). Construya su
+cliente para **reaccionar** a las respuestas de abajo en lugar de fijar umbrales: los valores pueden cambiar.
 
-```json
-{ "code": "RATE_LIMITED", "message": "Too many requests" }
-```
+## Qué cuenta para el límite
 
-El límite de uso se basa principalmente en la dirección IP del cliente; algunos endpoints propensos a abuso agregan el
-user-agent a la clave. Los límites se aplican en el **borde de rutas específicas**, no de manera uniforme a cada
-endpoint.
+La cuenta se lleva con claves distintas según la superficie: por cliente (dirección y navegador) en las lecturas anónimas,
+por clave en las operaciones con clave de integración y por sesión en las escrituras de un miembro.
 
-## Qué endpoints están limitados
+Hay una excepción importante: `GET /tenants/by-host` cuenta por dirección de origen, y todo el tráfico que pasa por el
+proxy de entrada comparte esa dirección. Su límite es, en la práctica, **compartido entre todos los clientes**. Llámelo una
+vez al configurar su integración (o en su prueba de humo) y guarde el resultado; no lo llame en cada solicitud.
 
-Los límites se concentran en superficies públicas anónimas de alto volumen. Ejemplos:
+## Qué respuestas esperar
 
-| Endpoint | Límite |
-|---|---|
-| `GET /tenants/by-host` (búsqueda de branding público) | ~60 solicitudes/minuto |
-| `GET /public/search/suggest` (sugerencias de type-ahead) | ~30 solicitudes/minuto |
+- **`429 RATE_LIMITED`**: superó el límite de la operación. Espere y reintente con espera creciente.
+- **`429 DOWNLOAD_RATE_LIMITED`**: demasiadas solicitudes de entrega seguidas; trae `Retry-After`.
+- **`503 CATALOG_BUSY`**: el catálogo está saturado y descarta solicitudes para proteger al resto de la API; trae
+  `Retry-After`.
 
-Otros endpoints pueden tener sus propios límites. Los flujos autenticados y de bajo volumen (inicio de sesión, tickets de
-entrega) generalmente no son el cuello de botella — pero maneja siempre `429` de forma defensiva, ya que los límites pueden
-ajustarse por entorno.
+Cuando la respuesta trae `Retry-After`, respételo antes que su propio cálculo.
 
-> Trata los números exactos como detalles operativos que pueden cambiar. Construye tu cliente para que **reaccione a `429`**
-> en lugar de codificar umbrales de forma fija.
+:::note En QA el 429 no trae el cuerpo estándar
+El `429 RATE_LIMITED` con el cuerpo estándar sólo está activo en producción. En QA el límite también corta, pero el `429`
+llega con un `detail` de texto y sin código. No use QA para probar su manejo de límites: simúlelo en sus pruebas.
+:::
 
-## Estrategia de backoff
+## Cómo reintentar
 
-Ante `429`, aplica backoff y reintenta con backoff exponencial más jitter. Reintenta automáticamente solo lecturas idempotentes:
+Reintente automáticamente sólo las lecturas y las operaciones idempotentes. Use espera exponencial con variación aleatoria:
 
 ```javascript
-async function getWithBackoff(url, init, { maxRetries = 4 } = {}) {
-  for (let attempt = 0; ; attempt++) {
+async function conReintento(url, init, { maxIntentos = 4 } = {}) {
+  for (let intento = 0; ; intento++) {
     const res = await fetch(url, init);
-    if (res.status !== 429) return res;
-    if (attempt >= maxRetries) return res; // rendirse; deja que el llamador lo maneje
-
-    // backoff exponencial con jitter: 0.5s, 1s, 2s, 4s (±20%)
-    const base = 500 * 2 ** attempt;
-    const jitter = base * (Math.random() * 0.4 - 0.2);
-    await new Promise((r) => setTimeout(r, base + jitter));
+    if (![429, 503].includes(res.status) || intento >= maxIntentos) return res;
+    const retryAfter = Number(res.headers.get("Retry-After"));
+    const base = retryAfter > 0 ? retryAfter * 1000 : 500 * 2 ** intento;
+    await new Promise((r) => setTimeout(r, base * (0.8 + Math.random() * 0.4)));
   }
 }
 ```
 
-## Evitar los límites
+## Cómo no llegar al límite
 
-- **Cachea las lecturas públicas.** El catálogo, el detalle de ítem y las respuestas de branding cambian lentamente — cáchealas en
-  tu lado (y deja que tu CDN cachee las superficies de SEO) en lugar de volver a obtenerlas por cada vista de página.
-- **Aplica debounce al type-ahead.** Espera una pausa en la escritura antes de llamar a `GET /public/search/suggest`, y limita
-  la tasa de solicitudes por usuario.
-- **No hagas polling en bucles ajustados.** Tras el checkout, llama a `entitlements/refresh` una vez (es idempotente)
-  en lugar de hacer polling de `entitlements/check` en un bucle ajustado.
-- **Reutiliza los tokens.** Mantén el JWT de un miembro durante toda su vida útil y usa el token de refresco; no solicites un
-  nuevo magic link por solicitud.
-
-## Consulta también
-
-- [Errores](/docs/saas/atlas-api/errors) — el código `RATE_LIMITED` y el contrato de errores completo.
-- [Buenas prácticas](/docs/saas/atlas-api/best-practices) — patrones de caché, reintentos e idempotencia.
-- [Entornos](/docs/saas/atlas-api/environments) — los límites pueden diferir entre QA y producción.
+- **Guarde en caché las lecturas públicas** (catálogo, detalle, portada del sitio): cambian poco.
+- **Espere una pausa en la escritura** antes de llamar a `GET /public/search/suggest`.
+- **Tras un pago, llame a `POST /entitlements/refresh` una sola vez**, no consulte el acceso en un bucle.
+- **Reutilice la sesión** del miembro durante toda su vida y refrésquela; no pida un enlace de acceso por solicitud.

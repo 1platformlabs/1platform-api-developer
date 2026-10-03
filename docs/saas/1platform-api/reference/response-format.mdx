@@ -1,83 +1,93 @@
 ---
 title: Formato de respuesta
-description: El envoltorio de respuesta estándar, la excepción del namespace de webhooks y cómo leer errores de forma consistente.
+description: El sobre estándar de las respuestas de la 1Platform API, las dos excepciones que su cliente debe tolerar y cómo leer un error.
 sidebar_position: 7
 ---
 
 # Formato de respuesta
 
-La 1Platform API usa **dos** formas de respuesta, según el namespace.
+Casi todas las respuestas usan el mismo sobre. Hay dos excepciones, y un cliente robusto tiene que aceptar las tres
+formas.
 
-## Envoltorio 1 — endpoints orientados al cliente (`{ success, data, msg }`)
+## El sobre estándar (`{ success, data, msg }`)
 
-Cada endpoint bajo `/auth/*`, `/users/*`, `/posts/*`, `/agents/*`, etc.
-envuelve la respuesta en:
+Las respuestas exitosas y los errores de negocio llegan así:
 
 ```json
 {
   "success": true,
-  "data": { /* endpoint-specific payload, can be null */ },
-  "msg": "Human-readable summary"
+  "data": { },
+  "msg": "Resumen legible para personas"
 }
 ```
 
-En caso de error:
+En un error, `success` es `false` y `data` es `null` o trae un código legible por máquina:
 
 ```json
 {
   "success": false,
   "data": { "code": "PAYMENT_GATEWAY_NOT_CONFIGURED" },
-  "msg": "This account does not have a payment gateway configured. ..."
+  "msg": "Payment gateway not configured for this user"
 }
 ```
 
-Cuando `data.code` está presente, ramifica según él para la lógica del cliente. Cuando está ausente,
-trata el código de estado HTTP como la fuente de verdad y muestra `msg` al
-operador.
-
-## Envoltorio 2 — namespace de webhook entrante (`{ status, message }`)
-
-`POST /webhooks/transactions` (el receptor **entrante** desde el proveedor
-upstream) usa una forma plana porque el proveedor la espera así:
+El código legible por máquina viaja en `data.code` en la mayoría de las operaciones. Algunas familias lo envían en la
+**raíz** de la respuesta (`code`, con `data: null`): Retiros, Correo, 1Trade y, en Facturación electrónica y en
+comercios y sucursales, los errores de activación, de selección de sucursal y de comercio archivado. Lea los dos
+lugares: use `data.code` y, si falta, `code`.
 
 ```json
-{ "status": "ok", "message": "Webhook accepted" }
+{
+  "success": false,
+  "data": null,
+  "msg": "Cash out is not available for this workspace",
+  "code": "CASH_OUT_DISABLED"
+}
 ```
 
-Normalmente no interactúas directamente con este endpoint — lo hace el proveedor
-upstream.
+Cuando no hay código en ninguno de los dos lugares, el código de estado HTTP es la fuente de verdad y `msg` es lo que
+puede mostrar.
 
-## Webhooks salientes — ningún envoltorio
+## Excepción 1: errores de validación (`422`)
 
-Los webhooks salientes (1Platform → comercio) usan una carga útil específica del dominio, no
-ninguno de los envoltorios anteriores. Consulta
-[recibir notificaciones → carga útil canónica](./webhooks-payload#canonical-payload).
-
-## Errores 422 de Pydantic
-
-La validación automática de esquema de FastAPI devuelve **su propia** forma, no el
-envoltorio:
+Cuando la solicitud no cumple el esquema (falta un campo, un tipo no corresponde), la respuesta no usa el sobre:
 
 ```json
 {
   "detail": [
-    { "type": "missing", "loc": ["body", "amount"], "msg": "Field required" }
+    { "type": "missing", "loc": ["body", "apiKey"], "msg": "Field required", "input": {} }
   ],
-  "message": "Validation error"
+  "message": "Validation error in request data"
 }
 ```
 
-Estos son errores del cliente (campo faltante, tipo incorrecto) — corrige la solicitud, nunca
-reintentes a ciegas.
+`detail[].loc` dice qué campo falló. Corrija la solicitud; no la reintente igual.
+
+## Excepción 2: autenticación y permisos (`401`, algunos `403` y `404`)
+
+Cuando falta un token, venció, fue revocado o el usuario no tiene el rol que exige la operación, la respuesta es un
+objeto con `detail`. También usan esta forma los `404` de un recurso que no pertenece a su espacio de trabajo:
+
+```json
+{ "detail": "Not authenticated" }
+```
+
+El texto de `detail` varía según la causa. Trátelo como informativo: ante un `401`, canjee de nuevo el token que
+corresponda; ante un `403` de rol, use el token de un usuario con ese rol.
+
+## Webhooks salientes: sin sobre
+
+Los webhooks que 1Platform envía a su backend no usan ninguna de estas formas: son un objeto plano. Ver
+[Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload#canonical-payload).
 
 ## Qué leer
 
-| Quieres saber... | Lee |
+| Quiere saber… | Lea |
 |---|---|
-| ¿La solicitud tuvo éxito? | Código de estado HTTP (`2xx` = sí) |
-| ¿La respuesta es un envoltorio? | Campo `success` — presente significa sí |
-| ¿Qué tipo de fallo de negocio? | `data.code` si está presente |
-| ¿Qué mostrar al operador? | `msg` |
-| ¿Qué campo de mi solicitud está mal? | `detail[].loc` (solo Pydantic 422) |
+| ¿La solicitud tuvo éxito? | El código de estado HTTP (`2xx` = sí) |
+| ¿La respuesta viene en el sobre? | Si existe el campo `success` |
+| ¿Qué tipo de fallo de negocio? | `data.code` o, si falta, `code` |
+| ¿Qué mostrar a una persona? | `msg` |
+| ¿Qué campo de mi solicitud está mal? | `detail[].loc` (sólo en `422`) |
 
-Consulta también: [referencia de códigos de error](./error-codes).
+Ver también: [Códigos de error](/docs/saas/1platform-api/reference/error-codes).

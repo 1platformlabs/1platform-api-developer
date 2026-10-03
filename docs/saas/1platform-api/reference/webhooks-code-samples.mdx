@@ -10,7 +10,8 @@ import TabItem from '@theme/TabItem';
 # Ejemplos de código
 
 Receptores de webhooks de extremo a extremo que verifican la firma, deduplican por
-`(transaction_id, event)` y encolan el cumplimiento para procesamiento asíncrono.
+`(transaction_id, event)` y encolan el cumplimiento para procesamiento asíncrono. Los ejemplos asumen el cuerpo
+canónico: si configuró `body_template`, tome esos dos campos de su plantilla.
 
 <Tabs groupId="lang" queryString>
 <TabItem value="python" label="Python (FastAPI)">
@@ -62,7 +63,7 @@ async def receive_webhook(
         return {"status": "duplicate"}
     SEEN.add(key)
 
-    # Ack rápido — difiere el cumplimiento a una cola en segundo plano
+    # Responde rápido — difiere el cumplimiento a una cola en segundo plano
     # await queue.enqueue(payload)
     return {"status": "ok"}
 ```
@@ -173,7 +174,7 @@ echo json_encode(['status' => 'ok']);
 ## Qué debe hacer todo receptor
 
 1. **Verificar el HMAC contra los bytes crudos** — nunca re-parsees el JSON antes de verificar.
-2. **Rechazar por skew de la ventana de replay** — rechaza cualquier cosa fuera de ±5 minutos.
-3. **Comparación de tiempo constante** — nunca uses `==`.
-4. **Deduplicar por `(transaction_id, event)`** — los webhooks son at-least-once.
+2. **Aplicar la ventana de repetición** — rechaza lo que tenga un `X-Webhook-Timestamp` a más de 5 minutos.
+3. **Comparación de tiempo constante** — nunca use `==`.
+4. **Deduplicar por `(transaction_id, event)`** — los webhooks se entregan al menos una vez.
 5. **Acusar recibo con 2xx rápidamente** — difiere el trabajo pesado a una cola en segundo plano.

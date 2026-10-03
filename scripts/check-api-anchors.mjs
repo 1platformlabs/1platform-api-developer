@@ -79,6 +79,15 @@ function run() {
     }
   }
 
+  for (const file of docFiles('docs')) {
+    for (const m of readFileSync(file, 'utf8').matchAll(/\/api-reference\/([a-z0-9-]+)#operation\/([A-Za-z0-9_-]+)/g)) {
+      const [, api, operation] = m;
+      const spec = JSON.parse(readFileSync(SPECS[api], 'utf8'));
+      const ids = new Set(Object.values(spec.paths ?? {}).flatMap(methods => Object.values(methods).map(op => op?.operationId)));
+      if (!ids.has(operation)) bad.push(`${file}: operation alias ${operation} absent in ${api}`);
+    }
+  }
+
   // Floor. A scanner that stops finding anchors reports "0 broken", which is
   // the same output as a healthy tree.
   if (seen < 15) throw new Error(`only ${seen} anchors found — the scanner stopped matching`);

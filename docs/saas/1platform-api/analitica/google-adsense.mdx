@@ -1,0 +1,91 @@
+---
+title: Google AdSense
+description: Conecte la cuenta de AdSense del usuario a un sitio, mantenga al día su estado de aprobación y consulte ingresos, alertas y problemas de políticas.
+sidebar_position: 3
+---
+
+# Google AdSense
+
+Esta guía conecta un sitio (`website_id`) a la cuenta de AdSense del propio usuario. El orden importa por dos motivos: no se puede vincular el sitio antes de que el usuario autorice en Google, y el estado de aprobación del sitio cambia del lado de Google, así que hay que sincronizarlo para verlo. Los ejemplos usan las variables de [Convenciones](/docs/saas/1platform-api/reference/convenciones); `$WEBSITE_ID` sale de [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
+
+## Paso 1 — Pedir la URL de autorización
+
+```bash
+curl "$BASE_URL/adsense/oauth/authorize?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Abra `data.authorization_url` en una ventana emergente del navegador del usuario. El usuario inicia sesión en Google y concede el acceso. La devolución de llamada la procesa la API y avisa a la ventana que la abrió; su backend no la llama. `500` indica que la integración con AdSense no está configurada en la plataforma.
+
+[Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
+
+## Paso 2 — Esperar la autorización
+
+Vincular el sitio antes de que la autorización esté confirmada responde `400`. Por eso conviene esperarla en lugar de reaccionar al error.
+
+```bash
+curl "$BASE_URL/adsense/oauth/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Repita la consulta hasta que `data.connected` sea `true`. `data.email` y `data.authorized_at` dicen con qué cuenta de Google y cuándo se autorizó; conviene mostrárselos al usuario antes de vincular.
+
+[Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
+
+## Paso 3 — Vincular el sitio
+
+La API toma la cuenta de AdSense ya autorizada y la asocia al sitio. Es la primera respuesta con datos de la cuenta.
+
+```bash
+curl -X POST "$BASE_URL/adsense/connect?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+La respuesta trae `data.status` en `active`, el `publisher_id` de la cuenta y el estado de aprobación del sitio en `site_state`. `400` significa que la autorización del paso 2 no está confirmada; `409`, que el sitio ya estaba vinculado. El límite es de 2 solicitudes por minuto: deje pasar al menos 30 segundos entre intentos.
+
+[Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
+
+## Paso 4 — Sincronizar el estado del sitio
+
+El estado de aprobación y los anuncios automáticos cambian en Google sin que su integración se entere. La sincronización trae ese cambio:
+
+```bash
+curl -X POST "$BASE_URL/adsense/sites/sync?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+La respuesta trae el estado actual del sitio y si tiene anuncios automáticos. `GET /adsense/sites` lista todos los sitios de la cuenta, paginados con `page` y `page_size`.
+
+[Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
+
+## Paso 5 — Consultar ingresos
+
+```bash
+curl "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=7d" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Devuelve ingresos estimados, clics e impresiones del período. `compare` está activado por defecto, así que cada métrica llega comparada con el período anterior; envíe `compare=false` para recibir valores simples. El plan gratuito sólo permite `7d`: pedir `30d` o `90d` sin plan Pro responde `403`, en lugar de recortar el rango sin avisar. El desglose por página (`GET /adsense/earnings/by-page`) y el reporte a medida (`POST /adsense/earnings/report`, con `start_date` y `end_date`) también requieren plan Pro.
+
+[Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
+
+## Paso 6 — Revisar alertas y problemas de políticas
+
+Una alerta de la cuenta o un problema de políticas explica una caída de ingresos que de otro modo parece un error de su integración. Las dos lecturas requieren plan Pro (`403` sin él).
+
+```bash
+curl "$BASE_URL/adsense/policy-issues?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Cada problema indica la entidad afectada (`entity`), el tema de la política (`topic`) y la acción requerida (`action`). Las alertas de la cuenta salen de `GET /adsense/alerts`. Después de corregir una página, sincronice el estado (paso 4). Google puede tardar en levantar una restricción, así que una sincronización inmediata no confirma la corrección.
+
+Para desvincular el sitio sin perder la autorización, use `DELETE /adsense/disconnect`: después puede volver al paso 3 sin repetir la autorización. `POST /adsense/oauth/revoke` borra la autorización, y para volver a conectar hay que empezar desde el paso 1.
+
+[Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)

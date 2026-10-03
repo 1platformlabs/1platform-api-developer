@@ -2,48 +2,72 @@
 id: overview
 slug: overview
 title: Atlas API
-description: La API de entrega de contenido independiente y multitenant — construye tu propia biblioteca, streaming o ecosistema de publicación con tu marca sobre la infraestructura de 1Platform.
-sidebar_position: 1
 sidebar_label: Vista general
+description: API multitenant de entrega de contenido de 1Platform Labs, independiente de la 1Platform API, para construir bibliotecas, servicios de streaming o sitios de publicación con su marca.
+sidebar_position: 1
 ---
 
 # Atlas API
 
-La **Atlas API** es una plataforma de entrega de contenido independiente y multitenant de 1Platform Labs. Úsala para
-construir tu propio ecosistema con tu marca — una biblioteca, un servicio de streaming, una red de podcasts o una plataforma
-de publicación — con gestión de catálogo, autenticación, entitlements y entrega de medios, todo aislado
-por tenant.
+<p className="lead">La Atlas API sirve el catálogo, las sesiones de los miembros, los derechos de acceso y la entrega de
+medios de cada tenant: una biblioteca, un servicio de streaming, una red de podcasts o un sitio de publicación con su marca.</p>
 
-> Atlas es **independiente** de la 1Platform API: modelo de autenticación distinto, sus propios datos, sin internals
-> compartidos. Para la API de la plataforma central, consulta [1Platform API](/docs/saas/1platform-api/overview).
+Un **tenant** es cada sitio o marca que opera sobre Atlas. Todo dato (catálogo, miembros, derechos de acceso, configuración)
+pertenece a un tenant, y cada solicitud se resuelve a uno solo.
 
-## Cómo difiere de la 1Platform API
+> Atlas es un producto **independiente** de la 1Platform API: tiene su propio modelo de autenticación, sus propios datos y
+> su propia URL base. Si busca la API de pagos, facturación y contenido de 1Platform, consulte
+> [1Platform API](/docs/saas/1platform-api/getting-started).
+
+## Cómo funciona
+
+1. **Cada solicitud nombra su tenant** con el header `X-Tenant-Slug`. Un slug mal escrito no da error: cae en el tenant
+   por defecto. Verifíquelo primero ([Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)).
+2. **El catálogo es público.** Listar, buscar y ver el detalle de un ítem no requiere sesión.
+3. **Los miembros inician sesión con un enlace de acceso sin contraseña** que se canjea por un JWT. Los operadores del tenant
+   usan correo y contraseña.
+4. **Un derecho de acceso (*entitlement*)** dice qué puede consumir cada miembro. Lo concede un operador, el acceso
+   gratuito automático del tenant, el proveedor de pagos del tenant mediante un webhook o el propio miembro al activar una
+   prueba o reconciliar su compra.
+5. **La entrega** emite un ticket de corta duración (URL firmada o manifiesto de streaming) sólo si el miembro tiene acceso.
+
+## Qué necesita {#qué-necesitas}
+
+Todo lo emite el equipo de 1Platform Labs; Atlas no tiene un alta de autoservicio:
+
+- el **slug** de su tenant y su dominio principal;
+- una **cuenta de operador** del tenant, si va a gestionar el catálogo;
+- una **clave de integración** (`ak-int-…`), si un servidor suyo va a aprovisionar miembros;
+- el **secreto de webhook** del tenant, si opera la integración de pagos que concede derechos de acceso.
+
+## En qué se diferencia de la 1Platform API
 
 | | 1Platform API | Atlas API |
 |---|---|---|
-| **Autenticación** | Dos tokens (`ak-` + `sk-`) | **JWT bearer** (tras el magic link) + claves de integración |
-| **Tenant** | Por `app` / `user` | Resuelto por `Host` / `X-Tenant-Slug` |
-| **Forma de error** | `{ success, data, msg }` | `{ code, message }` |
+| **Credenciales** | Token de aplicación + token de usuario | JWT del miembro u operador, o clave de integración |
+| **Alcance** | Espacio de trabajo del token | Tenant del header `X-Tenant-Slug` (o de la clave) |
+| **Errores** | Envoltorio `{ success, data, msg }` | `code` estable, plano o anidado en `detail` ([Errores](/docs/saas/atlas-api/errors)) |
 | **URL base** | `api.1platform.pro/api/v1` | `atlas-api.1platform.pro/api/v1` |
 
-## Flujos de integración principales
+## Operaciones
 
-- [Autenticación](/docs/saas/atlas-api/authentication) — magic link → JWT, refresco, sesiones.
-- [Claves de integración](/docs/saas/atlas-api/integration-keys) — acceso de servicio a servicio.
-- [Resolución de tenant](/docs/saas/atlas-api/tenant-resolution) — resuelve un tenant por host o slug.
-- [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing) — lista, obtén por slug, busca.
-- [Entrega de contenido](/docs/saas/atlas-api/content-delivery) — tickets de reproducción, URLs firmadas, streaming.
-- [Entitlements](/docs/saas/atlas-api/entitlements) — concede, revoca y verifica acceso (scopes: item, series, plan, live).
-- [Webhooks](/docs/saas/atlas-api/webhooks) — recibe eventos de entitlement (firmados, idempotentes).
+| Operación | Para qué |
+|---|---|
+| `GET /tenants/by-host` | Confirmar el slug real de un tenant a partir de su dominio. |
+| `POST /auth/magic-link` | Enviar un enlace de acceso al correo de un miembro. |
+| `POST /auth/magic-link/verify` | Canjear el token del enlace por una sesión. |
+| `GET /public/catalog` | Listar el catálogo publicado. |
+| `GET /public/items/{slug}` | Ver el detalle de un ítem. |
+| `GET /delivery/items/{content_id}/playback` | Emitir un ticket de reproducción o descarga. |
+| `POST /entitlements/checkout` | Crear el enlace de pago de un plan o ítem. |
+| `POST /integrations/bower/v1/members/upsert` | Aprovisionar un miembro desde su servidor. |
 
-## Referencia
+Todas las operaciones: [Referencia de API](/api-reference/atlas-api).
 
-- [Entornos](/docs/saas/atlas-api/environments) — URLs base de QA y producción.
-- [Errores](/docs/saas/atlas-api/errors) — códigos de error y mapeo de estado HTTP.
-- [Límites de uso](/docs/saas/atlas-api/rate-limits) — límites y backoff.
-- **[Referencia interactiva de la API →](/api-reference/atlas-api)** — explora y prueba cada endpoint.
+## Guías
 
-## Inicio rápido
-
-Consulta [Inicio rápido](/docs/saas/atlas-api/quickstart) para resolver un tenant, iniciar sesión y obtener tu primer
-ítem del catálogo.
+- [Inicio rápido](/docs/saas/atlas-api/quickstart) — de un slug verificado a su primer ticket de reproducción.
+- [Autenticación](/docs/saas/atlas-api/authentication) · [Claves de integración](/docs/saas/atlas-api/integration-keys)
+- [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing) · [Gestión de contenido](/docs/saas/atlas-api/content-management)
+- [Entrega de contenido](/docs/saas/atlas-api/content-delivery) · [Derechos de acceso](/docs/saas/atlas-api/entitlements) · [Webhooks](/docs/saas/atlas-api/webhooks)
+- Referencia: [Entornos](/docs/saas/atlas-api/environments) · [Errores](/docs/saas/atlas-api/errors) · [Límites de uso](/docs/saas/atlas-api/rate-limits) · [Buenas prácticas](/docs/saas/atlas-api/best-practices)

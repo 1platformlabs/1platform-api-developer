@@ -5538,6 +5538,18 @@
               }
             }
           },
+          "409": {
+            "description": "A book template opens like another same-language site's.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "SEO_TEMPLATE_COLLISION"
+                  }
+                }
+              }
+            }
+          },
           "422": {
             "description": "Biblioteca Viva requires the tenant's primary library archetype; Immersive Media requires a primary library, audio, or streaming archetype.",
             "content": {
@@ -28325,7 +28337,7 @@
           "platform:provisioning"
         ],
         "summary": "Write a tenant's search-console verification token (service-to-service)",
-        "description": "Set (or clear) the tenant's verification token, preserving the rest.\n\nWrites BOTH copies in one transaction, which is the whole point of the\nendpoint: ``GET /tenants/by-host`` — the resolver the public site\nrenders from — serves ``tenants.config``, never ``tenant_settings``.\nWriting only the settings row is a no-op with a 200 response: the tag\nnever reaches the HTML. Writing only the mirror leaves the admin form\nshowing an empty field, which is how an operator deletes the token\nwithout meaning to. Both rows are locked ``FOR UPDATE`` first so a\nconcurrent operator save cannot lose one of the two writes.\n\nLike ``POST /tenants``, the service key's own ``tenant_id`` is not\nconsulted: authorization is the capability, held by a single\ncredential, and every write lands in the audit log.",
+        "description": "Set (or clear) the tenant's verification token, preserving the rest.\n\nWrites BOTH copies in one transaction, which is the whole point of the\nendpoint: ``GET /tenants/by-host`` — the resolver the public site\nrenders from — serves ``tenants.config``, never ``tenant_settings``.\nWriting only the settings row is a no-op with a 200 response: the tag\nnever reaches the HTML. Writing only the mirror leaves the admin form\nshowing an empty field, which is how an operator deletes the token\nwithout meaning to. Both rows are locked ``FOR UPDATE`` first so a\nconcurrent operator save cannot lose one of the two writes.\n\nAuthorization is the capability plus the scope: a platform key may write\nany tenant, a tenant-scoped key only its own (``ensure_key_reaches_tenant``,\n#346 — until then its ``tenant_id`` was not consulted and a key issued for\none library could rewrite another's verification token). Every write lands\nin the audit log.",
         "operationId": "write_site_verification_api_v1_platform_tenants__slug__site_verification_put",
         "parameters": [
           {
@@ -28492,6 +28504,463 @@
           },
           "422": {
             "description": "Invalid email or domain"
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Move a tenant's operator account to another address (service-to-service)",
+        "description": "Change the sign-in address of an operator account, keeping its password.\n\n- Same domain gate and the same fail-closed refusal of staff accounts as\n  the reset: a site owner must not be able to re-point an account that\n  administers OTHER tenants.\n- 409 ``OPERATOR_EMAIL_TAKEN`` when another account of the tenant already\n  has the address — the unique index speaks, translated, never a 500.\n- In the same transaction: the pending reset links of BOTH addresses are\n  burned (the new one may hold links minted for an account that used it\n  before), and every live session of the old address's member is revoked\n  — moving an operator away must take their way in with it.\n- Both addresses are told (``auth.email_changed``), best-effort after the\n  commit; the old inbox sees the new address masked.\n- At most ``_EMAIL_CHANGE_CAP`` changes per tenant per hour (429).\n- The password is not returned and not changed.",
+        "operationId": "change_operator_email_api_v1_platform_tenants__slug__operator_credential_patch",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorEmailChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorEmailChangeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.provision capability"
+          },
+          "404": {
+            "description": "No tenant with that slug, or no operator with that address.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "OPERATOR_CREDENTIAL_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another administrator of this site already uses that address.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "OPERATOR_EMAIL_TAKEN"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid email or domain, or the new address is the current one"
+          },
+          "429": {
+            "description": "Too many address changes for this site.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "OPERATOR_EMAIL_CHANGE_RATE_LIMITED"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/operator-access": {
+      "get": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Read who administers a tenant (service-to-service)",
+        "description": "The operator accounts of the tenant serving ``primary_domain``.\n\nSame domain gate as the write: reading an operator's address for a site\nyou do not serve IS the leak. Never serialises a hash, a TOTP secret or a\ngrant list.",
+        "operationId": "read_operator_access_api_v1_platform_tenants__slug__operator_access_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "primary_domain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 255,
+              "title": "Primary Domain"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorAccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.provision capability"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The tenant with that slug is not the one serving that domain.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_DOMAIN_MISMATCH"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/operator-password-reset": {
+      "post": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Email an operator the password-reset link (service-to-service)",
+        "description": "Trigger the EXISTING operator password reset, and say what happened.\n\nCalls the same three pieces as ``POST /auth/admin/forgot-password``\n(``admin_password_reset.issue`` → ``build_admin_reset_url`` →\n``send_pwd_reset``) and inverts its two deliberate silences, which are\nright for an anonymous route and wrong here: an unknown address is a 404\n(the caller can already list the operators, there is nothing to\nenumerate), and a failed send is a 503 — answering \"sent\" when nothing\nwas sent is the lie that left #408 locked out. The reset mints no\nsession: the operator signs in afterwards, with TOTP if enrolled.",
+        "operationId": "reset_operator_password_api_v1_platform_tenants__slug__operator_password_reset_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorPasswordResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorPasswordResetResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.provision capability"
+          },
+          "404": {
+            "description": "No tenant with that slug, or no operator with that address.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "OPERATOR_CREDENTIAL_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That account carries a cross-tenant grant and is not a site operator.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "OPERATOR_HAS_CROSS_TENANT_GRANT"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many resets for this operator.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "RATE_LIMITED"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The email could not be sent.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "EMAIL_DELIVERY_FAILED"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "integrationKey": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{slug}/access-audit": {
+      "get": {
+        "tags": [
+          "platform:provisioning"
+        ],
+        "summary": "Latest changes to a tenant's operator access (service-to-service)",
+        "description": "The tenant's latest access events: mint/rotation, reset (asked by the\nplatform or by the operator), password change, address change.\n\nSame domain gate as the operator list — a site's trail is as private as\nits operators. Reads ONLY the access event types (``_ACCESS_EVENTS``), from\nthe tenant named by the path; the ``diff`` is never echoed, only the\naction it implies and the opaque actor reference.",
+        "operationId": "read_access_audit_api_v1_platform_tenants__slug__access_audit_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "primary_domain",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 255,
+              "title": "Primary Domain"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessAuditResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Integration key missing or invalid"
+          },
+          "403": {
+            "description": "Integration key lacks tenants.provision capability"
+          },
+          "404": {
+            "description": "No tenant with that slug.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The tenant with that slug is not the one serving that domain.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "TENANT_DOMAIN_MISMATCH"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -29106,7 +29575,7 @@
             }
           },
           "409": {
-            "description": "A written block changed since it was read.",
+            "description": "A written block changed since it was read (REVISION_STALE), or a book template opens like another same-language site's (SEO_TEMPLATE_COLLISION).",
             "content": {
               "application/json": {
                 "example": {
@@ -31160,6 +31629,62 @@
           "effective_from"
         ],
         "title": "AbuseSanctionView"
+      },
+      "AccessAuditEntry": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "credential_created",
+              "credential_rotated",
+              "password_reset_sent",
+              "password_reset_failed",
+              "operator_email_changed",
+              "password_reset_self_requested",
+              "password_changed"
+            ],
+            "title": "Action"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "actor_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Reference"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "occurred_at"
+        ],
+        "title": "AccessAuditEntry",
+        "description": "One change to the site's access. Never an address, a token or a key id:\n``actor_reference`` is the control plane's opaque id of the person, or\n``None`` when the platform itself acted (provisioning)."
+      },
+      "AccessAuditResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/AccessAuditEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "title": "AccessAuditResponse"
       },
       "AccessFlagsSchema": {
         "properties": {
@@ -40398,6 +40923,186 @@
         ],
         "title": "NotificationSubscribeResponse"
       },
+      "OperatorAccessResponse": {
+        "properties": {
+          "operators": {
+            "items": {
+              "$ref": "#/components/schemas/OperatorAccountView"
+            },
+            "type": "array",
+            "title": "Operators"
+          },
+          "staff_accounts": {
+            "type": "integer",
+            "title": "Staff Accounts"
+          },
+          "own_sender_domain": {
+            "type": "boolean",
+            "title": "Own Sender Domain"
+          },
+          "sender_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender Domain"
+          },
+          "self_service_url": {
+            "type": "string",
+            "title": "Self Service Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operators",
+          "staff_accounts",
+          "own_sender_domain",
+          "self_service_url"
+        ],
+        "title": "OperatorAccessResponse",
+        "description": "Who administers the tenant, and whether its mail leaves under its own name.\n\nAccounts holding a cross-tenant grant are staff, not site operators: they\nare COUNTED, never named, and cannot be reset through this facade.\n``sender_domain`` is present only when the tenant has its OWN mapped\nsender; the platform fallback is never echoed, because it may be another\ntenant's domain (measured in PROD, ``config.resolve_email_from_address``)."
+      },
+      "OperatorAccountView": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "has_second_factor": {
+            "type": "boolean",
+            "title": "Has Second Factor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "updated_at",
+          "has_second_factor"
+        ],
+        "title": "OperatorAccountView"
+      },
+      "OperatorEmailChangeRequest": {
+        "properties": {
+          "operator_email": {
+            "type": "string",
+            "format": "email",
+            "title": "Operator Email"
+          },
+          "new_email": {
+            "type": "string",
+            "format": "email",
+            "title": "New Email"
+          },
+          "primary_domain": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Primary Domain"
+          },
+          "actor_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Reference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operator_email",
+          "new_email",
+          "primary_domain"
+        ],
+        "title": "OperatorEmailChangeRequest"
+      },
+      "OperatorEmailChangeResponse": {
+        "properties": {
+          "operator_email": {
+            "type": "string",
+            "title": "Operator Email"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operator_email",
+          "updated_at"
+        ],
+        "title": "OperatorEmailChangeResponse"
+      },
+      "OperatorPasswordResetRequest": {
+        "properties": {
+          "operator_email": {
+            "type": "string",
+            "format": "email",
+            "title": "Operator Email"
+          },
+          "primary_domain": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Primary Domain"
+          },
+          "actor_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Reference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operator_email",
+          "primary_domain"
+        ],
+        "title": "OperatorPasswordResetRequest"
+      },
+      "OperatorPasswordResetResponse": {
+        "properties": {
+          "operator_email": {
+            "type": "string",
+            "title": "Operator Email"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operator_email",
+          "expires_at"
+        ],
+        "title": "OperatorPasswordResetResponse",
+        "description": "Where the link went and until when. NEVER the link itself: the caller\nmay be the workspace owner, not the operator, and a link returned here\nwould turn \"manage access\" into \"sign in as them\"."
+      },
       "ParentalUpdate": {
         "properties": {
           "pin": {
@@ -45571,6 +46276,43 @@
         "title": "SyncPolicy",
         "description": "Per-subscription policy controlling how fichas materialize."
       },
+      "TaxonomyAuthor": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "intro_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intro Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug"
+        ],
+        "title": "TaxonomyAuthor",
+        "description": "Presentación de UNA página de autor (atlas-dash#431).\n\nClon de :class:`TaxonomyGenre` con una diferencia que es toda la decisión:\nel campo es TEXTO PLANO (``intro_text``). La prosa pública en HTML crudo\nsigue prohibida (``platform_settings.py``, ``genres`` sin ``intro_html``);\nun campo que no puede portar marcado —el sitio lo escapa al pintarlo— no\ntiene la propiedad que motivó esa prohibición.\n\n``extra=\"forbid\"``: un ``intro_html`` (o cualquier clave desconocida) en\nuna entrada de autor es un 422 que NOMBRA la clave, nunca un 200 que la\ndescarta en silencio. La forma del ``slug``, los topes y los duplicados los\nvalida :func:`app.services.platform_settings_service.validate_taxonomy_authors`."
+      },
       "TaxonomyCrossLink": {
         "properties": {
           "source_kind": {
@@ -45651,6 +46393,13 @@
             },
             "type": "array",
             "title": "Genres"
+          },
+          "authors": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyAuthor"
+            },
+            "type": "array",
+            "title": "Authors"
           },
           "authors_intro_html": {
             "anyOf": [
@@ -47133,7 +47882,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "ak-int-",
-        "description": "Long-lived integration key for the service-to-service surface (`/platform/*`, `/integrations/*`), sent as `Authorization: Bearer ak-int-<prefix><secret>`. A key is scoped to one tenant or to the platform and carries an explicit capability list; the endpoint checks both."
+        "description": "Long-lived integration key for the service-to-service surface (`/platform/*`, `/integrations/*`), sent as `Authorization: Bearer INTEGRATION_API_KEY_EXAMPLE`. A key is scoped to one tenant or to the platform and carries an explicit capability list; the endpoint checks both."
       },
       "entitlementWebhookSignature": {
         "type": "apiKey",

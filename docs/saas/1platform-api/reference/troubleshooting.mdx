@@ -1,85 +1,77 @@
 ---
 title: Solución de problemas
-description: Modos de fallo comunes y no evidentes — organizados por síntoma.
+description: Fallos comunes y poco evidentes de una integración con la 1Platform API, organizados por síntoma.
 sidebar_position: 5
 ---
 
 # Solución de problemas
 
-Esta página está organizada por **síntoma**, para que puedas buscar el error que estás
-viendo en lugar de adivinar la causa raíz.
+Esta página está organizada por **síntoma**: busque el error que está viendo en lugar de adivinar la causa. Si
+nada de esto lo explica, pida soporte con el `x-request-id` de la respuesta.
 
-## "Obtengo 502 Bad Gateway con HTML al crear una transacción"
+## «Recibo `422` con `PAYMENT_GATEWAY_NOT_CONFIGURED` al crear una transacción»
 
-**Lo más probable:** tu tenant no tiene una pasarela de pago configurada. Desde el
-2026-04-29 la API devuelve **`422`** con JSON `data.code: PAYMENT_GATEWAY_NOT_CONFIGURED`
-en lugar de `502 HTML`.
+El espacio de trabajo no tiene una pasarela de cobro activa. Un administrador la configura en el Panel; reintentar
+sin ese cambio no sirve. Si el código es `PLATFORM_GATEWAY_REQUIRED`, el espacio de trabajo sí tiene pasarela, pero
+liquida directo al comercio y este cobro lo recauda la plataforma: no hay nada que configurar, contacta a soporte.
 
-Si aún ves HTML 502:
-1. Llama a `GET /health` y confirma que el despliegue incluye la corrección
-   (`version >= 0.x.x`).
-2. Inspecciona `GET /users/billing` — `data.billing.payment_gateway_id` debería ser
-   no null.
-3. Si es null, configura una pasarela a través del dashboard del operador y vuelve a crear la
-   transacción.
+## «`401` en todas las llamadas aunque mi clave es válida»
 
-## "401 en cada llamada aunque mi clave es válida"
+1. **Entorno equivocado.** Las claves de QA no funcionan en producción, ni al revés. Revise a qué host apunta su
+   cliente. Ver [Entornos](/docs/saas/1platform-api/reference/environments).
+2. **Clave en vez de token.** Los headers llevan los **tokens** (JWT), no las claves `ak-…`/`sk-…`. Canjéelas
+   primero; ver [Autenticación](/docs/saas/1platform-api/plataforma/autenticacion).
+3. **Clave incompleta.** Copie la clave entera, prefijo incluido.
 
-Dos causas comunes:
+## «`403` con `module_disabled`»
 
-1. **Discordancia de entorno.** Las claves de QA no se autentican contra prod ni
-   viceversa. Consulta [Entornos](./environments) — inspecciona el header `Host:`
-   que tu cliente envía.
-2. **Clave truncada.** Las claves recién emitidas llevan prefijos `ak-` / `sk-`. Copia
-   la cadena completa incluyendo el prefijo; las claves heredadas sin prefijo aún
-   funcionan mediante búsqueda por coincidencia exacta.
+El módulo de esa operación está apagado para el espacio de trabajo o no está asignado a su usuario. Pida a un
+administrador del espacio de trabajo que lo habilite.
 
-## "La verificación de firma de mi webhook sigue fallando"
+## «`403` al configurar webhooks»
 
-Tres trampas:
+La configuración de webhooks exige el token de usuario de un **administrador del espacio de trabajo**, además del
+token de aplicación. Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks).
 
-1. **Re-serializar el cuerpo.** 1Platform firma la re-serialización canónica
-   del cuerpo, pero debes verificar contra los **bytes crudos** que llegaron por
-   la red. Usa `request.body` / `php://input` / `express.raw()` de Express —
-   nunca `JSON.stringify(JSON.parse(body))`.
-2. **Desfase de reloj.** El material firmado incluye el header `X-Webhook-Timestamp`.
-   Rechaza cualquier cosa más antigua de 5 minutos. Sincronizar tus servidores con NTP
-   previene la mayoría de los falsos positivos de la ventana de reproducción.
-3. **Comparar el prefijo.** Elimina el prefijo `sha256=` de `X-Webhook-Signature`
-   **antes** de comparar. No lo incluyas en el valor calculado.
+## «La verificación de firma de mi webhook falla siempre»
 
-Consulta [seguridad de webhooks](./webhooks-security) para código de verificación en tres lenguajes.
+1. **Re-serializar el cuerpo.** Lo que se firma son exactamente los bytes que le llegan. Calcule el HMAC sobre el
+   cuerpo crudo (`request.body`, `php://input`, `express.raw()`), nunca sobre
+   `JSON.stringify(JSON.parse(body))`: el orden de las claves, los espacios o el escape de caracteres no ASCII
+   cambian los bytes.
+2. **Reloj desfasado.** El material firmado incluye `X-Webhook-Timestamp`, y su verificador rechaza lo que tenga más
+   de 5 minutos. Sincronice sus servidores por NTP.
+3. **El prefijo.** Quita `sha256=` de `X-Webhook-Signature` **antes** de comparar; no lo agregue al valor calculado.
+4. **Secreto equivocado.** Hay un solo secreto por espacio de trabajo y entorno. Si alguien lo rotó, el anterior ya
+   no sirve.
 
-## "Estoy alcanzando 429 en desarrollo"
+Ver [Seguridad de webhooks](/docs/saas/1platform-api/reference/webhooks-security) para verificadores en tres
+lenguajes.
 
-Probablemente estás generando un token nuevo en cada solicitud. Los endpoints de auth
-están limitados a 10 / min. Guarda los tokens en caché por `expires_in - 60s` y reutilízalos
-en todas las llamadas — consulta el
-[patrón de caché de tokens](../journeys/cobros-y-saldo).
+## «Recibo `429` durante el desarrollo»
 
-## "El webhook llegó pero mi manejador se ejecutó dos veces"
+Lo más probable es que esté canjeando un token nuevo en cada solicitud. Los canjes están limitados a 10 por minuto
+(en `POST /users/token`, compartidos por todos los usuarios del mismo token de aplicación). Guarde los tokens en
+caché; ver
+[Autenticación → Mantener los tokens vigentes](/docs/saas/1platform-api/plataforma/autenticacion#cache-de-tokens).
+Si el `429` aparece en otra operación, puede ser su límite por minuto, el cupo de su plan o un trabajo igual ya en
+curso: ver
+[Límites de uso](/docs/saas/1platform-api/reference/rate-limits).
 
-Los webhooks se entregan **al menos una vez**. Tu manejador debe ser idempotente.
-Deduplica con `(transaction_id, event)` — consulta
-[recibir notificaciones → idempotencia](./webhooks-payload#idempotency-on-the-merchant-side).
+## «El webhook llegó y mi receptor lo procesó dos veces»
 
-## "Roté el secreto del webhook y ahora los webhooks legítimos fallan la verificación"
+Los webhooks se entregan **al menos una vez**. Deduplique por `(transaction_id, event)`; ver
+[Webhooks — cuerpo saliente → Idempotencia de su lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
 
-El secreto antiguo se invalida de inmediato cuando llamas a
-`POST /webhooks/config/rotate-secret`. Los webhooks en vuelo firmados con el secreto
-antiguo fallarán la verificación de tu lado.
+## «Roté el secreto y ahora fallan webhooks legítimos»
 
-Mitigación: conserva el secreto anterior en tu verificador durante **24 horas** (acepta
-cualquiera de los dos) antes de eliminarlo. Consulta
-[seguridad de webhooks → rotación de secretos](./webhooks-security#secret-rotation).
+El secreto anterior deja de usarse para firmar en cuanto llama a `POST /webhooks/config/rotate-secret`, pero los
+reintentos de eventos firmados antes de la rotación siguen llegando con la firma vieja durante alrededor de un
+minuto. Acepte los dos secretos durante unos minutos después de rotar. Ver
+[Seguridad de webhooks → Rotación del secreto](/docs/saas/1platform-api/reference/webhooks-security#secret-rotation).
 
-## "El `amount` de la transacción se ve 7-8 veces más grande que lo que envié"
+## «El `amount` del webhook no coincide con lo que cobré»
 
-Estás leyendo la **moneda del proveedor** (a menudo GTQ) en lugar de la moneda del
-comercio (USD). La carga útil del webhook incluye ambas:
-
-- `amount` + `currency` — la moneda del proveedor upstream
-- `merchant_amount` + `merchant_currency` — lo que originalmente enviaste
-
-**Acredita siempre a tu vendedor usando `merchant_amount`.** El campo `amount` es
-solo informativo — la tasa de cambio es opaca y se aplica al momento del cargo.
+En el webhook, `amount` y `currency` están en la moneda de la pasarela, que puede ser distinta de la suya. Lo que
+cotizó está en `merchant_amount` y `merchant_currency`: **acredita siempre con esos dos**. Ver
+[Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).

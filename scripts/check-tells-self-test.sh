@@ -72,7 +72,7 @@ printf 'Injecting one tell per category into a throwaway copy of the tree.\n\n'
 
 expect_caught "emoji or entity glyphs" \
   "emoji as a category icon" \
-  "perl -CSD -i -pe 's/\"icon\": \"code\"/\"icon\": \"\x{1F9ED}\"/' docs/saas/1platform-api/_category_.json"
+  "perl -CSD -i -pe 's/\"icon\": \"card\"/\"icon\": \"\x{1F9ED}\"/' docs/saas/1platform-api/pagos-en-linea/_category_.json"
 
 expect_caught "emoji or entity glyphs" \
   "emoji hidden as an HTML entity" \
@@ -124,15 +124,15 @@ expect_caught "pastel product tiles" \
 
 expect_caught "pastel product tiles" \
   "customProps.tint returning to a category config" \
-  "perl -i -pe 's/(\"icon\": \"code\")/\$1, \"tint\": \"blue\"/' docs/saas/1platform-api/_category_.json"
+  "perl -i -pe 's/(\"icon\": \"card\")/\$1, \"tint\": \"blue\"/' docs/saas/1platform-api/pagos-en-linea/_category_.json"
 
 expect_caught "fonts are self-hosted" \
   "a font file going missing while its @font-face stays" \
-  "rm static/fonts/inter-latin-400-normal.woff2"
+  "rm static/fonts/manrope-variable.woff2"
 
 expect_caught "fonts are self-hosted" \
   "the OFL licence not travelling with the files" \
-  "rm static/fonts/LICENSE-inter.txt"
+  "rm static/fonts/LICENSE-manrope.txt"
 
 expect_caught "fonts are self-hosted" \
   "the preload tags being dropped" \

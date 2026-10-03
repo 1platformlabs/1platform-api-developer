@@ -1,0 +1,105 @@
+---
+title: Google Analytics
+description: Conecte la cuenta de Google Analytics del usuario a un sitio, cree la propiedad, instale la etiqueta y consulte métricas.
+sidebar_position: 2
+---
+
+# Google Analytics
+
+Esta guía conecta un sitio (`website_id`) a una propiedad de Google Analytics 4 en la cuenta de Google del propio usuario. El orden importa porque hay **dos esperas distintas**: primero espera a que el usuario autorice en Google y después a que la API cree la propiedad. Cada una se consulta en su propio endpoint, y confundirlas es el error más común. Los ejemplos usan las variables de [Convenciones](/docs/saas/1platform-api/reference/convenciones); `$WEBSITE_ID` sale de [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
+
+## Paso 1 — Pedir la URL de autorización
+
+Sin la autorización del usuario no se puede crear nada en su cuenta, así que todo empieza aquí.
+
+```bash
+curl "$BASE_URL/analytics/oauth/authorize?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Abra `data.authorize_url` en una ventana emergente del navegador del usuario. El usuario inicia sesión en Google y concede el acceso. Google vuelve a la devolución de llamada de la API, que guarda la autorización y avisa a la ventana que la abrió. Su backend no llama a esa devolución de llamada.
+
+[Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
+
+## Paso 2 — Esperar la autorización
+
+El paso 1 ocurre fuera de su aplicación y ninguna respuesta le avisa cuando termina. Consulte el estado de la autorización:
+
+```bash
+curl "$BASE_URL/analytics/oauth/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Repita la consulta hasta que `data.connected` sea `true`. `data.email` dice con qué cuenta de Google quedó conectado el sitio; conviene mostrárselo al usuario antes de seguir. Si el usuario cerró la ventana sin autorizar, vuelva al paso 1.
+
+[Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
+
+## Paso 3 — Crear la propiedad
+
+La propiedad se crea dentro de una cuenta de Google Analytics del usuario. `account_id` tiene el formato `accounts/123456789` y el usuario lo encuentra en la administración de Google Analytics.
+
+```bash
+curl -X POST "$BASE_URL/analytics/setup" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"website_id": "'"$WEBSITE_ID"'", "account_id": "accounts/123456789"}'
+```
+
+La respuesta es `202`: la creación sigue en segundo plano y la respuesta sólo confirma que empezó. Por defecto también se crean dimensiones personalizadas, eventos clave y el secreto para eventos de servidor. Puede desactivarlos con `create_content_dimensions`, `create_key_events` y `create_mp_secret` en `false`. `409` significa que el sitio ya tiene una propiedad activa; `429`, que ya hay una creación en curso o que superó el límite de solicitudes.
+
+[Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
+
+## Paso 4 — Esperar a que la propiedad esté activa
+
+Esta es la segunda espera, y es distinta de la del paso 2: aquí no depende del usuario, sino de un trabajo de la API.
+
+```bash
+curl "$BASE_URL/analytics/status?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.status` pasa de `provisioning` a `active`, o a `error` con el motivo en `data.error_message`. Con `active`, guarde `data.property_id` y `data.measurement_id` junto con el sitio.
+
+[Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
+
+## Paso 5 — Instalar la etiqueta en el sitio
+
+Sin la etiqueta, la propiedad existe pero no recibe tráfico del navegador. Sólo se puede pedir con la propiedad activa.
+
+```bash
+curl "$BASE_URL/analytics/streams/tag?website_id=$WEBSITE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Inserte `data.tag_html` en el `<head>` de todas las páginas del sitio.
+
+[Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
+
+## Paso 6 — Consultar métricas
+
+Con tráfico llegando, `GET /analytics/overview` da sesiones, usuarios, páginas vistas, rebote y fuentes de un período (`period`). `GET /analytics/realtime` da la actividad de los últimos 30 minutos y `GET /analytics/page` las métricas de una ruta (`page_path`). Ninguna tiene un orden obligatorio.
+
+Para desconectar la propiedad del sitio sin borrarla, use `DELETE /analytics/disconnect`, que es reversible. `DELETE /analytics/deprovision` la elimina, exige `confirm=true` y no se puede deshacer.
+
+[Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
+
+## Paso 7 — Enviar eventos desde su servidor (opcional) {#paso-7--enviar-eventos-desde-tu-servidor-opcional}
+
+Sirve para registrar lo que no ocurre en el navegador, como un artículo publicado por su integración.
+
+```bash
+curl -X POST "$BASE_URL/analytics/mp-event" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"website_id": "'"$WEBSITE_ID"'", "event_name": "article_published", "params": {"article_id": "a-123"}}'
+```
+
+`website_id` y `event_name` son obligatorios; `params` es un objeto libre. La operación no es idempotente: cada llamada registra un evento nuevo. Si reintenta, incluya en `params` un identificador propio para poder descartar duplicados en sus análisis.
+
+[Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)

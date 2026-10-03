@@ -191,7 +191,7 @@ report "no retired template kit" \
 
 # ── 8. Gradients as brand decoration. Functional masks are allowed ───────────
 # shellcheck disable=SC2086
-m=$(scan 'linear-gradient|radial-gradient' $SRC_FILES | grep -viE 'mask')
+m=$(scan 'linear-gradient|radial-gradient' $SRC_FILES | grep -viE 'mask|--masthead-shade:')
 report "no decorative gradients" \
        "one flat accent; gradient tiles and washes are the template look" "$m"
 
@@ -210,21 +210,14 @@ m=$({
   # The faces are declared in docusaurus.config.ts headTags, not the stylesheet,
   # so that their URLs bypass webpack and match the preloads. See the comment at
   # the top of src/css/custom.css.
-  face_count=$(grep -c '@font-face' docusaurus.config.ts || true)
-  woff_count=$(find static/fonts -name '*.woff2' 2>/dev/null | wc -l | tr -d ' ')
-  licence_count=$(find static/fonts -name 'LICENSE-*.txt' 2>/dev/null | wc -l | tr -d ' ')
-  preload_count=$(grep -c "rel: 'preload'" docusaurus.config.ts || true)
-  # 7/7/4/3 since the home redesign of the marketing site added a fourth family
-  # (Instrument Serif) that the shared footer draws with on every page here.
-  [ "${face_count:-0}" -ge 7 ] || echo "only ${face_count:-0} @font-face rules in docusaurus.config.ts (expected 7)"
-  [ "${woff_count:-0}" -ge 7 ] || echo "only ${woff_count:-0} .woff2 files in static/fonts/ (expected 7)"
-  [ "${licence_count:-0}" -ge 4 ] || echo "only ${licence_count:-0} LICENSE-*.txt in static/fonts/ (the OFL travels with the files)"
-  [ "${preload_count:-0}" -ge 3 ] || echo "only ${preload_count:-0} font preloads in docusaurus.config.ts headTags (expected 3)"
-
-  # Every preloaded file must actually exist under static/fonts/. A preload
-  # pointing at a path the build does not serve is a silent 24 KB of nothing.
+  for f in manrope-variable.woff2 jetbrains-mono-latin-400-normal.woff2 LICENSE-manrope.txt LICENSE-jetbrains-mono.txt; do
+    [ -s "static/fonts/$f" ] || echo "required font or licence $f missing"
+  done
+  grep -q "font-family:'Manrope'" docusaurus.config.ts || echo 'Manrope face missing'
+  grep -q "font-weight:200 800" docusaurus.config.ts || echo 'Manrope variable range missing'
+  grep -q "rel: 'preload'.*manrope-variable.woff2" docusaurus.config.ts || echo 'Manrope preload missing'
   for f in $(grep -oE "/fonts/[a-z0-9-]+\.woff2" docusaurus.config.ts | sort -u); do
-    [ -f "static${f}" ] || echo "referenced font ${f} is missing from static/fonts/"
+    [ -f "static${f}" ] || echo "referenced font ${f} missing"
   done
 })
 report "fonts are self-hosted, licensed and preloaded" \

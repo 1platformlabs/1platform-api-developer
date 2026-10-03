@@ -1,10 +1,22 @@
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import brandTokens from './src/css/brand-tokens.json';
+import {scalarEnvironment} from './src/config/scalar-environment';
+
+function publicOrigin(value: string | undefined, fallback: string): string {
+  const url = new URL(value || fallback);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('Public origins require an HTTP(S) URL without credentials');
+  return url.origin;
+}
+const WEBSITE = publicOrigin(process.env.WEBSITE_URL, 'https://1platform.pro');
+const DEVELOPER = publicOrigin(process.env.DEVELOPER_URL, 'https://developer.1platform.pro');
+const GUIDE = '/docs/saas/1platform-api/getting-started';
+const CONTACT = 'https://wa.me/50253946564';
 
 // ─── API Reference (Scalar) configuration ───────────────────────────────────
 // One Scalar instance per SaaS API. Specs are served from static/openapi/<id>.json
-// (downloaded at build time by scripts/fetch-openapi.mjs, committed as cache).
+// (refreshed explicitly by scripts/fetch-openapi.mjs, committed as cache).
 // Each instance MUST have a unique `id`.
 //
 // Scalar's theme is NOT configured here. It used to re-declare the whole
@@ -12,16 +24,30 @@ import type * as Preset from '@docusaurus/preset-classic';
 // was decided and guaranteed drift from the stylesheet. The `--scalar-*`
 // variables now live in src/css/custom.css, mapped onto the same tokens as
 // everything else.
-const scalarPlugin = (id: string, label: string, route: string, specPath: string) => [
-  '@scalar/docusaurus',
+const scalarPlugin = (id: '1platform-api' | 'atlas-api', label: string, route: string, specPath: string) => [
+  './plugins/scalar-reference/index.cjs',
   {
     id,
     label,
     route,
     showNavLink: false,
+    cdn: 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.72.3',
     configuration: {
       url: specPath,
-      proxy: 'https://proxy.scalar.com',
+      ...scalarEnvironment(id, process.env),
+      layout: 'modern' as const,
+      withDefaultFonts: false,
+      showSidebar: true,
+      hideSearch: false,
+      hideModels: false,
+      hideTestRequestButton: false,
+      localization: {
+        locale: 'es',
+        translations: {navigation: {openMenu: 'Explorar endpoints', closeMenu: 'Cerrar catálogo'}},
+      },
+      agent: {disabled: true},
+      mcp: {disabled: true},
+      showDeveloperTools: 'never' as const,
       darkMode: false,
       forceDarkModeState: 'light' as const,
       hideDarkModeToggle: true,
@@ -117,16 +143,30 @@ const PRODUCT_PAGES = [
   'dashboard/transactions',
 ];
 
+// journeys/<slug> → <product>/<page>, one per page that existed under journeys/.
+const JOURNEY_MOVES: Array<[string, string]> = [
+  ['autenticacion', 'plataforma/autenticacion'],
+  ['webhooks', 'plataforma/webhooks'],
+  ['cobros-y-saldo', 'pagos-en-linea/cobrar-y-conciliar'],
+  ['facturacion', 'facturacion-electronica/emitir-una-factura'],
+  ['generar-contenido', 'sitios-web-y-contenido/generar-contenido'],
+  ['google-analytics', 'analitica/google-analytics'],
+  ['google-adsense', 'analitica/google-adsense'],
+  ['telemetria', 'telemetria/integrar-telemetria'],
+  ['agentes', 'agentes-de-ia/crear-un-agente'],
+];
+
 const config: Config = {
   title: 'Documentación para desarrolladores de 1Platform',
-  tagline: 'Integra tu aplicación con las APIs SaaS de 1Platform',
+  tagline: 'Integre los servicios de 1Platform en su producto',
   favicon: 'img/favicon.ico',
 
   future: {
     v4: true,
   },
 
-  url: 'https://developer.1platform.pro',
+  url: DEVELOPER,
+  customFields: {websiteUrl: WEBSITE, contactUrl: CONTACT, brandTokens},
   baseUrl: '/',
 
   onBrokenLinks: 'throw',
@@ -144,73 +184,16 @@ const config: Config = {
   // reads the same spec the reference renders and ships with its own self-test.
   onBrokenAnchors: 'warn',
 
-  // ─── Typography ───────────────────────────────────────────────────────────
-  // The @font-face rules live HERE rather than in src/css/custom.css, and the
-  // reason is measurable: webpack's css-loader rewrites any `url()` it can
-  // resolve into a content-hashed copy under /assets/fonts/. With the faces
-  // declared in the stylesheet, every file shipped twice — the static
-  // passthrough and the hashed copy — and the preloads below pointed at the
-  // static path while the page actually fetched the hashed one. The browser made
-  // redundant woff2 requests, and the "preload" downloaded bytes that nothing
-  // used. Declared here, the URL never passes through webpack, so each preload
-  // and its @font-face agree by construction.
-  //
-  // The three preloaded faces draw the shared display, text and editorial
-  // chrome. `crossorigin` is required even same-origin, because a font fetch is
-  // always CORS-mode and omitting it downloads the file a second time.
+  // Fonts remain in headTags so webpack does not duplicate their bytes under
+  // hashed URLs. The preload and the face use the exact same local font URL.
   headTags: [
-    {
-      tagName: 'style',
-      attributes: {},
-      innerHTML: [
-        "@font-face{font-family:'Space Grotesk';src:url('/fonts/space-grotesk-latin-500-normal.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}",
-        "@font-face{font-family:'Space Grotesk';src:url('/fonts/space-grotesk-latin-700-normal.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}",
-        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
-        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-500-normal.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}",
-        "@font-face{font-family:'Inter';src:url('/fonts/inter-latin-600-normal.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}",
-        "@font-face{font-family:'JetBrains Mono';src:url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
-        // Fourth family, ported from the marketing site with its home redesign:
-        // the shared footer's heading is set in it on every page of this portal.
-        "@font-face{font-family:'Instrument Serif';src:url('/fonts/instrument-serif-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
-      ].join(''),
-    },
-    // The portal is light-only (see colorMode below). Declaring it means the
-    // browser chrome and form controls match the white canvas instead of
-    // guessing from the OS preference.
-    {
-      tagName: 'meta',
-      attributes: {name: 'theme-color', content: '#FFFFFF'},
-    },
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'preload',
-        href: '/fonts/space-grotesk-latin-700-normal.woff2',
-        as: 'font',
-        type: 'font/woff2',
-        crossorigin: 'anonymous',
-      },
-    },
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'preload',
-        href: '/fonts/inter-latin-400-normal.woff2',
-        as: 'font',
-        type: 'font/woff2',
-        crossorigin: 'anonymous',
-      },
-    },
-    {
-      tagName: 'link',
-      attributes: {
-        rel: 'preload',
-        href: '/fonts/instrument-serif-latin-400-normal.woff2',
-        as: 'font',
-        type: 'font/woff2',
-        crossorigin: 'anonymous',
-      },
-    },
+    {tagName: 'style', attributes: {}, innerHTML: [
+      "@font-face{font-family:'Manrope';src:url('/fonts/manrope-variable.woff2') format('woff2');font-weight:200 800;font-style:normal;font-display:swap}",
+      "@font-face{font-family:'JetBrains Mono';src:url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}",
+      ':root{' + Object.entries(brandTokens).map(([role, value]) => `--brand-${role}:${value}`).join(';') + '}',
+    ].join('')},
+    {tagName: 'meta', attributes: {name: 'theme-color', content: brandTokens.navy}},
+    {tagName: 'link', attributes: {rel: 'preload', href: '/fonts/manrope-variable.woff2', as: 'font', type: 'font/woff2', crossorigin: 'anonymous'}},
   ],
 
   // Spanish-only for now: the source content is the canonical Spanish version
@@ -272,7 +255,7 @@ const config: Config = {
       '/openapi/atlas-api.json',
     ),
     // Backward-compat. The root `/` is handled by src/pages/index.tsx (a
-    // <Redirect> to /docs/), since this site is pure documentation — the
+    // <Redirect> to Primeros pasos), since this site is pure documentation — the
     // marketing home lives at 1platform.pro.
     //
     // ── Why these are explicit and createRedirects is gone ──────────────────
@@ -300,47 +283,57 @@ const config: Config = {
       {
         redirects: [
           {from: '/api-docs', to: '/api-reference/1platform-api'},
+          {from: '/docs', to: GUIDE},
+          {from: '/docs/saas/1platform-api/overview', to: GUIDE},
 
           // Entry points that already 404 today, referenced 4× across the
           // ecosystem (transactional emails and the dashboard onboarding
           // wizard). Broken before this epic; the cut is when they get fixed.
-          {from: '/docs/quick-start', to: '/docs/saas/1platform-api/getting-started'},
-          {from: '/docs/flows', to: '/docs/saas/1platform-api/journeys/autenticacion'},
+          {from: '/docs/quick-start', to: GUIDE},
+          {from: '/docs/flows', to: '/docs/saas/1platform-api/plataforma/autenticacion'},
+
+          // ── Organización por producto (portada-por-productos) ────────────
+          // The journeys moved into the product they belong to, the capability
+          // index was replaced by the products themselves, and the "which API"
+          // page by the home. Every old URL lands on its successor.
+          ...JOURNEY_MOVES.map(([from, to]) => ({from: `/docs/saas/1platform-api/journeys/${from}`, to: `/docs/saas/1platform-api/${to}`})),
+          {from: '/docs/saas/1platform-api/capacidades', to: GUIDE},
+          {from: '/docs/saas/api-reference-index', to: GUIDE},
 
           // ── Flows absorbed by a journey → the journey that replaced them ──
-          ...flowRedirects('magic-link-authentication', 'journeys/autenticacion'),
-          ...flowRedirects('user-onboarding', 'journeys/autenticacion'),
-          ...flowRedirects('generate-ai-content', 'journeys/generar-contenido'),
-          ...flowRedirects('ai-generations', 'journeys/generar-contenido'),
-          ...flowRedirects('payments-and-subscriptions', 'journeys/cobros-y-saldo'),
-          ...flowRedirects('billing-holds-and-captures', 'journeys/cobros-y-saldo'),
-          ...flowRedirects('paid-onboarding', 'journeys/cobros-y-saldo'),
-          ...flowRedirects('generate-invoice', 'journeys/facturacion'),
-          ...flowRedirects('webhook-configuration', 'journeys/webhooks'),
-          ...flowRedirects('ai-agents', 'journeys/agentes'),
+          ...flowRedirects('magic-link-authentication', 'plataforma/autenticacion'),
+          ...flowRedirects('user-onboarding', 'plataforma/autenticacion'),
+          ...flowRedirects('generate-ai-content', 'sitios-web-y-contenido/generar-contenido'),
+          ...flowRedirects('ai-generations', 'sitios-web-y-contenido/generar-contenido'),
+          ...flowRedirects('payments-and-subscriptions', 'pagos-en-linea/cobrar-y-conciliar'),
+          ...flowRedirects('billing-holds-and-captures', 'pagos-en-linea/cobrar-y-conciliar'),
+          ...flowRedirects('paid-onboarding', 'pagos-en-linea/cobrar-y-conciliar'),
+          ...flowRedirects('generate-invoice', 'facturacion-electronica/emitir-una-factura'),
+          ...flowRedirects('webhook-configuration', 'plataforma/webhooks'),
+          ...flowRedirects('ai-agents', 'agentes-de-ia/crear-un-agente'),
 
           // ── Flows that kept a journey of their own ───────────────────────
-          ...flowRedirects('google-analytics', 'journeys/google-analytics'),
-          ...flowRedirects('google-adsense', 'journeys/google-adsense'),
+          ...flowRedirects('google-analytics', 'analitica/google-analytics'),
+          ...flowRedirects('google-adsense', 'analitica/google-adsense'),
 
-          // ── Flows withdrawn without a successor → the capability index, ──
-          // which names their tag and links into the reference.
-          ...flowRedirects('activity-logs', 'capacidades'),
-          ...flowRedirects('admin-operations', 'capacidades'),
-          ...flowRedirects('dashboard-overview', 'capacidades'),
-          ...flowRedirects('dashboard-settings', 'capacidades'),
-          ...flowRedirects('domain-management', 'capacidades'),
-          ...flowRedirects('external-integrations', 'capacidades'),
-          ...flowRedirects('manage-websites', 'capacidades'),
-          ...flowRedirects('notifications', 'capacidades'),
-          ...flowRedirects('referrals', 'capacidades'),
-          ...flowRedirects('support', 'capacidades'),
-          ...flowRedirects('tasks', 'capacidades'),
+          // ── Flows withdrawn without a page of their own → the product (or
+          // Plataforma) whose overview names their tag and links the reference.
+          ...flowRedirects('activity-logs', 'plataforma'),
+          ...flowRedirects('admin-operations', 'plataforma'),
+          ...flowRedirects('dashboard-overview', 'plataforma'),
+          ...flowRedirects('dashboard-settings', 'plataforma'),
+          ...flowRedirects('domain-management', 'dominios-y-correo'),
+          ...flowRedirects('external-integrations', 'sitios-web-y-contenido'),
+          ...flowRedirects('manage-websites', 'sitios-web-y-contenido'),
+          ...flowRedirects('notifications', 'plataforma'),
+          ...flowRedirects('referrals', 'plataforma'),
+          ...flowRedirects('support', 'plataforma'),
+          ...flowRedirects('tasks', 'plataforma'),
 
           // ── Webhook pages: three folded into the journey, three moved to
           // the reference (the "why" the OpenAPI spec cannot carry). ────────
-          ...webhookRedirects('overview', 'journeys/webhooks'),
-          ...webhookRedirects('configuring-urls', 'journeys/webhooks'),
+          ...webhookRedirects('overview', 'plataforma/webhooks'),
+          ...webhookRedirects('configuring-urls', 'plataforma/webhooks'),
           ...webhookRedirects('receiving-notifications', 'reference/webhooks-payload'),
           ...webhookRedirects('security', 'reference/webhooks-security'),
           ...webhookRedirects('retry-and-delivery', 'reference/retry-and-delivery'),
@@ -350,7 +343,7 @@ const config: Config = {
           // No equivalent page: the audience is no longer this portal's. The
           // ecosystem links to none of these; the redirect is for external
           // readers and search engines.
-          ...PRODUCT_PAGES.map((p) => ({from: `/docs/products/${p}`, to: '/docs/'})),
+          ...PRODUCT_PAGES.map((p) => ({from: `/docs/products/${p}`, to: GUIDE})),
         ],
       },
     ],
@@ -368,40 +361,16 @@ const config: Config = {
       // Mirrors the marketing website navbar (1platform.pro) — keep item order
       // and labels in sync with 1platform-website/src/components/Header.astro.
       //
-      // The shared floating rail keeps these public destinations visible on
+      // The shared opaque navy rail keeps these public destinations visible on
       // desktop. The native compact drawer owns the same list on mobile.
       items: [
-        {
-          type: 'dropdown',
-          label: 'Soluciones',
-          position: 'left',
-          href: 'https://1platform.pro/solutions/',
-          target: '_self',
-          items: [
-            {href: 'https://1platform.pro/solutions/online-store/', label: 'Tienda online', target: '_self'},
-            {href: 'https://1platform.pro/solutions/website/', label: 'Creador de sitios web', target: '_self'},
-            {href: 'https://1platform.pro/solutions/content/', label: 'Contenido con IA', target: '_self'},
-            {href: 'https://1platform.pro/solutions/deliveries/', label: 'Envíos', target: '_self'},
-            {href: 'https://1platform.pro/solutions/ads/', label: 'Publicidad', target: '_self'},
-            {href: 'https://1platform.pro/solutions/whitelabel/', label: 'Panel de marca blanca', target: '_self'},
-            {href: 'https://1platform.pro/payments-invoicing/', label: 'Pagos y facturación', target: '_self'},
-            // The site separates the five solutions from the catch-all link
-            // with a rule; mirror it so the two menus read identically.
-            {type: 'html', value: '<hr class="dropdown__divider" />'},
-            {href: 'https://1platform.pro/solutions/', label: 'Ver todas las soluciones', target: '_self'},
-          ],
-        },
-        {href: 'https://1platform.pro/features/', label: 'Funciones', position: 'left', target: '_self'},
-        {href: 'https://1platform.pro/pricing/', label: 'Precios', position: 'left', target: '_self'},
-        {
-          to: '/docs/',
-          label: 'Documentación',
-          position: 'left',
-          activeBaseRegex: '^/(docs|api-reference)?/?$|^/(docs|api-reference)/.*',
-        },
-        {href: 'https://1platform.pro/blog/', label: 'Blog', position: 'left', target: '_self'},
-        {href: 'https://app.1platform.pro/app/', label: 'Iniciar sesión', position: 'right', target: '_self', className: 'navbar__signin'},
-        {href: 'https://app.1platform.pro/app/', label: 'Comenzar gratis', position: 'right', target: '_self', className: 'navbar__cta'},
+        {href: `${WEBSITE}/es/#capacidades`, label: 'Soluciones', position: 'left', target: '_self'},
+        {href: `${WEBSITE}/es/#arquitectura`, label: 'Infraestructura', position: 'left', target: '_self'},
+        {href: `${WEBSITE}/es/#inteligencia`, label: 'IA', position: 'left', target: '_self'},
+        {href: `${WEBSITE}/es/blog/`, label: 'Blog', position: 'left', target: '_self'},
+        {to: GUIDE, label: 'Documentación', position: 'left', activeBaseRegex: '^/(docs|api-reference)/.*'},
+        {href: CONTACT, label: 'Contacto', position: 'left', target: '_self'},
+        {href: CONTACT, label: 'Hablemos de su proyecto', position: 'right', target: '_self', className: 'navbar__cta'},
       ],
     },
     // Footer content is rendered by the custom swizzle at src/theme/Footer/index.tsx.

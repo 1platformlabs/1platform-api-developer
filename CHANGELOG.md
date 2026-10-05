@@ -2,6 +2,14 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Identidad digital de 1Platform
+
+- Logo digital v2 en la cabecera, el menú móvil y el pie compartido, con la
+  composición del prototipo: 180 px en escritorio, 160 px en cabeceras móviles
+  y versión blanca sobre las superficies oscuras.
+- Favicon de la misma identidad. Los archivos originales conservan sus bytes;
+  el encuadre de los márgenes transparentes se resuelve con CSS.
+
 ## [Unreleased] — Textos y accesibilidad del portal
 
 - Trato de usted en la documentación vigente de 1Platform y Atlas, las tarjetas

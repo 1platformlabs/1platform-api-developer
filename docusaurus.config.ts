@@ -159,7 +159,7 @@ const JOURNEY_MOVES: Array<[string, string]> = [
 const config: Config = {
   title: 'Documentación para desarrolladores de 1Platform',
   tagline: 'Integre los servicios de 1Platform en su producto',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/brand/1platform-favicon-v2-digital.ico',
 
   future: {
     v4: true,

@@ -1,0 +1,33 @@
+---
+title: Integrar agentes en su aplicación
+description: Elija herramientas y permisos, ejecute un agente desde su backend y atienda resultados y decisiones humanas sin exigir un sitio a todo uso.
+sidebar_position: 3
+---
+
+# Integrar agentes en su aplicación
+
+Su aplicación puede orquestar agentes desde su backend. Necesita los dos tokens, el módulo y las herramientas autorizadas, además del presupuesto aplicable. Asignar sitios es necesario para herramientas que trabajan sobre sitios; no es un requisito universal del contrato de instalación.
+
+## 1. Elegir herramientas y alcance
+
+Consulte `GET /agents/catalog` y `GET /agents/tools`. Elija una plantilla cuyas herramientas resuelvan su objetivo y estén disponibles para su usuario. La instalación informa las herramientas omitidas en `skipped_tools`; no interprete un agente creado como prueba de que tiene todas las capacidades.
+
+## 2. Instalar con límites
+
+Use `POST /agents/catalog/{slug}/install`. Declare sitios sólo cuando la plantilla los utilice; dejar `website_ids` vacío no concede acceso a todos. Configure presupuesto y cadencia. Sin presupuesto, el agente queda en modo propuesta para las herramientas que cuestan dinero. Para ejecutarlo sólo desde su aplicación, envíe `schedule` como cadena vacía; omitirlo adopta la cadencia de la plantilla.
+
+La [guía para crear un agente de sitios](/docs/saas/1platform-api/agentes-de-ia/crear-un-agente) muestra un caso concreto con sitios asignados. Una definición propia requiere declarar sus herramientas; no permite añadir capacidades arbitrarias fuera del catálogo del servidor.
+
+## 3. Solicitar y consultar una ejecución
+
+Inicie `POST /agents/{agent_id}/run` con el objetivo de la tarea en `input_message`. Conserve el identificador de la ejecución y consulte `GET /agents/{agent_id}/runs/{run_id}` hasta su estado final. La aceptación `202` no confirma que la tarea haya terminado. Distinga ejecución fallida, detenida y completada antes de mostrar un resultado a su usuario.
+
+## 4. Resolver decisiones humanas
+
+Consulte `GET /agent-actions` y presente la acción pendiente a una persona con contexto suficiente. Use `PATCH /agent-actions/{action_id}/consume` sólo después de una decisión. Una acción ya consumida no se procesa de nuevo. Detener una ejecución pendiente o activa utiliza su operación específica; no borre recursos para simular una cancelación.
+
+## 5. Integrar Ventas sólo cuando esté habilitado
+
+[Ventas](/docs/saas/1platform-api/ventas) tiene ofertas, canales, leads y permisos propios. La automatización por WhatsApp y la activación con un clic permanecen en preparación. Una operación interna de avisos de mensajería no es una API pública de conversación ni habilita un canal para su aplicación.
+
+[Referencia de API → Catálogo](/api-reference/1platform-api#tag/agents-catalog) · [Herramientas](/api-reference/1platform-api#tag/agents-tools) · [Ejecución](/api-reference/1platform-api#tag/agents-execution) · [Acciones](/api-reference/1platform-api#tag/agents-actions).

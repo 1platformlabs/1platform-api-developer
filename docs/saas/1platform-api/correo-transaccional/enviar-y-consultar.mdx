@@ -1,0 +1,52 @@
+---
+title: Enviar un aviso y consultar su resultado
+description: Revise remitente, plantilla y cuota; confirme un aviso, repita con la misma clave si la respuesta se pierde y consulte su entrega.
+sidebar_position: 2
+---
+
+# Enviar un aviso y consultar su resultado
+
+Use las variables de [Convenciones](/docs/saas/1platform-api/reference/convenciones). Este recorrido requiere administrador, módulo de API y [servicio habilitado](/docs/saas/1platform-api/correo-transaccional).
+
+## 1. Revisar remitente y cuota
+
+Consulte `GET /transactional-email/senders`, seleccione una dirección con `can_send=true` y conserve su `id` como `$SENDER_ID`. Si sigue pendiente, complete la verificación de envío desde Dominios y correo. Una dirección de otro usuario o espacio no sirve como remitente.
+
+Consulte `GET /transactional-email/limits`. El cupo disponible es el menor de los cupos del espacio y del usuario. El reinicio es a medianoche UTC. Una prueba desde el Panel utiliza la misma cuota y la misma cola.
+
+## 2. Elegir la plantilla
+
+Consulte `GET /transactional-email/templates?locale=es`. Use `service_notice` y versión `1`, con `title` y `message`. El esquema de variables del catálogo es la fuente de validación. Revise remitente, destinatario y vista previa antes de confirmar; cancelar no crea un envío.
+
+## 3. Admitir un mensaje
+
+Genere una clave única por evento de negocio, de 16 a 128 caracteres ASCII imprimibles, y consérvela junto al contenido original. El ejemplo es ilustrativo: sustituya el destinatario por uno autorizado para su integración.
+
+```bash
+curl -X POST "$BASE_URL/transactional-email/messages" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Idempotency-Key: $NOTICE_EVENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sender_id":"'"$SENDER_ID"'","to":"cliente@example.com","template_key":"service_notice","template_version":1,"locale":"es","variables":{"title":"Solicitud recibida","message":"Puede revisar el estado desde su cuenta."}}'
+```
+
+`202` confirma admisión en la cola. Guarde `data.id` como `$MESSAGE_ID`; todavía no confirma entrega. Un replay idéntico devuelve `200` con el mismo mensaje y sin nueva cuota. La misma clave con otro contenido devuelve `409`. Si pierde la respuesta o recibe `503`, repita **la misma clave y el mismo contenido**; no genere otro evento para resolver un timeout.
+
+[Referencia de API → Admitir mensaje](/api-reference/1platform-api#operation/createTransactionalEmailMessage).
+
+## 4. Consultar resultado e historial
+
+```bash
+curl "$BASE_URL/transactional-email/messages/$MESSAGE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Consulte `GET /transactional-email/messages` con cursor, límite, estado y fechas para recuperar el historial. `sent` significa «Sin confirmación de entrega» hasta que exista evidencia adicional. Un timeout puede dejar el estado `unknown`; esta versión no ofrece reenvío manual. Use los motivos normalizados para corregir configuración, sin inferir que un fallo de consulta significa que el mensaje no salió.
+
+## 5. Conservar la identidad del evento
+
+La deduplicación dura mientras exista el mensaje o su registro de control: por defecto, 30 días desde su estado terminal y 24 horas para una admisión rechazada. Después del vencimiento una clave reutilizada puede crear otro envío; mantenga claves únicas por evento de negocio. El servidor conserva las reservas de cuota ante aceptación incierta y no borra la cola viva para liberar espacio.
+
+Los datos sensibles se cifran al persistir. Se eliminan después del plazo corto de retención terminal configurado, mientras los metadatos sanitizados permanecen el período del historial. Los límites efectivos y el máximo de intentos se consultan en la API.

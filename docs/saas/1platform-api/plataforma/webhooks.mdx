@@ -105,13 +105,9 @@ redirigir. Un `4xx` también es una falla y se reintenta igual que un `5xx`. El 
 
 ## Paso 6 — Prepararse para cuando su backend falla {#paso-6--prepararte-para-cuando-tu-backend-falla}
 
-La entrega es **al menos una vez**: el mismo evento puede llegarle más de una vez, con la misma firma y el mismo
-timestamp. Deduplique por `(transaction_id, event)`.
+La entrega usa **reintentos limitados**: puede haber duplicados y eventos no entregados. Requiere conciliación. El envío existente reintenta dentro de su despacho y no ofrece una cola histórica de reenvío. Concilie periódicamente mediante `GET /users/transactions` como indica [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar).
 
-Cada evento tiene **3 intentos** en poco más de un minuto (al instante, a los 5 s y a los 35 s). Si su backend está
-caído más tiempo, ese evento se pierde: no hay una cola de reenvío. Concilie periódicamente recorriendo
-`GET /users/transactions` en vez de asumir que todo lo que pasó le llegó; la forma de hacerlo está en
-[Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar).
+Si su espacio tiene habilitado el historial durable, consulte estados, intentos y elegibilidad de recuperación en [Entrega y recuperación de webhooks](/docs/saas/1platform-api/plataforma/webhooks-entregas). Ese modo conserva un `X-1Platform-Event-Id` estable y firma cada intento con timestamp nuevo. Use el identificador para deduplicar; no confunda un replay con una transacción nueva.
 
 [Referencia de API → Payments](/api-reference/1platform-api#tag/payments)
 
@@ -127,8 +123,7 @@ curl -X POST "$BASE_URL/webhooks/config/rotate-secret" \
 ```
 
 El nuevo secreto llega en `data.webhook_secret` una sola vez y el anterior deja de usarse para firmar en ese mismo
-momento. Despliegue el nuevo en su verificador de inmediato y acepte los dos durante unos minutos, para no rechazar
-los reintentos de eventos firmados antes de la rotación. Si pierde la respuesta, tiene que rotar de nuevo. El
+momento. Despliegue el nuevo en su verificador de inmediato y contemple las peticiones en vuelo firmadas antes de la rotación. En modo durable cada nuevo intento utiliza el secreto vigente; el envío existente puede conservar la firma durante su despacho. Si pierde la respuesta, tiene que rotar de nuevo. El
 procedimiento está en
 [Seguridad de webhooks → Rotación del secreto](/docs/saas/1platform-api/reference/webhooks-security#secret-rotation).
 

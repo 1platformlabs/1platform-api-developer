@@ -1,6 +1,6 @@
 ---
 title: Reintentos y entrega
-description: Cómo entrega 1Platform los webhooks — al menos una vez, 3 intentos en poco más de un minuto — y qué respuestas espera de su receptor.
+description: Entrega con reintentos limitados, posibilidad de duplicados y conciliación; diferencias entre envío existente e historial durable habilitado.
 sidebar_position: 5
 ---
 
@@ -8,55 +8,41 @@ sidebar_position: 5
 
 ## Garantía de entrega
 
-1Platform entrega los webhooks **al menos una vez**: el mismo evento puede llegarle más de una vez. Su receptor
-tiene que deduplicar; ver
-[Webhooks — cuerpo saliente → Idempotencia de su lado](/docs/saas/1platform-api/reference/webhooks-payload#idempotency-on-the-merchant-side).
+**Entrega con reintentos limitados; puede haber duplicados y eventos no entregados. Requiere conciliación.** Un receptor puede procesar un evento cuya respuesta se pierda. No hay garantía de exactamente una vez ni de que todo evento llegue.
 
-## Calendario de reintentos
+Deduplique antes de aplicar efectos y consulte periódicamente las transacciones. El recorrido está en [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar).
 
-Si su receptor no responde `2xx`, o la solicitud falla por completo, el evento se reintenta:
+## Modos de entrega
 
-| Intento | Espere antes del intento | Tiempo acumulado (sin contar las respuestas) |
-|---|---|---|
-| 1 | — | 0 s |
-| 2 | 5 s | 5 s |
-| 3 | 30 s | 35 s |
+<table tabIndex={0} aria-label="Comparación de modos de entrega">
+<thead><tr><th>Aspecto</th><th>Envío existente</th><th>Historial durable habilitado</th></tr></thead>
+<tbody>
+<tr><td>Recuperación</td><td>Reintentos dentro del despacho; no cola histórica de reenvío</td><td>Intención persistida, historial e intentos recuperables</td></tr>
+<tr><td>Calendario inicial</td><td>3 intentos: inmediato, tras 5 s y tras 30 s adicionales</td><td>Por defecto 3 intentos, con backoff de 30/120 s y variación acotada</td></tr>
+<tr><td>Reenvío manual</td><td>No disponible</td><td>Sólo fallos elegibles dentro de la retención y los límites configurados</td></tr>
+<tr><td>Firma y timestamp</td><td>Conservados durante el despacho existente</td><td>Nuevos por intento, usando el secreto vigente</td></tr>
+<tr><td>Identidad durable</td><td>Deduplicación por transacción y evento</td><td>Header estable <code>X-1Platform-Event-Id</code>, con el mismo payload</td></tr>
+</tbody>
+</table>
 
-Si el tercer intento falla, la entrega se da por agotada y no se vuelve a intentar. Cada intento espera su
-respuesta hasta 10 segundos, así que el ciclo completo dura como máximo unos 65 segundos.
+El historial durable y su despacho necesitan habilitación; no dé por hecho el modo por la existencia de la ruta. Consulte su cobertura y disponibilidad en [Entrega y recuperación](/docs/saas/1platform-api/plataforma/webhooks-entregas). Los valores operativos no son un SLA: dependen de configuración, capacidad, pausas y disponibilidad del receptor.
 
-:::caution[Planifica para las caídas]
-Si su receptor está caído más de un minuto, **pierde ese evento**: no hay una cola de reenvío. Concilie
-periódicamente recorriendo `GET /users/transactions`; la forma de hacerlo está en
-[Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar).
-:::
+## Respuestas del receptor
 
-## Respuestas que 1Platform espera
-
-| Status | Comportamiento |
+| Respuesta | Tratamiento |
 |---|---|
-| `2xx` | Entregado. **Sólo esto cuenta como entrega** |
-| `3xx` | Falla. La redirección no se sigue: su receptor no debe redirigir, ni siquiera en duplicados |
-| `4xx` | Falla, y se reintenta. Aunque el error sea de configuración (por ejemplo, un header de acceso equivocado), el evento no se descarta en el primer intento |
-| `5xx` | Falla, y se reintenta |
-| Conexión rechazada, error de DNS o tiempo agotado | Falla, y se reintenta |
+| `2xx` | Entrega confirmada al receptor; termine el efecto comercial mediante su propia cola |
+| `3xx` | No se sigue la redirección; el intento falla |
+| `4xx`, `429`, `5xx` | Se registra el fallo y se aplican los reintentos limitados |
+| Error de conexión, DNS o timeout | Fallo de transporte; no demuestra que el receptor no procesó la petición |
+| Destino revocado o no autorizado | La entrega durable queda bloqueada; no se redirige a una URL nueva |
 
-:::tip[Responda 200 cuanto antes]
-Responda `200` (o `202`) con un cuerpo mínimo **antes** de hacer el trabajo pesado y deje el procesamiento para
-una cola en segundo plano. Un receptor lento consume los intentos aunque al final termine bien.
-:::
+Responda `200` o `202` después de guardar de forma durable la recepción y antes del trabajo pesado. El timeout inicial por intento es de 10 segundos. Una respuesta rápida sin registrar el evento no protege a su aplicación de una caída posterior.
 
-## Carga alta
+## Carga, pausas y agotamiento
 
-Cuando hay muchas entregas en curso a la vez, un evento que no consigue turno de envío en 5 segundos se descarta
-sin reintentos. Es otra razón para conciliar periódicamente en lugar de confiar en que todo llegó.
+El envío existente puede perder un evento si no consigue turno de envío; no dispone de una cola histórica. En el modo durable, la pausa conserva los pendientes y cada próximo intento se programa en la cola. Al agotar el ciclo se conserva el resultado `failed`, y sólo una recuperación autorizada puede reencolarlo. Un `delivered` no se reenvía desde la API de recuperación.
 
-## Headers de cada intento
+## Headers
 
-| Header | Notas |
-|---|---|
-| `X-Webhook-Signature` | Se calcula **una vez por evento**: los tres intentos llevan el mismo valor |
-| `X-Webhook-Timestamp` | También es el mismo en los tres intentos. Como el ciclo dura alrededor de un minuto, la ventana de 5 minutos de su verificador alcanza para todos |
-| `Content-Type: application/json` | Siempre |
-| `Authorization` | Sólo si se acordó con 1Platform un token para autenticarse ante su receptor; viaja sólo a un dominio verificado |
-| Headers propios del evento | Los que configuró en `headers`, en cada intento. Ver [Webhooks → Paso 2](/docs/saas/1platform-api/plataforma/webhooks#eventos) |
+Verifique `X-Webhook-Signature` y `X-Webhook-Timestamp` según [Seguridad de webhooks](/docs/saas/1platform-api/reference/webhooks-security). En modo durable, use además `X-1Platform-Event-Id` para deduplicar; no use la firma cambiante como clave de negocio. `Content-Type` es `application/json`. El token externo sólo se adjunta cuando el destino tiene la verificación exigida; registrar un dominio no equivale a verificarlo por DNS.

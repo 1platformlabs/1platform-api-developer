@@ -1,0 +1,55 @@
+---
+title: Correo transaccional
+description: Envíe avisos individuales desde una dirección propia verificada y consulte sus límites, intentos y estado de entrega.
+sidebar_position: 1
+---
+
+# Correo transaccional
+
+<p className="lead">Envíe un aviso individual de su servicio con una plantilla controlada y una dirección propia verificada. Consulte el resultado desde la misma integración, sin confundir la aceptación del envío con su entrega.</p>
+
+## Disponibilidad y requisitos
+
+Este servicio requiere **habilitación del espacio de trabajo** y permanece apagado por defecto. Consulte sus límites efectivos antes de integrarlo. La habilitación de admisión y la del despacho se controlan por separado: una cola puede estar conservada mientras los envíos están pausados.
+
+Necesita los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido), un administrador del espacio y el módulo de API asignado. Cada remitente pertenece al propio usuario dentro del espacio. Su administración se realiza mediante [Dominios y correo](/docs/saas/1platform-api/dominios-y-correo); recepción verificada y envío verificado son estados independientes.
+
+## Qué puede enviar
+
+La plantilla pública inicial es `service_notice`, versión `1`, en español e inglés. Solicita título y mensaje de texto plano. La API admite además una acción opcional: etiqueta y URL deben aparecer juntas, y la URL debe usar HTTPS en un dominio propio verificado. El título se convierte en asunto; los valores se escapan al renderizar.
+
+Un mensaje tiene un solo destinatario. No admite HTML libre, adjuntos, listas, cc/bcc, campañas ni cabeceras arbitrarias. El catálogo público excluye las plantillas privadas de acceso, credenciales y facturación de la plataforma. El aviso representa a su servicio; no acredita pagos ni comunicaciones del personal de plataforma.
+
+## Operaciones
+
+| Operación | Propósito |
+|---|---|
+| `GET /transactional-email/senders` | Remitentes propios y motivo de no disponibilidad |
+| `GET /transactional-email/templates` | Plantillas públicas por idioma |
+| `GET /transactional-email/limits` | Uso, cupos, reinicio UTC y retención efectivos |
+| `POST /transactional-email/messages` | Admitir un aviso con clave de idempotencia |
+| `GET /transactional-email/messages` | Historial propio paginado y filtrado |
+| `GET /transactional-email/messages/{message_id}` | Estado e intentos sanitizados |
+
+[Referencia de API → Correo transaccional](/api-reference/1platform-api#tag/transactional-email).
+
+## Interpretar el resultado
+
+| Estado | Significado |
+|---|---|
+| `queued` | Admitido y pendiente de despacho o de su siguiente intento |
+| `processing` | Un trabajador está procesando el envío |
+| `sent` | El transporte aceptó el mensaje; no confirma recepción |
+| `delivered` | Existe confirmación de entrega del transporte |
+| `bounced` | Rechazo o devolución final; puede llegar después de una entrega |
+| `failed` | Fallo comprobado antes de aceptación o límite agotado |
+| `suppressed` | Remitente, dominio de acción o plantilla dejaron de estar autorizados antes de enviar |
+| `unknown` | No se pudo determinar si el transporte aceptó; no se reenvía a ciegas |
+
+No hay reintento manual ni métricas de apertura. El historial enmascara el destinatario y omite variables, credenciales y respuestas privadas del transporte. La retención y los límites son operativos; esta guía no define precios ni un plazo garantizado de entrega.
+
+## Guía
+
+[Enviar un aviso y consultar su resultado](/docs/saas/1platform-api/correo-transaccional/enviar-y-consultar).
+
+El [correo del negocio](/docs/saas/1platform-api/dominios-y-correo) conserva sus conversaciones y adjuntos. Un aviso transaccional no crea una conversación en esa bandeja.

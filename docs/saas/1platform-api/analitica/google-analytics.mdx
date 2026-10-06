@@ -48,7 +48,7 @@ curl -X POST "$BASE_URL/analytics/setup" \
   -d '{"website_id": "'"$WEBSITE_ID"'", "account_id": "accounts/123456789"}'
 ```
 
-La respuesta es `202`: la creación sigue en segundo plano y la respuesta sólo confirma que empezó. Por defecto también se crean dimensiones personalizadas, eventos clave y el secreto para eventos de servidor. Puede desactivarlos con `create_content_dimensions`, `create_key_events` y `create_mp_secret` en `false`. `409` significa que el sitio ya tiene una propiedad activa; `429`, que ya hay una creación en curso o que superó el límite de solicitudes.
+La respuesta es `202`: la creación sigue en segundo plano y la respuesta sólo confirma que empezó. Por defecto también se crean dimensiones personalizadas, eventos clave y el secreto para eventos de servidor. Puede desactivarlos con `create_content_dimensions`, `create_key_events` y `create_mp_secret` en `false`. `account_id`, `timezone` y `currency`, junto con los tres flags, se conservan para ese trabajo y para su recuperación. `409` indica una propiedad activa o un aprovisionamiento que todavía no admite otro intento; `429`, un límite de solicitudes. Un resultado ambiguo requiere revisar el estado antes de intentar crear otra propiedad.
 
 [Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
 
@@ -97,9 +97,9 @@ curl -X POST "$BASE_URL/analytics/mp-event" \
   -H "Authorization: Bearer $APP_TOKEN" \
   -H "x-user-token: $USER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"website_id": "'"$WEBSITE_ID"'", "event_name": "article_published", "params": {"article_id": "a-123"}}'
+  -d '{"website_id": "'"$WEBSITE_ID"'", "event_name": "content_published", "params": {"article_id": "a-123"}}'
 ```
 
-`website_id` y `event_name` son obligatorios; `params` es un objeto libre. La operación no es idempotente: cada llamada registra un evento nuevo. Si reintenta, incluya en `params` un identificador propio para poder descartar duplicados en sus análisis.
+`website_id` y `event_name` son obligatorios. Los eventos admitidos son `content_published`, `content_updated`, `comment_received`, `seo_action` y `keyword_research`. `params` admite hasta 25 parámetros: cada nombre cumple `^[a-z][a-z0-9_]{0,39}$` y la representación de cada valor no supera 100 caracteres. Un evento fuera de ese catálogo se rechaza. La operación no es idempotente: cada llamada registra un evento nuevo. Si reintenta, incluya en `params` un identificador propio para poder descartar duplicados en sus análisis.
 
 [Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)

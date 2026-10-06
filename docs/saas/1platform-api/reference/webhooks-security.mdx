@@ -18,7 +18,7 @@ trabajo, que se entrega una sola vez: al registrar el primer dominio o al rotarl
 | Encabezado complementario | `X-Webhook-Timestamp` (segundos epoch unix, string) |
 | Algoritmo | `HMAC-SHA256` |
 | Material firmado | `"{X-Webhook-Timestamp}." + cuerpo`, sobre los **mismos bytes** que viajan en la solicitud (JSON compacto, UTF-8) |
-| Cálculo | Una vez por evento: los reintentos llevan la misma firma y el mismo timestamp |
+| Cálculo | En modo durable, por intento con timestamp nuevo; el despacho existente conserva los originales |
 | Ventana de repetición | 5 minutos de desfase máximo de `X-Webhook-Timestamp`, comprobados por su verificador |
 
 :::warning[Verifique sobre los bytes que recibe]

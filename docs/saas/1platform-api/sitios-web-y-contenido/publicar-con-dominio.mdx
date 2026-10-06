@@ -1,0 +1,29 @@
+---
+title: Publicar un sitio con su dominio
+description: Conecte el alta del sitio, su dominio y DNS con la publicación y la comprobación del estado final.
+sidebar_position: 3
+---
+
+# Publicar un sitio con su dominio
+
+Este recorrido cubre los tipos de sitio que ofrece la plataforma. No es un servicio de hosting genérico ni incluye Cloud as a Service.
+
+## 1. Elegir el tipo de alta
+
+Para un sitio que ya existe, `POST /users/websites` registra la relación con el usuario y devuelve `website_id`; no despliega contenido. Para crear un sitio servido por la plataforma, use `POST /provisioning/tenants` con un tipo habilitado. Su respuesta `202` inicia un trabajo: consulte el estado hasta que termine antes de anunciar la publicación.
+
+Las llamadas usan los dos tokens y los módulos requeridos. Crear a nombre de otro usuario del espacio exige administración del espacio; tener un comercio no concede ese permiso.
+
+## 2. Preparar el dominio
+
+Registre un dominio o conecte uno propio mediante [Dominios y correo](/docs/saas/1platform-api/dominios-y-correo). Un dominio externo necesita la verificación correspondiente; escribir su nombre no demuestra propiedad. Revise registros existentes antes de reemplazar DNS para conservar correo y otros servicios.
+
+## 3. Esperar el aprovisionamiento
+
+Siga el trabajo y atienda los motivos de fallo que devuelve la API. Una solicitud registrada, la delegación DNS y la disponibilidad del sitio son estados distintos. Después de un timeout, consulte el trabajo original antes de pedir otra alta.
+
+## 4. Publicar y comprobar
+
+Use el recorrido de publicación del tipo de sitio elegido y confirme su dominio, contenido y acceso público. Un sitio de marca administrado tiene restricciones distintas de un sitio del usuario; no aplique automáticamente las mismas acciones a ambos. La configuración de correo y la [analítica](/docs/saas/1platform-api/analitica/trafico-del-sitio) son integraciones posteriores, no una consecuencia automática de registrar el sitio.
+
+[Referencia de API → Sitios](/api-reference/1platform-api#tag/websites) · [Aprovisionamiento](/api-reference/1platform-api#tag/provisioning) · [Dominios](/api-reference/1platform-api#tag/domains).

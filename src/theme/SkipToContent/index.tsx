@@ -1,12 +1,16 @@
+import {useEffect} from 'react';
 import type {ReactNode} from 'react';
 import OriginalSkipToContent from '@theme-original/SkipToContent';
 import {SkipToContentFallbackId} from '@docusaurus/theme-common/internal';
 
+const SKIP_LINK = `a[href="#${SkipToContentFallbackId}"]`;
+
 /** Upstream focuses `<main>` and drops its tabindex in the same tick, which
  * blurs it in Chromium: focus lands on BODY and, on mobile, the next Tab hits
- * the sections toggle. Runs after the original handler (bubbling) and keeps
- * the reading content focused so keyboard users actually skip the chrome. */
-function focusContent(): void {
+ * the sections toggle. A document listener runs after React's own handler
+ * (bubbling past the root) and keeps the reading content focused. */
+function focusContent(event: MouseEvent): void {
+  if (!(event.target instanceof Element) || !event.target.closest(SKIP_LINK)) return;
   const target = document.querySelector<HTMLElement>('main article')
     ?? document.querySelector<HTMLElement>('main')
     ?? document.getElementById(SkipToContentFallbackId);
@@ -16,9 +20,9 @@ function focusContent(): void {
 }
 
 export default function SkipToContent(): ReactNode {
-  return <div onClick={(event) => {
-    if ((event.target as Element).closest('a')) focusContent();
-  }}>
-    <OriginalSkipToContent />
-  </div>;
+  useEffect(() => {
+    document.addEventListener('click', focusContent);
+    return () => document.removeEventListener('click', focusContent);
+  }, []);
+  return <OriginalSkipToContent />;
 }

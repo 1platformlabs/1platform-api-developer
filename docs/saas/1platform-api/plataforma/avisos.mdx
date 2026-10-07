@@ -1,0 +1,37 @@
+---
+title: Avisos del espacio
+description: Publique avisos a un usuario o a todo su espacio, consulte el historial administrativo y mantenga la lectura independiente de cada persona.
+sidebar_position: 7
+---
+
+# Avisos del espacio
+
+Un aviso aparece en la bandeja del Panel. Publicarlo no envía un correo ni una notificación móvil y no certifica que sus destinatarios lo hayan leído.
+
+## 1. Preparar la audiencia
+
+La publicación exige un **administrador del espacio** y los dos tokens. El espacio se resuelve desde el administrador autenticado; no se selecciona enviando un identificador de tenant en el cuerpo.
+
+Elija exactamente una audiencia: un usuario activo del espacio mediante `user_id`, o todo el espacio mediante `is_global=true` sin usuario individual. Un destinatario ajeno no es válido, aunque conozca su identificador. Los usuarios comunes pueden consultar y marcar su propia bandeja, pero no publicar avisos administrativos.
+
+## 2. Revisar y publicar
+
+Prepare título, texto, severidad y, si hace falta, un enlace permitido. Revise el contenido y la audiencia antes de confirmar `POST /notifications`. Cancelar conserva el borrador del Panel y no publica un aviso.
+
+Use `Idempotency-Key` para que repetir la misma publicación después de un timeout conserve el mismo aviso. Una clave reutilizada con otro contenido devuelve conflicto. Una publicación nueva responde `201`; un replay idéntico, `200`. No regenere la clave al repetir la confirmación incierta.
+
+[Referencia de API → Publicar aviso](/api-reference/1platform-api#operation/createNotification).
+
+## 3. Consultar el historial administrativo
+
+`GET /admin/notifications` lista los avisos manuales del espacio con cursor y filtro de audiencia. `GET /admin/notifications/{notification_id}` abre el detalle. Este historial está separado de la bandeja personal y de las notificaciones automáticas del sistema; no informa aperturas, lecturas individuales ni entrega de correo.
+
+## 4. Leer desde la bandeja
+
+Cada persona consulta sus avisos y el contador de no leídos. Marcar un broadcast como leído sólo cambia el estado de esa persona: no lo marca leído para el resto del espacio. Lo mismo ocurre con «Marcar todos como leídos». Una recarga conserva el estado persistido.
+
+[Referencia de API → Notificaciones](/api-reference/1platform-api#tag/notifications).
+
+## Errores que debe distinguir
+
+Un `403` de rol indica que no puede publicar. Un `404` de destinatario o aviso evita revelar recursos ajenos. Un `409` de idempotencia requiere recuperar la publicación original o crear una intención nueva, no alterar el contenido bajo la misma clave. Los errores de validación de audiencia se corrigen antes de publicar.

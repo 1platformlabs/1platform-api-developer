@@ -1,0 +1,59 @@
+---
+title: Entrega y recuperación de webhooks
+description: Consulte entregas e intentos, identifique bloqueos y reencole fallos elegibles sin crear otra transacción.
+sidebar_position: 9
+---
+
+# Entrega y recuperación de webhooks
+
+La entrega tiene **reintentos limitados**: puede haber duplicados y eventos no entregados. Mantenga una conciliación con la API aunque consulte este historial.
+
+## Disponibilidad
+
+El historial durable y su despacho requieren habilitación del espacio y del servicio. La cobertura comienza cuando se registra la primera intención de entrega de ese espacio; `coverage_started_at` informa esa fecha y puede ser `null` antes de la primera. No se reconstruyen entregas de cobros anteriores. La referencia de una ruta no prueba que el historial esté habilitado para su espacio.
+
+Los administradores del espacio con el módulo de API y los dos tokens pueden consultar entregas y solicitar reintentos. Los filtros y las consultas siempre pertenecen al espacio del actor.
+
+## 1. Configurar el receptor
+
+Complete [Webhooks](/docs/saas/1platform-api/plataforma/webhooks): registre el dominio, configure los eventos y verifique firmas en el receptor. Los siete eventos configurables son `on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`, `on_refunded` y `on_reversed`.
+
+## 2. Consultar la entrega
+
+`GET /webhooks/deliveries` devuelve una página con cursor, cobertura y retención efectiva. Puede filtrar por estado, evento y fechas. Una fecha sin hora representa su día UTC; utilice una fecha y hora explícitas cuando necesite otra precisión.
+
+Abra `GET /webhooks/deliveries/{delivery_id}` para ver el destino sanitizado, intentos, códigos HTTP y motivos normalizados. La respuesta nunca incluye el payload privado, credenciales, cabeceras sensibles ni el cuerpo de la respuesta del receptor.
+
+| Estado | Lectura |
+|---|---|
+| `pending` | Espera su primer despacho |
+| `processing` | Existe un intento en curso |
+| `retrying` | Espera el siguiente intento programado |
+| `delivered` | El receptor respondió `2xx`; no acredita su procesamiento comercial interno |
+| `failed` | Agotó el ciclo automático o falló; consulte si admite recuperación |
+| `blocked` | El destino o la configuración ya no están autorizados |
+
+## 3. Recuperar sólo un fallo elegible
+
+La respuesta indica `can_retry` y, si no procede, `retry_block_reason`. Sólo una entrega `failed`, vigente y con el mismo destino todavía autorizado puede reencolarse. Un cambio de URL no redirige un evento antiguo. No ofrezca el botón sobre una entrega entregada o en proceso.
+
+Antes de confirmar, advierta que el receptor pudo procesar una petición cuya respuesta se perdió: repetirla puede producir un duplicado. Conserve el identificador y la clave elegida para la intención de reintento.
+
+```bash
+curl -X POST "$BASE_URL/webhooks/deliveries/$DELIVERY_ID/retry" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Idempotency-Key: $RETRY_EVENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+`202` confirma que la misma entrega se reencoló; un replay idéntico devuelve `200` sin otra admisión. El reintento conserva evento, payload y destino, y no crea una transacción ni otro cobro. Ante un timeout repita la misma clave; un `409` exige releer el estado y el motivo.
+
+[Referencia de API → Recuperar entrega](/api-reference/1platform-api#operation/retryWebhookDelivery).
+
+## 4. Deduplicar y conciliar
+
+Use `X-1Platform-Event-Id` como identidad estable de la entrega durable y deduplique antes de aplicar efectos. La firma y el timestamp son nuevos por intento; verifíquelos sobre los bytes exactos recibidos con el secreto vigente. El cuerpo canónico conserva su formato.
+
+La pausa de despacho conserva el trabajo pendiente. Límites de intentos, ventana automática y retención los define el servidor; una entrega vencida no se reconstruye para volver a enviarla. Concilie periódicamente como indica [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar).

@@ -102,8 +102,10 @@ que permite calcular la firma sobre el cuerpo crudo. Ver
 
 ## Idempotencia de su lado {#idempotency-on-the-merchant-side}
 
-La entrega es **al menos una vez**, con reintentos; ver
+La entrega tiene reintentos limitados y requiere conciliación; ver
 [Reintentos y entrega](/docs/saas/1platform-api/reference/retry-and-delivery). Su receptor **debe** deduplicar.
 
 Deduplique siempre por `(transaction_id, event)`. `merchant_reference` sirve para encontrar su pedido, no para
 deduplicar: una misma transacción emite varios eventos con la misma referencia.
+
+En el historial durable habilitado, `X-1Platform-Event-Id` es la identidad estable para deduplicar; conserva el mismo payload durante los reintentos. La firma y el timestamp pueden cambiar por intento. Consulte [Entrega y recuperación](/docs/saas/1platform-api/plataforma/webhooks-entregas).

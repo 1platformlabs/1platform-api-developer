@@ -27,9 +27,10 @@ const BOOT_JS_BUDGET = 180 * 1024;
 // The total grows with the page count: every doc is its own lazily-loaded
 // chunk, fetched only when visited (the boot budget above is what every page
 // pays). Measured 2026-10-01: origin/main 378,806 gzip bytes over 38 docs; the
-// per-product reorganisation 416,177 over 50 docs. Raised for that, with room
-// for a few more pages, not for a heavier boot.
-const TOTAL_JS_BUDGET = 420 * 1024;
+// per-product reorganisation 416,177 over 50 docs. SRV-07 adds nine guide
+// pages and one product category (2026-10-06): 445,308 gzip bytes over 62 docs (53 in the base).
+// This content allowance does not raise the boot or CSS budgets.
+const TOTAL_JS_BUDGET = 450 * 1024;
 const CSS_BUDGET = 25 * 1024;
 
 const SNAPSHOT_REQUIREMENTS = [

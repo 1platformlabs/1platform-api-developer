@@ -1,0 +1,33 @@
+---
+title: Mapas de calor
+description: Capture las muestras de interacción por página y pantalla, interprete clics y scroll y gestione etiqueta, snapshot y pausa.
+sidebar_position: 5
+---
+
+# Mapas de calor
+
+Los mapas agregan **las muestras de interacción**. Una visita con varios clics o desplazamientos puede aportar más de una muestra: el ranking de páginas no mide visitas ni personas únicas. No hay reproducción de sesiones.
+
+## 1. Registrar el sitio y las rutas
+
+Con los dos tokens y el módulo de mapas habilitado, use `POST /users/heatmap/sites`. Declare el host y los patrones `page_keys` que desea medir. Una lista vacía no captura todas las páginas: no mide ninguna. El sitio y sus lecturas quedan dentro del espacio y usuario autorizados. Los sitios de marca administrados por la plataforma mantienen sus restricciones propias.
+
+## 2. Instalar la etiqueta
+
+La respuesta trae la etiqueta exacta para el sitio. Use ese snippet; no exponga los tokens privados del backend en el navegador de un visitante. La captura pública utiliza su propio identificador. Las muestras se agregan al ingresar y no constituyen un historial de navegación individual.
+
+## 3. Elegir página, pantalla y período
+
+Consulte `GET /users/heatmap/sites/{site_id}/pages` y seleccione un patrón de ruta. `total` representa el número de muestras en el período. Lea el mapa con `GET /users/heatmap/sites/{site_id}/maps/{kind}`: `clicks` para la cuadrícula y `scroll` para bandas de profundidad. Envíe la misma página, `viewport` y `days` para comparar estados equivalentes.
+
+El Panel conserva página, pantalla, período y tipo en la URL, de modo que puede compartirla, recargarla o volver con el historial del navegador. La ausencia de muestras se presenta como estado vacío; no prueba que el sitio no haya tenido visitas.
+
+## 4. Capturar una referencia de página
+
+La captura obtiene una página pública de forma anónima y elimina scripts antes de mostrarla bajo el mapa. Consulte su estado antes de volver a solicitarla. Una referencia visual puede quedar desactualizada cuando cambia la página; no es una sesión grabada ni una captura autenticada del visitante.
+
+## 5. Pausar o rotar
+
+Para pausar la captura, actualice `enabled` mediante `PATCH /users/heatmap/sites/{site_id}`. Use la operación específica de rotación si necesita cambiar el token de captura. Rotar y pausar tienen efectos distintos; consulte los límites efectivos del espacio y las respuestas de la API antes de repetir una solicitud.
+
+[Referencia de API → Mapas de calor](/api-reference/1platform-api#tag/heatmaps).

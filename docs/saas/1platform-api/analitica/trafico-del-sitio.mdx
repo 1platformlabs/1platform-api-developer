@@ -1,0 +1,47 @@
+---
+title: Analítica de tráfico del sitio
+description: Conecte la cuenta del sitio, siga el aprovisionamiento e interprete los períodos, unidades y estados de sus informes.
+sidebar_position: 4
+---
+
+# Analítica de tráfico del sitio
+
+El recorrido pertenece a un sitio y al usuario que lo administra. Requiere los dos tokens, acceso al módulo de sitios y autorización de la cuenta de analítica de ese sitio. No se reutiliza una identidad global cuando faltan credenciales propias.
+
+## 1. Conectar la cuenta
+
+Seleccione el sitio y consulte la autorización mediante `GET /analytics/oauth/status`. Si falta, abra la URL obtenida con `GET /analytics/oauth/authorize`; la autorización se completa en el navegador. El callback conserva su autenticación específica y no recibe los tokens privados de su aplicación por query.
+
+La [guía de conexión](/docs/saas/1platform-api/analitica/google-analytics) explica el consentimiento y contiene los ejemplos de cliente. Cada sitio mantiene su propia autorización.
+
+## 2. Definir y revisar la configuración
+
+Al solicitar `POST /analytics/setup`, seleccione cuenta, zona horaria, moneda y los pasos opcionales `create_content_dimensions`, `create_key_events` y `create_mp_secret`. Son opciones efectivas del trabajo; desactivar una evita crear ese recurso. La respuesta `202` inicia el aprovisionamiento y no confirma una propiedad lista.
+
+## 3. Seguir el trabajo
+
+Consulte `GET /analytics/status` hasta `active` o `error`. El estado conserva las opciones del trabajo. Un fallo recuperable permite continuar la misma configuración; no cambie cuenta ni flags para intentar recuperar otro trabajo. Si `retryable=false` y el motivo indica resultado desconocido, conserve `support_reference` y solicite revisión. Un timeout remoto puede haber creado un recurso y no autoriza crear otro a ciegas ni eliminar el anterior.
+
+## 4. Instalar la etiqueta
+
+Con la propiedad activa, obtenga la etiqueta de `GET /analytics/streams/tag` y colóquela en el sitio. Crear la propiedad no genera tráfico por sí mismo. Un informe vacío después del alta es distinto de una integración fallida.
+
+## 5. Consultar e interpretar
+
+Use resumen para sesiones, usuarios, páginas vistas, fuentes y serie temporal; tiempo real para la ventana de los últimos 30 minutos; y detalle de página para una ruta concreta. Los filtros pertenecen al contexto del sitio y al período seleccionado.
+
+| Dato | Unidad y lectura |
+|---|---|
+| Sesiones, usuarios, páginas vistas | Conteos distintos; una persona puede generar varias sesiones y páginas |
+| Duración media | Segundos; formatee la duración sin tratarla como porcentaje |
+| Rebote | Fracción entre 0 y 1; multiplique por 100 al presentar porcentaje |
+| Variación de período | Porcentaje frente al período de comparación; `null` si no hay base comparable |
+| Tiempo real | Actividad reciente; no es el total del período del resumen |
+
+No convierta la ausencia de comparación en una variación de cero ni mezcle visitas con interacciones de mapas. La [guía de mapas de calor](/docs/saas/1platform-api/analitica/mapas-de-calor) explica esa unidad.
+
+## 6. Desconectar cuando corresponda
+
+Desconectar el sitio y revocar la autorización son acciones distintas. Revise su alcance antes de confirmar. Desconectar no acredita la eliminación de una propiedad remota; su eliminación es una acción independiente y destructiva.
+
+[Referencia de API → Analítica](/api-reference/1platform-api#tag/analytics).

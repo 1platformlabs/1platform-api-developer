@@ -1,0 +1,90 @@
+---
+title: Probar Envíos en QA
+description: Recorra el ciclo completo de un envío con mensajería en QA —cotizar, despachar, recogido, entregado o fallido— con sus propias credenciales y sin costo.
+sidebar_position: 2
+---
+
+# Probar Envíos en QA
+
+<p className="lead">En QA puede recorrer el ciclo completo de un envío con mensajería, de la cotización a la entrega, con sus propias credenciales y sin que ningún paquete salga de verdad. QA rechaza lo mismo que producción, así que lo que su integración maneje aquí lo va a manejar allá.</p>
+
+## Pida su espacio de pruebas
+
+Pida a su contacto comercial un **espacio de pruebas de Envíos en QA**. Recibirá:
+
+- las credenciales de QA (clave de aplicación y token de usuario), que sólo funcionan contra `https://api-qa.1platform.pro/api/v1`;
+- un **comercio** y una **sucursal** con el punto de recogida ya configurado;
+- la mensajería **simulada** encendida en su espacio.
+
+Use siempre la **clave de aplicación de ese espacio**, no la de otro: la cotización y el despacho siguen la
+configuración del espacio de la clave, y con la de otro espacio la mensajería simulada no se aplica.
+
+Ver [Entornos](/docs/saas/1platform-api/reference/environments) para la diferencia entre QA y producción.
+
+## Elija la dirección del catálogo de QA
+
+En QA, `GET /deliveries/geo/states` devuelve un **catálogo fijo de prueba**: dos departamentos con sus municipios, cada uno con al menos un poblado. Todos los códigos empiezan con `mock-`.
+
+```bash
+curl -s "https://api-qa.1platform.pro/api/v1/deliveries/geo/states" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Cree el envío como en producción, mandando en el punto de entrega el `city_code` de un municipio y el `area_code` de uno de sus poblados. El envío hereda las coordenadas y el departamento, y nace con `can_quote: true`. Un código que no está en el catálogo se comporta igual que en producción: el envío se crea, pero no se puede cotizar con mensajería.
+
+## Cotice y despache
+
+Cotice y despache con `mode: "courier"` igual que en producción (ver [Envíos](/docs/saas/1platform-api/envios)). La cotización de QA tiene un **precio fijo** y el número de guía (`waybill`) empieza con `mock-`.
+
+## Simule lo que hace la mensajería
+
+En producción, un envío despachado avanza cuando la mensajería avisa: recogido, entregado, fallido o cancelado por ella. En QA usted dispara esos avisos con sus propias credenciales, como administrador de la sucursal:
+
+```bash
+curl -s -X POST "https://api-qa.1platform.pro/api/v1/businesses/$BUSINESS_ID/deliveries/$DELIVERY_ID/simulate-courier-event" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"event": "delivered"}'
+```
+
+`event` acepta exactamente cuatro valores:
+
+| `event` | El envío termina en |
+|---|---|
+| `picked_up` | `picked_up` |
+| `delivered` | `delivered` |
+| `failed` | `failed` |
+| `cancelled_by_courier` | `cancelled` |
+
+El evento se procesa **igual que un aviso real de la mensajería**: si el envío estaba en `dispatched` y simula `delivered`, la línea de tiempo registra los dos hitos (`picked_up` y `delivered`); si su espacio tiene configurado el aviso a su tienda, lo recibe; y el dueño del comercio recibe la misma notificación que en producción.
+
+La respuesta trae el envío actualizado en `data.delivery` y el resultado del evento en `data.result`:
+
+| `data.result` | Qué significa |
+|---|---|
+| `applied` | El envío cambió de estado. |
+| `duplicate` | El envío ya estaba en ese estado; no cambió nada. |
+| `terminal` | El envío ya había terminado (entregado, fallido o cancelado); no cambió nada. |
+| `unknown_shipment` | Sólo ocurre en una carrera entre dos llamadas; vuelva a consultar el envío. |
+| `recorded`, `unmapped` | No se producen con estos cuatro eventos. |
+
+Un valor de `event` fuera de la lista responde `422` sin tocar el envío. Un usuario sin rol de administrador de la sucursal recibe `403`.
+
+## En qué difiere QA de producción
+
+| | QA | Producción |
+|---|---|---|
+| Catálogo de direcciones | Fijo, de prueba, con códigos `mock-` | El de la mensajería contratada |
+| Precio de la cotización | Fijo | El de la mensajería |
+| Número de guía | Empieza con `mock-` | El de la mensajería |
+| Avance de un envío despachado | Lo simula usted con el endpoint de arriba | Lo avisa la mensajería |
+| Endpoint de simulación | Disponible | Responde `404` |
+| Notificación al dueño del comercio | Se envía de verdad, una vez por cambio de estado | Igual |
+
+Lo que **no** cambia: los errores. QA rechaza lo mismo que producción, con el mismo código. En particular, un envío ya despachado con mensajería **no se puede cancelar** con `POST /businesses/{businessId}/deliveries/{deliveryId}/cancel` (responde `503`, como en producción): sólo termina cuando la mensajería avisa que lo entregó, que falló o que lo canceló. En QA, ese aviso es `delivered`, `failed` o `cancelled_by_courier`.
+
+## Fuera de QA
+
+En producción, en un espacio sin la mensajería simulada, sobre un envío de flota propia, sobre uno que todavía no se despachó o sobre uno que no existe, el endpoint de simulación responde el mismo `404`. Su integración no debe llamarlo fuera de QA.

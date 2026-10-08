@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.36.0"
+    "version": "PRODv5.89.0"
   },
   "servers": [
     {
@@ -23945,6 +23945,27 @@
             "description": "Website ID to authorize analytics for"
           },
           {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language of the page shown when the authorization ends (`es` or `en`). Defaults to `Accept-Language`, then `es`.",
+              "examples": [
+                "es"
+              ],
+              "title": "Lang"
+            },
+            "description": "Language of the page shown when the authorization ends (`es` or `en`). Defaults to `Accept-Language`, then `es`."
+          },
+          {
             "name": "x-user-token",
             "in": "header",
             "required": true,
@@ -24008,6 +24029,16 @@
           },
           "429": {
             "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The analytics connection is not available for this workspace (`code`: `ANALYTICS_CONNECTION_UNAVAILABLE`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -29663,6 +29694,25 @@
             "description": "Search subject and participants"
           },
           {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^space$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`space`: a workspace administrator also sees the conversations of the other members' domains (each with its `owner`). Ignored for everybody else, who get exactly the list they get without it",
+              "title": "Scope"
+            },
+            "description": "`space`: a workspace administrator also sees the conversations of the other members' domains (each with its `owner`). Ignored for everybody else, who get exactly the list they get without it"
+          },
+          {
             "name": "x-user-token",
             "in": "header",
             "required": true,
@@ -30457,6 +30507,42 @@
         ],
         "parameters": [
           {
+            "name": "thread_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PydanticObjectId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Attach to a reply in this conversation (a workspace administrator answering for a member)",
+              "title": "Thread Id"
+            },
+            "description": "Attach to a reply in this conversation (a workspace administrator answering for a member)"
+          },
+          {
+            "name": "address_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PydanticObjectId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Attach to a new conversation from this address (same, for a new conversation)",
+              "title": "Address Id"
+            },
+            "description": "Attach to a new conversation from this address (same, for a new conversation)"
+          },
+          {
             "name": "x-user-token",
             "in": "header",
             "required": true,
@@ -30609,6 +30695,24 @@
             "description": "Storage key of the attachment"
           },
           {
+            "name": "thread_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PydanticObjectId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The conversation the attachment belongs to (required for a workspace administrator reading a member's mail)",
+              "title": "Thread Id"
+            },
+            "description": "The conversation the attachment belongs to (required for a workspace administrator reading a member's mail)"
+          },
+          {
             "name": "x-user-token",
             "in": "header",
             "required": true,
@@ -30724,7 +30828,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Accepted, deduplicated, or deliberately dropped",
+            "description": "Accepted, deduplicated, or deliberately dropped (automatic mail)",
             "content": {
               "application/json": {
                 "schema": {},
@@ -30736,6 +30840,16 @@
                     "duplicate": false,
                     "reason": "created"
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The message cannot be stored for this recipient (unknown, reserved or not receiving): the transport bounces it to the sender",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -30775,6 +30889,16 @@
           },
           "429": {
             "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The recipient matches more than one live address; the sender's server retries",
             "content": {
               "application/json": {
                 "schema": {
@@ -35710,6 +35834,162 @@
         }
       }
     },
+    "/api/v1/businesses/{businessId}/deliveries/{deliveryId}/simulate-courier-event": {
+      "post": {
+        "tags": [
+          "Deliveries"
+        ],
+        "summary": "Simulate a courier event on a dispatched delivery (QA only)",
+        "description": "**Only available in the QA environment**, on a workspace configured with the simulated courier. Moves a dispatched courier delivery as if the courier had notified it, through exactly the same processing as a real courier notice: the same state transitions (intermediate milestones included), the same notice to your store and the same notification to the business owner.\n\nUse it to test how your integration receives each event without any courier secret. In production, on a workspace that is not simulated, on an own-fleet delivery, on a delivery that was not dispatched yet or on an unknown delivery it answers the same `404`.\n\n`data.result` is the outcome of the event: `applied` (the delivery moved), `duplicate` (it was already in that state) or `terminal` (it was already closed). `unknown_shipment` can only happen in a race; `recorded` and `unmapped` are not reachable with these events.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (branch admin)\n- **Rate limit:** 20 req/min",
+        "operationId": "simulateCourierEvent",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The business (commerce) id",
+              "title": "Businessid"
+            },
+            "description": "The business (commerce) id"
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The delivery id",
+              "title": "Deliveryid"
+            },
+            "description": "The delivery id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateCourierEventRequest"
+              },
+              "example": {
+                "event": "delivered"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_SimulateCourierEventResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "result": "applied",
+                    "delivery": {
+                      "id": "6690aaaa000000000000a001",
+                      "status": "delivered"
+                    }
+                  },
+                  "msg": "Event processed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your branch role does not allow this operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "module_disabled"
+            ]
+          },
+          "404": {
+            "description": "Business not yours, delivery not found, or simulation not available (outside QA, workspace not simulated, own-fleet or not dispatched)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Delivery feature disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/businesses/{businessId}/deliveries/{deliveryId}/quote": {
       "post": {
         "tags": [
@@ -38978,6 +39258,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -38999,6 +39281,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -39675,6 +39959,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -39696,6 +39982,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -40458,6 +40746,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -41193,6 +41483,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -41383,6 +41675,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -41404,6 +41698,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -41828,6 +42124,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -42193,6 +42491,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -42214,6 +42514,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -42413,6 +42715,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -42434,6 +42738,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -42635,6 +42941,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -42656,6 +42964,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -43052,6 +43362,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -43073,6 +43385,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -43272,6 +43586,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -43611,6 +43927,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -43632,6 +43950,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -44242,6 +44562,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -44263,6 +44585,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -44607,6 +44931,8 @@
               "sales_channel_account_restricted",
               "sales_channel_template_not_usable",
               "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
               "sales_health_claims_unreviewed",
               "sales_attachment_not_available"
             ],
@@ -44628,6 +44954,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -44966,6 +45294,8 @@
               "sales_settlement_currency_mismatch",
               "sales_attention_cursor_invalid",
               "sales_agent_invalid",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
               "offer_checkout_link_invalid"
             ],
             "content": {
@@ -45266,6 +45596,2365 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar": {
+      "get": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "This workspace's calendar",
+        "description": "Never writes: before the first change it answers the defaults with `persisted: false`.",
+        "operationId": "getCalendar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The calendar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "persisted": true,
+                    "name": "Visitas",
+                    "timezone": "America/Guatemala",
+                    "slot_minutes": 60,
+                    "booking_horizon_days": 14,
+                    "min_notice_minutes": 720,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Calendar retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Change the calendar",
+        "description": "Workspace admins only. Changing `slot_minutes` or `timezone` while visits are booked answers 409 `calendar_has_future_appointments`.",
+        "operationId": "updateCalendar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarUpdateRequest"
+              },
+              "example": {
+                "slot_minutes": 60,
+                "min_notice_minutes": 720
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calendar updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "persisted": true,
+                    "name": "Visitas",
+                    "timezone": "America/Guatemala",
+                    "slot_minutes": 60,
+                    "booking_horizon_days": 14,
+                    "min_notice_minutes": 720,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Calendar updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the calendar's state",
+            "x-error-codes": [
+              "calendar_error",
+              "calendar_not_configured",
+              "appointment_no_advisor_available",
+              "appointment_already_booked",
+              "appointment_invalid_transition",
+              "appointment_change_limit",
+              "appointment_stage_not_allowed",
+              "calendar_has_future_appointments"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/visit-advisors": {
+      "get": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "List the visit advisors",
+        "description": "Active first. Each carries how many future visits it holds; an inactive one with future visits needs them reassigned.",
+        "operationId": "listVisitAdvisors",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_inactive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Also list deactivated advisors.",
+              "default": false,
+              "title": "Include Inactive"
+            },
+            "description": "Also list deactivated advisors."
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Advisors skipped before this page.",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Advisors skipped before this page."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Page size, at most 100.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size, at most 100."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Visit advisors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6ad3c0f0a1b2c3d4e5f60719",
+                        "name": "Ana López",
+                        "phone": "+50255550100",
+                        "contact_email": "ana@example.com",
+                        "availability": [
+                          {
+                            "weekday": 0,
+                            "start": "09:00",
+                            "end": "13:00"
+                          }
+                        ],
+                        "rotation_order": 0,
+                        "is_active": true,
+                        "upcoming_appointments_count": 2,
+                        "pending_reassignment_count": 0,
+                        "created_at": "2026-10-06T15:00:00Z",
+                        "updated_at": "2026-10-06T15:00:00Z"
+                      }
+                    ],
+                    "total": 1,
+                    "skip": 0,
+                    "limit": 50
+                  },
+                  "msg": "Visit advisors retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Add a visit advisor",
+        "description": "Workspace admins only. The linked user (optional) must be an active, verified member of this workspace; it is the only address that receives visit notices.",
+        "operationId": "createVisitAdvisor",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitAdvisorCreateRequest"
+              },
+              "example": {
+                "name": "Ana López",
+                "phone": "+50255550100",
+                "availability": [
+                  {
+                    "weekday": 0,
+                    "start": "09:00",
+                    "end": "13:00"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Visit advisor created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "name": "Ana López",
+                    "phone": "+50255550100",
+                    "contact_email": "ana@example.com",
+                    "availability": [
+                      {
+                        "weekday": 0,
+                        "start": "09:00",
+                        "end": "13:00"
+                      }
+                    ],
+                    "rotation_order": 0,
+                    "is_active": true,
+                    "upcoming_appointments_count": 2,
+                    "pending_reassignment_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Visit advisor created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such visit advisor, appointment or record in THIS workspace",
+            "x-error-codes": [
+              "visit_advisor_not_found",
+              "appointment_not_found",
+              "visit_advisor_user_not_found",
+              "appointment_subject_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/visit-advisors/{visit_advisor_id}": {
+      "patch": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Change or deactivate a visit advisor",
+        "description": "Workspace admins only. Deactivating keeps the history; its future visits show as needing reassignment and `affected_appointments` says how many.",
+        "operationId": "updateVisitAdvisor",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_advisor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identifier of the visit advisor in this workspace.",
+              "title": "Visit Advisor Id"
+            },
+            "description": "Identifier of the visit advisor in this workspace."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitAdvisorUpdateRequest"
+              },
+              "example": {
+                "is_active": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Visit advisor updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "visit_advisor": {
+                      "id": "6ad3c0f0a1b2c3d4e5f60719",
+                      "name": "Ana López",
+                      "phone": "+50255550100",
+                      "contact_email": "ana@example.com",
+                      "availability": [
+                        {
+                          "weekday": 0,
+                          "start": "09:00",
+                          "end": "13:00"
+                        }
+                      ],
+                      "rotation_order": 0,
+                      "is_active": true,
+                      "upcoming_appointments_count": 2,
+                      "pending_reassignment_count": 0,
+                      "created_at": "2026-10-06T15:00:00Z",
+                      "updated_at": "2026-10-06T15:00:00Z"
+                    },
+                    "affected_appointments": 0
+                  },
+                  "msg": "Visit advisor updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such visit advisor, appointment or record in THIS workspace",
+            "x-error-codes": [
+              "visit_advisor_not_found",
+              "appointment_not_found",
+              "visit_advisor_user_not_found",
+              "appointment_subject_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/slots": {
+      "get": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Free visit slots",
+        "description": "Only slots with at least one free visit advisor, inside the notice and the horizon, computed in the calendar's timezone and returned in UTC.",
+        "operationId": "listCalendarSlots",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "First local day, YYYY-MM-DD.",
+              "title": "From"
+            },
+            "description": "First local day, YYYY-MM-DD."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 14,
+              "minimum": 1,
+              "description": "How many local days to list, 1-14.",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "How many local days to list, 1-14."
+          },
+          {
+            "name": "visit_advisor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only slots this visit advisor has free.",
+              "title": "Visit Advisor Id"
+            },
+            "description": "Only slots this visit advisor has free."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Free slots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "timezone": "America/Guatemala",
+                    "slot_minutes": 60,
+                    "slots": [
+                      {
+                        "start_at": "2026-10-12T15:00:00Z",
+                        "end_at": "2026-10-12T16:00:00Z",
+                        "available_advisors": 1,
+                        "available_visit_advisor_ids": [
+                          "6ad3c0f0a1b2c3d4e5f60719"
+                        ]
+                      }
+                    ]
+                  },
+                  "msg": "Slots retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/appointments/by-subject": {
+      "get": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "The live visit of a record",
+        "description": "The live visit of the record or, if there is none, its last visit that expired without being closed; `null` otherwise.",
+        "operationId": "getAppointmentBySubject",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subject_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{1,30}$",
+              "description": "Kind of record (e.g. lead).",
+              "title": "Subject Type"
+            },
+            "description": "Kind of record (e.g. lead)."
+          },
+          {
+            "name": "subject_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Identifier of the record in this workspace.",
+              "title": "Subject Id"
+            },
+            "description": "Identifier of the record in this workspace."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The visit, or null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                    "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "visit_advisor_name": "Ana López",
+                    "visit_advisor_active": true,
+                    "needs_reassignment": false,
+                    "subject_type": "lead",
+                    "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                    "subject": {
+                      "label": "Clínica Ejemplo"
+                    },
+                    "start_at": "2026-10-12T15:00:00Z",
+                    "end_at": "2026-10-12T16:00:00Z",
+                    "timezone": "America/Guatemala",
+                    "status": "confirmed",
+                    "address": "5a avenida 1-23, zona 1",
+                    "references": "Frente al parque",
+                    "source": "agent",
+                    "rev": 0,
+                    "reschedules_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Appointment retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/appointments": {
+      "get": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "List visits in a range",
+        "description": "At most 31 days and 500 per page. `subject.contact` only when the caller has Sales; the address is a detail of the visit and is visible with the calendar.",
+        "operationId": "listAppointments",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Range start (ISO-8601 with offset).",
+              "title": "From"
+            },
+            "description": "Range start (ISO-8601 with offset)."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Range end, exclusive (ISO-8601 with offset).",
+              "title": "To"
+            },
+            "description": "Range end, exclusive (ISO-8601 with offset)."
+          },
+          {
+            "name": "visit_advisor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this visit advisor's visits.",
+              "title": "Visit Advisor Id"
+            },
+            "description": "Only this visit advisor's visits."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(confirmed|cancelled|completed|expired)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only visits in this state.",
+              "title": "Status"
+            },
+            "description": "Only visits in this state."
+          },
+          {
+            "name": "needs_reassignment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only future visits whose advisor was deactivated.",
+              "title": "Needs Reassignment"
+            },
+            "description": "Only future visits whose advisor was deactivated."
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "description": "Visits skipped before this page.",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Visits skipped before this page."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Page size, at most 500.",
+              "default": 200,
+              "title": "Limit"
+            },
+            "description": "Page size, at most 500."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Visits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                        "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                        "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                        "visit_advisor_name": "Ana López",
+                        "visit_advisor_active": true,
+                        "needs_reassignment": false,
+                        "subject_type": "lead",
+                        "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                        "subject": {
+                          "label": "Clínica Ejemplo"
+                        },
+                        "start_at": "2026-10-12T15:00:00Z",
+                        "end_at": "2026-10-12T16:00:00Z",
+                        "timezone": "America/Guatemala",
+                        "status": "confirmed",
+                        "address": "5a avenida 1-23, zona 1",
+                        "references": "Frente al parque",
+                        "source": "agent",
+                        "rev": 0,
+                        "reschedules_count": 0,
+                        "created_at": "2026-10-06T15:00:00Z",
+                        "updated_at": "2026-10-06T15:00:00Z"
+                      }
+                    ],
+                    "total": 1,
+                    "skip": 0,
+                    "limit": 200
+                  },
+                  "msg": "Appointments retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Book a visit",
+        "description": "Workspace admins only. Assigns a visit advisor by round robin among those free at that time. If the record already has a live visit at the SAME time it is returned (200); at another time, 409 `appointment_already_booked`.",
+        "operationId": "bookAppointment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCreateRequest"
+              },
+              "example": {
+                "subject_type": "lead",
+                "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                "start_at": "2026-10-12T15:00:00Z",
+                "address": "5a avenida 1-23, zona 1"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing visit at that time",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                    "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "visit_advisor_name": "Ana López",
+                    "visit_advisor_active": true,
+                    "needs_reassignment": false,
+                    "subject_type": "lead",
+                    "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                    "subject": {
+                      "label": "Clínica Ejemplo"
+                    },
+                    "start_at": "2026-10-12T15:00:00Z",
+                    "end_at": "2026-10-12T16:00:00Z",
+                    "timezone": "America/Guatemala",
+                    "status": "confirmed",
+                    "address": "5a avenida 1-23, zona 1",
+                    "references": "Frente al parque",
+                    "source": "agent",
+                    "rev": 0,
+                    "reschedules_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Appointment already booked"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Visit booked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                    "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "visit_advisor_name": "Ana López",
+                    "visit_advisor_active": true,
+                    "needs_reassignment": false,
+                    "subject_type": "lead",
+                    "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                    "subject": {
+                      "label": "Clínica Ejemplo"
+                    },
+                    "start_at": "2026-10-12T15:00:00Z",
+                    "end_at": "2026-10-12T16:00:00Z",
+                    "timezone": "America/Guatemala",
+                    "status": "confirmed",
+                    "address": "5a avenida 1-23, zona 1",
+                    "references": "Frente al parque",
+                    "source": "agent",
+                    "rev": 0,
+                    "reschedules_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Appointment booked"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such visit advisor, appointment or record in THIS workspace",
+            "x-error-codes": [
+              "visit_advisor_not_found",
+              "appointment_not_found",
+              "visit_advisor_user_not_found",
+              "appointment_subject_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the calendar's state",
+            "x-error-codes": [
+              "calendar_error",
+              "calendar_not_configured",
+              "appointment_no_advisor_available",
+              "appointment_already_booked",
+              "appointment_invalid_transition",
+              "appointment_change_limit",
+              "appointment_stage_not_allowed",
+              "calendar_has_future_appointments"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/appointments/{appointment_id}": {
+      "get": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "One visit",
+        "description": "One visit of this workspace. A visit of another workspace answers the same 404 as one that does not exist.",
+        "operationId": "getAppointment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identifier of the visit in this workspace.",
+              "title": "Appointment Id"
+            },
+            "description": "Identifier of the visit in this workspace."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The visit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                    "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "visit_advisor_name": "Ana López",
+                    "visit_advisor_active": true,
+                    "needs_reassignment": false,
+                    "subject_type": "lead",
+                    "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                    "subject": {
+                      "label": "Clínica Ejemplo"
+                    },
+                    "start_at": "2026-10-12T15:00:00Z",
+                    "end_at": "2026-10-12T16:00:00Z",
+                    "timezone": "America/Guatemala",
+                    "status": "confirmed",
+                    "address": "5a avenida 1-23, zona 1",
+                    "references": "Frente al parque",
+                    "source": "agent",
+                    "rev": 0,
+                    "reschedules_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Appointment retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such visit advisor, appointment or record in THIS workspace",
+            "x-error-codes": [
+              "visit_advisor_not_found",
+              "appointment_not_found",
+              "visit_advisor_user_not_found",
+              "appointment_subject_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/appointments/{appointment_id}/reschedule": {
+      "post": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Move a visit to another time",
+        "description": "Workspace admins only. The SAME visit moves; the current advisor is kept if free, otherwise another free one is assigned.",
+        "operationId": "rescheduleAppointment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identifier of the visit in this workspace.",
+              "title": "Appointment Id"
+            },
+            "description": "Identifier of the visit in this workspace."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentRescheduleRequest"
+              },
+              "example": {
+                "start_at": "2026-10-13T15:00:00Z"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Visit moved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                    "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "visit_advisor_name": "Ana López",
+                    "visit_advisor_active": true,
+                    "needs_reassignment": false,
+                    "subject_type": "lead",
+                    "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                    "subject": {
+                      "label": "Clínica Ejemplo"
+                    },
+                    "start_at": "2026-10-12T15:00:00Z",
+                    "end_at": "2026-10-12T16:00:00Z",
+                    "timezone": "America/Guatemala",
+                    "status": "confirmed",
+                    "address": "5a avenida 1-23, zona 1",
+                    "references": "Frente al parque",
+                    "source": "agent",
+                    "rev": 0,
+                    "reschedules_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Appointment updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such visit advisor, appointment or record in THIS workspace",
+            "x-error-codes": [
+              "visit_advisor_not_found",
+              "appointment_not_found",
+              "visit_advisor_user_not_found",
+              "appointment_subject_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the calendar's state",
+            "x-error-codes": [
+              "calendar_error",
+              "calendar_not_configured",
+              "appointment_no_advisor_available",
+              "appointment_already_booked",
+              "appointment_invalid_transition",
+              "appointment_change_limit",
+              "appointment_stage_not_allowed",
+              "calendar_has_future_appointments"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/appointments/{appointment_id}/cancel": {
+      "post": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Cancel a visit",
+        "description": "Workspace admins only. Also closes a visit that expired without being closed.",
+        "operationId": "cancelAppointment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identifier of the visit in this workspace.",
+              "title": "Appointment Id"
+            },
+            "description": "Identifier of the visit in this workspace."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCancelRequest"
+              },
+              "example": {
+                "reason": "El prospecto pidió cancelar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Visit cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                    "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "visit_advisor_name": "Ana López",
+                    "visit_advisor_active": true,
+                    "needs_reassignment": false,
+                    "subject_type": "lead",
+                    "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                    "subject": {
+                      "label": "Clínica Ejemplo"
+                    },
+                    "start_at": "2026-10-12T15:00:00Z",
+                    "end_at": "2026-10-12T16:00:00Z",
+                    "timezone": "America/Guatemala",
+                    "status": "confirmed",
+                    "address": "5a avenida 1-23, zona 1",
+                    "references": "Frente al parque",
+                    "source": "agent",
+                    "rev": 0,
+                    "reschedules_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Appointment updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such visit advisor, appointment or record in THIS workspace",
+            "x-error-codes": [
+              "visit_advisor_not_found",
+              "appointment_not_found",
+              "visit_advisor_user_not_found",
+              "appointment_subject_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the calendar's state",
+            "x-error-codes": [
+              "calendar_error",
+              "calendar_not_configured",
+              "appointment_no_advisor_available",
+              "appointment_already_booked",
+              "appointment_invalid_transition",
+              "appointment_change_limit",
+              "appointment_stage_not_allowed",
+              "calendar_has_future_appointments"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/appointments/{appointment_id}/complete": {
+      "post": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Mark a visit as done",
+        "description": "Workspace admins only. Also valid for a visit that expired without being closed.",
+        "operationId": "completeAppointment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identifier of the visit in this workspace.",
+              "title": "Appointment Id"
+            },
+            "description": "Identifier of the visit in this workspace."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Visit completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                    "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "visit_advisor_name": "Ana López",
+                    "visit_advisor_active": true,
+                    "needs_reassignment": false,
+                    "subject_type": "lead",
+                    "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                    "subject": {
+                      "label": "Clínica Ejemplo"
+                    },
+                    "start_at": "2026-10-12T15:00:00Z",
+                    "end_at": "2026-10-12T16:00:00Z",
+                    "timezone": "America/Guatemala",
+                    "status": "confirmed",
+                    "address": "5a avenida 1-23, zona 1",
+                    "references": "Frente al parque",
+                    "source": "agent",
+                    "rev": 0,
+                    "reschedules_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Appointment updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such visit advisor, appointment or record in THIS workspace",
+            "x-error-codes": [
+              "visit_advisor_not_found",
+              "appointment_not_found",
+              "visit_advisor_user_not_found",
+              "appointment_subject_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the calendar's state",
+            "x-error-codes": [
+              "calendar_error",
+              "calendar_not_configured",
+              "appointment_no_advisor_available",
+              "appointment_already_booked",
+              "appointment_invalid_transition",
+              "appointment_change_limit",
+              "appointment_stage_not_allowed",
+              "calendar_has_future_appointments"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/appointments/{appointment_id}/reassign": {
+      "post": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Give a visit to another visit advisor",
+        "description": "Workspace admins only. Without `visit_advisor_id` the round robin picks a free advisor other than the current one.",
+        "operationId": "reassignAppointment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identifier of the visit in this workspace.",
+              "title": "Appointment Id"
+            },
+            "description": "Identifier of the visit in this workspace."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentReassignRequest"
+              },
+              "example": {
+                "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f6071c"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Visit reassigned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6ad3c0f0a1b2c3d4e5f6071a",
+                    "calendar_id": "6ad3c0f0a1b2c3d4e5f60718",
+                    "visit_advisor_id": "6ad3c0f0a1b2c3d4e5f60719",
+                    "visit_advisor_name": "Ana López",
+                    "visit_advisor_active": true,
+                    "needs_reassignment": false,
+                    "subject_type": "lead",
+                    "subject_id": "6ad3c0f0a1b2c3d4e5f6071b",
+                    "subject": {
+                      "label": "Clínica Ejemplo"
+                    },
+                    "start_at": "2026-10-12T15:00:00Z",
+                    "end_at": "2026-10-12T16:00:00Z",
+                    "timezone": "America/Guatemala",
+                    "status": "confirmed",
+                    "address": "5a avenida 1-23, zona 1",
+                    "references": "Frente al parque",
+                    "source": "agent",
+                    "rev": 0,
+                    "reschedules_count": 0,
+                    "created_at": "2026-10-06T15:00:00Z",
+                    "updated_at": "2026-10-06T15:00:00Z"
+                  },
+                  "msg": "Appointment updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The calendar is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "calendar_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such visit advisor, appointment or record in THIS workspace",
+            "x-error-codes": [
+              "visit_advisor_not_found",
+              "appointment_not_found",
+              "visit_advisor_user_not_found",
+              "appointment_subject_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the calendar's state",
+            "x-error-codes": [
+              "calendar_error",
+              "calendar_not_configured",
+              "appointment_no_advisor_available",
+              "appointment_already_booked",
+              "appointment_invalid_transition",
+              "appointment_change_limit",
+              "appointment_stage_not_allowed",
+              "calendar_has_future_appointments"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is not a valid calendar operation",
+            "x-error-codes": [
+              "visit_advisor_user_not_verified",
+              "visit_advisor_limit",
+              "visit_advisor_availability_invalid",
+              "appointment_subject_type_unknown",
+              "appointment_slot_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -96405,6 +99094,12 @@
             ],
             "description": "Owning user of the domain (Domain.user_id resolved to {user_id, email})."
           },
+          "openable": {
+            "type": "boolean",
+            "title": "Openable",
+            "description": "Whether the detail of this domain can be opened with the presented app token. False for a domain created through another App: `GET /domains/{id}` answers 404 for it, so a client must not link the row.",
+            "default": true
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -101947,6 +104642,167 @@
         "title": "AppResponse",
         "description": "Safe App projection — NEVER carries keys / api_key.\n\nUsed for all non-superadmin consumers. Any route that would expose\nprovider credentials (OpenAI, Claude, Pixabay, etc.) MUST serialize\nthrough this schema."
       },
+      "AppointmentCancelRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Why the visit is cancelled (one line, ≤ 300)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "AppointmentCancelRequest"
+      },
+      "AppointmentCreateRequest": {
+        "properties": {
+          "subject_type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,30}$",
+            "title": "Subject Type",
+            "description": "Kind of record the visit is for (e.g. lead)."
+          },
+          "subject_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Subject Id",
+            "description": "Identifier of that record in this workspace."
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At",
+            "description": "Slot start, ISO-8601 WITH offset (use Z for UTC), exactly as `GET /calendar/slots` returns it."
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address",
+            "description": "Where the visit happens (one line, ≤ 300)."
+          },
+          "references": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "References",
+            "description": "Directions or landmarks (one line, ≤ 300)."
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Internal notes for the team (≤ 500). Never mailed."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "subject_type",
+          "subject_id",
+          "start_at"
+        ],
+        "title": "AppointmentCreateRequest"
+      },
+      "AppointmentReassignRequest": {
+        "properties": {
+          "visit_advisor_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Advisor Id",
+            "description": "Visit advisor to give it to; omitted, the round robin picks a free one."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AppointmentReassignRequest"
+      },
+      "AppointmentRescheduleRequest": {
+        "properties": {
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At",
+            "description": "New slot start, ISO-8601 WITH offset."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start_at"
+        ],
+        "title": "AppointmentRescheduleRequest"
+      },
+      "AppointmentStageMapInput": {
+        "properties": {
+          "qualified": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Qualified",
+            "description": "Stage where a prospect may book."
+          },
+          "pending": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Pending",
+            "description": "Slots offered, no visit yet."
+          },
+          "booked": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Booked",
+            "description": "A visit is booked."
+          },
+          "done": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Done",
+            "description": "The visit happened."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "qualified",
+          "pending",
+          "booked",
+          "done"
+        ],
+        "title": "AppointmentStageMapInput",
+        "description": "The visit-stage map: four stage keys of the same offer (calendario-y-asesores)."
+      },
       "ArchiveBusinessResponse": {
         "properties": {
           "id": {
@@ -104734,6 +107590,83 @@
         ],
         "title": "BusinessStatus",
         "description": "Lifecycle state of a business. `inactive` businesses are hidden from the owner's active listings but not deleted."
+      },
+      "CalendarUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name of the calendar."
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone",
+            "description": "IANA timezone the slot grid is computed in (e.g. America/Guatemala). Refused with 409 while visits are booked."
+          },
+          "slot_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 240,
+                "minimum": 15
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot Minutes",
+            "description": "Length of every slot, 15-240 minutes. Refused with 409 while visits are booked."
+          },
+          "booking_horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 60,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Horizon Days",
+            "description": "How many days ahead a visit can be booked (1-60)."
+          },
+          "min_notice_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10080,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Notice Minutes",
+            "description": "Minimum notice before a slot can be booked, in minutes (0-10080)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CalendarUpdateRequest"
       },
       "CancelInvoiceRequest": {
         "properties": {
@@ -110910,6 +113843,17 @@
             "format": "date-time",
             "title": "Updated At",
             "description": "Record last update timestamp"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnerRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The member who owns this domain. Present only when a workspace administrator reads a domain owned by somebody else; absent for the owner"
           }
         },
         "type": "object",
@@ -121346,6 +124290,10 @@
               "checkout_link_sent",
               "follow_up_scheduled",
               "lead_marked_lost",
+              "visit_slots_offered",
+              "visit_booked",
+              "visit_rescheduled",
+              "visit_cancelled",
               "conversation_updated"
             ],
             "title": "Code",
@@ -122429,6 +125377,17 @@
             ],
             "title": "Agent Id",
             "description": "New answering agent, or omitted to leave unchanged."
+          },
+          "appointment_stages": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentStageMapInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stages a booked visit moves: the four keys together, or `null` to remove the map (refused with 409 `offer_has_live_appointments` while visits are booked). Validated against the resulting stages: distinct, existing and never the won or a lost stage (422 `offer_appointment_stages_invalid`)."
           },
           "declares_health_claims": {
             "anyOf": [
@@ -123767,6 +126726,91 @@
         ],
         "title": "SignalKind",
         "description": "What kind of evidence the state was derived from.\n\n``success_only`` and ``none`` are the two that cap an integration below\n``healthy``: the first records successes and nothing else, the second\nrecords no outcome at all."
+      },
+      "SimulateCourierEventRequest": {
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "picked_up",
+              "delivered",
+              "failed",
+              "cancelled_by_courier"
+            ],
+            "title": "Event",
+            "description": "The courier event to simulate: `picked_up`, `delivered`, `failed` or `cancelled_by_courier`.",
+            "examples": [
+              "delivered"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event"
+        ],
+        "title": "SimulateCourierEventRequest",
+        "description": "``POST .../deliveries/{deliveryId}/simulate-courier-event`` — QA only."
+      },
+      "SimulateCourierEventResponse": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "duplicate",
+              "recorded",
+              "unknown_shipment",
+              "terminal",
+              "unmapped"
+            ],
+            "title": "Result",
+            "description": "Outcome of applying the event, identical to a real courier notice: `applied` (the shipment moved), `duplicate` (already in that state), `terminal` (the shipment is already closed). `unknown_shipment` can only happen in a race; `recorded` and `unmapped` are not reachable with the four simulated events."
+          },
+          "delivery": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimulatedDeliveryState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The shipment after the event."
+          }
+        },
+        "type": "object",
+        "required": [
+          "result"
+        ],
+        "title": "SimulateCourierEventResponse",
+        "description": "What a simulated courier event did to the shipment (QA only)."
+      },
+      "SimulatedDeliveryState": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The delivery id.",
+            "examples": [
+              "6690aaaa000000000000a001"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeliveryStatus",
+            "description": "Status of the delivery after the event.",
+            "examples": [
+              "delivered"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "SimulatedDeliveryState",
+        "description": "The shipment after a simulated event: enough to assert on, nothing more.\n\nNot the full `DeliveryResponse` on purpose: the integrator reads the whole\nshipment with `GET .../deliveries/{deliveryId}`, which is what a real\ncourier notice also leaves them to do."
       },
       "SiteBrandAssets": {
         "properties": {
@@ -133159,6 +136203,38 @@
           "msg"
         ],
         "title": "SuccessResponse[SearchConsolePerformanceResponse]"
+      },
+      "SuccessResponse_SimulateCourierEventResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/SimulateCourierEventResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[SimulateCourierEventResponse]"
       },
       "SuccessResponse_SiteLandingPageView_": {
         "properties": {
@@ -145494,6 +148570,183 @@
         "title": "VerifyDomainResponse",
         "description": "Outcome of a domain-control check.\n\n``verified`` is the whole answer; the record fields are repeated so a caller\nthat failed can see exactly what was looked for without a second request."
       },
+      "VisitAdvisorCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Name shown in the calendar and to the agent (first name only)."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^\\+[1-9]\\d{6,18}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone",
+            "description": "Contact phone in international format (+country code). Contact data only."
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email",
+            "description": "Contact email. Never a mail destination: notices go only to the linked user's verified email."
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Optional active, verified member of this workspace who receives the visit notices."
+          },
+          "availability": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyWindow"
+            },
+            "type": "array",
+            "maxItems": 28,
+            "title": "Availability",
+            "description": "Weekly availability in the calendar's wall-clock time (≤ 28 windows, multiples of the slot, no overlaps)."
+          },
+          "rotation_order": {
+            "type": "integer",
+            "maximum": 10000,
+            "minimum": 0,
+            "title": "Rotation Order",
+            "description": "Tie-breaker of the round robin (lower first).",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "VisitAdvisorCreateRequest"
+      },
+      "VisitAdvisorUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "New name, or omitted to leave unchanged."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^\\+[1-9]\\d{6,18}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone",
+            "description": "New contact phone; null removes it."
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email",
+            "description": "New contact email; null removes it. Never a mail destination."
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "New linked user (active and verified, same workspace); null unlinks."
+          },
+          "availability": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WeeklyWindow"
+                },
+                "type": "array",
+                "maxItems": 28
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Availability",
+            "description": "New weekly availability, or omitted to leave unchanged."
+          },
+          "rotation_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotation Order",
+            "description": "New round-robin tie-breaker, or omitted."
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active",
+            "description": "False deactivates: no new visits; future ones show as needing reassignment."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VisitAdvisorUpdateRequest"
+      },
       "WebhookAllowedDomain": {
         "properties": {
           "domain": {
@@ -146811,6 +150064,37 @@
           "site_name": "Updated Name",
           "theme": "astra"
         }
+      },
+      "WeeklyWindow": {
+        "properties": {
+          "weekday": {
+            "type": "integer",
+            "maximum": 6,
+            "minimum": 0,
+            "title": "Weekday",
+            "description": "Day of the week, 0 = Monday … 6 = Sunday."
+          },
+          "start": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "title": "Start",
+            "description": "Window start, HH:MM local."
+          },
+          "end": {
+            "type": "string",
+            "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$",
+            "title": "End",
+            "description": "Window end, HH:MM local; 24:00 = end of day."
+          }
+        },
+        "type": "object",
+        "required": [
+          "weekday",
+          "start",
+          "end"
+        ],
+        "title": "WeeklyWindow",
+        "description": "A weekly availability window in the calendar's own wall-clock time.\n\n``weekday`` 0 = Monday … 6 = Sunday. ``end`` may be ``\"24:00\"`` (end of day\nonly). Multiples of the calendar's slot and non-overlapping per day are\nchecked by the service, which knows the slot length."
       },
       "WelcomeEmailReport": {
         "properties": {
@@ -148294,6 +151578,10 @@
     {
       "name": "Ads",
       "description": "Advertising campaigns funded from the workspace balance. The merchant connects the brand their ads are published as, builds a simple campaign, adds budget from their balance, and gets back whatever was not spent when it closes. Funding requires an `Idempotency-Key`; the remainder is returned once the reported spend settles, not at the instant of closing. All endpoints require the two-token auth, and the vertical is switched on per workspace by platform staff."
+    },
+    {
+      "name": "Calendar",
+      "description": "The workspace calendar: visits to any kind of record (a sales lead today), assigned by round robin among the workspace's **visit advisors** that are free at that time. One calendar per workspace, a fixed slot length and weekly availability per advisor, in the workspace's timezone. Reads need the calendar module; every write needs a workspace admin and is refused while impersonating. All endpoints require the two-token auth."
     },
     {
       "name": "Sales",

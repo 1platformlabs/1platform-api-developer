@@ -37,12 +37,11 @@ async function wordLines(page) {
   });
 }
 
-async function checkReading(browser) {
-  const page = await browser.newPage();
+async function checkReadingViewport(browser, width) {
+  const page = await browser.newPage({viewport: {width, height: 900}});
   let requests = 0;
   await page.route(cdnPattern, async route => {requests += 1; await route.abort();});
-  for (const width of [320, 360, 390, 520, 1440]) {
-    await page.setViewportSize({width, height: 900});
+  try {
     await page.goto(origin + home, {waitUntil: 'domcontentloaded'});
     await page.locator('.docs-masthead h1').waitFor({state: 'visible'});
     await page.evaluate(() => document.fonts.ready);
@@ -58,11 +57,25 @@ async function checkReading(browser) {
       await page.locator('.docs-masthead h1').evaluate(node => {node.style.fontSize = '47px';});
       assert.ok((await wordLines(page)).some(word => word.lines > 1), 'old fixed size must fail');
     }
+    assert.equal(requests, 0, 'the home page must never request the reference runtime');
+  } finally {
+    await page.close();
   }
-  await page.goto(origin + guide, {waitUntil: 'domcontentloaded'});
-  await page.locator('h1').waitFor({state: 'visible'});
-  assert.equal(requests, 0, 'reading pages must never request the reference runtime');
-  await page.close();
+}
+
+async function checkReading(browser) {
+  // Each viewport owns a page: concurrent checks cannot change one another's DOM.
+  await Promise.all([320, 360, 390, 520, 1440].map(width => checkReadingViewport(browser, width)));
+  const page = await browser.newPage();
+  let requests = 0;
+  await page.route(cdnPattern, async route => {requests += 1; await route.abort();});
+  try {
+    await page.goto(origin + guide, {waitUntil: 'domcontentloaded'});
+    await page.locator('h1').waitFor({state: 'visible'});
+    assert.equal(requests, 0, 'guides must never request the reference runtime');
+  } finally {
+    await page.close();
+  }
 }
 
 async function checkReference(browser, path) {

@@ -7,6 +7,9 @@ module.exports = function infrastructureReference(context, options) {
   const plugin = officialPlugin(context, options);
   return {
     ...plugin,
+    // The route component owns its runtime. The official preBody script is
+    // parser-blocking and would otherwise load on every documentation page.
+    injectHtmlTags() { return {}; },
     async contentLoaded(args) {
       return plugin.contentLoaded({
         ...args,

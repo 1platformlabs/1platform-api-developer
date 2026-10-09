@@ -17,16 +17,28 @@ export default function ApiReferencePage({route}: Props): ReactNode {
   useEffect(() => {
     const abort = new AbortController();
     let reference: ReferenceInstance | undefined;
+    let script: HTMLScriptElement | undefined;
+    let cancelScript: (() => void) | undefined;
     let alive = true;
     setState('loading');
     const init = async () => {
       const browser = window as unknown as {Scalar?: ReferenceRuntime};
       if (!browser.Scalar && route.cdn) {
         await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
+          script = document.createElement('script');
           script.src = route.cdn!;
-          script.onload = () => resolve();
-          script.onerror = () => {script.remove(); reject(new Error('Reference runtime unavailable'));};
+          script.async = true;
+          const clearHandlers = () => {
+            if (script) {script.onload = null; script.onerror = null;}
+            cancelScript = undefined;
+          };
+          script.onload = () => {clearHandlers(); resolve();};
+          script.onerror = () => {clearHandlers(); script?.remove(); reject(new Error('Reference runtime unavailable'));};
+          cancelScript = () => {
+            clearHandlers();
+            script?.remove();
+            reject(new Error('Reference route unloaded'));
+          };
           document.head.appendChild(script);
         });
       }
@@ -46,8 +58,14 @@ export default function ApiReferencePage({route}: Props): ReactNode {
       });
     };
     void init().catch(() => {if (alive) setState('error');});
-    return () => {alive = false; abort.abort(); reference?.destroy();};
-  }, [route.configuration, attempt]);
+    return () => {
+      alive = false;
+      abort.abort();
+      cancelScript?.();
+      script?.remove();
+      reference?.destroy();
+    };
+  }, [route.configuration, route.cdn, attempt]);
   return <Layout title={atlas ? 'Referencia Atlas API' : 'Referencia API'} description="Explore los endpoints, parámetros, esquemas y respuestas de la API">
     <main className="api-reference-page">
       <section className="reference-intro brand-wrap">

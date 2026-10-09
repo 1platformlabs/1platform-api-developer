@@ -2,6 +2,10 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Lectura móvil y carga de guías
+
+- El título de portada ajusta su tamaño al ancho móvil y conserva las palabras completas desde 320 px.
+
 ## [Unreleased] — Identidad digital de 1Platform
 
 - Logo digital v2 en la cabecera, el menú móvil y el pie compartido, con la

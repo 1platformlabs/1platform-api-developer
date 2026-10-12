@@ -1,32 +1,11 @@
 #!/usr/bin/env node
 /** Local built-client regression; this is not the authenticated E2E gate. */
 import assert from 'node:assert/strict';
-import {createServer} from 'node:http';
-import {readFile} from 'node:fs/promises';
-import {extname, resolve, sep} from 'node:path';
-import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
+import {serveBuild} from './build-server.mjs';
 import {searchLabelFindings} from './search-label.mjs';
 
-const build = fileURLToPath(new URL('../build/', import.meta.url));
-const mime = {'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webp': 'image/webp'};
-const server = createServer(async (request, response) => {
-  try {
-    const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-    const file = resolve(build, `.${pathname}`, extname(pathname) ? '' : 'index.html');
-    if (!file.startsWith(build.endsWith(sep) ? build : build + sep)) {
-      response.writeHead(404).end();
-      return;
-    }
-    const contents = await readFile(file);
-    response.writeHead(200, {'Content-Type': mime[extname(file)] ?? 'application/octet-stream'});
-    response.end(contents);
-  } catch {
-    response.writeHead(404).end();
-  }
-});
-await new Promise((ready) => server.listen(0, '127.0.0.1', ready));
-const origin = `http://127.0.0.1:${server.address().port}`;
+const {origin, close} = await serveBuild();
 
 async function checkPage(page, path, width) {
   await page.goto(origin + path);
@@ -70,6 +49,5 @@ try {
   await checkViewport(browser, 390);
 } finally {
   await browser?.close();
-  server.closeAllConnections();
-  await new Promise((done) => server.close(done));
+  await close();
 }

@@ -37,6 +37,10 @@ sidebar_position: 1
 | `GET /users/telemetry/projects/{project_id}/logs` | Registros estructurados (hasta 6 días) |
 | `POST /users/telemetry/projects/{project_id}/monitors` | Crear un monitor de disponibilidad |
 | `POST /users/telemetry/projects/{project_id}/alert-rules` | Crear una regla de alerta |
+| `GET /users/telemetry/alert-rules/{rule_id}/notifications` | Historial de avisos de una regla, con su desenlace |
+| `POST /users/telemetry/projects/{project_id}/silence-windows` | Declarar una ventana de silencio propia |
+| `GET /users/telemetry/projects/{project_id}/silence-windows` | Listar las ventanas del proyecto (propias y de despliegue de la plataforma) |
+| `DELETE /users/telemetry/silence-windows/{window_id}` | Cancelar una ventana propia que no terminó |
 | `POST /users/telemetry/recipients` | Agregar un destinatario de avisos (doble opt-in) |
 | `GET /users/telemetry/projects/{project_id}/usage` | Consumo, cuota, gasto y huecos de recepción del mes |
 | `POST /users/telemetry/projects/{project_id}/credentials/{kind}/rotate` | Rotar una credencial |
@@ -46,6 +50,51 @@ Todas las operaciones: [Referencia de API → Telemetry](/api-reference/1platfor
 ## Eventos
 
 Una regla de alerta con `webhook_url` envía sus avisos a ese webhook, firmados en el header `x-1platform-signature` con el secreto de la regla. Ese secreto se devuelve una sola vez, al crear la regla. Antes de recibir avisos, el destino debe superar un desafío: responder con el valor de `challenge` que recibe. Es independiente de los [webhooks de la plataforma](/docs/saas/1platform-api/plataforma/webhooks).
+
+## Silencio durante despliegues {#silencio-durante-despliegues}
+
+Cuando la plataforma actualiza su servidor, o cuando usted despliega lo suyo, es normal que aparezcan errores y caídas breves. Una **ventana de silencio** retiene esos avisos en vez de enviarlos: el incidente se registra igual, pero el aviso queda marcado como silenciado.
+
+**Despliegues de la plataforma.** Cada regla elige qué hacer con ellos mediante `during_platform_deploys`, en `POST` y `PATCH` de reglas de alerta:
+
+| Valor | Efecto |
+|---|---|
+| `alert` (por defecto) | La regla avisa también durante la actualización |
+| `silence` | La regla no avisa mientras dura la ventana de la plataforma |
+
+La regla informa cuántos avisos retuvo en `silenced_count`, aparte de `suppressed_count`. Pasar una regla a `silence` responde `403` (`telemetry_impersonation_refused`) si ve la cuenta como otro usuario; volver a `alert` sí se permite.
+
+**Ventanas manuales.** Para su propio despliegue declare una con `POST /users/telemetry/projects/{project_id}/silence-windows`. Silencia **todas** las reglas del proyecto, incluidas las que vigilan el checkout.
+
+```bash
+curl -X POST "$BASE_URL/users/telemetry/projects/$PROJECT_ID/silence-windows" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"starts_at": "2026-12-01T02:00:00Z", "ends_at": "2026-12-01T04:00:00Z"}'
+```
+
+| Límite | Valor |
+|---|---|
+| Zona horaria | `starts_at` y `ends_at` la llevan; sin ella, `422` |
+| Duración máxima | La de su espacio de trabajo (24 horas por defecto) |
+| Inicio | Hasta 30 días adelante; un inicio pasado se toma como ahora |
+| Fin | Posterior al inicio y no pasado |
+| Vigentes o futuras por proyecto | Hasta 2, sin solaparse |
+
+`GET .../silence-windows` lista las ventanas del proyecto, con `kind` (`deploy` o `manual`), `state` (`open`, `closing` o `closed`) y `silenced_count`. `DELETE /users/telemetry/silence-windows/{window_id}` cancela una ventana **manual** que no terminó: deja de silenciar desde ese momento y lo ya silenciado queda marcado. Las ventanas de despliegue de la plataforma no se cancelan; para protegerse de ellas use `during_platform_deploys`.
+
+| HTTP | Código | Cuándo |
+|---|---|---|
+| `422` | `telemetry_silence_window_invalid` | Fechas fuera de los límites |
+| `409` | `telemetry_silence_window_limit` | Ya hay 2 vigentes o futuras, o se solapa con otra |
+| `409` | `telemetry_silence_window_not_cancellable` | No es manual, ya terminó o ya se canceló |
+| `409` | `telemetry_silence_windows_disabled` | La función no está disponible en su espacio de trabajo |
+| `404` | `telemetry_silence_window_not_found` | No hay una ventana suya con ese id |
+
+**Historial.** `GET /users/telemetry/alert-rules/{rule_id}/notifications` muestra un aviso retenido con `outcome` = `suppressed`, `reason` = `deploy_window` o `manual_window` y `window_id` con la ventana responsable (`null` en las demás filas).
+
+**Correo de comparación.** Al cerrar una ventana de despliegue de la plataforma se envía un solo correo que compara el tramo de la ventana con el tramo anterior de igual duración: eventos de error aceptados (los del navegador, con la clave pública, y los del servidor, con la clave secreta; los registros no cuentan), incidentes abiertos, avisos silenciados y los títulos de los incidentes silenciados. Llega al dueño y a los destinatarios confirmados de las reglas encendidas del proyecto; si no hay reglas encendidas, no se envía. Se manda una vez que la ventana vence, en la siguiente evaluación de telemetría, y no hay correo para las ventanas manuales. No incluye versiones, servicios, compradores, montos ni causas.
 
 ## Guías
 

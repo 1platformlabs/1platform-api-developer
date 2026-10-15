@@ -44,9 +44,21 @@ existen, en `x-error-codes`). Esta página reúne los que más integraciones enc
 | Operación | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|---|
 | `POST /auth/user/magic-link/verify` | 403 | `account_inactive` | Un administrador desactivó la cuenta | No reintente; la cuenta debe reactivarse |
-| `POST /auth/user/magic-link/verify` | 410 | (sin código) | El enlace ya se usó o venció | Pida un enlace nuevo |
+| `POST /auth/user/magic-link/verify`<br />`POST /auth/user/magic-link/preview` | 400 | `magic_link_invalid` | El enlace no se puede canjear en este panel: mal formado, firmado por otro entorno, desconocido, emitido para otro espacio de trabajo o para otro flujo de acceso. El código es el mismo para toda causa | Pida un enlace nuevo desde el panel al que quiere entrar; no reintente el mismo token |
+| `POST /auth/user/magic-link/verify`<br />`POST /auth/user/magic-link/preview` | 410 | (sin código) | El enlace ya se usó o venció. A diferencia del `400`, el enlace era válido | Pida un enlace nuevo |
 | `POST /auth/user/refresh` | 409 | (sin código) | Se presentó un `refresh_token` ya usado | Trátelo como posible robo de sesión: vuelva a autenticar |
 | `POST /me/api-credentials/{credential_id}/reveal` | 409 | `credential_already_revealed` | Esa clave ya se mostró una vez | Cree una clave nueva |
+
+## Telemetría
+
+| Operación | HTTP | Código | Significado | Qué hacer |
+|---|---|---|---|---|
+| `POST /users/telemetry/projects/{project_id}/silence-windows` | 422 | `telemetry_silence_window_invalid` | La ventana de silencio no cumple sus límites: fecha sin zona horaria, fin anterior al inicio o ya pasado, duración mayor que la de su espacio, o inicio a más de 30 días | Corrija las fechas ([límites](/docs/saas/1platform-api/telemetria#silencio-durante-despliegues)) |
+| `POST /users/telemetry/projects/{project_id}/silence-windows` | 409 | `telemetry_silence_window_limit` | El proyecto ya tiene 2 ventanas manuales vigentes o futuras, o la nueva se solapa con otra | Cancele una o elija otro horario |
+| `POST`, `GET /users/telemetry/projects/{project_id}/silence-windows`<br />`DELETE /users/telemetry/silence-windows/{window_id}` | 409 | `telemetry_silence_windows_disabled` | Las ventanas de silencio no están disponibles en su espacio de trabajo | No reintente; consulte a su administrador |
+| `DELETE /users/telemetry/silence-windows/{window_id}` | 409 | `telemetry_silence_window_not_cancellable` | La ventana no es manual, ya terminó o ya se canceló | No reintente; las ventanas de despliegue de la plataforma no se cancelan |
+| `DELETE /users/telemetry/silence-windows/{window_id}` | 404 | `telemetry_silence_window_not_found` | No hay una ventana con ese id entre sus proyectos | Revise el id |
+| `POST`, `PATCH` de reglas de alerta | 403 | `telemetry_impersonation_refused` | Intentó fijar `during_platform_deploys` en `silence` mientras ve la cuenta como otro usuario | Hágalo desde la sesión del propio usuario |
 
 ## Webhooks
 

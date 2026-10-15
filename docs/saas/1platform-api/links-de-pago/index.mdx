@@ -13,7 +13,7 @@ sidebar_position: 1
 1. Cree el link para un **comercio** con el monto y el concepto. La moneda la decide el servidor: es la del comercio. La respuesta trae `url`, el enlace público que comparte.
 2. Si envía `customer_email`, el link se le manda por correo a ese cliente en cuanto se crea. Esa misma dirección recibe después el comprobante.
 3. El cliente abre el enlace. Si el link está activo, lo redirige al checkout. Si ya está pagado, cancelado o vencido, ve una página con ese estado.
-4. El link vive en uno de cuatro estados. Mientras no lo pagan está `active`. Después termina en `paid`, `cancelled` (lo canceló usted) o `expired` (pasó su vigencia, que fija en días u horas). Los tres son finales.
+4. El link vive en uno de cuatro estados. Mientras no lo pagan está `active`. Después termina en `paid`, `cancelled` (lo canceló usted) o `expired` (pasó su vigencia, que fija en días, en horas o con una fecha exacta). Los tres son finales.
 5. Lo cobrado con un link se acredita a su **saldo retirable** cuando la plataforma confirma el pago. Mientras no lo confirma, el monto puede aparecer en `pending_verification` de `GET /users/cash-out/summary` y todavía no puede retirarlo; si no se confirma a tiempo, se acredita como saldo prepagado, que no se retira (lo cuenta `frozen_collections`). Ver [Retiros](/docs/saas/1platform-api/retiros).
 
 Los pagos con link **no** disparan los webhooks de transacción de [Pagos en línea](/docs/saas/1platform-api/pagos-en-linea). Para saber si un link se pagó, consulte su estado o el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros).
@@ -25,6 +25,35 @@ Los pagos con link **no** disparan los webhooks de transacción de [Pagos en lí
 - El módulo de Links de pago encendido para su espacio de trabajo y asignado a su cuenta. Si falta, recibe `403` con `data.code` = `module_disabled`.
 - Una pasarela de pago activa. Si no la hay, la creación responde `422`.
 - No necesita tener activa la [Facturación electrónica](/docs/saas/1platform-api/facturacion-electronica) para cobrar con links. Si la Referencia de API todavía lista un `409` `business_not_activated` en la creación del link, ya no se produce.
+
+## Vigencia del link {#vigencia}
+
+Al crear el link fija cuánto dura con **uno** de tres campos. Si no envía ninguno, se aplica la vigencia por defecto de su espacio de trabajo.
+
+| Campo | Qué es |
+|---|---|
+| `expires_at` | Fecha y hora exactas de vencimiento, en ISO-8601 **con zona horaria** (por ejemplo `2026-12-31T16:30:00-06:00`). Se respeta al segundo: sin redondeo ni mínimo propio |
+| `expires_in_hours` | Duración en horas, entero de 1 en adelante |
+| `expires_in_days` | Duración en días, entero de 1 en adelante |
+
+Los tres son excluyentes entre sí. Estos son los rechazos:
+
+| HTTP | Cuándo | Qué hacer |
+|---|---|---|
+| `422` | `expires_at` no trae zona horaria | Envíe la fecha con `Z` o con su desfase (`-06:00`) |
+| `400` con el campo `expires_at` | Va junto con `expires_in_hours` o `expires_in_days` | Envíe sólo uno de los tres |
+| `400` con el campo `expires_at` | La fecha ya pasó | Envíe una fecha futura |
+| `400` con el campo `expires_at` | La fecha supera el tope de vigencia de su espacio de trabajo (90 días por defecto) | Elija una fecha dentro del tope |
+
+`expires_in_hours` y `expires_in_days` también tienen ese tope y no pueden enviarse juntos.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/payment-links" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 150.00, "concept": "Anticipo de la reserva", "expires_at": "2026-12-31T16:30:00-06:00"}'
+```
 
 ## Operaciones
 

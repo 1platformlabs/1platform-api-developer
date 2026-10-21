@@ -14,13 +14,15 @@ Consulte `GET /agents/catalog` y `GET /agents/tools`. Elija una plantilla cuyas 
 
 ## 2. Instalar con límites
 
-Use `POST /agents/catalog/{slug}/install`. Declare sitios sólo cuando la plantilla los utilice; dejar `website_ids` vacío no concede acceso a todos. Configure presupuesto y cadencia. Sin presupuesto, el agente queda en modo propuesta para las herramientas que cuestan dinero. Para ejecutarlo sólo desde su aplicación, envíe `schedule` como cadena vacía; omitirlo adopta la cadencia de la plantilla.
+Use `POST /agents/catalog/{slug}/install`. Declare sitios sólo cuando la plantilla los utilice. Con `website_ids` vacío, el agente puede leer todos los sitios del usuario, pero sus herramientas de escritura en sitios se niegan a actuar; asignar sitios limita lectura y escritura a esa lista. Configure presupuesto y cadencia. Sin presupuesto, el agente queda en modo propuesta para las herramientas que cuestan dinero. Para ejecutarlo sólo desde su aplicación, envíe `schedule` como cadena vacía; omitirlo adopta la cadencia de la plantilla.
 
-La [guía para crear un agente de sitios](/docs/saas/1platform-api/agentes-de-ia/crear-un-agente) muestra un caso concreto con sitios asignados. Una definición propia requiere declarar sus herramientas; no permite añadir capacidades arbitrarias fuera del catálogo del servidor.
+La [guía para crear un agente de sitios](/docs/saas/1platform-api/agentes-de-ia/crear-un-agente) muestra un caso concreto con sitios asignados. Una definición propia (`POST /agents`) declara cada herramienta completa. Las internas deben estar disponibles para su plan (`403` si no lo están). Las externas (`type: external`) llaman a un endpoint HTTPS que usted declara en `execution_config`; el servidor valida esa URL al ejecutar la herramienta, con un tiempo máximo de 30 segundos.
 
 ## 3. Solicitar y consultar una ejecución
 
-Inicie `POST /agents/{agent_id}/run` con el objetivo de la tarea en `input_message`. Conserve el identificador de la ejecución y consulte `GET /agents/{agent_id}/runs/{run_id}` hasta su estado final. La aceptación `202` no confirma que la tarea haya terminado. Distinga ejecución fallida, detenida y completada antes de mostrar un resultado a su usuario.
+Inicie `POST /agents/{agent_id}/run` con el objetivo de la tarea en `input_message`. Conserve el identificador de la ejecución y consulte `GET /agents/{agent_id}/runs/{run_id}` hasta su estado final. La aceptación `202` no confirma que la tarea haya terminado. Distinga ejecución fallida, detenida y completada antes de mostrar un resultado a su usuario. No hay respuesta en streaming.
+
+Si el agente tiene `webhook_url`, al terminar cada ejecución el servidor envía un único aviso a esa URL con el estado y un resumen. El aviso no lleva firma ni reintentos: úselo como señal para consultar la ejecución, no como fuente del resultado.
 
 ## 4. Resolver decisiones humanas
 
@@ -28,6 +30,6 @@ Consulte `GET /agent-actions` y presente la acción pendiente a una persona con 
 
 ## 5. Integrar Ventas sólo cuando esté habilitado
 
-[Ventas](/docs/saas/1platform-api/ventas) tiene ofertas, canales, leads y permisos propios. La automatización por WhatsApp y la activación con un clic permanecen en preparación. Una operación interna de avisos de mensajería no es una API pública de conversación ni habilita un canal para su aplicación.
+[Ventas](/docs/saas/1platform-api/ventas) tiene ofertas, canales, leads y permisos propios. La automatización por WhatsApp y la activación con un clic permanecen en preparación. La plantilla conversacional del catálogo exige el módulo de Ventas: sin él, la instalación responde `422`. Una operación interna de avisos de mensajería, bajo `/integrations/*` y con credencial de servicio de la plataforma, no es una API pública de conversación ni habilita un canal para su aplicación.
 
 [Referencia de API → Catálogo](/api-reference/1platform-api#tag/agents-catalog) · [Herramientas](/api-reference/1platform-api#tag/agents-tools) · [Ejecución](/api-reference/1platform-api#tag/agents-execution) · [Acciones](/api-reference/1platform-api#tag/agents-actions).

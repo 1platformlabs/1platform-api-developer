@@ -34,9 +34,9 @@ curl -X POST "$BASE_URL/agents/catalog/$TEMPLATE_SLUG/install" \
   -d '{"website_ids": ["'"$WEBSITE_ID"'"], "monthly_budget_usd": "25.00"}'
 ```
 
-Guarde `data.agent.id` como `$AGENT_ID`. El agente nace **activo** y con la cadencia de la plantilla. Para crear uno que sólo corra cuando lo dispara, envíe `"schedule": ""`. Si el plan no incluye alguna herramienta de la plantilla, la instalación la omite y la informa en `data.skipped_tools`. `409` significa que otro agente con el mismo objetivo ya vigila uno de esos sitios.
+Guarde `data.agent.id` como `$AGENT_ID`. El agente nace **activo** y con la cadencia de la plantilla. Para crear uno que sólo corra cuando lo dispara, envíe `"schedule": ""`. Si el plan no incluye alguna herramienta de la plantilla, la instalación la omite y la informa en `data.skipped_tools`. `409` significa que otro agente con el mismo objetivo ya vigila uno de esos sitios; `404`, que la plantilla no existe o que alguno de los sitios no es del usuario. En ambos casos no queda ningún agente a medio crear. `403` indica que el plan no incluye ninguna de las herramientas de la plantilla y `429`, que se alcanzó el máximo de agentes. Una plantilla conversacional no admite sitios ni cadencia y exige el módulo de Ventas: lo contrario responde `422` con el motivo en `data.code`.
 
-`monthly_budget_usd` es el tope de gasto **por ciclo**, aunque el nombre del campo diga mensual. Si lo omite, el agente no tiene gasto ilimitado: queda en modo propuesta y no recibe las herramientas que cuestan dinero hasta que le fije un tope con `PUT /agents/{agent_id}/budget`.
+`monthly_budget_usd` es el tope de gasto **por ciclo**, y el ciclo es el mes calendario en UTC (`period_key` con formato `AAAA-MM`). Si lo omite en una plantilla de tareas, el agente no tiene gasto ilimitado: queda en modo propuesta y no recibe las herramientas que cuestan dinero hasta que le fije un tope con `PUT /agents/{agent_id}/budget`.
 
 [Referencia de API → Agents Catalog](/api-reference/1platform-api#tag/agents-catalog)
 
@@ -52,7 +52,7 @@ curl -X POST "$BASE_URL/agents/$AGENT_ID/run" \
   -d '{"input_message": "Revisa los artículos publicados hoy y marca los que tengan enlaces rotos"}'
 ```
 
-La respuesta es `202`: la ejecución quedó registrada en `pending` y todavía no corrió. Guarde `data.id` como `$RUN_ID`. `409` significa que el agente ya tiene el máximo de ejecuciones simultáneas; espere a que termine alguna. `503` significa que el agente está inactivo o que la plataforma no tiene capacidad en ese momento.
+La respuesta es `202`: la ejecución quedó registrada en `pending` y todavía no corrió. Guarde `data.id` como `$RUN_ID`. `409` significa que el agente ya tiene el máximo de ejecuciones simultáneas; espere a que termine alguna. `503` significa que el agente está inactivo o que la plataforma no tiene capacidad en ese momento. `429` indica el límite de solicitudes o que se agotó el cupo mensual de procesamiento.
 
 [Referencia de API → Agents Execution](/api-reference/1platform-api#tag/agents-execution)
 
@@ -64,7 +64,7 @@ curl "$BASE_URL/agents/$AGENT_ID/runs/$RUN_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-`data.status` pasa de `pending` a `running` y termina en `completed`, `failed` o `stopped`. Con `completed`, `data.result` resume lo que hizo el agente y `data.total_tokens` dice cuánto consumió. Para cortar una ejecución pendiente o en curso, use `POST /agents/{agent_id}/runs/{run_id}/stop`.
+`data.status` pasa de `pending` a `running` y termina en `completed`, `failed` o `stopped`. Con `completed`, `data.result` resume lo que hizo el agente y `data.total_tokens` dice cuánto consumió. `data.stop_reason` explica por qué terminó, por ejemplo `budget_exhausted` o `insufficient_balance`. Para cortar una ejecución pendiente o en curso, use `POST /agents/{agent_id}/runs/{run_id}/stop`: la ejecución queda en `stopped` y el agente se detiene antes de su siguiente iteración. Detener una ejecución ya terminada responde `409`.
 
 [Referencia de API → Agents Execution](/api-reference/1platform-api#tag/agents-execution)
 

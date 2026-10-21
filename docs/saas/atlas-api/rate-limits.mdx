@@ -12,16 +12,19 @@ cliente para **reaccionar** a las respuestas de abajo en lugar de fijar umbrales
 
 ## Qué cuenta para el límite
 
-La cuenta se lleva con claves distintas según la superficie: por cliente (dirección y navegador) en las lecturas anónimas,
-por clave en las operaciones con clave de integración y por sesión en las escrituras de un miembro.
+La cuenta se lleva con claves distintas según la superficie: por cliente (dirección y navegador) en las lecturas anónimas
+limitadas, por clave en las operaciones de plataforma con clave de integración y por sesión en las escrituras de listas de
+un miembro. Las operaciones de aprovisionamiento de miembros con clave de integración no declaran un límite propio.
 
-Hay una excepción importante: `GET /tenants/by-host` cuenta por dirección de origen, y todo el tráfico que pasa por el
-proxy de entrada comparte esa dirección. Su límite es, en la práctica, **compartido entre todos los clientes**. Llámelo una
-vez al configurar su integración (o en su prueba de humo) y guarde el resultado; no lo llame en cada solicitud.
+Hay una excepción importante: `GET /tenants/by-host` y la ingesta de eventos de uso (`POST /events`) cuentan por dirección
+de origen, y todo el tráfico que pasa por el proxy de entrada comparte esa dirección. Su límite es, en la práctica,
+**compartido entre todos los clientes**. Llame a `by-host` una vez al configurar su integración (o en su prueba de humo) y
+guarde el resultado; no lo llame en cada solicitud.
 
 ## Qué respuestas esperar
 
-- **`429 RATE_LIMITED`**: superó el límite de la operación. Espere y reintente con espera creciente.
+- **`429 RATE_LIMITED`**: superó el límite de la operación. No trae `Retry-After` ni headers de cuota: espere y reintente
+  con espera creciente.
 - **`429 DOWNLOAD_RATE_LIMITED`**: demasiadas solicitudes de entrega seguidas; trae `Retry-After`.
 - **`503 CATALOG_BUSY`**: el catálogo está saturado y descarta solicitudes para proteger al resto de la API; trae
   `Retry-After`.

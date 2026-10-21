@@ -25,7 +25,8 @@ recuperarla: si se pierde o se filtra, pida una nueva.
 
 ## Cómo se usa
 
-Envíe la clave como `Authorization: Bearer ak-int-…`. El tenant sale de la clave, así que **no** envíe `X-Tenant-Slug`.
+Envíe la clave como `Authorization: Bearer ak-int-…`. El tenant sale de la clave, así que no necesita `X-Tenant-Slug`: estas
+operaciones no lo leen.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/integrations/bower/v1/members/upsert" \
@@ -42,13 +43,15 @@ Las operaciones disponibles para un tenant son las de aprovisionamiento de miemb
 | `POST /integrations/bower/v1/members/{member_id}/issue-magic-link` | Obtener un enlace de acceso nuevo para un miembro existente. |
 
 Las operaciones de gestión de contenido (`/content/*`), de derechos de acceso (`/entitlements/*`) y de administración
-(`/admin/*`) **no** aceptan una clave de integración: responden `401 UNAUTHORIZED` y exigen el JWT de un operador o miembro.
+(`/admin/*`) **no** reconocen una clave de integración como sesión: las que exigen sesión responden `401 UNAUTHORIZED` y
+piden el JWT de un operador o miembro.
 Si su caso necesita escribir catálogo desde un servidor, coordínelo con el equipo de 1Platform Labs.
 
 ## El orden de un aprovisionamiento
 
 1. Tras la compra, llame a `members/upsert`. Es idempotente por tenant y correo: repetirlo no duplica al miembro.
-2. Muestre el enlace de acceso que devuelve **en ese momento**. Es de un solo uso y vence en minutos.
+2. Muestre el enlace de acceso que devuelve (`sign_in_url`) **en ese momento**. Es de un solo uso y vence en minutos: la
+   respuesta indica el instante exacto (`sign_in_expires_at`).
 3. Si el comprador vuelve más tarde a la página de acceso, pida un enlace nuevo con `issue-magic-link`. Nunca guarde el
    enlace: un registro filtrado no debe servir para entrar.
 
@@ -59,8 +62,8 @@ avisa de dos maneras:
 
 - **Durante los últimos 14 días** de vida de la clave, cada respuesta exitosa trae el header `X-Atlas-Key-Expires-At` con
   la fecha y hora de vencimiento (UTC). Vigílelo y avise en cuanto aparezca: es la señal para pedir la renovación.
-- **Una vez vencida**, la clave responde `401 INTEGRATION_KEY_EXPIRED`, distinto de `INTEGRATION_KEY_INVALID`. No los trate
-  igual: uno pide renovar la clave; el otro, revisar cuál está enviando.
+- **Una vez vencida**, la clave responde `401 INTEGRATION_KEY_EXPIRED`, con el instante de vencimiento en `expired_at`, distinto
+  de `INTEGRATION_KEY_INVALID`. No los trate igual: uno pide renovar la clave; el otro, revisar cuál está enviando.
 
 ## Errores de la clave
 
@@ -68,8 +71,11 @@ avisa de dos maneras:
 - `401 INTEGRATION_KEY_INVALID`: la clave no existe, fue revocada o el secreto no coincide.
 - `401 INTEGRATION_KEY_EXPIRED`: la clave venció.
 - `403 INTEGRATION_CAPABILITY_MISSING`: la clave es válida pero no tiene la capacidad que pide la operación; la respuesta
-  nombra la capacidad requerida.
-- `404 TENANT_NOT_FOUND` o `404 MEMBER_NOT_FOUND`: el tenant o el miembro ya no existe. Un miembro de otro tenant también
-  responde `404`, para que una clave filtrada no pueda averiguar qué identificadores existen.
+  nombra la capacidad requerida en `required`.
+- `403 INTEGRATION_SCOPE_INVALID`: la clave es válida pero su alcance (tenant o plataforma) no es el que exige la operación;
+  la respuesta lo indica en `required_scope`.
+- `404 TENANT_NOT_FOUND` o `404 MEMBER_NOT_FOUND`: el tenant o el miembro ya no existe. Un miembro de otro tenant, o uno
+  bloqueado por el operador, también responde `404 MEMBER_NOT_FOUND`, para que una clave filtrada no pueda averiguar qué
+  identificadores existen.
 
 Estos errores llegan anidados en `detail`; consulte [Errores](/docs/saas/atlas-api/errors).

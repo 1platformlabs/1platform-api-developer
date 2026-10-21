@@ -24,7 +24,9 @@ El código llega en **dos formas**, según la operación:
 La forma **anidada en `detail`** es la más frecuente: la usan casi todos los errores de autenticación, tenant, entrega,
 derechos de acceso, claves de integración y webhooks. Algunos errores anidados traen campos extra junto al código (por
 ejemplo, la capacidad que falta o la fecha de vencimiento de una clave). La forma **plana** aparece en otros errores de
-dominio, como los de búsqueda y algunos de entrega.
+dominio, como los de búsqueda y algunos de entrega, y también en `SESSION_REVOKED`, `TENANT_SWITCH_FORBIDDEN`,
+`TENANT_SWITCH_INVALID` y el `429 RATE_LIMITED`. No suponga la forma por el tipo de error: léala como en el ejemplo de
+abajo.
 
 La tercera forma son los **fallos de validación** (`422`) de parámetros o cuerpos mal formados: `detail` es una **lista** de
 errores por campo y no hay `code`. Corríjalos en su cliente; no se reintentan.
@@ -45,21 +47,23 @@ La Atlas API no usa el envoltorio `{ success, data, msg }` de la 1Platform API.
 
 | Código | HTTP | Qué hacer |
 |---|---|---|
-| `UNAUTHORIZED` | 401 | Falta una credencial válida: inicie sesión. |
-| `TOKEN_EXPIRED` | 401 | Refresque la sesión ([Autenticación](/docs/saas/atlas-api/authentication)); si falla, pida un enlace de acceso nuevo. |
+| `UNAUTHORIZED` | 401 | Falta un token válido o el token de acceso venció: refresque la sesión ([Autenticación](/docs/saas/atlas-api/authentication)); si falla, vuelva a iniciar sesión. |
+| `TOKEN_EXPIRED` | 401 | Venció el enlace de acceso o el token de refresco: pida un enlace de acceso nuevo (un operador vuelve a iniciar sesión). |
 | `TOKEN_INVALID` / `TOKEN_CONSUMED` | 401 | Token mal formado, de otro tenant o ya usado: vuelva a iniciar sesión. |
+| `SESSION_REVOKED` | 401 | El operador bloqueó al miembro y cortó sus sesiones: no reintente con ese token. |
 | `CREDENTIALS_INVALID` / `TOTP_REQUIRED` / `TOTP_INVALID` | 401 | Inicio de sesión de operador rechazado. |
 | `INSUFFICIENT_ROLE` / `INSUFFICIENT_PERMISSION` | 403 | La sesión no tiene el rol o permiso que pide la operación. |
 | `TENANT_SWITCH_FORBIDDEN` | 403 | No envíe `X-Admin-Tenant-Slug` con esa cuenta. |
+| `TENANT_SWITCH_INVALID` | 400 | El tenant de `X-Admin-Tenant-Slug` no existe o está desactivado. |
 | `TENANT_MISMATCH` | 403 | La sesión es de otro tenant: revise `X-Tenant-Slug`. |
 | `MEMBER_MISMATCH` | 403 | Un miembro sólo puede consultar sus propios derechos de acceso. |
 | `TENANT_UNRESOLVED` | 404 | El dominio o el slug no corresponden a un tenant activo. En `GET /tenants/by-host`, su dominio no está dado de alta; en otra operación, el tenant que envió está desactivado. |
 | `INTEGRATION_KEY_REQUIRED` / `INTEGRATION_KEY_INVALID` | 401 | Revise qué clave envía. |
 | `INTEGRATION_KEY_EXPIRED` | 401 | La clave venció: pida una nueva ([Claves de integración](/docs/saas/atlas-api/integration-keys)). |
-| `INTEGRATION_CAPABILITY_MISSING` | 403 | La clave no tiene la capacidad que pide la operación. |
+| `INTEGRATION_CAPABILITY_MISSING` / `INTEGRATION_SCOPE_INVALID` | 403 | La clave no tiene la capacidad o el alcance que pide la operación. |
 | `ENTITLEMENT_DENIED` | 403 | Muestre el muro de suscripción o compra. |
 | `FREEMIUM_GATE_BLOCKED` | 402 | Miembro gratuito sin cuota o sin plan: muestre el muro de suscripción. |
-| `ACCOUNT_TEMPORARILY_BLOCKED` | 403 | Cuenta bloqueada temporalmente: no reintente. |
+| `ACCOUNT_TEMPORARILY_BLOCKED` | 403 | Cuenta bloqueada: no reintente; si trae `expires_at`, no antes de ese instante. |
 | `CONTENT_NOT_FOUND` / `ASSET_NOT_AVAILABLE` / `CHAPTER_NOT_FOUND` | 404 | El ítem, formato o capítulo no existe en este tenant. |
 | `CONTENT_SLUG_TAKEN` / `CONTENT_ALREADY_PUBLISHED` | 409 | Conflicto esperable: elija otro slug o trátelo como éxito. |
 | `OPTIMISTIC_LOCK_FAILED` | 409 | Alguien cambió el registro a la vez: vuelva a leerlo y reintente. |
@@ -67,7 +71,7 @@ La Atlas API no usa el envoltorio `{ success, data, msg }` de la 1Platform API.
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Revise secreto, timestamp y bytes firmados ([Webhooks](/docs/saas/atlas-api/webhooks)). |
 | `RATE_LIMITED` / `DOWNLOAD_RATE_LIMITED` | 429 | Espere y reintente ([Límites de uso](/docs/saas/atlas-api/rate-limits)). |
 | `CATALOG_BUSY` | 503 | Espere lo que indique `Retry-After` y reintente. |
-| `EMAIL_DELIVERY_FAILED` | 503 | El correo no salió: pida un enlace nuevo. |
+| `EMAIL_DELIVERY_FAILED` | 503 | El correo no salió: pida un enlace nuevo pasado el `Retry-After`. |
 | `PROVIDER_UNAVAILABLE` / `MEDIA_UNAVAILABLE` | 503 | Falla transitoria de un servicio externo: reintente con espera creciente. |
 
 Cada operación declara sus códigos en la [Referencia de API](/api-reference/atlas-api); si recibe uno que no está aquí,

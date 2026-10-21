@@ -13,7 +13,7 @@ nada de esto lo explica, pida soporte con el `x-request-id` de la respuesta.
 
 El espacio de trabajo no tiene una pasarela de cobro activa. Un administrador la configura en el Panel; reintentar
 sin ese cambio no sirve. Si el código es `PLATFORM_GATEWAY_REQUIRED`, el espacio de trabajo sí tiene pasarela, pero
-liquida directo al comercio y este cobro lo recauda la plataforma: no hay nada que configurar, contacta a soporte.
+liquida directo al comercio y este cobro lo recauda la plataforma: no hay nada que configurar, contacte a soporte.
 
 ## «`401` en todas las llamadas aunque mi clave es válida»
 
@@ -22,6 +22,8 @@ liquida directo al comercio y este cobro lo recauda la plataforma: no hay nada q
 2. **Clave en vez de token.** Los headers llevan los **tokens** (JWT), no las claves `ak-…`/`sk-…`. Canjéelas
    primero; ver [Autenticación](/docs/saas/1platform-api/plataforma/autenticacion).
 3. **Clave incompleta.** Copie la clave entera, prefijo incluido.
+4. **Token vencido.** Los tokens duran lo que indica `expires_in` al canjearlos. Si los guarda en caché, renuévelos
+   antes de que venzan; un token vencido responde `401` con la forma `detail`.
 
 ## «`403` con `module_disabled`»
 
@@ -31,7 +33,8 @@ administrador del espacio de trabajo que lo habilite.
 ## «`403` al configurar webhooks»
 
 La configuración de webhooks exige el token de usuario de un **administrador del espacio de trabajo**, además del
-token de aplicación. Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks).
+token de aplicación. Si el `403` trae `module_disabled`, el módulo de desarrolladores no está habilitado para ese
+usuario o para el espacio de trabajo. Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhooks).
 
 ## «La verificación de firma de mi webhook falla siempre»
 
@@ -41,7 +44,7 @@ token de aplicación. Ver [Webhooks](/docs/saas/1platform-api/plataforma/webhook
    cambian los bytes.
 2. **Reloj desfasado.** El material firmado incluye `X-Webhook-Timestamp`, y su verificador rechaza lo que tenga más
    de 5 minutos. Sincronice sus servidores por NTP.
-3. **El prefijo.** Quita `sha256=` de `X-Webhook-Signature` **antes** de comparar; no lo agregue al valor calculado.
+3. **El prefijo.** Quite `sha256=` de `X-Webhook-Signature` **antes** de comparar; no lo agregue al valor calculado.
 4. **Secreto equivocado.** Hay un solo secreto por espacio de trabajo y entorno. Si alguien lo rotó, el anterior ya
    no sirve.
 
@@ -51,7 +54,8 @@ lenguajes.
 ## «Recibo `429` durante el desarrollo»
 
 Lo más probable es que esté canjeando un token nuevo en cada solicitud. Los canjes están limitados a 10 por minuto
-(en `POST /users/token`, compartidos por todos los usuarios del mismo token de aplicación). Guarde los tokens en
+(en `POST /auth/token`, por dirección IP; en `POST /users/token`, compartidos por todos los usuarios del mismo token
+de aplicación). Guarde los tokens en
 caché; ver
 [Autenticación → Mantener los tokens vigentes](/docs/saas/1platform-api/plataforma/autenticacion#cache-de-tokens).
 Si el `429` aparece en otra operación, puede ser su límite por minuto, el cupo de su plan o un trabajo igual ya en
@@ -65,13 +69,13 @@ La entrega usa reintentos limitados; puede haber duplicados y eventos no entrega
 
 ## «Roté el secreto y ahora fallan webhooks legítimos»
 
-El secreto anterior deja de usarse para firmar en cuanto llama a `POST /webhooks/config/rotate-secret`, pero los
-reintentos de eventos firmados antes de la rotación siguen llegando con la firma vieja durante alrededor de un
-minuto. Acepte los dos secretos durante unos minutos después de rotar. Ver
+El secreto anterior deja de usarse para firmar en cuanto llama a `POST /webhooks/config/rotate-secret`, pero cada
+entrega se firma una sola vez, antes del primer intento, así que los reintentos de eventos firmados antes de la
+rotación siguen llegando con la firma vieja durante alrededor de un minuto. Acepte los dos secretos durante unos minutos después de rotar. Ver
 [Seguridad de webhooks → Rotación del secreto](/docs/saas/1platform-api/reference/webhooks-security#secret-rotation).
 
 ## «El `amount` del webhook no coincide con lo que cobré»
 
 En el webhook, `amount` y `currency` están en la moneda de la pasarela, que puede ser distinta de la suya. Lo que
-cotizó está en `merchant_amount` y `merchant_currency`: **acredita siempre con esos dos**. Ver
+cotizó está en `merchant_amount` y `merchant_currency`: **acredite siempre con esos dos**. Ver
 [Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).

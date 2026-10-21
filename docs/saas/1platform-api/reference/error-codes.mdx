@@ -7,9 +7,10 @@ sidebar_position: 3
 # Códigos de error
 
 Los errores de negocio llegan en el sobre `{ success: false, data, msg }`. Cuando la operación necesita que su
-cliente distinga el **tipo** de fallo, trae un código legible por máquina: casi siempre en `data.code`, y en algunas
-familias (Retiros, Correo, 1Trade, y la activación, la selección de sucursal y el comercio archivado en Facturación
-electrónica y en comercios) en `code`, en la raíz. Si no hay código, el código de estado HTTP es la información. Los
+cliente distinga el **tipo** de fallo, trae un código legible por máquina: casi siempre en `data.code`, y en otras
+familias en `code`, en la raíz: entre ellas Retiros, Correo, Correo transaccional, Telemetría, 1Trade, Notificaciones,
+Cobros con terminal y, en Facturación electrónica y comercios, la activación, la selección de sucursal y el comercio
+archivado. Si no hay código, el código de estado HTTP es la información. Los
 errores de validación, de autenticación y de rol usan otra forma (`detail`): ver
 [Formato de respuesta](/docs/saas/1platform-api/reference/response-format). En las tablas, la columna «Código» vale
 para los dos lugares.
@@ -21,21 +22,24 @@ existen, en `x-error-codes`). Esta página reúne los que más integraciones enc
 
 | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|
-| 401 | (forma `detail`) | Falta un token, venció o no es válido | Canjee de nuevo el token que corresponda y reintente **una vez** |
+| 401 | (forma `detail`) | Falta un token, venció, fue revocado o no es válido | Canjee de nuevo el token que corresponda y reintente **una vez** |
+| 401 | (sin código) | `POST /auth/token` o `POST /users/token` rechazó la clave: no existe o fue revocada (en `POST /auth/token`, también si el espacio de trabajo está inactivo). Responde con el sobre, no con `detail` | Revise la clave y el entorno. **No reintente** con la misma clave |
 | 402 | (sin código) | El saldo no alcanza el costo de la operación | Pida al usuario que recargue. **No reintente** sin recargar |
 | 403 | `module_disabled` | El módulo está apagado para el espacio de trabajo o no está asignado a este usuario | Pida a un administrador del espacio de trabajo que lo habilite. **No reintente** |
 | 403 | (forma `detail`) | El usuario no tiene el rol que exige la operación (por ejemplo, no es administrador del espacio de trabajo) | Use el token de un usuario con ese rol |
 | 422 | (forma `detail`) | La solicitud no cumple el esquema (falta un campo, tipo incorrecto) | Corrija la solicitud. **Nunca reintente** igual |
-| 429 | (sin código, salvo excepciones) | La operación no acepta más solicitudes por ahora: casi siempre, el límite por minuto | Ver [Límites de uso](/docs/saas/1platform-api/reference/rate-limits) |
+| 429 | (sin código, salvo excepciones) | La operación no acepta más solicitudes por ahora: casi siempre, su límite de uso | Ver [Límites de uso](/docs/saas/1platform-api/reference/rate-limits) |
+| 500 | (sin código) | Error inesperado del servidor. Si la operación no lo controló, llega con la forma `detail` | Aplique la regla de reintentos de [Convenciones](/docs/saas/1platform-api/reference/convenciones#reintentos-e-idempotencia) e incluya el `x-request-id` si pide soporte |
 
 ## Pagos en línea
 
 | Operación | HTTP | Código | Significado | Qué hacer |
 |---|---|---|---|---|
 | `POST /users/transactions` | 422 | `PAYMENT_GATEWAY_NOT_CONFIGURED` | El espacio de trabajo no tiene una pasarela de cobro activa | Un administrador la configura en el Panel. **No reintente** |
-| `POST /users/transactions` | 422 | `PLATFORM_GATEWAY_REQUIRED` | El espacio de trabajo tiene pasarela, pero liquida directo al comercio y este cobro lo recauda la plataforma | No hay nada que configurar; contacta a soporte. **No reintente** |
+| `POST /users/transactions` | 422 | `PLATFORM_GATEWAY_REQUIRED` | El espacio de trabajo tiene pasarela, pero liquida directo al comercio y este cobro lo recauda la plataforma | No hay nada que configurar; contacte a soporte. **No reintente** |
 | `POST /users/transactions` | 409 | `business_archived` | El comercio dueño de la sucursal indicada en `branch_id` está archivado | Use una sucursal de un comercio activo |
 | `POST /users/transactions` | 403 | (sin código) | Su rol en la sucursal indicada no permite cobrar | Use un usuario con un rol que cobre en esa sucursal |
+| `POST /users/transactions` | 403 | `module_disabled` | Envió `branch_id` con un usuario que no tiene asignado ninguno de los módulos de comercio | Pida a un administrador del espacio de trabajo que se los asigne |
 | `POST /users/transactions` | 503 | (sin código) | El servicio de pagos no está disponible temporalmente | Compruebe que el cobro no se creó (ver [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar)) antes de reintentar |
 | `POST /users/transactions/{id}/refund` | 501 | `REFUND_NOT_SUPPORTED` | La API todavía no emite reembolsos | **No reintente**. El reembolso de un pago aprobado le llega como evento `on_refunded` |
 
@@ -46,7 +50,8 @@ existen, en `x-error-codes`). Esta página reúne los que más integraciones enc
 | `POST /auth/user/magic-link/verify` | 403 | `account_inactive` | Un administrador desactivó la cuenta | No reintente; la cuenta debe reactivarse |
 | `POST /auth/user/magic-link/verify`<br />`POST /auth/user/magic-link/preview` | 400 | `magic_link_invalid` | El enlace no se puede canjear en este panel: mal formado, firmado por otro entorno, desconocido, emitido para otro espacio de trabajo o para otro flujo de acceso. El código es el mismo para toda causa | Pida un enlace nuevo desde el panel al que quiere entrar; no reintente el mismo token |
 | `POST /auth/user/magic-link/verify`<br />`POST /auth/user/magic-link/preview` | 410 | (sin código) | El enlace ya se usó o venció. A diferencia del `400`, el enlace era válido | Pida un enlace nuevo |
-| `POST /auth/user/refresh` | 409 | (sin código) | Se presentó un `refresh_token` ya usado | Trátelo como posible robo de sesión: vuelva a autenticar |
+| `POST /auth/user/refresh` | 409 | (sin código) | Se presentó un `refresh_token` ya usado o revocado | Trátelo como posible robo de sesión: vuelva a autenticar |
+| `POST /auth/user/refresh` | 401 | (sin código) | El `refresh_token` venció: la sesión terminó. Responde con el sobre | Vuelva a autenticar |
 | `POST /me/api-credentials/{credential_id}/reveal` | 409 | `credential_already_revealed` | Esa clave ya se mostró una vez | Cree una clave nueva |
 
 ## Telemetría

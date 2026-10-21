@@ -35,8 +35,8 @@ No todas las operaciones aceptan a cualquier usuario. Antes de integrar un paso,
 | Un administrador del espacio de trabajo | Token de aplicación + token de usuario de un administrador | Webhooks, dominios de retorno, solicitudes de acceso, usuarios del espacio de trabajo |
 | Un rol en la sucursal | Token de aplicación + token de usuario con ese rol en la sucursal | Cobrar o facturar desde una sucursal concreta |
 
-Además, cada producto depende de que su módulo esté habilitado para el espacio de trabajo y para el usuario: si no
-lo está, la operación responde `403` con `data.code` `module_disabled`.
+Además, las operaciones de un producto con módulo dependen de que ese módulo esté habilitado para el espacio de
+trabajo y para el usuario: si no lo está, la operación responde `403` con `data.code` `module_disabled`.
 
 ## Variables de los ejemplos
 
@@ -61,15 +61,30 @@ que falta: [Referencia de API → Websites](/api-reference/1platform-api#tag/web
 
 ## Formato de las respuestas
 
-Las respuestas usan el sobre `{success, data, msg}`, salvo dos casos que su cliente debe tolerar: los errores de
-validación (`422`) y los rechazos de autenticación o de rol (todo `401` y algunos `403`), que responden con un
-objeto `detail` en lugar del sobre. El código de un error de negocio viaja en `data.code` o, en algunas familias, en
-`code` en la raíz: lea los dos. Las formas están en
+Las respuestas usan el sobre `{success, data, msg}`, salvo casos que su cliente debe tolerar: los errores de
+validación (`422`), los rechazos de autenticación o de rol que ocurren antes de la operación (un token ausente,
+vencido o revocado, y algunos `403`) y los errores inesperados no controlados (`500`), que responden con un objeto
+`detail` en lugar del sobre. Un canje de clave rechazado (`401` de `POST /auth/token` o `POST /users/token`) sí usa
+el sobre. El código de un error de negocio viaja en `data.code` o, en algunas familias, en `code` en la raíz: lea
+los dos. Las formas están en
 [Formato de respuesta](/docs/saas/1platform-api/reference/response-format) y los códigos legibles por máquina, en
 [Códigos de error](/docs/saas/1platform-api/reference/error-codes). Las guías nombran el campo que necesita el
 paso siguiente; no reproducen el cuerpo.
 
-Cada respuesta trae un header `x-request-id`. Inclúyalo cuando pida soporte: identifica su llamada.
+Cada respuesta trae un header `x-request-id`. Inclúyalo cuando pida soporte: identifica su llamada. Si envía su
+propio `X-Request-ID` (hasta 128 caracteres: letras, dígitos y `.`, `_`, `:`, `-`), la respuesta lo devuelve igual;
+si no cumple ese formato, la API genera uno nuevo.
+
+## Paginación
+
+Las operaciones de listado no comparten una sola convención: según la familia, paginan con `limit` y `skip`, con
+`page` y `page_size` o con un `cursor`. Los parámetros, sus valores por defecto y sus máximos están en cada
+operación de la Referencia de API; no asuma los de otra familia.
+
+## Llamadas desde el navegador
+
+La API acepta solicitudes de origen cruzado sólo desde los orígenes que la plataforma tiene autorizados. Haga sus
+llamadas desde su backend: así, además, las claves y los tokens no quedan expuestos en el navegador.
 
 ## Reintentos e idempotencia
 

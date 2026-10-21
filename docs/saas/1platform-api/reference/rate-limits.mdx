@@ -6,18 +6,25 @@ sidebar_position: 4
 
 # Límites de uso
 
-Cada operación protegida tiene un límite de solicitudes por minuto. Superarlo devuelve `429 Too Many Requests`.
+Cada operación tiene un límite de solicitudes, casi siempre por minuto; unas pocas operaciones sensibles (por ejemplo,
+mostrar una clave nueva) se cuentan por hora. Superarlo devuelve `429 Too Many Requests`.
 
 ## Cómo se cuenta
 
-El límite se cuenta por **combinación de token de aplicación y token de usuario**. Las operaciones que se llaman sin
-tokens, como `GET /health/`, se cuentan por dirección IP.
+Por defecto, el límite se cuenta por **combinación de token de aplicación y token de usuario**. Las operaciones que se
+llaman sin tokens, como `GET /health/`, se cuentan por dirección IP. Algunas operaciones usan otra cuenta, que su
+descripción declara (por ejemplo, la renovación de sesión se cuenta por `refresh_token`).
 
-Dos casos merecen atención:
+Los contadores se llevan por proceso del servidor, así que el corte exacto puede variar. Diseñe su cliente para
+quedarse por debajo del valor publicado; no lo use como cupo garantizado.
+
+Tres casos merecen atención:
 
 - **`POST /auth/token`**: 10 por minuto desde una misma dirección, y además un tope por clave de aplicación.
 - **`POST /users/token`**: 10 por minuto **por token de aplicación**. Ese cupo lo comparten todos los usuarios que
   canjea con el mismo token de aplicación.
+- **`POST /users`** (alta de usuarios): además del límite de escrituras, 5 por minuto por espacio de trabajo y
+  dirección IP de origen.
 
 ## Valores por defecto
 
@@ -29,18 +36,21 @@ Dos casos merecen atención:
 | 20 / min | Escrituras sin un límite propio |
 
 Muchas familias tienen su propio límite, más alto o más bajo que estos (contenido, analítica, ingresos
-publicitarios, dominios, agentes, telemetría, entre otras). **Cada operación declara el suyo en su descripción** en la
-[Referencia de API](/api-reference/1platform-api): esa es la fuente de verdad.
+publicitarios, dominios, agentes, telemetría, entre otras). La mayoría de las operaciones declara el suyo en su
+descripción en la [Referencia de API](/api-reference/1platform-api). Si una operación no lo declara, no asuma el valor
+por defecto: trate el `429` como se indica abajo.
 
 ## Cómo manejar un 429
 
 `429` significa que la operación no acepta más solicitudes por ahora:
 
-- **Límite por minuto** (lo más común): espere y reintente. La API **no** envía el header `Retry-After`, así que
-  espera al menos 60 segundos antes del siguiente intento.
+- **Límite de uso** (lo más común): espere y reintente. Este `429` llega con el sobre, sin código y **sin** el header
+  `Retry-After`, así que espere al menos 60 segundos antes del siguiente intento. La API tampoco envía headers
+  `X-RateLimit-*`.
 - **Otras causas**: algunas operaciones lo usan también cuando se agotó el cupo de su plan o cuando ya hay un trabajo
   igual en curso. Su descripción en la Referencia de API dice cuál, y en esos casos reintentar no sirve hasta que
-  cambie la condición.
+  cambie la condición. Algunas de esas respuestas (por ejemplo, en Analítica, Correo transaccional y el reintento de
+  entregas de webhooks) sí traen `Retry-After`: si viene, respételo.
 
 ```python
 import time
@@ -51,12 +61,14 @@ def call_with_backoff(client: httpx.Client, *args, **kwargs) -> httpx.Response:
         r = client.request(*args, **kwargs)
         if r.status_code != 429:
             return r
-        time.sleep(60 * (attempt + 1))  # la API no envía Retry-After
+        retry_after = r.headers.get("Retry-After", "")
+        # El límite de uso no envía Retry-After; algunas operaciones sí.
+        time.sleep(int(retry_after) if retry_after.isdigit() else 60 * (attempt + 1))
     return r  # se agotaron los intentos
 ```
 
 :::tip[Guarde los tokens en caché]
 El límite de 10 por minuto de los canjes es la causa más común de un `429` durante el desarrollo. Reutilice cada
-token mientras le quede más de un minuto de vida y Renuévelo antes de que venza. El patrón está en
+token mientras le quede más de un minuto de vida y renuévelo antes de que venza. El patrón está en
 [Autenticación → Mantener los tokens vigentes](/docs/saas/1platform-api/plataforma/autenticacion#cache-de-tokens).
 :::

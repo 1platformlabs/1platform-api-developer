@@ -12,9 +12,9 @@ sidebar_position: 1
 
 - **Todo cuelga de un sitio.** Analytics y AdSense reciben `website_id` en cada llamada. Primero se registra el sitio en [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
 - **Google Analytics:** el usuario autoriza su cuenta de Google en una ventana de consentimiento, la API crea la propiedad en segundo plano y le entrega la etiqueta para el sitio. Luego consulta métricas y puede enviar eventos desde su servidor. Hay dos esperas distintas: la autorización del usuario y la creación de la propiedad.
-- **AdSense:** el usuario autoriza su cuenta, vincula el sitio y consulta ingresos, alertas y problemas de políticas. El estado de aprobación del sitio cambia en Google; para traerlo, sincronícelo. El plan gratuito ve los últimos 7 días; los períodos largos, el desglose por página, el reporte a medida, las alertas y los problemas de políticas requieren plan Pro (`403` sin él).
+- **AdSense:** el usuario autoriza su cuenta, vincula el sitio y consulta ingresos, alertas y problemas de políticas. El estado de aprobación del sitio cambia en Google; para traerlo, sincronícelo. El desglose por página, el reporte a medida, las alertas y los problemas de políticas requieren un plan que incluya reportes de AdSense (`403` sin él).
 - **Mapas de calor:**
-  1. Registre el sitio con su `host` y los patrones de ruta que quiere medir (`page_keys`, por ejemplo `/productos/[slug]`). Una lista vacía no mide nada: no funciona como comodín.
+  1. Registre el sitio con su `host`, los patrones de ruta que quiere medir (`page_keys`, por ejemplo `/productos/[slug]`) y `enabled: true`: la captura nace apagada si no lo envía. Una lista vacía no funciona como comodín: toma los patrones predeterminados de su espacio de trabajo, que vienen vacíos, y en ese caso no mide nada.
   2. La respuesta trae la etiqueta exacta para pegar en el `<head>`. El recolector que carga esa etiqueta toma las muestras y las envía solo. Las muestras se agregan al escribirse: no se guarda nada en bruto.
   3. Lea los mapas por ruta: `clicks` (una cuadrícula) o `scroll` (bandas de profundidad).
   4. Para dibujar el calor sobre la página, guarde una copia de la ruta. La plataforma la descarga de forma anónima desde su dirección pública y le quita los scripts.
@@ -23,7 +23,8 @@ sidebar_position: 1
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
 - Un `website_id` del usuario para Analytics y AdSense. En los mapas de calor es opcional.
-- Para Analytics y AdSense, una cuenta de Google del usuario con acceso a Analytics o a AdSense. La autorización la da el usuario en el navegador; su backend no la puede dar por él.
+- Para Analytics y AdSense, una cuenta de Google del usuario con acceso a Analytics o a AdSense. La autorización la da el usuario en el navegador; su backend no la puede dar por él. La URL de autorización queda ligada a la red desde la que se pidió: ver el paso 1 de cada guía.
+- El módulo de sitios web habilitado para el usuario en Analytics y AdSense, y el módulo de mapas de calor en los mapas. Sin él, la respuesta es `403` con `module_disabled`.
 
 ## Operaciones
 

@@ -29587,7 +29587,7 @@
             }
           },
           "422": {
-            "description": "A path in the body is not writable.",
+            "description": "A path in the body is not writable (KEY_NOT_WRITABLE), a list would shrink without allow_shrink (LIST_WRITE_INCOMPLETE), a SEO block has no source (SEO_BLOCK_WITHOUT_SOURCE), or an author presentation names a page the site does not have (AUTHOR_PAGE_NOT_FOUND).",
             "content": {
               "application/json": {
                 "example": {
@@ -29913,7 +29913,7 @@
             }
           },
           "422": {
-            "description": "A field is not editorially writable.",
+            "description": "A field is not editorially writable (KEY_NOT_WRITABLE), or faq would drop stored entries without allow_shrink (LIST_WRITE_INCOMPLETE).",
             "content": {
               "application/json": {
                 "example": {
@@ -35540,6 +35540,18 @@
               }
             ],
             "title": "People"
+          },
+          "faq": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faq"
           }
         },
         "type": "object",
@@ -36141,6 +36153,15 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
+          },
+          "allow_shrink": {
+            "items": {
+              "type": "string",
+              "const": "faq"
+            },
+            "type": "array",
+            "maxItems": 1,
+            "title": "Allow Shrink"
           }
         },
         "additionalProperties": false,
@@ -45764,6 +45785,13 @@
             },
             "type": "array",
             "title": "Changed Paths"
+          },
+          "unmatched_author_slugs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unmatched Author Slugs"
           }
         },
         "type": "object",

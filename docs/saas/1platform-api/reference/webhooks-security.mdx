@@ -19,6 +19,7 @@ trabajo, que se entrega una sola vez: al registrar el primer dominio o al rotarl
 | Algoritmo | `HMAC-SHA256` |
 | Material firmado | `"{X-Webhook-Timestamp}." + cuerpo`, sobre los **mismos bytes** que viajan en la solicitud (JSON compacto, UTF-8) |
 | Cálculo | En modo durable, por intento con timestamp nuevo; el despacho existente conserva los originales |
+| Secreto | El `webhook_secret` tal como se lo entregamos, usado como texto UTF-8: no lo decodifique de hexadecimal |
 | Ventana de repetición | 5 minutos de desfase máximo de `X-Webhook-Timestamp`, comprobados por su verificador |
 
 :::warning[Verifique sobre los bytes que recibe]
@@ -41,7 +42,7 @@ def verify_webhook(
     body: bytes,                   # cuerpo crudo de la solicitud
     signature_header: str,         # valor de X-Webhook-Signature
     timestamp_header: str,         # valor de X-Webhook-Timestamp
-    secret: str,                   # tu webhook_secret
+    secret: str,                   # su webhook_secret
 ) -> bool:
     if not signature_header.startswith("sha256="):
         return False
@@ -138,6 +139,7 @@ La rotación la hace un administrador del espacio de trabajo (ver
 1. Llame a `POST /webhooks/config/rotate-secret` desde un script que escriba la respuesta directamente en su gestor
    de secretos.
 2. Despliegue el secreto nuevo en su verificador y **conserve el anterior unos minutos** (acepte cualquiera de los
-   dos). Los eventos firmados antes de la rotación siguen reintentándose con la firma vieja durante alrededor de un
-   minuto.
+   dos). En el envío existente, los reintentos de un evento firmado antes de la rotación conservan la firma vieja
+   durante poco más de un minuto; en modo durable cada intento nuevo se firma con el secreto vigente, pero un intento
+   que ya estaba en vuelo puede llegar con la firma anterior.
 3. Pasados esos minutos, elimine el secreto anterior del verificador.

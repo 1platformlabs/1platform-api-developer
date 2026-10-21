@@ -22,7 +22,7 @@ Este producto es para cobrar a **otros**. Para recargar el saldo de su propia cu
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
 - Una pasarela de pago activa en su espacio de trabajo. Sin ella, la creación responde `422` con `data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED`.
 - La [configuración de webhooks](/docs/saas/1platform-api/plataforma/webhooks), que hace un **administrador del espacio de trabajo**. Ahí se registra el dominio de su `return_url` y se mapean los eventos a sus URLs.
-- **Opcional:** un comercio y una sucursal ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si envía `branch_id`, el cobro sale en la moneda de ese comercio. Para eso su cuenta necesita alguno de los módulos de comercio; si no lo tiene, recibe `403` `module_disabled`.
+- **Opcional:** un comercio y una sucursal ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si envía `branch_id`, el cobro sale en la moneda de ese comercio. Para eso su cuenta necesita alguno de los módulos de comercio; si no lo tiene, recibe `403` `module_disabled`. Si no envía `branch_id` ni `currency` y su cuenta cobra en una sola sucursal, el cobro usa la moneda de ese comercio.
 
 ## Operaciones
 
@@ -39,7 +39,7 @@ Todas las operaciones: [Referencia de API → Payments](/api-reference/1platform
 
 ### Reporte de cobros
 
-El tag **Collections** es un reporte de solo lectura de lo que cobraron sus comercios con [Links de pago](/docs/saas/1platform-api/links-de-pago) y con las invitaciones de [Suscripciones](/docs/saas/1platform-api/suscripciones). Las transacciones que crea con `POST /users/transactions` no aparecen ahí: se concilian con las operaciones de la tabla anterior. Requiere el módulo de Links de pago o el de Terminal de tarjetas.
+El tag **Collections** es un reporte de solo lectura de lo que cobraron sus comercios por tres canales: [Links de pago](/docs/saas/1platform-api/links-de-pago) (`payment_link`), [Suscripciones](/docs/saas/1platform-api/suscripciones) (`subscription`: la invitación pagada y las renovaciones) y los cobros que registra una [terminal de tarjetas](/docs/saas/1platform-api/terminal-de-tarjetas) conectada (`terminal`). Las transacciones que crea con `POST /users/transactions` no aparecen ahí: se concilian con las operaciones de la tabla anterior. Requiere el módulo de Links de pago o el de Terminal de tarjetas.
 
 | Operación | Para qué |
 |---|---|
@@ -56,4 +56,4 @@ Cada cambio de estado de una transacción puede enviarse a su backend. Son siete
 
 ## Guías
 
-- [Cobrar y concilier](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar): crear el cobro, esperar el webhook y concilier sin duplicar cobros.
+- [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar): crear el cobro, esperar el webhook y conciliar sin duplicar cobros.

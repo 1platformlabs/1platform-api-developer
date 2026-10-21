@@ -18,7 +18,7 @@ export default function Footer(): ReactNode {
       <nav className={styles.column} aria-label="Recursos"><h2>RECURSOS</h2>
         <Link target="_self" to="/docs/saas/1platform-api/getting-started">Documentación</Link>
         <Link target="_self" to={`${website}/es/blog/`}>Blog</Link>
-        <Link target="_self" to="/api-reference/1platform-api">Referencia API</Link>
+        <Link target="_self" to="/api-reference/1platform-api">Referencia de API</Link>
       </nav>
       <nav className={styles.column} aria-label="1Platform"><h2>1PLATFORM</h2>
         <Link target="_self" to={String(siteConfig.customFields?.contactUrl)}>Contacto</Link>

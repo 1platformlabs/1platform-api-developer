@@ -115,7 +115,7 @@ async function checkPendingNavigation(browser) {
   try {
     await page.goto(origin + home);
     await page.locator('html[data-has-hydrated="true"]').waitFor();
-    await page.getByRole('link', {name: 'Referencia de API', exact: true}).click();
+    await page.getByLabel('Documentación para').getByRole('link', {name: 'Referencia de API', exact: true}).click();
     await page.locator('script[src*="cdn.jsdelivr.net"]').waitFor({state: 'attached'});
     await page.getByRole('link', {name: 'Primeros pasos', exact: true}).click();
     await page.locator('html.docs-wrapper').waitFor();

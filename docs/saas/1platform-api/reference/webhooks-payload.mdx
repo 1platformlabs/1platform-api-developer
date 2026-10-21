@@ -35,12 +35,11 @@ Si configuró el evento **sin** `body_template`, el cuerpo tiene esta forma:
 ```
 
 Si configuró un `body_template`, recibe lo que definió en él: el cuerpo canónico es lo que llega cuando no hay
-plantilla.
+plantilla. Ver [Plantilla del cuerpo](#body-template).
 
-`status` es el estado de la transacción en el momento del envío y normalmente coincide con `event`: `on_approved`
-viaja con `"status": "approved"`, `on_refunded` con `"refunded"`, y así con los siete. Si la transacción cambia dos
-veces en pocos segundos (aprobada y luego reembolsada), un reintento del primer evento puede traer ya el estado
-nuevo. Enruta por `event`.
+`status` es el estado al que pasó la transacción con ese cambio y coincide con `event`: `on_approved` viaja con
+`"status": "approved"`, `on_refunded` con `"refunded"`, y así con los siete. Los reintentos de una misma entrega
+repiten los mismos bytes del cuerpo. Aun así, enrute por `event`.
 
 ## Campos
 
@@ -57,7 +56,7 @@ nuevo. Enruta por `event`.
 | `metadata` | Reflejado | El objeto libre que envió al crear la transacción |
 | `merchant_reference` | Reflejado | El identificador libre que envió al crear. Úselo para encontrar **su** pedido; para deduplicar, ver abajo |
 | `reference` | Pasarela | Referencia de la pasarela (p. ej. la autorización de la tarjeta) |
-| `timestamp` | 1Platform | Hora de la última actualización de la transacción (ISO 8601 con zona horaria) |
+| `timestamp` | 1Platform | Momento en que la transacción pasó a ese estado (ISO 8601 con zona horaria) |
 
 :::warning[`currency` cambia de sentido entre la respuesta y el webhook]
 En la respuesta de `POST /users/transactions`, `currency` es **su** moneda (y `currency_provider`, la de la
@@ -87,12 +86,24 @@ razonable:
 
 | `status` | Estado en su sistema |
 |---|---|
-| `approved` | `paid` (y procede a cumplir el pedido) |
+| `approved` | `paid` (y cumpla el pedido) |
 | `denied`, `cancelled`, `expired`, `dismiss` | `failed` |
-| `refunded`, `reversed` | `refunded` (revierte el cumplimiento y el registro contable) |
+| `refunded`, `reversed` | `refunded` (revierta el cumplimiento y el registro contable) |
 
 La API todavía no permite **emitir** reembolsos (`POST /users/transactions/{id}/refund` responde `501`). Un
 reembolso o una reversión hechos por otra vía le llegan igualmente como `on_refunded` u `on_reversed`.
+
+## Plantilla del cuerpo {#body-template}
+
+`body_template` es un objeto JSON, uno por evento, cuyos textos pueden incluir variables `{{variable}}`. Se resuelven
+también dentro de objetos y listas anidados, y siempre como texto. Las variables documentadas son `transaction_id`,
+`status`, `amount`, `usd_amount`, `currency`, `currency_provider`, `user_id`, `billing_id`, `reference` y
+`external_transaction_id`; un nombre que no es variable queda escrito tal cual. Para un `$` literal escriba `$$`.
+
+En la plantilla, `currency` es **su** moneda y `currency_provider` la de la pasarela, como en la respuesta de
+`POST /users/transactions`; `amount` es el monto cobrado por la pasarela y `usd_amount` el que usted cotizó. `event`,
+`merchant_reference` y `metadata` no son variables: si su receptor necesita el evento, escríbalo como texto fijo en la
+plantilla de cada evento o use una URL distinta por evento.
 
 ## Sin sobre de respuesta
 

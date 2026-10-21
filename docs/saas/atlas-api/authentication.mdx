@@ -15,7 +15,8 @@ Ambos terminan con un **JWT** que envía como `Authorization: Bearer <token>`. L
 otra credencial, la [clave de integración](/docs/saas/atlas-api/integration-keys).
 
 > No es el modelo de dos tokens de la 1Platform API. Si ve un header `x-user-token` en la
-> [Referencia de API](/api-reference/atlas-api#tag/auth), ignórelo: Atlas no lo usa en QA ni en producción.
+> [Referencia de API](/api-reference/atlas-api#tag/auth), ignórelo: no forma parte de la autenticación de Atlas y no
+> debe enviarlo.
 
 Todas las operaciones de esta página van con `X-Tenant-Slug`. Antes de empezar,
 [verifique su slug](/docs/saas/atlas-api/tenant-resolution#verifica-tu-slug-antes-de-integrar): un slug mal escrito enviaría
@@ -34,11 +35,12 @@ curl -s -X POST "$ATLAS_BASE/auth/magic-link" -H "X-Tenant-Slug: $TENANT_SLUG" \
 
 **Dónde aterriza el enlace.** En el dominio principal del tenant, en `/auth/verify?token=…`. Con `surface: "app"` aterriza
 en una página puente que intenta abrir la app nativa del tenant. En los dos casos, quien opera ese frente es quien recibe el
-`token` y debe canjearlo en el paso 2. `return_url` es opcional: si lo envía (ruta relativa del sitio), el sitio vuelve ahí
-tras el canje; si no, no hay redirección posterior.
+`token` y debe canjearlo en el paso 2. `return_url` es opcional y sólo aplica a `surface: "web"`: si envía una ruta relativa
+segura del sitio, el sitio vuelve ahí tras el canje; si no la envía, o no es una ruta relativa segura, se descarta sin error
+y el sitio usa su página de destino predeterminada.
 
-Si el envío del correo falla, recibe `503 EMAIL_DELIVERY_FAILED`. El token ya se generó, así que puede pedir un enlace
-nuevo.
+Si el envío del correo falla, recibe `503 EMAIL_DELIVERY_FAILED` con `Retry-After`. El token ya se generó, así que puede
+pedir un enlace nuevo pasado ese intervalo.
 
 ## Paso 2 — Canjee el token por una sesión {#paso-2--canjea-el-token-por-una-sesión}
 
@@ -52,8 +54,9 @@ curl -s -X POST "$ATLAS_BASE/auth/magic-link/verify" -H "X-Tenant-Slug: $TENANT_
 
 La sesión trae un token de acceso (24 h por defecto, indicado en `expires_in`), un token de refresco (30 días) y los roles
 del miembro (`fan`). Un token ya usado, vencido o inválido responde `401` con `TOKEN_CONSUMED`, `TOKEN_EXPIRED` o
-`TOKEN_INVALID`. Si envía un identificador de dispositivo nuevo para el miembro, Atlas le manda un aviso de seguridad por
-correo; ese aviso nunca bloquea el inicio de sesión.
+`TOKEN_INVALID`; un miembro bloqueado por el operador recibe `401 CREDENTIALS_INVALID`. Si envía en `device_fingerprint`
+un identificador de dispositivo nuevo para el miembro, Atlas le manda un aviso de seguridad por correo; ese aviso nunca
+bloquea el inicio de sesión.
 
 ## Paso 3 — Llame con el token de acceso {#paso-3--llama-con-el-token-de-acceso}
 
@@ -62,13 +65,16 @@ curl -s "$ATLAS_BASE/me" -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bea
 ```
 
 Los navegadores del sitio del tenant usan la cookie `atlas_session`; desde su servidor use siempre el header `Authorization`.
+Un token de acceso vencido, mal formado o ausente responde `401 UNAUTHORIZED` (no `TOKEN_EXPIRED`): esa es la señal para
+refrescar. En las operaciones del miembro, un token emitido para otro tenant que el resuelto responde `403 TENANT_MISMATCH`.
 Las operaciones del miembro (perfil, progreso, listas, sesiones) están en
 [Referencia de API → me](/api-reference/atlas-api#tag/me).
 
 ## Paso 4 — Refresque antes de que venza {#paso-4--refresca-antes-de-que-venza}
 
-`POST /auth/refresh` cambia el token de refresco por una sesión nueva sin otro correo. Un token de refresco emitido para
-otro tenant responde `401 TOKEN_INVALID`.
+`POST /auth/refresh` cambia el token de refresco por una sesión nueva sin otro correo. Un token de refresco vencido responde
+`401 TOKEN_EXPIRED`; uno emitido para otro tenant, o anterior a un bloqueo del miembro, responde `401 TOKEN_INVALID`. En
+ambos casos, pida un enlace de acceso nuevo.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/auth/refresh" -H "X-Tenant-Slug: $TENANT_SLUG" \
@@ -76,8 +82,9 @@ curl -s -X POST "$ATLAS_BASE/auth/refresh" -H "X-Tenant-Slug: $TENANT_SLUG" \
 ```
 
 :::warning El refresco siempre emite roles de miembro
-La sesión que devuelve el refresco lleva sólo el rol `fan`, aunque la original fuera de operador. Para una sesión de
-operador, no refresque: vuelva a iniciar sesión con `POST /auth/admin/sign-in` cuando venza el token de acceso.
+La sesión que devuelve el refresco lleva sólo el rol `fan` y ningún permiso sobre otros tenants, aunque la original fuera
+de operador. Para una sesión de operador, no refresque: vuelva a iniciar sesión con `POST /auth/admin/sign-in` cuando venza
+el token de acceso.
 :::
 
 ## Inicio de sesión de operador {#inicio-de-sesion-de-operador}
@@ -93,11 +100,14 @@ curl -s -X POST "$ATLAS_BASE/auth/admin/sign-in" -H "X-Tenant-Slug: $TENANT_SLUG
 ```
 
 Credenciales incorrectas responden `401 CREDENTIALS_INVALID`; falta el código TOTP: `401 TOTP_REQUIRED`; código
-incorrecto: `401 TOTP_INVALID`. La cuenta de operador la crea el equipo de 1Platform Labs.
+incorrecto: `401 TOTP_INVALID`. La cuenta de operador la crea el equipo de 1Platform Labs. Si el operador olvida su
+contraseña, `POST /auth/admin/forgot-password` envía un enlace de restablecimiento (responde igual exista o no la cuenta) y
+`POST /auth/admin/reset-password` fija la nueva; después vuelva a iniciar sesión, con TOTP si la cuenta lo tiene.
 
-Una cuenta de operador trabaja sobre su propio tenant. Sólo si tiene permiso explícito sobre otros tenants puede elegir uno
-con el header `X-Admin-Tenant-Slug` en las operaciones `/admin/*`. Con una cuenta sin ese permiso, el header responde
-`403 TENANT_SWITCH_FORBIDDEN`: no lo envíe.
+Una cuenta de operador trabaja sobre su propio tenant: en las operaciones `/admin/*` el tenant sale del token, no de
+`X-Tenant-Slug`. Sólo si tiene permiso explícito sobre otros tenants puede elegir uno con el header `X-Admin-Tenant-Slug`.
+Con una cuenta sin ese permiso, cualquier slug distinto del propio responde `403 TENANT_SWITCH_FORBIDDEN`: no lo envíe. Un
+slug permitido que no existe o está desactivado responde `400 TENANT_SWITCH_INVALID`.
 
 ## Roles
 
@@ -109,7 +119,11 @@ porque son dueños del catálogo.
 
 `POST /auth/sign-out` no invalida nada en el servidor: el sitio borra su cookie y el token de acceso sigue vigente hasta que
 vence. `GET /me/sessions` lista los dispositivos del miembro, y `DELETE /me/sessions/{session_id}` o `DELETE /me/sessions`
-(todos menos el actual) los quitan de esa lista. Quitar un dispositivo **tampoco** invalida los tokens ya emitidos: siguen
-vigentes hasta que vencen. Trate la duración del token de acceso como el límite real de una credencial filtrada.
+los quitan de esa lista. `DELETE /me/sessions` conserva sólo el dispositivo cuyo `device_fingerprint` envíe; sin ese
+parámetro, los quita todos. Quitar un dispositivo **tampoco** invalida los tokens ya emitidos: siguen vigentes hasta que
+vencen. Trate la duración del token de acceso como el límite real de una credencial filtrada.
+
+Lo único que corta los tokens vigentes de un miembro es que el operador lo bloquee: desde ese momento sus llamadas que exigen
+sesión responden `401 SESSION_REVOKED` y no puede volver a iniciar sesión mientras dure el bloqueo.
 
 Todas las operaciones de autenticación: [Referencia de API → auth](/api-reference/atlas-api#tag/auth).

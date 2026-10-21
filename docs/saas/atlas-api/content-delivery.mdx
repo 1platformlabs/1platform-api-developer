@@ -12,27 +12,29 @@ corta duración que Atlas emite sólo después de comprobar su [derecho de acces
 ## Paso 1 — Pida el ticket justo antes de usarlo {#paso-1--pide-el-ticket-justo-antes-de-usarlo}
 
 `GET /delivery/items/{content_id}/playback` recibe el `id` del ítem (no su slug) y, opcionalmente, el formato que quiere
-(`format`, por ejemplo `epub` o `mp3`) y el capítulo de un audiolibro (`chapter`). Sin `format`, Atlas elige el primer
-formato disponible del ítem ([Referencia de API → delivery](/api-reference/atlas-api#tag/delivery)).
+(`format`: `pdf`, `epub`, `mobi`, `mp3` o `m4a`) y el capítulo de un audiolibro (`chapter`). Sin `format`, Atlas elige un
+formato por defecto, normalmente el primero disponible del ítem; en los tenants configurados para descarga con cuota, ese
+defecto es `pdf` aunque el ítem no lo tenga. Envíe siempre `format`: además, sólo una entrega con `format` explícito queda
+en el historial de descargas del miembro ([Referencia de API → delivery](/api-reference/atlas-api#tag/delivery)).
 
 ```bash
 curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback?format=epub" \
   -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
 ```
 
-El ticket vence a los pocos minutos (`expires_in_seconds`). Pídalo justo antes de abrir el contenido, no lo guarde en caché
-ni lo comparta, y pida uno nuevo cuando venza.
+El ticket vence a los pocos minutos: hoy, 10 minutos; lea siempre `expires_in_seconds` en lugar de fijar ese valor. Pídalo
+justo antes de abrir el contenido, no lo guarde en caché ni lo comparta, y pida uno nuevo cuando venza.
 
 ## Paso 2 — Ramifique por `delivery_kind` {#paso-2--ramifica-por-delivery_kind}
 
-La forma de entrega la decide el arquetipo del tenant, no su solicitud, y un mismo producto puede tener tenants de distintos
-arquetipos. Por eso no la deduzca: lea `delivery_kind` en cada respuesta.
+La forma de entrega la deciden el arquetipo del tenant y el tipo de contenido del ítem, no su solicitud, y un mismo producto
+puede tener tenants de distintos arquetipos. Por eso no la deduzca: lea `delivery_kind` en cada respuesta.
 
 - **`signed_url`**: una URL firmada al archivo; el cliente la descarga o la abre. Si `renderable` es `false`, el formato no
   puede abrirse en un lector integrado: ofrezca descargarlo o abrirlo fuera de su app, y use `render_format` para elegir el
   motor de lectura cuando sí es renderizable.
-- **`hls`** (y, según el tenant, otros formatos de streaming): una URL de manifiesto más un `drm_token` ligado al miembro
-  y al vencimiento; su reproductor lo usa para reproducir.
+- **`hls`** (y, según el tenant, otros formatos de streaming): una URL de manifiesto y, cuando corresponde, un `drm_token`
+  ligado al miembro y al vencimiento; su reproductor los usa para reproducir. No suponga que `drm_token` siempre viene.
 
 Trate cualquier otro valor como no soportado por su cliente en lugar de suponer una forma.
 
@@ -40,24 +42,29 @@ Trate cualquier otro valor como no soportado por su cliente en lugar de suponer 
 
 Antes de emitir el ticket, Atlas comprueba el acceso. Los operadores y administradores del tenant no pasan por esa
 comprobación. Para un miembro, si el tenant tiene acceso gratuito y el miembro todavía no tiene derecho de acceso, Atlas
-intenta concederlo en ese momento antes de rechazar.
+intenta concederlo en ese momento antes de rechazar. Salvo que el tenant la desactive o use su propia descarga con cuota,
+Atlas aplica una cuota gratuita diaria (al menos un título por día): abrir un título nuevo consume un lugar de esa cuota y,
+por defecto, el título queda del miembro; un plan pagado activo quita la cuota. El primer capítulo de un audiolibro con capítulos subidos por separado es una muestra gratuita y no
+consume cuota.
 
 | Respuesta | Qué significa | Qué hacer |
 |---|---|---|
-| `403 ENTITLEMENT_DENIED` | El miembro no tiene acceso a este ítem. | Muestre el muro de suscripción o compra. |
-| `402 FREEMIUM_GATE_BLOCKED` | Miembro gratuito: agotó su cuota diaria o el ítem exige un plan. | Muestre el muro de suscripción. |
+| `403 ENTITLEMENT_DENIED` | Tenant sin cuota gratuita: el miembro no tiene acceso a este ítem. | Muestre el muro de suscripción o compra. |
+| `402 FREEMIUM_GATE_BLOCKED` | Miembro gratuito: agotó su cuota diaria, o el tenant no ofrece descargas gratuitas sin plan. | Muestre el muro de suscripción. |
+| `429 QUOTA_EXCEEDED` | Tenant con descarga con cuota propia: el miembro agotó sus descargas del día. | No reintente hoy; muestre el límite. |
 | `403 ASSET_FORMAT_NOT_ALLOWED` | El tenant no permite ese formato. | Pida otro formato. |
 | `404 ASSET_NOT_AVAILABLE` / `404 CHAPTER_NOT_FOUND` | El formato o el capítulo no existe para este ítem. | Pida otro formato o capítulo. |
 | `404 CONTENT_NOT_FOUND` | El ítem no existe en este tenant. | Revise el `content_id` y el slug del tenant. |
 | `403 TENANT_MISMATCH` | Su sesión es de otro tenant. | Inicie sesión en el tenant correcto. |
 | `429 DOWNLOAD_RATE_LIMITED` | Demasiadas descargas seguidas. | Espere lo que indique `Retry-After`. |
-| `403 ACCOUNT_TEMPORARILY_BLOCKED` | La cuenta está bloqueada temporalmente. | No reintente; informe al miembro. |
+| `403 ACCOUNT_TEMPORARILY_BLOCKED` | La cuenta está bloqueada temporalmente, hasta el `expires_at` del cuerpo. | No reintente; informe al miembro. |
 | `503 MEDIA_UNAVAILABLE` | El origen del archivo no responde. | Reintente con espera creciente. |
 | `403 ASSET_KEY_FORBIDDEN` | El ítem está mal configurado y Atlas se niega a firmarlo. | No reintente; avise al operador. |
 
 `ASSET_KEY_FORBIDDEN` y `MEDIA_UNAVAILABLE` llegan con el código en el primer nivel del cuerpo; los demás, anidados en
-`detail`. Lea el código como se explica en [Errores](/docs/saas/atlas-api/errors). La lista vigente de respuestas está en la
-[Referencia de API](/api-reference/atlas-api#tag/delivery).
+`detail`. Lea el código como se explica en [Errores](/docs/saas/atlas-api/errors). La lista de respuestas de la
+[Referencia de API](/api-reference/atlas-api#tag/delivery) todavía no incluye las dos respuestas `429`; trátelas como se
+indica en la tabla.
 
 ## El recorrido completo
 

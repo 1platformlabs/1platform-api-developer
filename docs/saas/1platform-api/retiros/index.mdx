@@ -10,21 +10,24 @@ sidebar_position: 1
 
 ## Cómo funciona
 
-- **Saldo retirable.** Se forma con lo que cobra con [Links de pago](/docs/saas/1platform-api/links-de-pago) una vez confirmado el pago (lo pendiente de confirmar se ve en `pending_verification` del resumen, y lo que terminó como saldo prepagado, en `frozen_collections`) y, cuando la plataforma lleva esa cuenta, con los cobros de su propia integración. Es una cifra **distinta** del saldo prepagado de [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo). Los dos nunca se suman, y el saldo prepagado no se convierte en efectivo. Se lleva por moneda.
+- **Saldo retirable.** Se forma con lo que cobra con [Links de pago](/docs/saas/1platform-api/links-de-pago) una vez confirmado el pago (lo pendiente de confirmar se ve en `pending_verification` del resumen, y lo que terminó como saldo prepagado, en `frozen_collections`) y, cuando la plataforma lleva esa cuenta, con los cobros de su propia integración. Los cobros de una [terminal de tarjetas](/docs/saas/1platform-api/terminal-de-tarjetas) conectada sólo se suman cuando la plataforma habilita su acreditación, que viene apagada. Es una cifra **distinta** del saldo prepagado de [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo). Los dos nunca se suman y se llevan por moneda.
+- **Cobros que quedaron como saldo prepagado.** Una recarga suya nunca se convierte en efectivo. Un cobro de link que se acreditó como saldo prepagado sí puede pasar al saldo retirable: `GET /users/cash-out/reclassifiable` lista esos cobros con la fecha desde la que puede moverlos (`available_at`, al terminar el periodo de espera de su espacio de trabajo), y `POST /users/cash-out/charges/{transaction_id}/reclassify` mueve uno. Repetir un movimiento que expiró lo termina sin mover el dinero dos veces.
 - **Método de pago.** Es el destino donde quiere recibir el dinero. Se guarda cifrado y nunca se edita: un destino distinto es un método nuevo. Un método nuevo, o uno que acaba de marcar como predeterminado, no puede recibir dinero hasta que pasa un periodo de espera.
 - **Cotización.** Antes de pedir, el servidor le dice cuánto recibiría: la comisión, el neto, los montos mínimo y máximo, y quién liberará el pago.
-- **Retiro.** Pedirlo descuenta el saldo retirable y deja el retiro esperando liberación. También puede fijar un periodo para que los retiros se generen solos.
+- **Retiro.** Pedirlo descuenta el saldo retirable y deja el retiro esperando liberación. También puede fijar un periodo para que los retiros se generen solos. Estados del retiro: `debiting` (descontando el saldo), `pending_release` (esperando la transferencia), y los finales `paid`, `failed` y `aborted` (se anuló antes de mover dinero).
 - **Quién transfiere.** Nadie libera su propio retiro.
   - Si el dinero se cobró en la cuenta de cobro propia de su espacio de trabajo, lo libera un **administrador del espacio de trabajo**.
-  - En los demás casos, lo libera la plataforma.
+  - Si el dinero se cobró en la cuenta compartida de la plataforma, o su espacio de trabajo lo opera la plataforma, lo libera la plataforma.
+  - Si no se puede determinar quién controla la cuenta de cobro, la cotización y el pedido responden `409` `CASH_OUT_SETTLEMENT_ACCOUNT_UNKNOWN`.
+  - Cuando el retiro lo liberan los administradores de su espacio de trabajo, un administrador no puede pedirlo para sí mismo: responde `409` `CASH_OUT_PAYEE_CONTROLS_THE_ACCOUNT`.
 
   Si la transferencia falla, el monto completo vuelve a su saldo retirable.
 
 ## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
-- Retiros encendido para su espacio de trabajo: viene apagado por defecto. Si no está encendido, recibe `403` con `code` = `CASH_OUT_DISABLED`. Además, el módulo tiene que estar asignado a su cuenta; si no, recibe `403` `module_disabled`.
-- **Para cambiar algo, una sesión iniciada por una persona.** Registrar o borrar métodos, cambiar el periodo y pedir un retiro exige un token de usuario obtenido con el [enlace mágico](/docs/saas/1platform-api/plataforma/autenticacion) (`POST /auth/user/magic-link/verify`). Un token de usuario canjeado desde una clave `sk-…` sólo puede leer. Con él, las escrituras responden `403` `CASH_OUT_SESSION_REQUIRED`. `GET /users/cash-out/summary` se lo anticipa en `writes_require_sign_in`.
+- Retiros encendido para su espacio de trabajo: viene apagado por defecto. Si no está encendido, recibe `403` con `code` = `CASH_OUT_DISABLED`. Además, su cuenta tiene que tener asignado el módulo de saldo (`billing`); si no, recibe `403` `module_disabled`.
+- **Para cambiar algo, una sesión iniciada por una persona.** Registrar, cambiar o borrar métodos, cambiar el periodo, pedir un retiro y mover un cobro al saldo retirable exige un token de usuario obtenido con el [enlace mágico](/docs/saas/1platform-api/plataforma/autenticacion) (`POST /auth/user/magic-link/verify`). Un token de usuario canjeado desde una clave `sk-…` sólo puede leer. Con él, las escrituras responden `403` `CASH_OUT_SESSION_REQUIRED`. `GET /users/cash-out/summary` se lo anticipa en `writes_require_sign_in`.
 - En esta superficie, el código de error viaja en `code`, en la raíz de la respuesta, no dentro de `data` (salvo `module_disabled`, que va en `data.code` como en el resto de la API). Ver [Formato de respuesta](/docs/saas/1platform-api/reference/response-format).
 
 ## Operaciones
@@ -39,8 +42,10 @@ sidebar_position: 1
 | `DELETE /users/cash-out/methods/{method_id}` | Dar de baja un método |
 | `PUT /users/cash-out/settings` | Fijar cada cuánto se genera un retiro automático (`null` = seguir al espacio de trabajo) |
 | `POST /users/cash-out/quote` | Cotizar un retiro |
-| `POST /users/cash-out/payouts` | Pedir un retiro |
+| `POST /users/cash-out/payouts` | Pedir un retiro (`idempotency_key` obligatorio, de 8 a 64 caracteres) |
 | `GET /users/cash-out/payouts` | Sus retiros, del más reciente al más antiguo, con filtro por `status` |
+| `GET /users/cash-out/reclassifiable` | Cobros de link que quedaron como saldo prepagado y desde cuándo puede moverlos |
+| `POST /users/cash-out/charges/{transaction_id}/reclassify` | Mover uno de esos cobros al saldo retirable |
 
 Si un `POST /users/cash-out/payouts` expira, reintente con el mismo `idempotency_key` y los mismos datos: le devuelve el retiro que ya existe. Si cambia los datos con la misma clave, la llamada se rechaza.
 

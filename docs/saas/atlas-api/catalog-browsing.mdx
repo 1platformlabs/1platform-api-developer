@@ -16,8 +16,11 @@ normalmente vacío; si ve `total: 0` donde esperaba contenido, revise primero el
 
 ## Paso 1 — Liste el catálogo {#paso-1--lista-el-catálogo}
 
-`GET /public/catalog` devuelve una página de ítems publicados y el `total` de coincidencias. `total` cuenta siempre con los
-mismos filtros que la página, así que úselo para paginar.
+`GET /public/catalog` devuelve una página de ítems publicados (hasta 100 por página) y el `total` de coincidencias. `total`
+cuenta siempre con los mismos filtros que la página, así que úselo para paginar.
+
+Por defecto el listado omite los ítems «próximos»: los programados y los publicados que todavía no tienen ningún archivo
+descargable. Esos se listan aparte con `coming_soon=true`, que no se combina con `status`.
 
 ```bash
 curl -s "$ATLAS_BASE/public/catalog?page=1&page_size=20&sort=recent" -H "X-Tenant-Slug: $TENANT_SLUG"
@@ -50,8 +53,8 @@ necesitará el `id` del ítem, no su slug.
 curl -s "$ATLAS_BASE/public/search?q=maquina%20del%20tiempo" -H "X-Tenant-Slug: $TENANT_SLUG"
 ```
 
-Valide la consulta en su cliente antes de enviarla: una consulta vacía o demasiado larga responde `422` con la lista de
-errores de validación. Una búsqueda que no puede completarse en el servidor no da error: devuelve cero resultados, así que
+Valide la consulta en su cliente antes de enviarla: una consulta vacía o de más de 120 caracteres responde `422` con la
+lista de errores de validación. Una búsqueda que no puede completarse en el servidor no da error: devuelve cero resultados, así que
 muestre un estado de «sin resultados» y no un error.
 
 ## Paso 4 — Agregue autocompletado {#paso-4--agrega-autocompletado}

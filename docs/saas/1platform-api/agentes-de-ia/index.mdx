@@ -10,19 +10,21 @@ sidebar_position: 1
 
 ## Cómo funciona
 
-- **Plantillas.** El catálogo trae agentes listos, con sus herramientas, su cadencia y su nivel de modelo. `POST /agents/catalog/{slug}/install` crea el agente **ya activo**. Es la vía recomendada: `POST /agents` exige una definición completa y herramientas compatibles. Revise el catálogo de herramientas y sus permisos antes de construir una definición propia. Si prefiere una conversación guiada, el asistente (`/agents/wizard/...`) arma la configuración y la confirma al final.
-- **Sitios, cuando la herramienta los necesita.** Un agente de sitios sólo trabaja sobre los sitios que le asigna. Sin sitios asignados no vigila ninguno: la lista no es un filtro sobre todo lo del usuario, es todo su alcance. Un sitio sólo admite un agente por objetivo; un segundo responde `409`.
-- **Tope de gasto.** El tope es por ciclo y lo aplica el servidor antes de cada iteración. Un agente **sin tope no tiene gasto ilimitado**: queda en modo propuesta, en el que razona y registra lo que haría, pero no recibe las herramientas que cuestan dinero. Bajar el tope por debajo de lo ya consumido lo pasa a ese modo de inmediato.
+- **Plantillas.** El catálogo trae agentes listos, con sus herramientas, su cadencia y su nivel de modelo. `POST /agents/catalog/{slug}/install` crea el agente **ya activo**. Es la vía recomendada: `POST /agents` exige una definición completa y herramientas compatibles. Revise el catálogo de herramientas y sus permisos antes de construir una definición propia. Si prefiere una conversación guiada, el asistente (`/agents/wizard/...`) arma la configuración y la confirma al final. Iniciar, responder y confirmar el asistente se cobran del saldo (`402` sin saldo), y una sesión vencida responde `410`.
+- **Sitios, cuando la herramienta los necesita.** Con sitios asignados, el agente lee y escribe sólo en esos sitios. Sin sitios asignados, puede leer todos los sitios del usuario, pero las herramientas que escriben en un sitio se niegan a actuar. Asignar sitios reemplaza la lista completa y todos deben ser del dueño del agente (`404` si alguno no lo es). Un sitio sólo admite un agente por objetivo; un segundo responde `409`.
+- **Tope de gasto.** El tope es por ciclo, que corresponde al mes calendario en UTC, y lo aplica el servidor antes de cada iteración. Un agente **sin tope no tiene gasto ilimitado**: queda en modo propuesta, en el que razona y registra lo que haría, pero no recibe las herramientas que cuestan dinero. Bajar el tope por debajo de lo ya consumido lo pasa a ese modo de inmediato: la siguiente iteración no se reserva ni se ejecuta y `GET /agents/{agent_id}/budget` informa el modo `proposing`.
 - **Ejecuciones.** Una ejecución se dispara a mano o por la cadencia (`schedule`, en formato cron, con intervalos de al menos 15 minutos). Es asíncrona: devuelve `202` y se consulta hasta que termina en `completed`, `failed` o `stopped`.
 - **Acciones pendientes.** Cuando el agente necesita una decisión humana, crea una acción (por ejemplo `publish_content`, `review_invoice` o `send_email`) que queda `pending` hasta que alguien la consume con su decisión.
 - **Memoria.** El agente recuerda lo que hizo entre ejecuciones. El dueño puede cerrar o hacer olvidar un recuerdo, y dejarle instrucciones permanentes que el agente lee al empezar cada ejecución y no puede modificar.
 
 ## Qué necesita {#qué-necesitas}
 
-- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido). Un agente siempre pertenece a un usuario, así que crear uno exige el token de usuario.
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido). Un agente siempre pertenece a un usuario, así que todas las operaciones exigen el token de usuario.
+- El módulo de agentes habilitado para el espacio de trabajo y para el usuario. Si no lo está, la operación responde `403` con `module_disabled`.
+- Según la configuración de la plataforma, los agentes y sus acciones pendientes son visibles para todos los usuarios del espacio de trabajo o sólo para su dueño. No dé por sentado que una acción pendiente sólo la ve su dueño.
 - Para herramientas que actúan sobre sitios, los sitios del usuario que el agente va a vigilar. Una integración propia no necesita inventar un sitio si las herramientas elegidas no lo requieren. Ver [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
 - **Saldo** para lo que consume el agente. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
-- Las herramientas que el plan de su espacio de trabajo no incluye se omiten al instalar y se informan en `skipped_tools`. `GET /agents/tools` lista todas y dice por qué una no está disponible. El máximo es de 50 agentes por espacio de trabajo.
+- Las herramientas que el plan de su espacio de trabajo no incluye se omiten al instalar y se informan en `skipped_tools`; si el plan no incluye ninguna, la instalación responde `403`. `GET /agents/tools` lista todas y dice por qué una no está disponible. El máximo es de 50 agentes por espacio de trabajo, o por usuario cuando la plataforma separa los agentes por dueño; superarlo responde `429`.
 
 ## Operaciones
 

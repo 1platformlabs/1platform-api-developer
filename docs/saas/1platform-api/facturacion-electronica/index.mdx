@@ -15,15 +15,15 @@ sidebar_position: 1
    - Con las credenciales del portal tributario. El certificado de firma se obtiene y se registra solo.
    - Subiendo un certificado `.pfx`/`.p12`.
 
-   En los dos casos llega un código por WhatsApp. Al verificarlo, el comercio pasa a `activating`. Queda listo para facturar cuando `display_status` es `active` y `ready` es `true`.
+   En los dos casos llega un código por WhatsApp. Al verificarlo, el comercio pasa a `activating`. Queda listo para facturar cuando `display_status` es `active` y `ready` es `true`; `ready_at` indica cuándo ocurrirá (por defecto, 24 horas después de verificar el código).
 3. **Sucursales y establecimientos.** La factura se certifica bajo el código de establecimiento de una sucursal. Sincronizar trae los establecimientos del registro tributario y crea o actualiza las sucursales. Si el comercio queda con varias sucursales con establecimiento, cada factura tiene que decir de cuál sale: envíe `branchId` o designe una sucursal por defecto con `defaultBranchId` en `PATCH /businesses/{businessId}`.
-4. **Factura.** Por defecto se emite en la misma llamada que la crea (`emitOnCreate` vale `true`). Puede consultarla, descargar su PDF o XML y anularla. Anular una factura certificada la anula también ante el ente tributario.
+4. **Factura.** Por defecto se emite en la misma llamada que la crea (`emitOnCreate` vale `true`). Puede consultarla, descargar su PDF o XML y anularla. Anular una factura certificada la anula también ante el ente tributario. Estados de la factura: `issued`, `failed` (la certificación la rechazó o no respondió; queda registrada) y `cancelled`.
 
 ## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
 - Los módulos de Comercios y de Facturación electrónica encendidos para su espacio de trabajo y asignados a su cuenta. Si falta alguno, recibe `403` con `data.code` = `module_disabled`.
-- Un rol en la sucursal que permita la operación. Activar con credenciales del portal exige ser **administrador de la sucursal**, el rol con el que nace quien crea el comercio. Es un rol del comercio, no del espacio de trabajo. Si su rol no alcanza, recibe `403`.
+- Un rol en la sucursal que permita la operación. Activar con credenciales del portal exige ser **administrador de la sucursal**, el rol con el que nace quien crea el comercio. Emitir y anular facturas admite **administrador** o **cajero**. Es un rol del comercio, no del espacio de trabajo. Si su rol no alcanza, recibe `403`.
 - El NIT del comercio y, para activar, las credenciales de su portal tributario o su certificado de firma.
 
 La facturación electrónica **no** es requisito para cobrar con [Links de pago](/docs/saas/1platform-api/links-de-pago), [Suscripciones](/docs/saas/1platform-api/suscripciones) ni [Terminal de tarjetas](/docs/saas/1platform-api/terminal-de-tarjetas).

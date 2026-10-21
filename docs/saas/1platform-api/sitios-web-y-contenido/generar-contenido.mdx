@@ -20,7 +20,7 @@ curl -X POST "$BASE_URL/posts/keywords/" \
   -d '{"domain": "example.com", "country": "es", "lang": "es"}'
 ```
 
-Si el sitio todavía no existe o busca un nicho nuevo, use `POST /posts/keywords/topic/` con un `topic` en lugar de `domain`. Las dos responden en la misma llamada con keywords y su volumen estimado. Cada consulta se cobra del saldo del usuario: `402` significa saldo insuficiente.
+Si el sitio todavía no existe o busca un nicho nuevo, use `POST /posts/keywords/topic/` con un `topic` en lugar de `domain`. Las dos responden en la misma llamada con keywords y su volumen estimado. Cada consulta se cobra del saldo del usuario: `402` significa saldo insuficiente. Si la consulta falla, el cobro se reembolsa. El límite es de 10 solicitudes por minuto.
 
 [Referencia de API → Keywords Content & Indexing](/api-reference/1platform-api#tag/keywords-content-indexing)
 
@@ -36,7 +36,7 @@ curl -X POST "$BASE_URL/posts/content/" \
   -d '{"keyword": "consejos de jardinería sostenible", "lang": "es", "country": "es", "image_provider": "default"}'
 ```
 
-Guarde `data.job_id` como `$JOB_ID`. El costo se **cobra al aceptar el trabajo**: la respuesta trae el monto en el header `X-Operation-Cost` y el saldo que queda en `X-Balance-Remaining`. Si después el trabajo termina en `failed`, ese cobro no se devuelve automáticamente.
+Guarde `data.job_id` como `$JOB_ID`. El costo se **cobra al aceptar el trabajo**: la respuesta trae el monto en el header `X-Operation-Cost` y el saldo que queda en `X-Balance-Remaining`. Si después el trabajo termina en `failed`, ese cobro no se devuelve automáticamente. `data.credits_released` es `true` sólo cuando se devolvió una reserva de saldo; con el cobro al aceptar, siempre es `false`.
 
 Esta operación **no es idempotente**. Cada llamada encola un trabajo nuevo y vuelve a cobrar. Enviar `X-Idempotency-Key` no lo evita: ese header no forma parte del contrato y, aun cuando se lee, cada llamada crea otro trabajo. Si una llamada se corta antes de recibir la respuesta, no la repita a ciegas: el trabajo pudo haberse creado y cobrado igual.
 
@@ -76,7 +76,7 @@ Con `completed`, la misma respuesta trae `data.result` con el título, el conten
 
 ## Paso 5 — Pedir la indexación (opcional)
 
-Con la página ya publicada, puede pedirle a Google que la rastree antes. La URL tiene que ser pública y pertenecer a un sitio verificado en Search Console. La verificación se hace en [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
+Con la página ya publicada, puede pedir que el buscador la rastree antes. La URL tiene que ser pública y pertenecer a un sitio verificado en Search Console. La verificación se hace en [Sitios web y contenido](/docs/saas/1platform-api/sitios-web-y-contenido).
 
 ```bash
 curl -X POST "$BASE_URL/posts/indexing/" \
@@ -86,6 +86,6 @@ curl -X POST "$BASE_URL/posts/indexing/" \
   -d '{"url": "https://example.com/consejos-de-jardineria-sostenible"}'
 ```
 
-`400` indica una URL con formato inválido o que todavía no es accesible: confirme que la publicación del paso 4 ya está en línea. `500` es un error del servicio de indexación. Esta llamada también se cobra y es independiente de las anteriores: puede hacerla días después de publicar.
+`400` indica una URL con formato inválido; el servidor no comprueba que la página ya esté en línea, así que confírmelo usted antes de llamar. `500` indica que el servicio de indexación rechazó o no pudo procesar la solicitud; en ese caso el cobro se reembolsa. Esta llamada se cobra antes del envío, admite 20 solicitudes por minuto y es independiente de las anteriores: puede hacerla días después de publicar.
 
 [Referencia de API → Keywords Content & Indexing](/api-reference/1platform-api#tag/keywords-content-indexing)

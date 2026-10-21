@@ -11,7 +11,9 @@ import TabItem from '@theme/TabItem';
 
 Receptores de webhooks de extremo a extremo que verifican la firma, deduplican por
 `(transaction_id, event)` y encolan el cumplimiento para procesamiento asíncrono. Los ejemplos asumen el cuerpo
-canónico: si configuró `body_template`, tome esos dos campos de su plantilla.
+canónico: si configuró `body_template`, incluya `{{transaction_id}}` en su plantilla y escriba el nombre del evento
+como texto fijo en la plantilla de cada evento, porque `event` no es una variable
+([Plantilla del cuerpo](/docs/saas/1platform-api/reference/webhooks-payload#body-template)).
 
 <Tabs groupId="lang" queryString>
 <TabItem value="python" label="Python (FastAPI)">
@@ -28,7 +30,7 @@ app = FastAPI()
 WEBHOOK_SECRET = os.environ["WEBHOOK_SECRET"]
 REPLAY_WINDOW = 300  # segundos
 
-# Reemplaza con un SET de Redis en producción
+# Reemplace con un SET de Redis en producción
 SEEN: set[tuple[str, str]] = set()
 
 
@@ -63,7 +65,7 @@ async def receive_webhook(
         return {"status": "duplicate"}
     SEEN.add(key)
 
-    # Responde rápido — difiere el cumplimiento a una cola en segundo plano
+    # Responda rápido: difiera el cumplimiento a una cola en segundo plano
     # await queue.enqueue(payload)
     return {"status": "ok"}
 ```
@@ -81,7 +83,7 @@ const REPLAY_WINDOW = 300; // segundos
 
 const seen = new Set<string>();
 
-// IMPORTANTE: captura el cuerpo crudo antes del parseo JSON
+// IMPORTANTE: capture el cuerpo crudo antes del parseo JSON
 app.use(
   "/webhooks/payments",
   express.raw({ type: "application/json", limit: "1mb" }),
@@ -121,9 +123,9 @@ app.post("/webhooks/payments", (req, res) => {
 app.listen(3000);
 ```
 
-:::tip[Captura el cuerpo crudo]
+:::tip[Capture el cuerpo crudo]
 Express parsea JSON de forma anticipada por defecto, lo que pierde la igualdad
-byte a byte. Monta `express.raw` solo para la ruta del webhook.
+byte a byte. Monte `express.raw` sólo para la ruta del webhook.
 :::
 
 </TabItem>
@@ -131,7 +133,7 @@ byte a byte. Monta `express.raw` solo para la ruta del webhook.
 
 ```php
 <?php
-// /webhooks/payments — asume un router que te entrega el cuerpo crudo de la solicitud.
+// /webhooks/payments — asume un router que le entrega el cuerpo crudo de la solicitud.
 const REPLAY_WINDOW = 300;
 
 function verify(string $body, string $sig, string $ts, string $secret): bool {
@@ -156,7 +158,7 @@ if (!verify($rawBody, $sig, $ts, $secret)) {
 }
 
 $payload = json_decode($rawBody, true);
-// Reemplaza con una caché real (Redis, Memcached o un índice único en la BD)
+// Reemplace con una caché real (Redis, Memcached o un índice único en la BD)
 $cacheKey = "webhook:{$payload['transaction_id']}:{$payload['event']}";
 if (apcu_exists($cacheKey)) {
     echo json_encode(['status' => 'duplicate']);
@@ -173,8 +175,9 @@ echo json_encode(['status' => 'ok']);
 
 ## Qué debe hacer todo receptor
 
-1. **Verificar el HMAC contra los bytes crudos** — nunca re-parsees el JSON antes de verificar.
-2. **Aplicar la ventana de repetición** — rechaza lo que tenga un `X-Webhook-Timestamp` a más de 5 minutos.
+1. **Verificar el HMAC contra los bytes crudos** — nunca vuelva a serializar el JSON antes de verificar.
+2. **Aplicar la ventana de repetición** — rechace lo que tenga un `X-Webhook-Timestamp` a más de 5 minutos.
 3. **Comparación de tiempo constante** — nunca use `==`.
-4. **Deduplicar por `(transaction_id, event)`** — puede haber duplicados y eventos no entregados.
-5. **Acusar recibo con 2xx rápidamente** — difiere el trabajo pesado a una cola en segundo plano.
+4. **Deduplicar por `(transaction_id, event)`** — puede haber duplicados y eventos no entregados. Con el historial
+   durable habilitado, `X-1Platform-Event-Id` identifica el mismo evento en todos sus intentos.
+5. **Acusar recibo con 2xx rápidamente** — difiera el trabajo pesado a una cola en segundo plano.

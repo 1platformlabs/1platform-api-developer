@@ -21,7 +21,7 @@ Antes del primer cobro, un administrador del espacio de trabajo registra en la
 `return_url` y la URL que recibe cada evento. Va primero porque, si envía `return_url` y su dominio no
 está registrado, la creación del cobro responde `400`. Y sin los eventos mapeados, se queda sin la única señal que liquida un pedido.
 
-Mapea los siete eventos. `on_refunded` y `on_reversed` llegan después de un `on_approved`, cuando un pago
+Mapee los siete eventos. `on_refunded` y `on_reversed` llegan después de un `on_approved`, cuando un pago
 aprobado se reembolsa o se revierte (por ejemplo, por un contracargo).
 
 ## Paso 2 — Guarde su referencia y cree el cobro {#paso-2--guarda-tu-referencia-y-crea-el-cobro}
@@ -47,7 +47,7 @@ cuando el pago se aprueba.
 | 403 | Su rol en el comercio de `branch_id` no permite cobrar, o su cuenta no tiene un módulo de comercio (`module_disabled`) |
 | 404 | Su cuenta no tiene saldo en esa moneda, o `branch_id` no corresponde a una sucursal suya |
 | 409 | El comercio de `branch_id` está archivado (`data.code` = `business_archived`) |
-| 422 | Validación, o no hay pasarela utilizable (`data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED` o `PLATFORM_GATEWAY_REQUIRED`) |
+| 422 | Validación del cuerpo (por ejemplo, `return_url` sin HTTPS o un `amount` no positivo; el detalle viene en `detail`), o no hay pasarela utilizable (`data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED` o `PLATFORM_GATEWAY_REQUIRED`) |
 | 429 | Superó el límite de 20 solicitudes por minuto |
 | 503 | El servicio de pago no está disponible por ahora |
 
@@ -61,7 +61,7 @@ nuevos.
 
 ## Paso 3 — Lleve al comprador al checkout {#paso-3--lleva-al-comprador-al-checkout}
 
-Redirige al comprador a `data.payment_url` de inmediato. Cuando termina, su navegador vuelve a su
+Redirija al comprador a `data.payment_url` de inmediato. Cuando termina, su navegador vuelve a su
 `return_url`. Ahí ya se reemplazaron `{{transaction_id}}` y `{{merchant_reference}}` si los usó.
 
 La vuelta a `return_url` sirve para mostrarle al comprador una pantalla de "estamos confirmando su pago".
@@ -100,7 +100,7 @@ cobro con sus saldos.
 Si la creación expiró, no tiene `$TRANSACTION_ID`. Llame a `GET /users/transactions?limit=100&skip=0`:
 el listado viene del más reciente al más antiguo y sólo admite `limit` y `skip`, sin filtro por
 referencia. Además, cada fila del listado **no** trae `merchant_reference`. Tome las transacciones
-creadas desde su intento, abra el detalle de cada una y compara su `merchant_reference` con la suya.
+creadas desde su intento, abra el detalle de cada una y compare su `merchant_reference` con la suya.
 Sólo si no aparece, vuelva a crear el cobro.
 
 [Referencia de API → Payments](/api-reference/1platform-api#tag/payments)

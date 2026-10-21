@@ -25,10 +25,13 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** The slug rule, read off a row that is live and working:
- *  "Link Building & Search Console" -> "link-building-search-console". */
+/** The slug rule, read off rows that are live and working:
+ *  "Link Building & Search Console" -> "link-building-search-console".
+ *  Scalar 1.72.3 drops a colon instead of hyphenating it: the Atlas tag
+ *  "integrations:bower" renders as id "tag/integrationsbower" (measured on all
+ *  112 tags of both contracts on 2026-10-20; only the two colon tags differed). */
 export const slugify = (tag) =>
-  tag.toLowerCase().replace(/&/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  tag.toLowerCase().replace(/:/g, '').replace(/&/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 const SPECS = {
   '1platform-api': 'static/openapi/1platform-api.json',
@@ -116,6 +119,10 @@ if (process.argv.includes('--self-test')) {
   const ok = derived === 'link-building-search-console';
   console.log(`${ok ? 'ok  ' : 'FAIL'}  the slug rule reproduces the live row (${derived})`);
   if (!ok) failed++;
+  const colon = slugify('integrations:bower');
+  const colonOk = colon === 'integrationsbower';
+  console.log(`${colonOk ? 'ok  ' : 'FAIL'}  the slug rule drops a colon like Scalar (${colon})`);
+  if (!colonOk) failed++;
   process.exit(failed ? 1 : 0);
 }
 

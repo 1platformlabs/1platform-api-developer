@@ -5,6 +5,8 @@ const minimal = {paths: {'/v1/example/{id}': {parameters: [], post: {operationId
 assert.equal(operationAliases(minimal).get('#operation/example'), '#tag/example-work/POST/v1/example/{id}');
 assert.equal(operationAliases(minimal).get('#tag/example-work'), undefined);
 assert.equal(operationAliases(minimal).get('#tag/example-work/POST/v1/example/{id}'), undefined);
+const colonTag = {paths: {'/v1/colon': {post: {operationId: 'colonExample', tags: ['integrations:bower']}}}};
+assert.equal(operationAliases(colonTag).get('#operation/colonExample'), '#tag/integrationsbower/POST/v1/colon');
 assert.equal(operationAliases({paths: {'/health': {get: {}}}}).size, 0);
 for (const api of ['1platform-api', 'atlas-api']) {
   const spec = JSON.parse(readFileSync(`static/openapi/${api}.json`, 'utf8'));

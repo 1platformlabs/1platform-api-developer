@@ -10,17 +10,17 @@ Este recorrido cubre los tipos de sitio que ofrece la plataforma. No es un servi
 
 ## 1. Elegir el tipo de alta
 
-Para un sitio que ya existe, `POST /users/websites` registra la relación con el usuario y devuelve `website_id`; no despliega contenido. Para crear un sitio servido por la plataforma, use `POST /provisioning/tenants` con un tipo habilitado. Su respuesta `202` inicia un trabajo: consulte el estado hasta que termine antes de anunciar la publicación.
+Para un sitio que ya existe, `POST /users/websites` registra la relación con el usuario y devuelve `website_id`; no despliega contenido. Para crear un sitio servido por la plataforma, use `POST /provisioning/tenants` con el tipo (`kind`): `content` (el predeterminado), `store` o `wordpress`. Su respuesta `202` inicia un trabajo: consulte `GET /provisioning/tenants/{job_id}` hasta que termine antes de anunciar la publicación. Cada usuario tiene un máximo de sitios; superarlo responde `429` con `website_quota_exceeded` en `code`, en la raíz de la respuesta. Para `wordpress`, el saldo del dueño tiene que cubrir el contenido inicial estimado del sitio; si no alcanza, el alta responde `402`.
 
 Las llamadas usan los dos tokens y los módulos requeridos. Crear a nombre de otro usuario del espacio exige administración del espacio; tener un comercio no concede ese permiso.
 
 ## 2. Preparar el dominio
 
-Registre un dominio o conecte uno propio mediante [Dominios y correo](/docs/saas/1platform-api/dominios-y-correo). Un dominio externo necesita la verificación correspondiente; escribir su nombre no demuestra propiedad. Revise registros existentes antes de reemplazar DNS para conservar correo y otros servicios.
+Registre un dominio o conecte uno propio mediante [Dominios y correo](/docs/saas/1platform-api/dominios-y-correo). Un dominio externo necesita la verificación correspondiente; escribir su nombre no demuestra propiedad. Si el dominio, o el dominio raíz de un subdominio, es externo y no está verificado, el alta responde `422` con `code` `DOMAIN_NOT_VERIFIED`. Si usted no es administrador del espacio de trabajo, el dominio tiene que estar en su cuenta; de lo contrario, el alta responde `404`. Revise registros existentes antes de reemplazar DNS para conservar correo y otros servicios.
 
 ## 3. Esperar el aprovisionamiento
 
-Siga el trabajo y atienda los motivos de fallo que devuelve la API. Una solicitud registrada, la delegación DNS y la disponibilidad del sitio son estados distintos. Después de un timeout, consulte el trabajo original antes de pedir otra alta.
+Siga el trabajo y atienda los motivos de fallo que devuelve la API. Una solicitud registrada, la delegación DNS y la disponibilidad del sitio son estados distintos. Después de un timeout, consulte el trabajo original antes de pedir otra alta. Repetir el alta de un dominio con un trabajo en curso devuelve ese mismo trabajo si es suyo, y `409` si pertenece a otro usuario.
 
 ## 4. Publicar y comprobar
 

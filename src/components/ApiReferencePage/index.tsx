@@ -66,14 +66,14 @@ export default function ApiReferencePage({route}: Props): ReactNode {
       reference?.destroy();
     };
   }, [route.configuration, route.cdn, attempt]);
-  return <Layout title={atlas ? 'Referencia Atlas API' : 'Referencia API'} description="Explore los endpoints, parámetros, esquemas y respuestas de la API">
+  return <Layout title={atlas ? 'Referencia de API de Atlas' : 'Referencia de API'} description="Explore los endpoints, parámetros, esquemas y respuestas de la API">
     <main className="api-reference-page">
       <section className="reference-intro brand-wrap">
         <div><p className="eyebrow">DOCUMENTACIÓN · {atlas ? 'ATLAS' : '1PLATFORM'}</p>
-          <h1>{atlas ? 'Referencia Atlas API' : 'Referencia API'}</h1>
+          <h1>{atlas ? 'Referencia de API de Atlas' : 'Referencia de API'}</h1>
           <p>{atlas ? 'Entrega de contenido, dentro de su producto' : 'Los servicios de 1Platform, dentro de su producto'}</p>
         </div>
-        <nav className="reference-tabs" aria-label="Documentación técnica"><Link to={guide}>Primeros pasos</Link><a href={atlas ? '/api-reference/atlas-api' : '/api-reference/1platform-api'} aria-current="page">Referencia API</a></nav>
+        <nav className="reference-tabs" aria-label="Documentación técnica"><Link to={guide}>Primeros pasos</Link><a href={atlas ? '/api-reference/atlas-api' : '/api-reference/1platform-api'} aria-current="page">Referencia de API</a></nav>
       </section>
       {state === 'loading' && <p className="reference-status brand-wrap" role="status">Cargando referencia interactiva</p>}
       {state === 'error' && <div className="reference-error brand-wrap" role="alert"><h2>No se pudo cargar la referencia</h2><p>Compruebe su conexión y vuelva a intentarlo</p><button type="button" onClick={() => setAttempt(value => value + 1)}>Volver a cargar</button></div>}

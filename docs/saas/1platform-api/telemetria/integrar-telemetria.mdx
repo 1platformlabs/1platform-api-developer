@@ -24,7 +24,9 @@ Guarde `data.id` como `$PROJECT_ID`. `data.public_credential` va en el navegador
 
 `hosts` es opcional y limita desde qué sitios se aceptan eventos del navegador, incluidos sus subdominios. Sin él se aceptan de cualquier origen: es cómodo el primer día, pero conviene declararlo antes de publicar el sitio. No es una protección contra abusos, porque fuera de un navegador el origen lo escribe quien llama.
 
-`403` significa que Telemetría está apagada para su espacio de trabajo. `409` significa que llegó al tope de proyectos de su cuenta o que ya tiene un proyecto que mide esos hosts.
+`403` significa que Telemetría está apagada para su espacio de trabajo. `409` significa que llegó al tope de proyectos de su cuenta, que ya tiene un proyecto que mide esos hosts o que otra cuenta verificó la propiedad de uno de ellos.
+
+El alta termina en segundo plano: `data.provisioning` vale `pending` mientras corre y `failed` si se detuvo a mitad. En ese caso, reintente con `POST /users/telemetry/projects/{project_id}/provisioning/retry`.
 
 Si el sitio es una tienda suya, `POST /users/telemetry/projects/for-website/{website_id}` hace lo mismo partiendo del sitio y es idempotente: si ya existe un proyecto propio que lo mide, lo reutiliza.
 
@@ -38,7 +40,7 @@ curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-`data.tag_snippet` es la línea exacta que va en el `<head>`, armada por el servidor. No la componga a mano: el origen de recepción cambia según el entorno. Conserve el atributo `crossorigin` que trae. Sin él, el navegador oculta el mensaje y la traza de los errores de scripts servidos desde otro dominio, que suele ser donde vive su código.
+`data.tag_snippet` es la línea exacta que va en el `<head>`, armada por el servidor; llega en `null` si el entorno no tiene configurado el origen de recepción. No la componga a mano: el origen de recepción cambia según el entorno. Conserve el atributo `crossorigin` que trae. Sin él, el navegador oculta el mensaje y la traza de los errores de scripts servidos desde otro dominio, que suele ser donde vive su código.
 
 [Referencia de API → Telemetry](/api-reference/1platform-api#tag/telemetry)
 
@@ -54,11 +56,11 @@ curl "$BASE_URL/users/telemetry/projects/$PROJECT_ID/install-status" \
 
 `data.verdict` tiene siete valores posibles, y cada uno pide algo distinto:
 
-- `receiving`: están llegando eventos. No hace falta nada.
+- `receiving`: ya llegó al menos un evento. No hace falta nada.
 - `waiting_first_event`: el sitio pidió la etiqueta y todavía no llegó ningún evento. Si su sitio no tuvo errores, es lo esperable.
 - `never_requested`: nadie pidió la etiqueta. Puede no estar pegada, tener mal la dirección o estar bloqueada por la política de seguridad de contenido del sitio.
 - `rejecting`: la etiqueta corre, pero se rechaza todo lo que envía. Revise que el dominio del sitio esté en `hosts`.
-- `throttled`: el proyecto está limitado. Está perdiendo parte de los eventos y desde el sitio no se nota, porque un script limitado no llega a ejecutarse. Si envía eventos desde un servidor, el origen de recepción sí manda `Retry-After`: respételo.
+- `throttled`: el proyecto tuvo solicitudes limitadas este mes. Está perdiendo parte de los eventos y desde el sitio no se nota, porque un script limitado no llega a ejecutarse. Si envía eventos desde un servidor, el origen de recepción sí manda `Retry-After`: respételo.
 - `blocked`: superó la cuota o el tope de gasto. Sólo entra una muestra reservada hasta el mes siguiente, salvo que suba el tope.
 - `disabled`: apagó el proyecto.
 
@@ -90,7 +92,9 @@ curl -X POST "$BASE_URL/users/telemetry/projects/$PROJECT_ID/alert-rules" \
   -d '{"name": "Errores nuevos en la tienda", "condition": "new_issue", "cooldown_minutes": 60}'
 ```
 
-Las condiciones son `new_issue` (un error nunca visto), `event_burst` (N eventos en M minutos) y `monitor_down` (un monitor de disponibilidad caído, que crea con `POST /users/telemetry/projects/{project_id}/monitors`). `cooldown_minutes` evita que una condición sostenida envíe un aviso en cada evaluación.
+Las condiciones son `new_issue` (un error nunca visto), `event_burst` (`threshold` eventos en `window_minutes` minutos) y `monitor_down` (un monitor de disponibilidad caído, que crea con `POST /users/telemetry/projects/{project_id}/monitors`). `cooldown_minutes` evita que una condición sostenida envíe un aviso en cada evaluación. Por defecto, `threshold` vale 10, `window_minutes` 5 y `cooldown_minutes` 60; los límites exactos están en [Referencia de API → createTelemetryAlertRule](/api-reference/1platform-api#operation/createTelemetryAlertRule).
+
+Monitores y `webhook_url` dependen de un interruptor de salida de la plataforma; mientras esté apagado, responden `409` con `telemetry_egress_disabled`.
 
 Los avisos llegan al dueño y a las direcciones que **aceptaron**. Una dirección nueva se agrega con `POST /users/telemetry/recipients`, recibe un correo de confirmación y no recibe nada hasta confirmar. Un aviso nunca incluye el cuerpo del evento, su URL ni su traza: sólo conteos, etiquetas de la plataforma y el título recortado del grupo de errores. Si la recepción del proyecto está limitada o interrumpida, un incidente abierto no se declara recuperado hasta tener dos evaluaciones seguidas con recepción normal. Para no recibir avisos durante una actualización de la plataforma o un despliegue suyo, vea [Silencio durante despliegues](/docs/saas/1platform-api/telemetria#silencio-durante-despliegues).
 

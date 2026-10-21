@@ -16,9 +16,9 @@ Elija exactamente una audiencia: un usuario activo del espacio mediante `user_id
 
 ## 2. Revisar y publicar
 
-Prepare título, texto, severidad y, si hace falta, un enlace permitido. Revise el contenido y la audiencia antes de confirmar `POST /notifications`. Cancelar conserva el borrador del Panel y no publica un aviso.
+Prepare título, texto, severidad, la pestaña de la bandeja donde aparecerá (`billing`, `system` o `team`) y, si hace falta, un enlace permitido: una ruta del Panel o una URL `https`. Revise el contenido y la audiencia antes de confirmar `POST /notifications`. Cancelar conserva el borrador del Panel y no publica un aviso.
 
-Use `Idempotency-Key` para que repetir la misma publicación después de un timeout conserve el mismo aviso. Una clave reutilizada con otro contenido devuelve conflicto. Una publicación nueva responde `201`; un replay idéntico, `200`. No regenere la clave al repetir la confirmación incierta.
+Use `Idempotency-Key` (de 16 a 128 caracteres ASCII visibles) para que repetir la misma publicación después de un timeout conserve el mismo aviso. La clave vale por administrador: otro administrador que use la misma clave publica un aviso distinto. Una clave reutilizada con otro contenido devuelve conflicto. Una publicación nueva responde `201`; un replay idéntico, `200`. No regenere la clave al repetir la confirmación incierta.
 
 [Referencia de API → Publicar aviso](/api-reference/1platform-api#operation/createNotification).
 
@@ -28,7 +28,7 @@ Use `Idempotency-Key` para que repetir la misma publicación después de un time
 
 ## 4. Leer desde la bandeja
 
-Cada persona consulta sus avisos y el contador de no leídos. Marcar un broadcast como leído sólo cambia el estado de esa persona: no lo marca leído para el resto del espacio. Lo mismo ocurre con «Marcar todos como leídos». Una recarga conserva el estado persistido.
+Cada persona consulta sus avisos, filtrados por pestaña o sólo los no leídos, y el contador de no leídos. La bandeja exige que la persona haya verificado su correo entrando al menos una vez con un enlace mágico; un usuario creado sólo por API recibe `403`. Marcar un broadcast como leído sólo cambia el estado de esa persona: no lo marca leído para el resto del espacio. Lo mismo ocurre con «Marcar todos como leídos». Una recarga conserva el estado persistido.
 
 [Referencia de API → Notificaciones](/api-reference/1platform-api#tag/notifications).
 

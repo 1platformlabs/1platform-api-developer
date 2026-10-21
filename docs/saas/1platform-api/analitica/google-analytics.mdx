@@ -18,7 +18,9 @@ curl "$BASE_URL/analytics/oauth/authorize?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-Abra `data.authorize_url` en una ventana emergente del navegador del usuario. El usuario inicia sesión en Google y concede el acceso. Google vuelve a la devolución de llamada de la API, que guarda la autorización y avisa a la ventana que la abrió. Su backend no llama a esa devolución de llamada.
+Abra `data.authorize_url` en una ventana emergente del navegador del usuario. El usuario inicia sesión en Google y concede el acceso. Google vuelve a la devolución de llamada de la API, que guarda la autorización. Su backend no llama a esa devolución de llamada.
+
+La URL vence a los 10 minutos, sirve una sola vez y queda ligada a la dirección de red desde la que se pidió: si la devolución de llamada llega desde otra red, se rechaza y hay que pedir una URL nueva. Pídala, por lo tanto, desde la misma red que usará el navegador del usuario. La página de la devolución de llamada sólo avisa a la ventana que la abrió cuando la solicitud vino de un origen de panel permitido para su espacio de trabajo; en cualquier otro caso, confirme el resultado con el paso 2. `503` con `ANALYTICS_CONNECTION_UNAVAILABLE` indica que la conexión no está disponible para su espacio de trabajo.
 
 [Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
 
@@ -76,7 +78,7 @@ curl "$BASE_URL/analytics/streams/tag?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-Inserte `data.tag_html` en el `<head>` de todas las páginas del sitio.
+Inserte `data.tag_html` en el `<head>` de todas las páginas del sitio. Con la propiedad sin activar, la respuesta es `400`.
 
 [Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)
 
@@ -100,6 +102,8 @@ curl -X POST "$BASE_URL/analytics/mp-event" \
   -d '{"website_id": "'"$WEBSITE_ID"'", "event_name": "content_published", "params": {"article_id": "a-123"}}'
 ```
 
-`website_id` y `event_name` son obligatorios. Los eventos admitidos son `content_published`, `content_updated`, `comment_received`, `seo_action` y `keyword_research`. `params` admite hasta 25 parámetros: cada nombre cumple `^[a-z][a-z0-9_]{0,39}$` y la representación de cada valor no supera 100 caracteres. Un evento fuera de ese catálogo se rechaza. La operación no es idempotente: cada llamada registra un evento nuevo. Si reintenta, incluya en `params` un identificador propio para poder descartar duplicados en sus análisis.
+`website_id` y `event_name` son obligatorios. Los eventos admitidos son `content_published`, `content_updated`, `comment_received`, `seo_action` y `keyword_research`. `params` admite hasta 25 parámetros: cada nombre cumple `^[a-z][a-z0-9_]{0,39}$` y la representación de cada valor no supera 100 caracteres. Un evento fuera de ese catálogo o un parámetro fuera de esos límites se rechaza con `400`. Requiere la propiedad activa y el secreto para eventos de servidor, que se crea en el paso 3 salvo que envíe `create_mp_secret` en `false`; sin él, la respuesta es `404`. El límite es de 10 solicitudes por minuto.
+
+Una respuesta `200` confirma que la plataforma envió el evento, no que Google Analytics lo haya aceptado: un rechazo del destino no se le devuelve. La operación no es idempotente: cada llamada registra un evento nuevo. Si reintenta, incluya en `params` un identificador propio para poder descartar duplicados en sus análisis.
 
 [Referencia de API → Analytics](/api-reference/1platform-api#tag/analytics)

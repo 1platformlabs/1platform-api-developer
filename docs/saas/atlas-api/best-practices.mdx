@@ -12,14 +12,14 @@ Cada punto enlaza a la página que lo explica.
 
 - **Verifique su slug antes de integrar** con `GET /tenants/by-host` y use el `slug` que devuelve. Un slug mal escrito no da
   error: cae en el tenant por defecto ([Resolución de tenant](/docs/saas/atlas-api/tenant-resolution)).
-- **Envíe `X-Tenant-Slug` en cada llamada con JWT o anónima.** No envíe tenant en el cuerpo, ni `X-Tenant-Slug` con una
-  clave de integración: ahí el tenant sale de la clave.
-- **Sospeche del slug ante un catálogo vacío** o un token que de pronto responde `TOKEN_INVALID`.
+- **Envíe `X-Tenant-Slug` en cada llamada con JWT o anónima.** No envíe tenant en el cuerpo; con una clave de integración
+  no hace falta `X-Tenant-Slug`: ahí el tenant sale de la clave.
+- **Sospeche del slug ante un catálogo vacío** o un token que de pronto responde `TOKEN_INVALID` o `TENANT_MISMATCH`.
 
 ## Sesiones y credenciales
 
-- **Refresque la sesión del miembro** en lugar de pedir otro enlace de acceso; pida uno nuevo sólo si el refresco falla
-  ([Autenticación](/docs/saas/atlas-api/authentication)).
+- **Refresque la sesión del miembro** cuando una llamada responda `401 UNAUTHORIZED`, en lugar de pedir otro enlace de
+  acceso; pida uno nuevo sólo si el refresco falla ([Autenticación](/docs/saas/atlas-api/authentication)).
 - **No refresque sesiones de operador:** el refresco devuelve roles de miembro. Vuelva a iniciar sesión.
 - **Cerrar sesión no invalida el token.** Trate la duración del token de acceso como el límite de una credencial filtrada.
 - **Vigile `X-Atlas-Key-Expires-At`** y avise cuando aparezca; distinga `INTEGRATION_KEY_EXPIRED` de

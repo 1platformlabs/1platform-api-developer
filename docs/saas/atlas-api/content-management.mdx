@@ -10,13 +10,15 @@ Esta guía cubre el lado de **escritura** del catálogo: crear un ítem, adjunta
 lado de lectura está en [Exploración del catálogo](/docs/saas/atlas-api/catalog-browsing).
 
 Estas operaciones aceptan **sólo** el JWT de una sesión de operador o administrador del tenant
-([Inicio de sesión de operador](/docs/saas/atlas-api/authentication#inicio-de-sesion-de-operador)), con `X-Tenant-Slug`. Una
-clave de integración no sirve aquí: responde `401 UNAUTHORIZED`. Todas las operaciones de esta página:
+([Inicio de sesión de operador](/docs/saas/atlas-api/authentication#inicio-de-sesion-de-operador)). El tenant lo fija ese
+JWT, no el header `X-Tenant-Slug`; puede enviarlo igual, pero no cambia el tenant sobre el que escribe. Una clave de
+integración no sirve aquí: responde `401 UNAUTHORIZED`. Todas las operaciones de esta página:
 [Referencia de API → content](/api-reference/atlas-api#tag/content).
 
-Crear y listar ítems exige el rol de operador (`403 INSUFFICIENT_ROLE` si falta); editar, publicar y borrar exigen además
-un permiso de contenido concreto (`403 INSUFFICIENT_PERMISSION`, con el permiso que falta). Cada cambio queda registrado en
-la auditoría del tenant.
+Crear, listar y leer un ítem por su `id` exige el rol de operador (`403 INSUFFICIENT_ROLE` si falta); editar, publicar,
+archivar y subir o quitar archivos y portadas exigen además un permiso de contenido concreto
+(`403 INSUFFICIENT_PERMISSION`, con el permiso que falta). Las ediciones, publicaciones, archivados y cambios de archivos y
+portadas quedan registrados en la auditoría del tenant; la creación del ítem, no.
 
 ## El ciclo de vida de un ítem
 
@@ -37,25 +39,31 @@ curl -s -X POST "$ATLAS_BASE/content/items" -H "X-Tenant-Slug: $TENANT_SLUG" \
         "metadata": { "language": "es", "genres": ["ciencia-ficcion"] } }'
 ```
 
-Guarde el `id` que devuelve: todas las operaciones siguientes lo usan. Los metadatos son libres, pero algunas claves conocidas
-(resumen, idioma, año, géneros, etiquetas, personas, banderas de acceso) se validan; sus límites están en la Referencia de API.
-El filtro de género del catálogo busca tanto en `genres` como en `tags`. Las banderas `metadata.access` son sólo una pista
+Guarde el `id` que devuelve: todas las operaciones siguientes lo usan. Los metadatos son libres, pero en esta operación y en
+la edición algunas claves se validan: `language` se normaliza a un código de idioma (el valor original queda en
+`language_raw`), `tags` admite hasta 40 valores, `people` hasta 80 créditos con nombre y `faq` hasta 12 preguntas
+frecuentes `{ q, a }`; un valor inválido en cualquiera de ellas responde `422`. El resto de las claves se
+guarda tal como llega. El filtro de género del catálogo busca tanto en `genres` como en `tags`. Las banderas `metadata.access` son sólo una pista
 para la interfaz: el acceso real lo deciden los [derechos de acceso](/docs/saas/atlas-api/entitlements).
 
 ## Paso 2 — Adjunte el archivo {#paso-2--adjunta-el-archivo}
 
 Para tenants que entregan archivos, suba el binario con `POST /content/items/{item_id}/assets` (formulario multipart con el
-formato y el archivo). Subir otra vez el mismo formato reemplaza el anterior; `DELETE /content/items/{item_id}/assets/{fmt}`
-lo quita. Para audiolibros, `PUT /content/items/{item_id}/audio` define narrador, idioma y capítulos.
+formato, `pdf`, `epub`, `mobi`, `mp3` o `m4a`, y el archivo). Subir otra vez el mismo formato reemplaza el anterior;
+`DELETE /content/items/{item_id}/assets/{fmt}` lo quita y es seguro de reintentar. Para audiolibros,
+`PUT /content/items/{item_id}/audio` define narrador, idioma y capítulos, y el campo `chapter` de la subida asocia el audio
+a un capítulo ya declarado.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/assets" -H "X-Tenant-Slug: $TENANT_SLUG" \
   -H "Authorization: Bearer $ATLAS_JWT" -F "format=epub" -F "file=@la-maquina-del-tiempo.epub"
 ```
 
-La subida valida antes de leer el archivo: un formato no admitido responde `400 ASSET_FORMAT_INVALID`, un formato que la
-forma de entrega del tenant no puede servir `400 ASSET_STRATEGY_MISMATCH`, un archivo demasiado grande `413 ASSET_TOO_LARGE`
-y un tenant sin almacenamiento configurado `409 ASSET_STORE_UNCONFIGURED` (avise a 1Platform Labs). Si el almacenamiento
+Atlas valida la subida antes de guardar nada: un formato no admitido responde `400 ASSET_FORMAT_INVALID`, un formato que la
+forma de entrega del tenant o el tipo del ítem no puede servir `400 ASSET_STRATEGY_MISMATCH`, un tipo de archivo que no
+corresponde al formato `400 ASSET_CONTENT_TYPE_MISMATCH`, un archivo vacío `400 ASSET_FILE_REQUIRED`, un archivo demasiado
+grande `413 ASSET_TOO_LARGE` (con el máximo en `max_bytes`) y un tenant sin almacenamiento configurado
+`409 ASSET_STORE_UNCONFIGURED` (avise a 1Platform Labs). Si el almacenamiento
 falla, recibe `502 ASSET_STORAGE_FAILED` o `503 MEDIA_UNAVAILABLE`: reintente más tarde.
 
 ## Paso 3 — Suba la portada {#paso-3--sube-la-portada}
@@ -79,14 +87,20 @@ curl -s -X POST "$ATLAS_BASE/content/items/$ITEM_ID/publish" -H "X-Tenant-Slug: 
   -H "Authorization: Bearer $ATLAS_JWT"
 ```
 
-Desde ese momento aparece en `GET /public/catalog` y los miembros con derecho de acceso pueden pedir su
-[ticket de entrega](/docs/saas/atlas-api/content-delivery).
+Desde ese momento los miembros con derecho de acceso pueden pedir su
+[ticket de entrega](/docs/saas/atlas-api/content-delivery). Publicar no exige que el ítem tenga archivo: si todavía no
+tiene ninguno descargable, el listado normal de `GET /public/catalog` no lo muestra y aparece sólo entre los próximos
+(`coming_soon=true`). Por eso conviene adjuntar el archivo antes de publicar.
 
 ## Paso 5 — Edite o retire {#paso-5--edita-o-retira}
 
 - **Editar:** `PATCH /content/items/{item_id}` cambia sólo los campos que envía. `metadata` se **reemplaza** completo, no se
-  fusiona: envíe el objeto entero. Cambiar el slug a uno ocupado responde `409 CONTENT_SLUG_TAKEN`.
+  fusiona: envíe el objeto entero. La única excepción es `metadata.assets`, que administra Atlas: si no lo envía se
+  conserva, y las claves de almacenamiento que envíe se ignoran. Cambiar el slug a uno ocupado responde
+  `409 CONTENT_SLUG_TAKEN`.
 - **Retirar:** `POST /content/items/{item_id}/archive` o `DELETE /content/items/{item_id}` lo archivan. Ambas son
   idempotentes y seguras de reintentar.
 - **Leer:** `GET /content/items` lista todos los estados (a diferencia del catálogo público, que sólo muestra lo publicado);
-  `GET /content/items/{item_id}` y `GET /content/items/by-slug/{slug}` leen uno.
+  `GET /content/items/{item_id}` lee uno. `GET /content/items/by-slug/{slug}` es la excepción de esta página: resuelve el
+  tenant por `X-Tenant-Slug`, sin sesión devuelve sólo ítems publicados o programados, y con el JWT de un operador de ese
+  tenant devuelve el ítem en cualquier estado.

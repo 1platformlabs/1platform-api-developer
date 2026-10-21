@@ -69,9 +69,13 @@ nuevo **invalida el anterior**, incluida cualquier copia que se use fuera de 1Pl
 
 | Código | Causa |
 |---|---|
-| 400 | El portal tributario rechazó las credenciales o pidió un código adicional |
+| 400 | El portal tributario rechazó las credenciales o pidió un código adicional (`activation_credentials_rejected`) |
 | 403 | Su rol en la sucursal no es administrador |
-| 409 | El comercio no es elegible o ya tiene un certificado |
+| 409 | El comercio no es elegible o ya tiene un certificado (`activation_not_eligible`), no se pudo obtener el certificado (`activation_certificate_failed`) o el comercio está archivado |
+| 503 | La activación está apagada para su espacio de trabajo (`activation_disabled`) o el portal tributario no responde (`activation_portal_unavailable`) |
+| 503 `activation_delivery_failed_after_issue` | El certificado nuevo **ya se emitió**, pero su registro no terminó. **No reintente**: otra llamada emitiría otro certificado. Contacte a soporte |
+
+Cada error de esta llamada trae su `code` en la raíz de la respuesta; decida por él, no por `msg`.
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
 
@@ -89,7 +93,9 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoicing/activation/verify" \
 
 El estado pasa a `activating`. La activación tarda: no es inmediata. Consulte
 `GET /businesses/{businessId}/invoicing/activation` hasta que `display_status` sea `active` y `ready` sea
-`true`. Un código inválido o vencido responde `422`, y `409` significa que no hay una activación pendiente.
+`true`; `ready_at` indica cuándo ocurrirá (por defecto, 24 horas después de verificar el código). Un código
+inválido o vencido responde `422`, `409` significa que no hay una activación pendiente y `429`, que agotó los
+intentos.
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
 
@@ -133,15 +139,26 @@ curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/invoices" \
   -d '{"branchId": "'"$BRANCH_ID"'", "items": [{"description": "Servicio de consultoría", "unit_price": 1000.00, "quantity": 1}], "receptorInfo": {"name": "Cliente S.A.", "documentType": "NIT", "documentNumber": "98765432", "email": "cliente@ejemplo.com"}}'
 ```
 
-Guarde `data.id` como `$INVOICE_ID`. Si facturas a una persona y no a una empresa, `POST /identify`
+Guarde `data.id` como `$INVOICE_ID`. Si factura a una persona y no a una empresa, `POST /identify`
 busca sus datos por CUI/DPI y le ayuda a llenar `receptorInfo`. Sólo consulta, no emite nada.
+
+Emitir exige rol de **administrador** o **cajero** en la sucursal. `POST /businesses/{businessId}/invoices`
+no acepta clave de idempotencia: si pierde la respuesta, no repita la llamada a ciegas. Liste las facturas
+del comercio con `GET /businesses/{businessId}/invoices` y confirme si la emisión ya ocurrió antes de
+reintentar. Una emisión rechazada por la certificación también queda registrada, con estado `failed`.
+
+No envíe `emitOnCreate: false` si espera una factura certificada: la factura queda registrada sin `uid`,
+`serieFEL` ni `numeroFEL`, y la API no ofrece una operación para certificarla después.
 
 | Código | Causa |
 |---|---|
-| 404 | El comercio no existe, o el `branchId` no corresponde a una sucursal suya |
-| 409 | La facturación electrónica del comercio todavía no está lista (pasos 2 y 3) |
+| 400 | El `branchId` es de una sucursal de otro comercio |
+| 403 | Su rol en la sucursal no es administrador ni cajero |
+| 404 | El comercio o la sucursal de `branchId` no existen |
+| 409 | La facturación electrónica del comercio todavía no está lista (pasos 2 y 3), el contribuyente no aprobó la integración, la firma del comercio no está registrada ante la certificación (vuelva a activar) o el comercio está archivado |
 | 422 `branch_selection_required` | Hay varias sucursales con establecimiento, no nombró ninguna y el comercio no tiene una por defecto. El código viaja en `code`, en la raíz, y `data.branches` trae las opciones. No se emitió nada ni se consumió correlativo: reintente con `branchId` |
 | 422 | Datos inválidos o rechazo de la certificación. Revise el NIT del receptor y los ítems |
+| 503 | La certificación no respondió. Antes de reintentar, confirme con la lista de facturas que no se emitió |
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)
 
@@ -178,7 +195,9 @@ curl -X DELETE "$BASE_URL/businesses/$BUSINESS_ID/invoices/$INVOICE_ID" \
 | Código | Causa |
 |---|---|
 | 400 | La factura ya está anulada |
+| 403 | Su rol en la sucursal no es administrador ni cajero |
 | 404 | El comercio o la factura no existen |
 | 422 | La anulación falló en la certificación |
+| 503 | La certificación no respondió; la factura sigue vigente |
 
 [Referencia de API → Electronic Invoicing (FEL)](/api-reference/1platform-api#tag/electronic-invoicing-fel)

@@ -16,7 +16,9 @@ curl "$BASE_URL/adsense/oauth/authorize?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-Abra `data.authorization_url` en una ventana emergente del navegador del usuario. El usuario inicia sesión en Google y concede el acceso. La devolución de llamada la procesa la API y avisa a la ventana que la abrió; su backend no la llama. `500` indica que la integración con AdSense no está configurada en la plataforma.
+Abra `data.authorization_url` en una ventana emergente del navegador del usuario. El usuario inicia sesión en Google y concede el acceso. La devolución de llamada la procesa la API; su backend no la llama. `500` indica que la integración con AdSense no está configurada en la plataforma.
+
+La URL vence a los 10 minutos, sirve una sola vez y queda ligada a la red **y al navegador** (su agente de usuario) que la pidieron: si la devolución de llamada llega desde otra red u otro navegador, se rechaza. Pídala desde el mismo navegador que abrirá la ventana. La página de la devolución de llamada sólo avisa a la ventana que la abrió cuando su origen es uno de los permitidos por la plataforma; en cualquier otro caso, confirme el resultado con el paso 2.
 
 [Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
 
@@ -44,7 +46,7 @@ curl -X POST "$BASE_URL/adsense/connect?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-La respuesta trae `data.status` en `active`, el `publisher_id` de la cuenta y el estado de aprobación del sitio en `site_state`. `400` significa que la autorización del paso 2 no está confirmada; `409`, que el sitio ya estaba vinculado. El límite es de 2 solicitudes por minuto: deje pasar al menos 30 segundos entre intentos.
+La respuesta trae `data.status` en `active`, el `publisher_id` de la cuenta y el estado de aprobación del sitio en `site_state`, que llega en `null` si el dominio del sitio no aparece entre los sitios de la cuenta. `400` significa que la autorización del paso 2 no está confirmada; `409`, que el sitio ya estaba vinculado. El límite es de 2 solicitudes por minuto: deje pasar al menos 30 segundos entre intentos.
 
 [Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
 
@@ -58,7 +60,7 @@ curl -X POST "$BASE_URL/adsense/sites/sync?website_id=$WEBSITE_ID" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-La respuesta trae el estado actual del sitio y si tiene anuncios automáticos. `GET /adsense/sites` lista todos los sitios de la cuenta, paginados con `page` y `page_size`.
+La respuesta trae el estado actual del sitio y si tiene anuncios automáticos, o `data` en `null` si el dominio del sitio no aparece en la cuenta. `GET /adsense/sites` lista todos los sitios de la cuenta, paginados con `page` y `page_size`.
 
 [Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
 
@@ -70,13 +72,13 @@ curl "$BASE_URL/adsense/earnings/overview?website_id=$WEBSITE_ID&period=7d" \
   -H "x-user-token: $USER_TOKEN"
 ```
 
-Devuelve ingresos estimados, clics e impresiones del período. `compare` está activado por defecto, así que cada métrica llega comparada con el período anterior; envíe `compare=false` para recibir valores simples. El plan gratuito sólo permite `7d`: pedir `30d` o `90d` sin plan Pro responde `403`, en lugar de recortar el rango sin avisar. El desglose por página (`GET /adsense/earnings/by-page`) y el reporte a medida (`POST /adsense/earnings/report`, con `start_date` y `end_date`) también requieren plan Pro.
+Devuelve ingresos estimados, clics e impresiones del período (`7d`, `30d` o `90d`; `7d` por defecto). `compare` está activado por defecto, así que cada métrica llega comparada con el período anterior; envíe `compare=false` para recibir valores simples. La Referencia de API describe un límite de `7d` para el plan gratuito, pero esa restricción no está verificada en el código actual de esta operación: no dependa de un `403` para acotar el rango. El desglose por página (`GET /adsense/earnings/by-page`) y el reporte a medida (`POST /adsense/earnings/report`, con `start_date` y `end_date`) sí requieren un plan que incluya reportes de AdSense (`403` sin él).
 
 [Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)
 
 ## Paso 6 — Revisar alertas y problemas de políticas
 
-Una alerta de la cuenta o un problema de políticas explica una caída de ingresos que de otro modo parece un error de su integración. Las dos lecturas requieren plan Pro (`403` sin él).
+Una alerta de la cuenta o un problema de políticas explica una caída de ingresos que de otro modo parece un error de su integración. Las dos lecturas requieren un plan que incluya reportes de AdSense (`403` sin él).
 
 ```bash
 curl "$BASE_URL/adsense/policy-issues?website_id=$WEBSITE_ID" \
@@ -86,6 +88,6 @@ curl "$BASE_URL/adsense/policy-issues?website_id=$WEBSITE_ID" \
 
 Cada problema indica la entidad afectada (`entity`), el tema de la política (`topic`) y la acción requerida (`action`). Las alertas de la cuenta salen de `GET /adsense/alerts`. Después de corregir una página, sincronice el estado (paso 4). Google puede tardar en levantar una restricción, así que una sincronización inmediata no confirma la corrección.
 
-Para desvincular el sitio sin perder la autorización, use `DELETE /adsense/disconnect`: después puede volver al paso 3 sin repetir la autorización. `POST /adsense/oauth/revoke` borra la autorización, y para volver a conectar hay que empezar desde el paso 1.
+`DELETE /adsense/disconnect` desvincula el sitio y conserva sólo el `publisher_id`: también descarta la autorización guardada, así que para volver a conectar hay que repetir los pasos 1 a 3. `POST /adsense/oauth/revoke` revoca además la autorización ante Google, y para volver a conectar también hay que empezar desde el paso 1.
 
 [Referencia de API → AdSense](/api-reference/1platform-api#tag/adsense)

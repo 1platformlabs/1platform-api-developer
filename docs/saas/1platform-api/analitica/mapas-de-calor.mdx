@@ -10,11 +10,11 @@ Los mapas agregan **las muestras de interacción**. Una visita con varios clics 
 
 ## 1. Registrar el sitio y las rutas
 
-Con los dos tokens y el módulo de mapas habilitado, use `POST /users/heatmap/sites`. Declare el host y los patrones `page_keys` que desea medir. Una lista vacía no captura todas las páginas: no mide ninguna. El sitio y sus lecturas quedan dentro del espacio y usuario autorizados. Los sitios de marca administrados por la plataforma mantienen sus restricciones propias.
+Con los dos tokens y el módulo de mapas habilitado, use `POST /users/heatmap/sites`. Declare el host, los patrones `page_keys` que desea medir y `enabled: true`: si no lo envía, el sitio se crea con la captura apagada. Una lista vacía no captura todas las páginas: toma los patrones predeterminados de su espacio de trabajo, que vienen vacíos, y en ese caso no mide ninguna. `sample_rate`, entre 0 y 1, es la fracción de páginas vistas que reportan; si lo omite, se usa el valor de la plataforma. El sitio y sus lecturas quedan dentro del espacio y usuario autorizados. Un mismo host se registra una sola vez por espacio de trabajo y el espacio tiene un tope de sitios: los dos casos responden `409`. Si los mapas están apagados para su espacio de trabajo, la respuesta es `403`.
 
 ## 2. Instalar la etiqueta
 
-La respuesta trae la etiqueta exacta para el sitio. Use ese snippet; no exponga los tokens privados del backend en el navegador de un visitante. La captura pública utiliza su propio identificador. Las muestras se agregan al ingresar y no constituyen un historial de navegación individual.
+La respuesta trae la etiqueta exacta para el sitio en `tag_snippet`. Use ese snippet; no exponga los tokens privados del backend en el navegador de un visitante. La captura pública utiliza su propio identificador. Las muestras se agregan al ingresar en conteos por celda y por banda de profundidad, y no constituyen un historial de navegación individual. Una ruta que no coincide con ningún patrón se cuenta como descartada y no se guarda.
 
 ## 3. Elegir página, pantalla y período
 
@@ -24,10 +24,10 @@ El Panel conserva página, pantalla, período y tipo en la URL, de modo que pued
 
 ## 4. Capturar una referencia de página
 
-La captura obtiene una página pública de forma anónima y elimina scripts antes de mostrarla bajo el mapa. Consulte su estado antes de volver a solicitarla. Una referencia visual puede quedar desactualizada cuando cambia la página; no es una sesión grabada ni una captura autenticada del visitante.
+`POST /users/heatmap/sites/{site_id}/snapshot` obtiene una página pública de forma anónima, elimina scripts y copia dentro del documento las hojas de estilo que puede descargar, antes de mostrarla bajo el mapa. Un patrón como `/productos/[slug]` se captura desde una página concreta que ya recibió visitas; sin ninguna, la respuesta es `422`. Consulte su estado con `GET /users/heatmap/sites/{site_id}/snapshot` antes de volver a solicitarla. Una referencia visual puede quedar desactualizada cuando cambia la página; no es una sesión grabada ni una captura autenticada del visitante.
 
 ## 5. Pausar o rotar
 
-Para pausar la captura, actualice `enabled` mediante `PATCH /users/heatmap/sites/{site_id}`. Use la operación específica de rotación si necesita cambiar el token de captura. Rotar y pausar tienen efectos distintos; consulte los límites efectivos del espacio y las respuestas de la API antes de repetir una solicitud.
+Para pausar la captura, actualice `enabled` mediante `PATCH /users/heatmap/sites/{site_id}`. Use `POST /users/heatmap/sites/{site_id}/rotate-token` si necesita cambiar el token de captura: la etiqueta instalada no cambia, pero durante unos 5 minutos los navegadores que conservan la versión anterior envían el token viejo y esos lotes se descartan. Rotar y pausar tienen efectos distintos; consulte los límites efectivos del espacio y las respuestas de la API antes de repetir una solicitud.
 
 [Referencia de API → Mapas de calor](/api-reference/1platform-api#tag/heatmaps).

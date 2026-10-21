@@ -11,16 +11,16 @@ sidebar_position: 1
 ## Cómo funciona
 
 - **Un proyecto por cosa que mide.** Al crearlo recibe una dirección estable y **dos credenciales**: una pública, que viaja dentro de la etiqueta del sitio, y una secreta, para sus servidores. La secreta se muestra **una sola vez**, en la respuesta del alta; si la pierde, rótela. Rotar una credencial no cambia la dirección, así que la etiqueta ya pegada sigue sirviendo.
-- **La etiqueta la arma el servidor.** La lectura del proyecto trae `tag_snippet`, la línea exacta para el `<head>`.
+- **La etiqueta la arma el servidor.** La lectura del proyecto trae `tag_snippet`, la línea exacta para el `<head>`, o `null` si el entorno no tiene configurado el origen de recepción.
 - **Los eventos entran por un origen aparte**, separado de esta API, para que una ráfaga de errores en un sitio no frene el resto. Cada evento aceptado se cobra del saldo y lo que se rechaza (por tipo, tamaño o cuota) no se cobra. Los datos personales se eliminan antes de guardar nada.
 - **Las lecturas son del dueño del proyecto.** Un proyecto, grupo de errores o regla de otra cuenta responde `404`.
 - **Errores, rendimiento y registros.** Los errores se agrupan en grupos de errores (*issues*), cada uno con un id propio (`tlm_…`). Rendimiento y registros se piden en días hacia atrás, con un máximo de 30 y 6 días respectivamente.
-- **Avisos.** Una regla de alerta vigila una condición (`new_issue`, `event_burst` o `monitor_down`) y avisa al dueño, a las direcciones que confirmaron un doble opt-in y, si la configura, a un webhook verificado. Los monitores de disponibilidad comprueban una URL aunque no haya visitas.
+- **Avisos.** Una regla de alerta vigila una condición (`new_issue`, `event_burst` o `monitor_down`) y avisa al dueño, a las direcciones que confirmaron un doble opt-in y, si la configura, a un webhook verificado. Los monitores de disponibilidad comprueban una URL aunque no haya visitas. Monitores y webhooks hacen solicitudes salientes, que dependen de un interruptor de la plataforma: mientras esté apagado, crear un monitor o una regla con `webhook_url` responde `409` con `telemetry_egress_disabled`.
 
 ## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
-- Telemetría **encendida para su espacio de trabajo**. Viene apagada y la enciende el equipo de la plataforma; mientras tanto, todas las operaciones responden `403`.
+- Telemetría **encendida para su espacio de trabajo** y el módulo habilitado para el usuario. La controla el equipo de la plataforma; si está apagada, las operaciones responden `403` con `telemetry_disabled`, y sin el módulo, `403` con `module_disabled`.
 - **Saldo** para los eventos aceptados. Cada proyecto tiene cuota mensual y tope de gasto propios. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
 
 ## Operaciones
@@ -63,6 +63,8 @@ Cuando la plataforma actualiza su servidor, o cuando usted despliega lo suyo, es
 | `silence` | La regla no avisa mientras dura la ventana de la plataforma |
 
 La regla informa cuántos avisos retuvo en `silenced_count`, aparte de `suppressed_count`. Pasar una regla a `silence` responde `403` (`telemetry_impersonation_refused`) si ve la cuenta como otro usuario; volver a `alert` sí se permite.
+
+Las ventanas de silencio dependen de un interruptor propio de la plataforma, que nace apagado: mientras lo esté, sus operaciones responden `409` con `telemetry_silence_windows_disabled` y no se abren ventanas de despliegue.
 
 **Ventanas manuales.** Para su propio despliegue declare una con `POST /users/telemetry/projects/{project_id}/silence-windows`. Silencia **todas** las reglas del proyecto, incluidas las que vigilan el checkout.
 

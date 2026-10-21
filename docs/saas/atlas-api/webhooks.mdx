@@ -46,12 +46,13 @@ Una firma o un timestamp ausente o incorrecto responde `401 WEBHOOK_SIGNATURE_IN
 
 | `type` | Efecto en Atlas |
 |---|---|
-| `access.granted` | Concede el derecho de acceso de `data.scope` y `data.scope_ref`. |
+| `access.granted` | Concede el derecho de acceso de `data.scope` y `data.scope_ref`, con `data.expires_at` si lo envía. Para un plan con vencimiento, actualiza el vencimiento del derecho existente en lugar de duplicarlo (renovación). |
 | `access.revoked`, `subscription.cancelled`, `rental.expired` | Revocan el derecho de acceso de `data.scope_ref` (y de `data.scope`, si lo envía). |
 | `subscription.renewed`, `subscription.payment_failed`, `rental.started` | No cambian derechos de acceso; algunos disparan un correo al miembro. |
 
-Envíe sólo estos siete tipos. Atlas no procesa otro valor de `type` ni un cuerpo que no sea JSON, y no lo registra: no lo
-reintente, corrija el origen.
+Envíe sólo estos siete tipos, con `id`, `type`, `occurred_at` y `data`. Atlas no procesa otro valor de `type`, un cuerpo
+incompleto ni uno que no sea JSON: responde con un error sin registrarlo. Reintentarlo no lo arreglará, aunque el error
+sea `5xx`: corrija el origen.
 
 ## Qué garantiza Atlas
 
@@ -59,8 +60,11 @@ reintente, corrija el origen.
   `id` del cuerpo. Un reenvío del mismo identificador responde `2xx` con `deduplicated: true` sin volver a aplicar el
   cambio. Use un identificador estable por evento lógico para que sus reintentos sean seguros.
 - **Sin control de antigüedad.** Atlas no rechaza timestamps viejos; la protección contra reenvíos es la deduplicación.
-- **Un `2xx` significa que Atlas tiene el evento.** Reintente sólo ante `5xx` o un fallo de red. Los correos al miembro se
-  envían después de guardar el cambio y su fallo nunca convierte el webhook en un error.
-- **Los datos incompletos no se reprocesan.** Un evento sin `tenant_id` o `member_id`, una concesión sin `scope` o
-  `scope_ref`, o una revocación sin `scope_ref` se registra y responde `2xx` sin efecto. Como ya quedó registrado, reenviarlo
-  con el mismo identificador tampoco tendrá efecto: corrija el origen y envíe un evento nuevo.
+- **Un `2xx` significa que Atlas tiene el evento.** Reintente ante `5xx` o un fallo de red, salvo en el caso del cuerpo
+  inválido descrito arriba. Los correos al miembro se envían después de guardar el cambio y su fallo nunca convierte el
+  webhook en un error.
+- **Los datos incompletos no se reprocesan.** Un evento firmado correctamente pero sin `member_id`, una concesión sin
+  `scope` o `scope_ref`, o una revocación sin `scope_ref` se registra y responde `2xx` sin efecto. Como ya quedó
+  registrado, reenviarlo con el mismo identificador tampoco tendrá efecto: corrija el origen y envíe un evento nuevo. Un
+  evento sin `data.tenant_id` firmado con el secreto de su tenant no llega a ese punto: responde
+  `401 WEBHOOK_SIGNATURE_INVALID`.

@@ -41,7 +41,8 @@ Guarde el `id` de un ítem: es el `content_id` del paso 5.
 Los miembros inician sesión sin contraseña. Atlas envía un correo con un enlace que aterriza en el **sitio del tenant**
 (`/auth/verify?token=…`), o en el puente hacia la app nativa si pide `surface: "app"`. Sólo quien opera ese frente
 recibe el token, así que su frente debe leer el `token` de la URL y canjearlo en el paso 4
-([Autenticación](/docs/saas/atlas-api/authentication)).
+([Autenticación](/docs/saas/atlas-api/authentication)). El enlace es de un solo uso y vence a los 15 minutos por defecto;
+cada tenant puede configurar otro plazo.
 
 ```bash
 curl -s -X POST "$ATLAS_BASE/auth/magic-link" -H "X-Tenant-Slug: $TENANT_SLUG" \
@@ -70,8 +71,10 @@ curl -s "$ATLAS_BASE/delivery/items/<CONTENT_ID>/playback" \
   -H "X-Tenant-Slug: $TENANT_SLUG" -H "Authorization: Bearer $ATLAS_JWT"
 ```
 
-Sin acceso recibe `403 ENTITLEMENT_DENIED` (muestre el muro de suscripción) o `402 FREEMIUM_GATE_BLOCKED` (el miembro
-gratuito agotó su cuota). Cómo se concede el acceso: [Derechos de acceso](/docs/saas/atlas-api/entitlements).
+Sin acceso recibe `402 FREEMIUM_GATE_BLOCKED` (el miembro gratuito agotó su cuota diaria, que Atlas aplica salvo que el
+tenant la desactive) o `403 ENTITLEMENT_DENIED` (en un tenant sin cuota gratuita); en los dos casos, muestre el muro de
+suscripción. Cómo se concede el acceso:
+[Derechos de acceso](/docs/saas/atlas-api/entitlements).
 
 ## Siguientes pasos
 

@@ -22,18 +22,27 @@ sidebar_position: 1
 
 ### Correo del negocio
 
-1. Cree una dirección sobre un dominio de la cuenta (`local_part@dominio`). La plataforma publica los registros que necesita. Si el dominio ya recibe correo en otro servidor, la respuesta es `409` `mail_foreign_mx` y no se escribe nada en el DNS, para no interceptar el correo que el comercio ya usa. Un dominio externo todavía sin delegar queda en `awaiting_delegation`, que es un estado y no un error.
+1. Cree una dirección sobre un dominio de la cuenta (`local_part@dominio`). La plataforma publica los registros que necesita. Si el dominio ya recibe correo en otro servidor, la respuesta es `409` `mail_foreign_mx` y no se escribe nada en el DNS, para no interceptar el correo que el comercio ya usa. Si no se pudo consultar el DNS público, la respuesta es `503` `mail_mx_unverifiable`, que no equivale a «no hay correo». Un dominio externo todavía sin delegar queda en `awaiting_delegation`, que es un estado y no un error.
 2. Cada dirección tiene dos verificaciones independientes: recibir y enviar. Hasta que la de envío esté lista, iniciar o responder una conversación responde `409` `mail_send_not_verified`. En Correo, el código de error viaja en `code`, en la raíz de la respuesta, no dentro de `data`.
 3. Los correos entrantes forman **conversaciones** (`/mail/threads`), que lee, marca como leídas o archiva, y responde desde la dirección del comercio. Un mensaje enviado nace en `sent` y sólo pasa a entregado cuando el servidor de destino lo confirma.
-4. **Iniciar una conversación exige `Idempotency-Key`**, porque envía correo real a un cliente real. Si repite la clave, recibe la misma conversación y no se envía otro correo.
-5. Los adjuntos se suben primero con `POST /mail/attachments` (multipart) y en el envío se nombra la `key` que devuelve esa subida.
+4. **Iniciar una conversación exige `Idempotency-Key`**, porque envía correo real a un cliente real. Sin ella responde `422` `mail_idempotency_key_required`. Si repite la clave, recibe la misma conversación y no se envía otro correo.
+5. Los adjuntos se suben primero con `POST /mail/attachments` (multipart, un solo `file`) y en el envío se nombra la `key` que devuelve esa subida. Cada archivo tiene un tope configurable (10 MB por defecto): un tipo no admitido responde `415` y uno demasiado grande, `413`.
 6. Apagar el correo de un dominio entero (`DELETE /domains/{domain_id}/mail`) primero retira el registro de correo entrante, luego congela las conversaciones en sólo lectura y luego retira las direcciones. Las conversaciones no se borran.
+
+### Dominios sólo de correo {#dominios-solo-de-correo}
+
+Un dominio puede conectarse **sólo para correo**: su DNS sigue con usted y usted publica los registros. Esa conexión la hace el equipo de la plataforma; la API para integradores no ofrece una operación para crearla.
+
+1. `GET /domains/{domain_id}/mail/records` lista los registros que debe publicar en su DNS, cada uno con su último estado conocido. Para otros dominios la lista está vacía.
+2. `POST /domains/{domain_id}/mail/recheck` comprueba los registros en ese momento y activa las direcciones cuyos registros ya verificaron. La misma comprobación corre sola cada 10 minutos.
+
+La configuración asistida del DNS (`…/mail/dns-assist`) está **apagada por defecto** en la plataforma: mientras siga así, la consulta responde `available: false` y crear el enlace o iniciar la autorización responde `409` `dns_assist_disabled`. No la integre como disponible; copiar los registros a mano siempre funciona.
 
 ## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido). Dominios y direcciones son del usuario del token de usuario: el dominio de otro usuario responde `404`.
 - **Saldo** para registrar, transferir y renovar. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
-- Los módulos de Dominios y de Correo encendidos en su espacio de trabajo. Si están apagados, la respuesta es `403` o `503`.
+- Los módulos de Dominios y de Correo encendidos en su espacio de trabajo y asignados a su usuario. Si falta alguno, la respuesta es `403` con `module_disabled`; si el servicio de dominios o el correo del espacio están apagados, `503`.
 
 ## Operaciones
 
@@ -53,9 +62,11 @@ sidebar_position: 1
 | `POST /mail/threads` | Iniciar una conversación (con `Idempotency-Key`) |
 | `POST /mail/threads/{thread_id}/reply` | Responder desde la dirección del comercio |
 | `POST /mail/attachments` | Subir un adjunto y obtener su `key` |
+| `GET /domains/{domain_id}/mail/records` | Registros que necesita un dominio sólo de correo |
+| `POST /domains/{domain_id}/mail/recheck` | Comprobar ahora esos registros |
 
 Todas las operaciones: [Referencia de API → Domains](/api-reference/1platform-api#tag/domains) · [Referencia de API → Mail](/api-reference/1platform-api#tag/mail).
 
-El tag Mail incluye dos rutas que no llama usted: `POST /webhooks/mail/{route_token}` y `POST /webhooks/mail/{route_token}/delivery` son por donde el servicio de transporte entrega los mensajes entrantes y los avisos de entrega. `GET /mail/public/threads/{token}` abre en sólo lectura la conversación de un enlace de aviso, sin sesión.
+El tag Mail incluye tres rutas que no llama usted: `POST /webhooks/mail/{route_token}` y `POST /webhooks/mail/{route_token}/delivery` son por donde el servicio de transporte entrega los mensajes entrantes y los avisos de entrega, y `POST /webhooks/mail-provider/inbound` recibe los mensajes entrantes de los dominios sólo de correo. `GET /mail/public/threads/{token}` abre en sólo lectura la conversación de un enlace de aviso, sin sesión.
 
 - [Correo transaccional](/docs/saas/1platform-api/correo-transaccional)

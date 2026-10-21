@@ -13,20 +13,26 @@ sidebar_position: 1
 1. Cree el envío en un comercio indicando la sucursal (`branch_id`), el punto de entrega (`dropoff`) y el paquete. Nace en `draft`. El punto de recogida se **copia** de la sucursal en ese momento: si mañana cambia su dirección, el envío conserva la de salida.
 2. Mientras está en `draft` puede editarlo. Una vez despachado ya no se puede modificar.
 3. Lo despacha de una de dos formas (`mode`):
-   - `own_fleet`: asigna a uno de sus repartidores (`assignee`). Funciona de punta a punta sin terceros, y usted avanza el estado a `picked_up`, `delivered` o `failed`.
-   - `courier`: primero pide una **cotización** a la mensajería configurada. La cotización queda guardada en el servidor y el despacho la confirma, así que nunca envía el precio. Si una dirección no se puede cotizar, devuelva el envío a `draft`, corríjala y vuelva a cotizar.
-4. Puede cancelar cualquier envío que todavía no se entregó, incluso uno ya recogido. Si lo despachó una mensajería, la cancelación se pide primero a ella: si falla, el envío **no** se cancela y recibe el error.
-5. Para el destinatario existe un **rastreo público**: `GET /deliveries/tracking/{handle}` no lleva credenciales. El `handle` viene en el envío (`tracking_handle`) y es una derivación firmada, no el número de guía. La respuesta muestra sólo lo que el destinatario puede ver: estado y nombre de pila, sin dirección, teléfono ni precio. Cuando el envío termina, la respuesta trae `expires_at`; el enlace sigue funcionando hasta ese momento y después responde `410`.
+   - `own_fleet`: asigna a uno de sus repartidores (`assignee`). Funciona de punta a punta sin terceros, y usted avanza el estado con `POST …/status` a `picked_up`, `delivered` o `failed`. Un envío `dispatched` no pasa directo a `delivered`: primero se marca `picked_up` (responde `409`); `failed` sí se acepta desde `dispatched` o `picked_up`.
+   - `courier`: primero pide una **cotización** a la mensajería configurada. La cotización queda guardada en el servidor y el despacho la confirma, así que nunca envía el precio. Envíe `expected_quoted_at` (el `quote.quoted_at` que vio) para confirmar esa cotización y no otra: si la reemplazaron, responde `409` `delivery_quote_superseded` y no despacha. Si una dirección no se puede cotizar, devuelva el envío a `draft` con `POST …/return-to-draft`, corríjala y vuelva a cotizar.
+   - **Elección de mensajería.** Si la cotización lleva cuerpo (aunque sea `{}`), `quote.choice` lista las opciones de mensajería de la ruta, cada una con su precio, e indica cuál quedó elegida. Para cotizar con una en particular, envíe su `courier_id` con `courier_mode` `explicit` (sólo esa) o `preferred` (esa primero); `exclude_courier_ids` deja opciones fuera de la elección automática. Un `courier_id` que ya no se ofrece no es un error: elige la política y `choice_honored` vale `false`.
+4. Puede cancelar cualquier envío que todavía no se entregó ni falló, incluso uno ya recogido. Antes de ofrecer la acción, lea `can_cancel`, `cancel_blocked_reason` y `cancel_mode`, que dicen qué hará `POST …/cancel`:
+   - `immediate`: borradores, cotizaciones y envíos de flota propia se cancelan en el acto.
+   - `provider`: la cancelación se pide primero a la mensajería y sólo después se aplica aquí; si la mensajería la rechaza, el envío **no** se cancela y recibe `503`.
+   - `manual_request`: la mensajería no ofrece cancelación por API. Para un envío ya despachado, la llamada responde `200` con el envío **sin cambios** y una solicitud `cancel_request` pendiente, que atiende el equipo de la plataforma; el resultado llega al envío. Repetir la llamada mientras está pendiente devuelve la misma solicitud. Puede enviar un `reason` opcional.
 
-Estados: `draft`, `quoted`, `dispatched`, `picked_up`, `delivered`, `failed`, `cancelled`. El campo `fee` es una referencia informativa y no genera ningún cobro.
+   Un envío con mensajería que puede estar saliendo en ese momento (`cancel_blocked_reason: courier_cancellation_unavailable`) responde `503`: reintente cuando ya figure como despachado. Un envío `delivered`, `failed` o `cancelled` responde `409`.
+5. Para el destinatario existe un **rastreo público**: `GET /deliveries/tracking/{handle}` no lleva credenciales. El `handle` viene en el envío (`tracking_handle`) y es una derivación firmada, no el número de guía. La respuesta muestra sólo lo que el destinatario puede ver: estado, línea de tiempo, nombre del comercio y nombre de pila del destinatario, sin dirección, teléfono, coordenadas ni precio. Un `handle` inválido y un envío inexistente responden el mismo `404`. Cuando el envío termina, la respuesta trae `expires_at` (por defecto, 7 días después de terminar); el enlace sigue funcionando hasta ese momento y después responde `410` `tracking_expired`.
+
+Estados: `draft`, `quoted`, `dispatched`, `picked_up`, `delivered`, `failed`, `cancelled`. El campo `fee` es una referencia informativa y no genera ningún cobro. En Envíos, el código de error viaja dentro de `data` (`data.code`), no en la raíz de la respuesta.
 
 ## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
 - Un **comercio** con al menos una **sucursal** que tenga punto de recogida configurado. Sin él, crear el envío responde `409`. Ver [Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches).
 - Rol de **administrador de la sucursal** para crear, editar, cotizar, despachar, avanzar o cancelar. Leer sólo requiere acceso al comercio.
-- El módulo de Envíos encendido en su espacio de trabajo (si está apagado, la respuesta es `403` o `503`).
-- Para el modo `courier`, una mensajería configurada en su espacio de trabajo. Sin ella, cotizar y despachar con `courier` responden `503`. Las ciudades que acepta salen de `GET /deliveries/geo/states`: envíe el `code` de la ciudad como `city_code` del punto de entrega y el envío hereda sus coordenadas.
+- El módulo de Envíos asignado a su usuario (si no, `403` con `module_disabled`) y Envíos encendido en su espacio de trabajo (si está apagado, `503`).
+- Para el modo `courier`, una mensajería configurada en su espacio de trabajo. Sin ella, cotizar y despachar con `courier` responden `503` y `GET /deliveries/geo/states` responde `404`. Las ciudades que acepta salen de ese catálogo: envíe el `code` de la ciudad como `city_code` del punto de entrega y el envío hereda sus coordenadas. Donde el catálogo tiene un tercer nivel de dirección, el punto de entrega necesita además su `area_code`; sin él, `can_quote` queda en `false`.
 
 ## Operaciones
 

@@ -33,6 +33,8 @@ curl -X POST "$BASE_URL/transactional-email/messages" \
 
 `202` confirma admisión en la cola. Guarde `data.id` como `$MESSAGE_ID`; todavía no confirma entrega. Un replay idéntico devuelve `200` con el mismo mensaje y sin nueva cuota. La misma clave con otro contenido devuelve `409`. Si pierde la respuesta o recibe `503`, repita **la misma clave y el mismo contenido**; no genere otro evento para resolver un timeout.
 
+Otros rechazos: `422` si el remitente no tiene verificado el envío (`sender_not_verified`) o el dominio de la acción no está verificado (`action_domain_not_verified`), y `429` si se agotó el cupo diario o el límite por minuto, con `Retry-After`. En este servicio el código de error viaja en `code`, en la raíz de la respuesta.
+
 [Referencia de API → Admitir mensaje](/api-reference/1platform-api#operation/createTransactionalEmailMessage).
 
 ## 4. Consultar resultado e historial

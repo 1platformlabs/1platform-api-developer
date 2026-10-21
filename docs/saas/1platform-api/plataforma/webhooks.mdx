@@ -8,7 +8,7 @@ sidebar_position: 3
 
 1Platform le llama a usted —no al revés— cada vez que una transacción llega a un estado final. El orden que importa
 aquí no es de llamadas sino de garantías: registre antes de que se dispare nada, verifique antes de confiar,
-responde rápido antes de procesar y sabe qué pasa si su backend no contesta. Sin verificar la firma, cualquiera
+responda rápido antes de procesar y sepa qué pasa si su backend no contesta. Sin verificar la firma, cualquiera
 podría simularle un pago aprobado con un POST a su propio endpoint.
 
 **Quién configura los webhooks.** La configuración es de todo el espacio de trabajo, así que la hace un
@@ -37,14 +37,17 @@ El **primer** dominio que registra crea el secreto de firma del espacio de traba
 sin esquema, puerto ni ruta (`hooks.example.com`).
 
 Verificar el dominio por DNS es **opcional**: un dominio registrado ya recibe eventos. Si controla su zona DNS y
-quiere dejar constancia, publique el registro TXT que le indica la respuesta y llama a
+quiere dejar constancia, publique el registro TXT que le indica la respuesta y llame a
 `POST /webhooks/config/domains/{domain}/verify`.
+
+Si elimina un dominio con `DELETE /webhooks/config/domains/{domain}`, los eventos cuya URL apuntaba a ese host
+quedan sin configurar en la misma operación: vuelva a asignarlos en el paso 2 si los necesita.
 
 | Código | Causa |
 |---|---|
 | 400 | El dominio no es válido (incluye esquema o puerto, no tiene dominio de nivel superior o es una IP privada) |
 | 409 | El dominio ya está registrado; consúltelo con `GET /webhooks/config/` en vez de reintentar |
-| 422 | El espacio de trabajo llegó al máximo de dominios registrados |
+| 422 | El espacio de trabajo llegó al máximo de 10 dominios registrados |
 
 [Referencia de API → Webhook Configuration](/api-reference/1platform-api#tag/webhook-configuration)
 
@@ -63,7 +66,8 @@ curl -X PUT "$BASE_URL/webhooks/config/events" \
 ```
 
 Sólo cambian los eventos que envía: los que omite conservan su configuración, y `null` en un evento lo elimina.
-Repetir la misma llamada deja el mismo estado. La URL debe ser `https://` y se usa tal cual, con su query string;
+Repetir la misma llamada deja el mismo estado. `method` admite `GET`, `POST`, `PUT` o `PATCH` y, si lo omite, se usa
+`POST`. La URL debe ser `https://` y se usa tal cual, con su query string;
 de ella sólo se compara el host con los dominios registrados. El objeto opcional `headers` viaja en cada intento
 de entrega (hasta 20 por evento) y sirve para atravesar una protección de acceso delante de su receptor; los nombres
 reservados, como `Authorization`, `Content-Type`, `Host`, `X-Webhook-Signature` o `X-Webhook-Timestamp`, se rechazan
@@ -71,15 +75,16 @@ al guardar.
 
 | Código | Causa |
 |---|---|
-| 400 | La URL o su dominio no son válidos |
-| 422 | El host de la URL no está registrado (regístrelo en el paso 1). Si la URL no es `https://` o un header usa un nombre reservado, el `422` llega con la forma `detail` |
+| 422 | El host de la URL no está registrado (regístrelo en el paso 1). Si la URL no es `https://`, no tiene host o un header usa un nombre reservado, el `422` llega con la forma `detail` |
 
 [Referencia de API → Webhook Configuration](/api-reference/1platform-api#tag/webhook-configuration)
 
 ## Paso 3 — Recibir la entrega
 
-Con dominio y eventos configurados, su endpoint recibe un POST firmado cada vez que una transacción llega a un
-estado final, o cuando un pago aprobado se reembolsa o se revierte. El estado inicial `created` nunca se notifica.
+Con dominio y eventos configurados, su endpoint recibe una solicitud firmada —con el método que eligió en `method`,
+`POST` por defecto— cada vez que una transacción llega a un estado final, o cuando un pago aprobado se reembolsa o se
+revierte. El estado inicial `created` nunca se notifica. Las recargas de su propio saldo y los cobros de
+[Links de pago](/docs/saas/1platform-api/links-de-pago) no se envían a estas URLs.
 El cuerpo **no** viene en el sobre `{success, data, msg}` del resto de la API: es un objeto plano, el cuerpo
 canónico o el que definió con `body_template`. Su forma, los estados y cómo llevarlos a su propia máquina de
 estados están en [Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).
@@ -107,7 +112,7 @@ redirigir. Un `4xx` también es una falla y se reintenta igual que un `5xx`. El 
 
 La entrega usa **reintentos limitados**: puede haber duplicados y eventos no entregados. Requiere conciliación. El envío existente reintenta dentro de su despacho y no ofrece una cola histórica de reenvío. Concilie periódicamente mediante `GET /users/transactions` como indica [Cobrar y conciliar](/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar).
 
-Si su espacio tiene habilitado el historial durable, consulte estados, intentos y elegibilidad de recuperación en [Entrega y recuperación de webhooks](/docs/saas/1platform-api/plataforma/webhooks-entregas). Ese modo conserva un `X-1Platform-Event-Id` estable y firma cada intento con timestamp nuevo. Use el identificador para deduplicar; no confunda un replay con una transacción nueva.
+Si la plataforma tiene habilitado el historial durable —es un interruptor del servicio, no una opción que active su espacio—, consulte estados, intentos y elegibilidad de recuperación en [Entrega y recuperación de webhooks](/docs/saas/1platform-api/plataforma/webhooks-entregas). Ese modo conserva un `X-1Platform-Event-Id` estable y firma cada intento con timestamp nuevo. Use el identificador para deduplicar; no confunda un replay con una transacción nueva.
 
 [Referencia de API → Payments](/api-reference/1platform-api#tag/payments)
 

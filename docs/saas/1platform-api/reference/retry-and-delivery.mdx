@@ -18,7 +18,7 @@ Deduplique antes de aplicar efectos y consulte periódicamente las transacciones
 <thead><tr><th>Aspecto</th><th>Envío existente</th><th>Historial durable habilitado</th></tr></thead>
 <tbody>
 <tr><td>Recuperación</td><td>Reintentos dentro del despacho; no cola histórica de reenvío</td><td>Intención persistida, historial e intentos recuperables</td></tr>
-<tr><td>Calendario inicial</td><td>3 intentos: inmediato, tras 5 s y tras 30 s adicionales</td><td>Por defecto 3 intentos, con backoff de 30/120 s y variación acotada</td></tr>
+<tr><td>Calendario inicial</td><td>3 intentos: inmediato, tras 5 s y tras 30 s adicionales</td><td>Por defecto 3 intentos dentro de un ciclo de hasta 24 h, con backoff de 30/120 s y variación acotada; el primero sale en un ciclo posterior del despachador, no dentro del cambio de estado</td></tr>
 <tr><td>Reenvío manual</td><td>No disponible</td><td>Sólo fallos elegibles dentro de la retención y los límites configurados</td></tr>
 <tr><td>Firma y timestamp</td><td>Conservados durante el despacho existente</td><td>Nuevos por intento, usando el secreto vigente</td></tr>
 <tr><td>Identidad durable</td><td>Deduplicación por transacción y evento</td><td>Header estable <code>X-1Platform-Event-Id</code>, con el mismo payload</td></tr>
@@ -34,10 +34,11 @@ El historial durable y su despacho necesitan habilitación; no dé por hecho el 
 | `2xx` | Entrega confirmada al receptor; termine el efecto comercial mediante su propia cola |
 | `3xx` | No se sigue la redirección; el intento falla |
 | `4xx`, `429`, `5xx` | Se registra el fallo y se aplican los reintentos limitados |
-| Error de conexión, DNS o timeout | Fallo de transporte; no demuestra que el receptor no procesó la petición |
+| Error de conexión o timeout | Fallo de transporte; se reintenta igual que un `5xx` y no demuestra que el receptor no procesó la petición |
 | Destino revocado o no autorizado | La entrega durable queda bloqueada; no se redirige a una URL nueva |
+| Nombre que no resuelve o que resuelve a una dirección no pública, o URL fuera de `https` en el puerto 443 | En modo durable la entrega queda `blocked` sin reintento automático ni manual |
 
-Responda `200` o `202` después de guardar de forma durable la recepción y antes del trabajo pesado. El timeout inicial por intento es de 10 segundos. Una respuesta rápida sin registrar el evento no protege a su aplicación de una caída posterior.
+Responda `200` o `202` después de guardar de forma durable la recepción y antes del trabajo pesado. El tiempo de espera de cada intento es de 10 segundos. Una respuesta rápida sin registrar el evento no protege a su aplicación de una caída posterior.
 
 ## Carga, pausas y agotamiento
 

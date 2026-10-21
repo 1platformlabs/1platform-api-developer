@@ -29,8 +29,11 @@ const BOOT_JS_BUDGET = 180 * 1024;
 // pays). Measured 2026-10-01: origin/main 378,806 gzip bytes over 38 docs; the
 // per-product reorganisation 416,177 over 50 docs. SRV-07 adds nine guide
 // pages and one product category (2026-10-06): 445,308 gzip bytes over 62 docs (53 in the base).
+// The 2026-10-20 code-grounded audit corrected all 63 pages: 468,566 gzip bytes
+// (453,307 before), the growth spread over per-page doc chunks; main.js and
+// runtime~main.js did not grow. Raised to 470 KiB by owner decision.
 // This content allowance does not raise the boot or CSS budgets.
-const TOTAL_JS_BUDGET = 450 * 1024;
+const TOTAL_JS_BUDGET = 470 * 1024;
 const CSS_BUDGET = 25 * 1024;
 
 const SNAPSHOT_REQUIREMENTS = [

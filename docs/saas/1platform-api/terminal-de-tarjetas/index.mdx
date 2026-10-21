@@ -10,7 +10,7 @@ sidebar_position: 1
 
 ## Disponibilidad
 
-El **alta de terminal está disponible** para espacios habilitados. El **cobro presencial está en preparación**: abrir o aprobar una solicitud y obtener un código de activación no equivale a disponer de una API para hacer cargos con tarjeta presente.
+El **alta de terminal está disponible** para espacios habilitados. El **cobro presencial está en preparación**: abrir o aprobar una solicitud y obtener un código de activación no equivale a disponer de una API para hacer cargos con tarjeta presente. No existe una operación para cobrar con la terminal. Lo que la API prevé es recibir los cobros que la terminal ya hizo: un administrador del espacio de trabajo vincula la solicitud aprobada con los identificadores de la terminal y el equipo de la plataforma confirma esa conexión. Desde entonces, cada cobro aparece en el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros) con el canal `terminal`. Que ese dinero se acredite a su saldo retirable depende de una habilitación de la plataforma, apagada por defecto. Confirme con la plataforma el estado de su espacio antes de prometer cobros presenciales.
 
 ## Cómo funciona
 
@@ -20,12 +20,12 @@ El **alta de terminal está disponible** para espacios habilitados. El **cobro p
 4. La solicitud avanza por estos estados:
    - `draft`: la está editando.
    - `submitted`: ya está en manos del proveedor.
-   - `submit_failed`: el envío falló. Puede reintentarlo.
+   - `submit_failed`: el envío falló. Puede corregir y reintentarlo.
    - `needs_info`: piden correcciones. Vuelva a ser editable.
    - Estados finales: `approved`, `rejected` o `cancelled` (la retiró usted).
 5. Cuando la solicitud llega a `approved`, el detalle trae el **código de activación**. El comercio instala la app de la terminal desde el enlace a la tienda y la activa con ese código.
 
-Un administrador del espacio de trabajo registra el resultado de cada solicitud enviada. Lo hace con las operaciones `/admin/terminal-requests` del mismo tag. Si su integración es el comercio, no las necesita: consulte el estado de su solicitud.
+Un administrador del espacio de trabajo registra el resultado de cada solicitud enviada y, ya aprobada, la vincula con los identificadores de la terminal (`PUT /admin/terminal-requests/{requestId}/connection`). Lo hace con las operaciones `/admin/terminal-requests` del mismo tag. Si su integración es el comercio, no las necesita: consulte el estado de su solicitud.
 
 ## Qué necesita {#qué-necesitas}
 
@@ -40,7 +40,7 @@ Un administrador del espacio de trabajo registra el resultado de cada solicitud 
 | Operación | Para qué |
 |---|---|
 | `POST /businesses/{businessId}/terminal-requests` | Abrir la solicitud |
-| `PATCH /businesses/{businessId}/terminal-requests/{requestId}` | Corregir los datos mientras está en `draft` o `needs_info` |
+| `PATCH /businesses/{businessId}/terminal-requests/{requestId}` | Corregir los datos mientras está en `draft`, `needs_info` o `submit_failed` |
 | `POST /businesses/{businessId}/terminal-requests/{requestId}/documents` | Adjuntar un documento (`multipart/form-data` con `kind` y `file`) |
 | `POST /businesses/{businessId}/terminal-requests/{requestId}/submit` | Enviar la solicitud completa |
 | `GET /businesses/{businessId}/terminal-requests/{requestId}` | Ver el estado, lo que falta y, si se aprobó, el código de activación |

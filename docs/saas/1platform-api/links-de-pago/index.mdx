@@ -11,19 +11,22 @@ sidebar_position: 1
 ## Cómo funciona
 
 1. Cree el link para un **comercio** con el monto y el concepto. La moneda la decide el servidor: es la del comercio. La respuesta trae `url`, el enlace público que comparte.
-2. Si envía `customer_email`, el link se le manda por correo a ese cliente en cuanto se crea. Esa misma dirección recibe después el comprobante.
+2. Si envía `customer_email`, el link se le manda por correo a ese cliente en cuanto se crea, salvo que su espacio de trabajo haya desactivado ese envío. Esa misma dirección recibe después el comprobante.
 3. El cliente abre el enlace. Si el link está activo, lo redirige al checkout. Si ya está pagado, cancelado o vencido, ve una página con ese estado.
 4. El link vive en uno de cuatro estados. Mientras no lo pagan está `active`. Después termina en `paid`, `cancelled` (lo canceló usted) o `expired` (pasó su vigencia, que fija en días, en horas o con una fecha exacta). Los tres son finales.
-5. Lo cobrado con un link se acredita a su **saldo retirable** cuando la plataforma confirma el pago. Mientras no lo confirma, el monto puede aparecer en `pending_verification` de `GET /users/cash-out/summary` y todavía no puede retirarlo; si no se confirma a tiempo, se acredita como saldo prepagado, que no se retira (lo cuenta `frozen_collections`). Ver [Retiros](/docs/saas/1platform-api/retiros).
+5. A qué saldo va lo cobrado depende de su cuenta:
+   - Con [Retiros](/docs/saas/1platform-api/retiros) encendido, se acredita a su **saldo retirable** cuando la plataforma confirma el pago. Mientras no lo confirma, el monto aparece en `pending_verification` de `GET /users/cash-out/summary` y todavía no puede retirarlo. Si no se confirma a tiempo, se acredita como saldo prepagado (lo cuenta `frozen_collections`); pasado el periodo de espera de su espacio de trabajo, usted puede moverlo al saldo retirable desde Retiros.
+   - Con Retiros apagado, se acredita como saldo prepagado.
+   - Si el cobro entró por una cuenta de cobro propia de su comercio, el dinero ya llegó a esa cuenta y no se acredita a ningún saldo.
 
 Los pagos con link **no** disparan los webhooks de transacción de [Pagos en línea](/docs/saas/1platform-api/pagos-en-linea). Para saber si un link se pagó, consulte su estado o el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros).
 
 ## Qué necesita {#qué-necesitas}
 
 - Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
-- Un **comercio** con su sucursal, donde sea dueño o administrador ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si sólo tiene rol de lectura en la sucursal, crear o cancelar responde `403`.
+- Un **comercio** con su sucursal, donde tenga rol de administrador o de cajero, o ser administrador del espacio de trabajo ([Referencia de API → Businesses & Branches](/api-reference/1platform-api#tag/businesses-branches)). Si sólo tiene rol de lectura en la sucursal, crear o cancelar responde `403`.
 - El módulo de Links de pago encendido para su espacio de trabajo y asignado a su cuenta. Si falta, recibe `403` con `data.code` = `module_disabled`.
-- Una pasarela de pago activa. Si no la hay, la creación responde `422`.
+- Una pasarela de pago activa. Si no la hay, la creación responde `422` con `data.code` = `PAYMENT_GATEWAY_NOT_CONFIGURED`. El monto no puede superar el tope de su espacio de trabajo; si lo supera, también responde `422`.
 - No necesita tener activa la [Facturación electrónica](/docs/saas/1platform-api/facturacion-electronica) para cobrar con links. Si la Referencia de API todavía lista un `409` `business_not_activated` en la creación del link, ya no se produce.
 
 ## Vigencia del link {#vigencia}
@@ -43,7 +46,7 @@ Los tres son excluyentes entre sí. Estos son los rechazos:
 | `422` | `expires_at` no trae zona horaria | Envíe la fecha con `Z` o con su desfase (`-06:00`) |
 | `400` con el campo `expires_at` | Va junto con `expires_in_hours` o `expires_in_days` | Envíe sólo uno de los tres |
 | `400` con el campo `expires_at` | La fecha ya pasó | Envíe una fecha futura |
-| `400` con el campo `expires_at` | La fecha supera el tope de vigencia de su espacio de trabajo (90 días por defecto) | Elija una fecha dentro del tope |
+| `400` con el campo `expires_at` | La fecha supera el tope de vigencia de su espacio de trabajo (90 días por defecto; el tope vigente viaja en `data.max_days`) | Elija una fecha dentro del tope |
 
 `expires_in_hours` y `expires_in_days` también tienen ese tope y no pueden enviarse juntos.
 

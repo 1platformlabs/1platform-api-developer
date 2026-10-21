@@ -48,15 +48,17 @@ curl -X POST "$BASE_URL/users" \
 Guarde `data.api_key` como `$USER_API_KEY` en un lugar seguro: es la credencial de ese usuario en este flujo.
 `currency` es opcional; si la omite, el saldo principal del usuario usa la primera moneda del catálogo de su
 espacio de trabajo. Un `409` indica que ese correo ya tiene cuenta: la API no devuelve la clave de un usuario
-existente, así que pídele que entre por enlace mágico (paso 4) o que cree su propia clave de usuario desde la
-sección **API** del Panel. Un `400` indica que el correo no tiene un formato válido.
+existente, así que pídale que entre por enlace mágico (paso 4) o que cree su propia clave de usuario desde la
+sección **API** del Panel. Un `400` indica que el correo no tiene un formato válido. Un `403` con `data.code`
+`registration_closed` indica que su espacio de trabajo no acepta registros nuevos.
 
 :::warning[La clave del alta se renueva cuando la persona verifica su correo]
 Si después la misma persona **entra al Panel con un enlace mágico** (es decir, verifica que el correo es
 suyo), en ese primer ingreso la plataforma desactiva todas las credenciales emitidas antes de la
 verificación —incluida la `api_key` que devolvió este paso y cualquier credencial creada con ella— y emite
-una nueva que no se entrega por la API. Desde ese momento `POST /users/token` con la clave anterior responde
-`401`.
+una nueva que no se entrega por la API. Los tokens de usuario emitidos hasta entonces dejan de valer, y se
+desactiva lo que esa cuenta había configurado para enviar datos hacia afuera, como webhooks de agentes, reglas
+de alerta o monitores. Desde ese momento `POST /users/token` con la clave anterior responde `401`.
 
 Es una protección: como el token de aplicación es público, cualquiera podría dar de alta el correo de otra
 persona y quedarse con su clave. Si su integración guarda la `api_key` del alta, no combine ese flujo con que
@@ -79,9 +81,9 @@ curl -X POST "$BASE_URL/users/token" \
 ```
 
 Guarde `data.access_token` como `$USER_TOKEN`. La clave de usuario es reutilizable: cada vez que necesite un token
-nuevo vuelve a este canje, nunca a crear el usuario. El límite de este canje es de 10 por minuto **por token de
+nuevo vuelva a este canje, nunca a crear el usuario. El límite de este canje es de 10 por minuto **por token de
 aplicación**, y lo comparten todos los usuarios que canjea con ese mismo token: canjee una vez por usuario y
-reutiliza el resultado (ver [Mantener los tokens vigentes](#cache-de-tokens)).
+reutilice el resultado (ver [Mantener los tokens vigentes](#cache-de-tokens)).
 
 [Referencia de API → Users & Tokens](/api-reference/1platform-api#tag/users-tokens)
 
@@ -98,13 +100,18 @@ curl -X POST "$BASE_URL/auth/user/magic-link/request" \
   -d '{"email": "'"$USER_EMAIL"'"}'
 ```
 
-La respuesta es siempre `200` y no confirma si el correo existe, para que nadie pueda averiguar qué cuentas hay. El
-enlace del correo abre la ruta `/auth/verify?token=…` del panel de su espacio de trabajo y vence a los 10 minutos.
+La respuesta es siempre `200` y no confirma si el correo existe, para que nadie pueda averiguar qué cuentas hay. Si
+el correo no tiene cuenta en el espacio de trabajo, la solicitud la crea, salvo que el espacio no acepte registros
+nuevos; en ese caso no se crea nada ni sale ningún correo. El enlace del correo abre la ruta `/auth/verify?token=…` del panel de su espacio de trabajo y vence a los 10 minutos.
 La página que recibe ese `token` lo canjea con `POST /auth/user/magic-link/verify` (token de aplicación, cuerpo
 `{"token": "…"}`), que devuelve un `access_token` —se usa como token de usuario— y un `refresh_token`.
 
 - `410`: el enlace ya se usó o venció. Pida uno nuevo; no repita la verificación.
+- `400` con `data.code` `magic_link_invalid`: el enlace no se puede canjear en este Panel (está mal formado, es de
+  otro entorno o de otro espacio de trabajo). Pida uno nuevo desde el Panel al que quiere entrar.
 - `403` con `data.code` `account_inactive`: un administrador desactivó la cuenta.
+- `403` con `data.code` `workspace_mismatch`: el enlace se abrió en el Panel con marca propia de otro espacio de
+  trabajo. En los dos `403` el enlace no se consume.
 - `429` en la solicitud: superó 10 solicitudes por minuto desde su servidor. Aparte, cada dirección recibe como
   máximo 3 enlaces cada 10 minutos; pasado ese tope la llamada sigue respondiendo `200` pero el correo no sale, así
   que no reintente en bucle.
@@ -125,6 +132,10 @@ curl "$BASE_URL/users/profile" \
 Un `401` indica que alguno de los dos tokens falta, venció o no es válido: repita el paso que lo generó. A partir
 de aquí, todas las operaciones protegidas se llaman con estos mismos dos headers.
 
+Algunas operaciones del Panel, como la bandeja de [avisos](/docs/saas/1platform-api/plataforma/avisos), exigen
+además que la persona haya verificado su correo entrando al menos una vez con un enlace mágico. Para un usuario que
+sólo existe por los pasos 2 y 3 responden `403`.
+
 [Referencia de API → My Profile](/api-reference/1platform-api#tag/my-profile)
 
 ## Paso 6 — Renovar y cerrar la sesión
@@ -140,12 +151,12 @@ curl -X POST "$BASE_URL/auth/user/refresh" \
 ```
 
 Cada renovación invalida el `refresh_token` anterior. Un `409` indica que se presentó uno ya usado: trátelo como un
-posible robo de sesión y vuelve a autenticar a la persona. Un `401` indica que el `refresh_token` venció. Para cerrar
+posible robo de sesión y vuelva a autenticar a la persona. Un `401` indica que el `refresh_token` venció. Para cerrar
 la sesión, llame a `POST /auth/user/logout` con los dos tokens en los headers y, en el cuerpo, el token que quiere
 revocar (`{"token": "…"}`).
 
 En el camino servidor a servidor (pasos 2 y 3) no hay nada que renovar: para cortar todas las sesiones de un
-usuario llama a `POST /users/revoke-tokens` con sus dos tokens. Todo token de usuario emitido hasta ese momento deja
+usuario llame a `POST /users/revoke-tokens` con sus dos tokens. Todo token de usuario emitido hasta ese momento deja
 de valer y hace falta un canje nuevo (paso 3).
 
 Guarde los `refresh_token` en cookies `httpOnly` seguras o en el almacenamiento seguro del sistema (Keychain,

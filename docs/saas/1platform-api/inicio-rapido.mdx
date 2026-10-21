@@ -28,13 +28,14 @@ Las claves se piden desde el **Panel** de su espacio de trabajo, en la sección 
    sola vez** (por API, `POST /me/api-credentials/{credential_id}/reveal`). Guárdelo en su gestor de secretos antes
    de cerrar la pantalla: no hay forma de volver a leerlo.
 4. **Cree su clave de usuario (`sk-…`).** Con el acceso concedido, cada usuario crea las suyas (por API,
-   `POST /me/api-credentials`). También se muestra una sola vez; si la pierde, cree otra y elimina la anterior.
+   `POST /me/api-credentials`). También se muestra una sola vez; si la pierde, cree otra y elimine la anterior.
 
 Si su backend da de alta a sus propios usuarios, la clave de usuario de cada uno la devuelve el alta
 (`POST /users`); ese camino está en [Autenticación](/docs/saas/1platform-api/plataforma/autenticacion). Si quiere
-que el alta incluya una primera recarga pagada, use `POST /onboarding/`: devuelve una URL de pago, la cuenta se crea
-cuando el pago se confirma y la clave de usuario se obtiene **una sola vez** consultando
-`GET /onboarding/status/{session_id}` hasta que el estado sea `completed` o `failed`.
+que el alta incluya una primera recarga pagada, use `POST /onboarding/`: devuelve una URL de pago y un `session_id`, la
+cuenta queda activa cuando el pago se confirma y la clave de usuario se obtiene consultando
+`GET /onboarding/status/{session_id}` hasta que el estado sea `completed` o `failed`. Cada consulta de una sesión
+completada vuelve a devolver la clave, así que guarde el `session_id` como un secreto.
 
 :::info[Requisito: el módulo de API]
 Si la sección **API** no aparece en su Panel, o las llamadas anteriores responden `403` con `data.code`
@@ -100,8 +101,9 @@ curl "$BASE_URL/users/profile" \
 ```
 
 Las respuestas de la API usan el sobre `{success, data, msg}`: lo que pidió viaja en `data`. Hay dos excepciones
-que su cliente debe tolerar: los errores de validación (`422`) y los rechazos de autenticación o de rol (todo `401`
-y algunos `403`) responden con un objeto `detail` en lugar del sobre. Las formas exactas están en
+que su cliente debe tolerar: los errores de validación (`422`) y los rechazos de los tokens o del rol en las
+operaciones protegidas (sus `401` y algunos `403`) responden con un objeto `detail` en lugar del sobre. Los canjes de
+claves (`/auth/token` y `/users/token`) responden su `401` con el sobre. Las formas exactas están en
 [Formato de respuesta](/docs/saas/1platform-api/reference/response-format).
 
 Un `401` indica que alguno de los dos tokens falta, venció o no es válido: vuelva a canjear el que corresponda. Un

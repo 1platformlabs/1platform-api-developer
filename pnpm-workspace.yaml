@@ -12,3 +12,48 @@ allowBuilds:
   core-js-pure: false
 patchedDependencies:
   '@easyops-cn/docusaurus-search-local@0.55.2': patches/@easyops-cn__docusaurus-search-local@0.55.2.patch
+
+# Parches de seguridad de dependencias TRANSITIVAS (PR fix/security-deps-2026-10,
+# `pnpm audit --prod` 2026-10-23). Cada selector acota la versión vulnerable a su
+# major actual y la sube al último parche de ese mismo major: ninguno cambia de
+# major salvo los dos marcados abajo. Casi todo esto es tooling de BUILD
+# (webpack, babel, postcss, dev-server); el sitio se sirve como estáticos desde
+# nginx y ningún paquete de esta lista corre en producción. Al subir Docusaurus,
+# borrar las entradas que el árbol nuevo ya resuelva por sí solo.
+overrides:
+  '@babel/plugin-transform-modules-systemjs@7': ^7.29.8
+  ajv@6: ^6.15.0
+  ajv@8: ^8.20.0
+  baseline-browser-mapping@2: ^2.11.32
+  body-parser@1: ^1.20.9
+  brace-expansion@1: ^1.1.21
+  browserslist@4: ^4.29.4
+  compression@1: ^1.8.2
+  fast-uri@3: ^3.1.9
+  http-cache-semantics@4: ^4.3.0
+  image-size@2: ^2.0.4
+  joi@17: ^17.13.8
+  js-yaml@3: ^3.15.2
+  js-yaml@4: ^4.3.2
+  launch-editor@2: ^2.14.2
+  lodash@4: ^4.18.1
+  minimatch@3: ^3.1.5
+  nanoid@3: ^3.3.20
+  nanoid@5: ^5.1.16
+  path-to-regexp@0.1: ^0.1.13
+  picomatch@2: ^2.3.2
+  postcss@8: ^8.5.31
+  proxy-addr@2: ^2.0.8
+  shell-quote@1: ^1.12.0
+  source-map-js@1: ^1.2.2
+  svgo@3: ^3.3.5
+  undici@7: ^7.30.1
+  websocket-driver@0: ^0.7.5
+  ws@7: ^7.5.13
+  ws@8: ^8.22.0
+  zod@4: ^4.6.7
+  # Cambian de MAJOR (Docusaurus 3.9.2 pide ^6 y ^1). Misma API para el uso que
+  # hace el build; probado con `pnpm build` y con el pool de SSG forzado a 2
+  # hilos (DOCUSAURUS_SSG_WORKER_THREADS=2). Engines Node ^20 || >=22.
+  serialize-javascript@6: ^7.1.4
+  tinypool@1: ^2.2.0

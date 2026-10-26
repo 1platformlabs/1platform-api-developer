@@ -20,6 +20,40 @@ const guide = '/docs/saas/1platform-api/inicio-rapido';
 const home = '/docs/saas/1platform-api/getting-started';
 const reference = '/api-reference/1platform-api';
 
+async function checkAccess(browser) {
+  const page = await browser.newPage();
+  await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+  try {
+    for (const width of [320, 390, 844, 1291, 1440]) {
+      await page.setViewportSize({width, height: 900});
+      await page.goto(origin + home);
+      await page.locator('html[data-has-hydrated="true"]').waitFor();
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px: overflow`);
+      const desktop = page.locator('.navbar__items .navbar__access');
+      if (width > 1290) {
+        assert.ok(await desktop.isVisible(), `${width}px: desktop access`);
+        assert.ok(await desktop.evaluate(element => {
+          const rect = element.getBoundingClientRect();
+          return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+        }), `${width}px: access must not be occluded`);
+      } else {
+        const toggle = page.locator('.navbar__toggle');
+        await toggle.click();
+        const menu = page.locator('.navbar-sidebar');
+        const back = menu.locator('.navbar-sidebar__back');
+        if (await back.isVisible()) await back.click();
+        const access = menu.locator('a.navbar__access');
+        await access.waitFor({state: 'visible'});
+        assert.equal(await access.getAttribute('href'), 'https://1platform.pro/es/acceso/');
+        await page.keyboard.press('Escape');
+        assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
+      }
+      assert.equal(await page.locator('footer a[href="https://1platform.pro/es/acceso/"]').count(), 1);
+    }
+    console.log('ok   shared access navigation and Escape at 320/390/844/1291/1440px');
+  } finally { await page.close(); }
+}
+
 async function wordLines(page) {
   return page.locator('.docs-masthead h1').evaluate(heading => {
     const words = [];
@@ -138,6 +172,7 @@ async function checkPendingNavigation(browser) {
 let browser;
 try {
   browser = await chromium.launch({headless: true});
+  await checkAccess(browser);
   await checkReading(browser);
   await checkReference(browser, reference);
   await checkReference(browser, '/api-reference/atlas-api');

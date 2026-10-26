@@ -370,6 +370,7 @@ const config: Config = {
         {href: `${WEBSITE}/es/blog/`, label: 'Blog', position: 'left', target: '_self'},
         {to: GUIDE, label: 'Documentación', position: 'left', activeBaseRegex: '^/(docs|api-reference)/.*'},
         {href: CONTACT, label: 'Contacto', position: 'left', target: '_self'},
+        {href: `${WEBSITE}/es/acceso/`, label: 'Acceder', position: 'right', target: '_self', className: 'navbar__access'},
         {href: CONTACT, label: 'Hablemos de su proyecto', position: 'right', target: '_self', className: 'navbar__cta'},
       ],
     },

@@ -2,6 +2,14 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Acceso desde el portal
+
+- «Acceder» en la navegación y «Acceder / Solicitar acceso» en el pie, coordinados
+  con el website. En móvil se conserva el drawer nativo, su foco y cierre con Escape.
+- Guards del HTML y del navegador verifican destinos, visibilidad y ausencia de
+  solapamiento. La publicación depende de activar las rutas en el website;
+  ver `docs-internal/infrastructure-access.md`.
+
 ## [Unreleased] — Lectura móvil y carga de guías
 
 - El título de portada ajusta su tamaño al ancho móvil y conserva las palabras completas desde 320 px.

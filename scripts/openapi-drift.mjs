@@ -52,13 +52,15 @@ function operations(spec) {
 // invertidas para que no rompan el bloque de código del informe.
 const quote = (text) => '`' + String(text).replaceAll('`', "'") + '`';
 
+const byName = (a, b) => a.localeCompare(b);
+
 export function compareSpec(id, committed, live) {
   const same = JSON.stringify(committed) === JSON.stringify(live);
   const before = operations(committed);
   const after = operations(live);
-  const added = [...after.keys()].filter((op) => !before.has(op)).sort();
-  const removed = [...before.keys()].filter((op) => !after.has(op)).sort();
-  const changed = [...after.keys()].filter((op) => before.has(op) && before.get(op) !== after.get(op)).sort();
+  const added = [...after.keys()].filter((op) => !before.has(op)).sort(byName);
+  const removed = [...before.keys()].filter((op) => !after.has(op)).sort(byName);
+  const changed = [...after.keys()].filter((op) => before.has(op) && before.get(op) !== after.get(op)).sort(byName);
   return {
     id,
     drift: !same,

@@ -71,6 +71,14 @@ async function fetchOne(spec) {
     writeFileSync(outPath, JSON.stringify(json, null, 2), 'utf-8');
     console.log(`[${spec.id}] saved → ${outPath}`);
   } catch {
+    // OPENAPI_FETCH_STRICT=1 (lo usa `.github/workflows/openapi-drift.yml`):
+    // caer a la copia versionada haría que el detector de deriva comparara la
+    // copia contra sí misma y declarara «sin deriva» justo cuando el API no
+    // respondió. Para el build, el respaldo sigue siendo el comportamiento por
+    // defecto.
+    if (process.env.OPENAPI_FETCH_STRICT === '1') {
+      throw new Error(`[${spec.id}] fetch or contract validation failed (strict mode: no fallback to the cached spec)`);
+    }
     if (existsSync(outPath)) {
       console.warn(
         `[${spec.id}] WARN: fetch or contract validation failed; using cached ${outPath} (may be stale)`,

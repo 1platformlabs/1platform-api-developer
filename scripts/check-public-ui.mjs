@@ -74,6 +74,21 @@ function gzipFiles(directory, predicate) {
     .reduce((total, name) => total + gzipSync(readFileSync(join(directory, name))).length, 0);
 }
 
+function auditAccess(name, html) {
+  const findings = [];
+  const $ = load(html);
+  const access = $('.navbar__items a.navbar__access');
+  if (access.length !== 1 || access.text().trim() !== 'Acceder' || access.attr('href') !== 'https://1platform.pro/es/acceso/') {
+    findings.push(`${name}_ACCESS_NAV: missing access entry in the shared navbar`);
+  }
+  for (const [label, path] of [['Acceder', 'acceso'], ['Solicitar acceso', 'solicitar-acceso']]) {
+    if (!$(`footer a[href="https://1platform.pro/es/${path}/"]`).toArray().some(link => $(link).text().trim() === label)) {
+      findings.push(`${name}_ACCESS_FOOTER: missing ${label}`);
+    }
+  }
+  return findings;
+}
+
 function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimensions}) {
   const findings = [];
   const requireText = (code, haystack, needle) => {
@@ -91,18 +106,7 @@ function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, sn
   requireText('BRAND_RETURN', docsHtml, 'href="https://1platform.pro/es/" target="_self"');
   requireText('BLOG_LANGUAGE', docsHtml, 'href="https://1platform.pro/es/blog/" target="_self"');
   requireText('NAV_CTA', docsHtml, 'href="https://wa.me/50253946564" target="_self"');
-  for (const [name, html] of [['DOC', docsHtml], ['API', apiHtml]]) {
-    const $ = load(html);
-    const access = $('.navbar__items a.navbar__access');
-    if (access.length !== 1 || access.text().trim() !== 'Acceder' || access.attr('href') !== 'https://1platform.pro/es/acceso/') {
-      findings.push(`${name}_ACCESS_NAV: missing access entry in the shared navbar`);
-    }
-    for (const [label, path] of [['Acceder', 'acceso'], ['Solicitar acceso', 'solicitar-acceso']]) {
-      if (!$(`footer a[href="https://1platform.pro/es/${path}/"]`).toArray().some(link => $(link).text().trim() === label)) {
-        findings.push(`${name}_ACCESS_FOOTER: missing ${label}`);
-      }
-    }
-  }
+  findings.push(...auditAccess('DOC', docsHtml), ...auditAccess('API', apiHtml));
   requireText('DOC_PRIMARY_CTA', docsHtml, 'href="/docs/saas/1platform-api/inicio-rapido"');
   requireText('DOC_API_CTA', docsHtml, 'href="/api-reference/1platform-api"');
   requireText(

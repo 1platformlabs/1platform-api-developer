@@ -93,8 +93,10 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          node scripts/openapi-drift.mjs "${RUNNER_TEMP}/versionada" static/openapi "${RUNNER_TEMP}/drift.md"
-          code=$?
+          # `shell: bash` corre con -e: sin el `|| code=$?` el exit 10 (deriva) cortaba el
+          # paso antes de leerlo y el issue de deriva nunca se abría (corrida 40397040986).
+          code=0
+          node scripts/openapi-drift.mjs "${RUNNER_TEMP}/versionada" static/openapi "${RUNNER_TEMP}/drift.md" || code=$?
           # 0 = al día, 10 = deriva; cualquier otro código es un error de medida
           # y tiene que poner la corrida en rojo, nunca pasar por «al día».
           if [ "$code" -ne 0 ] && [ "$code" -ne 10 ]; then

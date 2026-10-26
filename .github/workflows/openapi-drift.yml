@@ -1,0 +1,181 @@
+name: OpenAPI drift — portal vs API en vivo
+
+# Detecta, DESDE ESTE REPO y sin credenciales externas, que el portal sirve una
+# especificación atrasada respecto del API en vivo, y lo deja en UN issue con
+# etiqueta `openapi-drift` que se abre, se actualiza y se cierra solo.
+#
+# Por qué existe (1platform-api#600, #636):
+#
+#   1. El Core avisaba con un `repository_dispatch` firmado por un token
+#      PERSONAL (`DOCS_REPO_DISPATCH_TOKEN`). Venció el 2026-03 y desde entonces
+#      cada deploy del Core recibe 401: decenas de deploys sin aviso efectivo.
+#   2. Aun con el token sano, el aviso NO refrescaba el portal: producción
+#      construye desde el árbol de git (`deploy.sh prod build` → `COPY . .`), y
+#      `prod.yml` sólo publica la especificación nueva como ARTEFACTO (#45/#47).
+#      Lo que el portal sirve cambia únicamente cuando se mergea un PR que
+#      actualiza `static/openapi/`. El aviso disparaba, como mucho, un release
+#      redundante del mismo commit.
+#
+# Este detector no vence (usa el `GITHUB_TOKEN` de la corrida), no depende de
+# que el pipeline del Core diga la verdad, y nombra lo que falta: el PR.
+#
+# Lo que NO hace, a propósito: no commitea ni abre el PR. Un PR abierto con el
+# `GITHUB_TOKEN` no dispara los checks requeridos de `main` (GitHub no encadena
+# workflows desde ese token) y quedaría congelado; y escribir en ramas desde un
+# `schedule` es una superficie de escritura que este repo ya decidió no tener
+# (ver el comentario del job `update_spec` en `prod.yml`).
+
+on:
+  schedule:
+    # Cada 2 horas, minuto 23 (fuera del pico de :00). El Core despliega varias
+    # veces por día: el atraso máximo del aviso queda en ~2 h.
+    - cron: "23 */2 * * *"
+  workflow_dispatch:
+  # El aviso del Core, si algún día vuelve a llegar, adelanta la detección. Ya
+  # no dispara `prod.yml`: allí sólo producía un release del mismo árbol.
+  repository_dispatch:
+    types: [api-deployed]
+
+permissions: {}
+
+concurrency:
+  group: openapi-drift
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DRIFT_LABEL: openapi-drift
+  DRIFT_TITLE: "El portal sirve una especificación OpenAPI atrasada respecto del API en vivo"
+
+jobs:
+  drift:
+    name: Especificación servida vs API en vivo
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Sin `pnpm install`: `fetch-openapi.mjs` y `openapi-drift.mjs` usan sólo
+      # built-ins de Node.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: El comparador discrimina (self-test)
+        shell: bash
+        run: node scripts/openapi-drift.mjs --self-test
+
+      - name: Guardar la especificación versionada (la que sirve el portal)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/versionada"
+          cp static/openapi/*.json "${RUNNER_TEMP}/versionada/"
+
+      # ESTRICTO: sin el modo estricto, una caída del API haría caer al respaldo
+      # versionado y el detector compararía la copia contra sí misma ⇒ «al día».
+      - name: Bajar la especificación del API en vivo (estricto)
+        shell: bash
+        env:
+          OPENAPI_FETCH_STRICT: "1"
+        run: node scripts/fetch-openapi.mjs
+
+      - name: Comparar
+        id: compare
+        shell: bash
+        run: |
+          set -uo pipefail
+          node scripts/openapi-drift.mjs "${RUNNER_TEMP}/versionada" static/openapi "${RUNNER_TEMP}/drift.md"
+          code=$?
+          # 0 = al día, 10 = deriva; cualquier otro código es un error de medida
+          # y tiene que poner la corrida en rojo, nunca pasar por «al día».
+          if [ "$code" -ne 0 ] && [ "$code" -ne 10 ]; then
+            echo "::error::El comparador no pudo medir (exit ${code})."
+            exit 1
+          fi
+          cat "${RUNNER_TEMP}/drift.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar la especificación en vivo como artefacto
+        if: steps.compare.outputs.drift == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec-${{ github.run_id }}
+          path: static/openapi/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Abrir, actualizar o cerrar el issue de deriva
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRIFT: ${{ steps.compare.outputs.drift }}
+          VERSIONS: ${{ steps.compare.outputs.versions }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          gh label create "$DRIFT_LABEL" --repo "$REPO" --color D93F0B \
+            --description "La especificación OpenAPI versionada quedó atrás del API en vivo" \
+            >/dev/null 2>&1 || true
+
+          # A lo sumo UNO abierto: el más viejo con la etiqueta es el vigente.
+          ISSUE=$(gh issue list --repo "$REPO" --label "$DRIFT_LABEL" --state open \
+            --json number --jq 'sort_by(.number) | .[0].number // empty')
+
+          if [ "$DRIFT" != "true" ]; then
+            if [ -n "$ISSUE" ]; then
+              gh issue close "$ISSUE" --repo "$REPO" \
+                --comment "Al día: la especificación versionada coincide con el API en vivo (${VERSIONS}). Medido en ${RUN_URL}."
+            fi
+            echo "Sin deriva."
+            exit 0
+          fi
+
+          BODY="${RUNNER_TEMP}/issue.md"
+          {
+            echo "<!-- openapi-drift versions=${VERSIONS} -->"
+            echo "El portal (\`developer.1platform.pro\`) sirve la especificación **versionada** en \`static/openapi/\`, y el API en vivo ya cambió. Quien integre leyendo el portal no ve lo que sigue."
+            echo
+            echo "Última medición: ${RUN_URL} (artefacto \`openapi-spec-${GITHUB_RUN_ID}\`, 14 días)."
+            echo
+            cat "${RUNNER_TEMP}/drift.md"
+            echo
+            echo "### Cómo se cierra"
+            echo
+            echo "Un PR a \`main\` que actualice la copia versionada:"
+            echo
+            echo '```bash'
+            echo 'pnpm fetch-openapi'
+            echo 'git diff --stat static/openapi/   # revisar que sólo cambie lo esperado'
+            echo 'pnpm build'
+            echo '```'
+            echo
+            echo "⚠️ **Mergear ese PR despliega el portal a PRODUCCIÓN** (\`prod.yml\` corre en push a \`main\`). Correr \`prod.yml\` a mano NO alcanza: reconstruye el mismo árbol."
+            echo
+            echo "Este issue lo mantiene \`.github/workflows/openapi-drift.yml\`: se actualiza en cada medición y se cierra solo cuando la copia versionada vuelve a coincidir con el API."
+          } > "$BODY"
+
+          if [ -z "$ISSUE" ]; then
+            gh issue create --repo "$REPO" --title "$DRIFT_TITLE" --label "$DRIFT_LABEL" --body-file "$BODY"
+            exit 0
+          fi
+
+          # Editar el cuerpo no notifica a nadie; un comentario sí, así que sólo
+          # se comenta cuando el API en vivo cambió de versión desde la última
+          # medición.
+          PREV=$(gh issue view "$ISSUE" --repo "$REPO" --json body --jq '.body' \
+            | sed -n 's/^<!-- openapi-drift versions=\(.*\) -->$/\1/p' | head -1)
+          gh issue edit "$ISSUE" --repo "$REPO" --body-file "$BODY" >/dev/null
+          if [ "$PREV" != "$VERSIONS" ]; then
+            gh issue comment "$ISSUE" --repo "$REPO" \
+              --body "El API en vivo cambió de versión (${PREV:-?} → ${VERSIONS}) y la copia versionada sigue atrás. Detalle actualizado arriba; medición: ${RUN_URL}."
+          fi

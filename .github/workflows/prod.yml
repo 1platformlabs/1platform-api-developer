@@ -2,8 +2,11 @@ name: 1Platform API Developer — PROD
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [api-deployed]
+  # Sin `repository_dispatch: api-deployed` desde 2026-10-26 (1platform-api#600):
+  # este pipeline construye el árbol VERSIONADO, así que el aviso del Core sólo
+  # producía un release redundante del mismo commit — nunca publicaba la
+  # especificación nueva. Ese evento lo escucha ahora `openapi-drift.yml`, que
+  # mide la deriva y la deja en un issue.
   push:
     branches: [main]
 

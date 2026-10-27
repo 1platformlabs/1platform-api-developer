@@ -22,6 +22,8 @@ export default function Footer(): ReactNode {
       </nav>
       <nav className={styles.column} aria-label="1Platform"><h2>1PLATFORM</h2>
         <Link target="_self" to={String(siteConfig.customFields?.contactUrl)}>Contacto</Link>
+        <Link target="_self" to={`${website}/es/acceso/`}>Acceder</Link>
+        <Link target="_self" to={`${website}/es/solicitar-acceso/`}>Solicitar acceso</Link>
       </nav>
     </div>
     <div className={`brand-wrap ${styles.bottom}`}>

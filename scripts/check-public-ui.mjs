@@ -74,6 +74,21 @@ function gzipFiles(directory, predicate) {
     .reduce((total, name) => total + gzipSync(readFileSync(join(directory, name))).length, 0);
 }
 
+function auditAccess(name, html) {
+  const findings = [];
+  const $ = load(html);
+  const access = $('.navbar__items a.navbar__access');
+  if (access.length !== 1 || access.text().trim() !== 'Acceder' || access.attr('href') !== 'https://1platform.pro/es/acceso/') {
+    findings.push(`${name}_ACCESS_NAV: missing access entry in the shared navbar`);
+  }
+  for (const [label, path] of [['Acceder', 'acceso'], ['Solicitar acceso', 'solicitar-acceso']]) {
+    if (!$(`footer a[href="https://1platform.pro/es/${path}/"]`).toArray().some(link => $(link).text().trim() === label)) {
+      findings.push(`${name}_ACCESS_FOOTER: missing ${label}`);
+    }
+  }
+  return findings;
+}
+
 function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, snapshotDimensions}) {
   const findings = [];
   const requireText = (code, haystack, needle) => {
@@ -91,6 +106,7 @@ function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, sn
   requireText('BRAND_RETURN', docsHtml, 'href="https://1platform.pro/es/" target="_self"');
   requireText('BLOG_LANGUAGE', docsHtml, 'href="https://1platform.pro/es/blog/" target="_self"');
   requireText('NAV_CTA', docsHtml, 'href="https://wa.me/50253946564" target="_self"');
+  findings.push(...auditAccess('DOC', docsHtml), ...auditAccess('API', apiHtml));
   requireText('DOC_PRIMARY_CTA', docsHtml, 'href="/docs/saas/1platform-api/inicio-rapido"');
   requireText('DOC_API_CTA', docsHtml, 'href="/api-reference/1platform-api"');
   requireText(
@@ -196,6 +212,7 @@ if (process.argv.includes('--self-test')) {
   const expected = [
     'DOC_LANG', 'DOC_CANONICAL', 'DOC_HREFLANG_ES', 'DOC_HREFLANG_DEFAULT', 'DOC_SEARCH_LABEL_ES', 'API_SEARCH_LABEL_ES',
     'DOC_JSONLD', 'BRAND_RETURN', 'BLOG_LANGUAGE', 'SKIP_LINK', 'MOBILE_TOGGLE', 'SEARCH', 'NAV_CTA',
+    'DOC_ACCESS_NAV', 'API_ACCESS_NAV', 'DOC_ACCESS_FOOTER', 'API_ACCESS_FOOTER',
     'DOC_PRIMARY_CTA', 'DOC_API_CTA', 'DOC_CTA_SEMANTICS', 'DOC_LEAD', 'DOC_PRODUCTS', 'DOC_SECTIONS', 'API_LANG', 'API_CANONICAL',
     'API_HREFLANG_ES', 'API_HREFLANG_DEFAULT', 'API_SHELL', 'API_SEARCH',
     'REDUCED_MOTION', 'FOCUS_VISIBLE', 'COLLAPSED_SEARCH_QUERY', 'COLLAPSED_SEARCH_QUERY_MOBILE', 'SCALAR_CODE_SURFACE', 'SCALAR_MARKDOWN_CODE', 'BOOT_JS_BUDGET', 'TOTAL_JS_BUDGET',

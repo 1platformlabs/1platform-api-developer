@@ -1,9 +1,9 @@
 ---
 name: mcp
-description: Conectar el servidor MCP de 1Platform para consultar la documentación y operar la API con sus propias llaves, en QA por defecto.
+description: Conectar el servidor MCP de OnePlatform para consultar la documentación y operar la API con sus propias llaves, en QA por defecto.
 ---
 
-# Servidor MCP de 1Platform
+# Servidor MCP de OnePlatform
 
 El servidor MCP expone la documentación y un conjunto acotado de operaciones de la API.
 

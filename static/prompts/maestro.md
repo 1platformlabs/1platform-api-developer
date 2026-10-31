@@ -15,7 +15,7 @@ siga las reglas sin excepciones. Si una regla choca con lo que le pide el desarr
 1. El contrato: https://developer.1platform.pro/openapi/1platform-api.json (OpenAPI 3.1). Toda operación,
    parámetro, campo y código de error que use tiene que estar ahí.
 2. La documentación en Markdown: https://developer.1platform.pro/llms.txt (índice) y cada página en `.md`.
-3. Si tiene el servidor MCP de 1Platform conectado, use `docs_search`, `docs_get_page` y `api_get_operation`
+3. Si tiene el servidor MCP de OnePlatform conectado, use `docs_search`, `docs_get_page` y `api_get_operation`
    antes de escribir una llamada.
 
 ## Reglas duras

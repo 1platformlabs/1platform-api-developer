@@ -149,6 +149,16 @@ jobs:
           bash -n deploy/cpanel/qa-health-config.sh
           bash -n deploy/cpanel/activate-docs.sh
 
+      # What an agent is told to obey literally — prompts, skills and MCP
+      # configurations — cites only operations that exist in the OpenAPI, names
+      # no provider and carries no credential-looking value (D-5). check:contract
+      # reads docs/**/*.mdx only and never saw these files.
+      - name: Agent assets — self-test
+        run: pnpm check:agent-assets:self-test
+
+      - name: Agent assets
+        run: pnpm check:agent-assets
+
       # The MDX → Markdown converter for agents and its gate, watched failing on
       # every seeded case first (épica infraestructura-para-agentes-ia, IPA-01).
       - name: Agent docs — self-test
@@ -193,6 +203,11 @@ jobs:
 
       - name: Reading and reference runtime regressions
         run: pnpm check:docs-runtime
+
+      # Disabled until the text loads, exact clipboard copy, focus kept, live
+      # announcement, retry on failure and the raw link without JavaScript.
+      - name: Agent prompt block runtime
+        run: pnpm check:prompt-runtime
 
       - name: Production nginx routing (isolated local container)
         run: pnpm check:serving

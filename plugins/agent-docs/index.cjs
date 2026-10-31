@@ -140,7 +140,10 @@ module.exports = function agentDocs(context) {
           quickList: () => quickList(siteDir, website, link),
           prompt,
         });
-        const md = `${indexLine(origin)}\n\n# ${page.title}\n\n${page.description}\n\n${body}`;
+        // A page whose body already opens with its own `# Title` keeps it; the
+        // others get the title from the front matter. Never two.
+        const heading = /^# /.test(body) ? '' : `# ${page.title}\n\n`;
+        const md = `${indexLine(origin)}\n\n${heading}${page.description}\n\n${body}`;
         const target = path.join(outDir, mdPath(page.permalink));
         fs.mkdirSync(path.dirname(target), {recursive: true});
         fs.writeFileSync(target, md);

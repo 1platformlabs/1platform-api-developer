@@ -1,0 +1,72 @@
+#!/usr/bin/env node
+/**
+ * «Prompt para su agente» in a real browser over the built site (épica
+ * infraestructura-para-agentes-ia, IPA-02 CA-1 / T-6). jsdom cannot answer what
+ * matters here: that the button stays disabled until the text arrives, that
+ * Copy writes exactly the file to the clipboard without moving focus, that the
+ * live region announces it, that a failed fetch offers a retry, and that the
+ * raw link is there without JavaScript.
+ */
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {chromium} from 'playwright';
+import {serveBuild} from './build-server.mjs';
+
+const PAGE = '/docs/saas/1platform-api/inicio-rapido';
+const PROMPT = '/prompts/inicio-rapido.md';
+const expected = readFileSync(new URL(`../static${PROMPT}`, import.meta.url), 'utf8');
+
+const {origin, close} = await serveBuild();
+const browser = await chromium.launch();
+try {
+  const context = await browser.newContext();
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], {origin});
+  const page = await context.newPage();
+
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  let fail = true;
+  await page.route(`**${PROMPT}`, async (route) => {
+    await held;
+    if (fail) return route.fulfill({status: 500, body: 'error'});
+    return route.continue();
+  });
+
+  await page.goto(origin + PAGE);
+  await page.locator('html[data-has-hydrated="true"]').waitFor();
+  const block = page.getByRole('region', {name: 'Prompt para su agente'});
+  await block.scrollIntoViewIfNeeded();
+  const copyButton = block.getByRole('button', {name: 'Copiar'});
+  await copyButton.waitFor();
+  assert.equal(await copyButton.isDisabled(), true, 'Copy is disabled before the text loads');
+  assert.equal(await block.getByRole('link', {name: 'Ver como texto'}).getAttribute('href'), PROMPT);
+
+  release();
+  const retry = block.getByRole('button', {name: 'Reintentar'});
+  await retry.waitFor();
+  console.log('ok   disabled while loading; a failed fetch offers Reintentar and the raw link');
+
+  fail = false;
+  await retry.click();
+  await block.locator('pre code').waitFor();
+  assert.equal(await block.locator('pre code').textContent(), expected, 'the block shows the file verbatim');
+  await copyButton.focus();
+  await copyButton.click();
+  await block.getByText('Copiado').waitFor();
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), expected, 'the clipboard holds the file verbatim');
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Copiar', 'focus stays on the button');
+  assert.equal(await block.locator('[aria-live="polite"]').textContent(), 'Copiado');
+  console.log('ok   retry loads the prompt; Copy writes the exact file, keeps focus and announces «Copiado»');
+
+  const noJs = await browser.newPage({javaScriptEnabled: false});
+  await noJs.goto(origin + PAGE);
+  // Streaming SSR ships the fallback visible and the resolved block hidden until
+  // a script swaps them; without JavaScript the reader keeps the fallback.
+  assert.equal(await noJs.locator(`a[href="${PROMPT}"]`).filter({visible: true}).count(), 1, 'one visible raw link');
+  console.log('ok   without JavaScript the raw link is present');
+  const raw = await (await fetch(origin + PROMPT)).text();
+  assert.equal(raw, expected, 'the build serves the static prompt');
+} finally {
+  await browser.close();
+  await close();
+}

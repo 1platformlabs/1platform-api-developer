@@ -50,7 +50,8 @@ export type IconName =
   | 'clock'
   | 'logs'
   | 'shield'
-  | 'tag';
+  | 'tag'
+  | 'copy';
 
 export const iconPaths: Record<IconName, string> = {
   dashboard:
@@ -59,6 +60,7 @@ export const iconPaths: Record<IconName, string> = {
   // Not in the site registry — the site documents no mobile app. Same idiom.
   mobile: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
   code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
   globe:
     '<circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/>',
   console:

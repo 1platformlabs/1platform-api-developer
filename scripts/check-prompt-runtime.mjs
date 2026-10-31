@@ -37,8 +37,8 @@ try {
   // The SSR fallback carries the same region name and is replaced when the
   // lazy chunk arrives; only the resolved block has the live region.
   const block = page.getByRole('region', {name: 'Prompt para su agente'}).filter({has: page.locator('[aria-live]')});
-  await page.getByRole('region', {name: 'Prompt para su agente'}).first().evaluate((el) => el.scrollIntoView());
-  await block.waitFor();
+  await block.waitFor({state: 'attached'});
+  await block.evaluate((el) => el.scrollIntoView());
   const copyButton = block.getByRole('button', {name: 'Copiar'});
   await copyButton.waitFor();
   assert.equal(await copyButton.isDisabled(), true, 'Copy is disabled before the text loads');
@@ -66,8 +66,10 @@ try {
   const order = labels.map((label) => label.split('\n')[0].trim());
   assert.deepEqual(order.slice(0, 3), ['Inicio', 'Inicio rápido', 'Integrar con IA'], `sidebar order: ${order.slice(0, 4)}`);
   await page.goto(origin + '/docs/saas/1platform-api/integrar-con-ia');
-  await page.getByRole('region', {name: 'Prompt maestro de integración'}).first().evaluate((el) => el.scrollIntoView());
+  await page.locator('html[data-has-hydrated="true"]').waitFor();
   const master = page.getByRole('region', {name: 'Prompt maestro de integración'}).filter({has: page.locator('[aria-live]')});
+  await master.waitFor({state: 'attached'});
+  await master.evaluate((el) => el.scrollIntoView());
   await master.locator('pre code').waitFor();
   assert.match(await master.locator('pre code').textContent(), /<contexto>/);
   console.log('ok   «Integrar con IA» follows «Inicio rápido» and its master prompt loads');

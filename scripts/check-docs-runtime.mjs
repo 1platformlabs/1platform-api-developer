@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {serveBuild} from './build-server.mjs';
+import {checkMobileDocsContrast} from './mobile-docs-contrast.mjs';
 
 const {origin, close} = await serveBuild();
 const runtime = `window.Scalar = {createApiReference(element, configuration) {
@@ -174,6 +175,7 @@ async function checkPendingNavigation(browser) {
 let browser;
 try {
   browser = await chromium.launch({headless: true});
+  await checkMobileDocsContrast(browser, origin, home);
   await checkAccess(browser);
   await checkReading(browser);
   await checkReference(browser, reference);

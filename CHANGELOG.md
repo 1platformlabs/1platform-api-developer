@@ -2,6 +2,13 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Índice móvil legible
+
+- El índice de documentación usa tintas legibles sobre el fondo oscuro del menú
+  móvil, también en texto secundario y código. Conserva el foco y el cierre con
+  Escape; el guard de navegador mide contraste a 320/390 px y comprueba escritorio
+  con un control negativo del color anterior (Refs #83).
+
 ## [Unreleased] — Acceso desde el portal
 
 - «Acceder» en la navegación y «Acceder / Solicitar acceso» en el pie, coordinados

@@ -58,6 +58,17 @@ try {
   assert.equal(await block.locator('[aria-live="polite"]').textContent(), 'Copiado');
   console.log('ok   retry loads the prompt; Copy writes the exact file, keeps focus and announces «Copiado»');
 
+  // IPA-06 CA-1: «Integrar con IA» sits right after «Inicio rápido».
+  const labels = await page.locator('.theme-doc-sidebar-menu > li > a, .theme-doc-sidebar-menu > li > div > a').allInnerTexts();
+  const order = labels.map((label) => label.split('\n')[0].trim());
+  assert.deepEqual(order.slice(0, 3), ['Inicio', 'Inicio rápido', 'Integrar con IA'], `sidebar order: ${order.slice(0, 4)}`);
+  await page.goto(origin + '/docs/saas/1platform-api/integrar-con-ia');
+  const master = page.getByRole('region', {name: 'Prompt maestro de integración'});
+  await master.scrollIntoViewIfNeeded();
+  await master.locator('pre code').waitFor();
+  assert.match(await master.locator('pre code').textContent(), /<contexto>/);
+  console.log('ok   «Integrar con IA» follows «Inicio rápido» and its master prompt loads');
+
   const noJs = await browser.newPage({javaScriptEnabled: false});
   await noJs.goto(origin + PAGE);
   // Streaming SSR ships the fallback visible and the resolved block hidden until

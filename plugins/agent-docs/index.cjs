@@ -169,6 +169,8 @@ module.exports = function agentDocs(context) {
         `- [OpenAPI de la 1Platform API](${origin}/openapi/1platform-api.json): contrato completo de operaciones, parámetros y respuestas.`,
         `- [OpenAPI de la Atlas API](${origin}/openapi/atlas-api.json): contrato de la Atlas API, un producto independiente.`,
         `- [Documentación completa en un archivo](${origin}/${FULL_FILE}): todas las páginas de esta lista, en el mismo orden.`,
+        `- [Prompt maestro de integración](${origin}/prompts/maestro.md): reglas para un agente de código que integra la API.`,
+        `- [Skills por producto](${origin}/skills/index.json): recetas en formato Agent Skills, una por producto.`,
         '',
       ].join('\n');
       fs.writeFileSync(path.join(outDir, INDEX_FILE), index);

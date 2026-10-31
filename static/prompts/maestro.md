@@ -7,7 +7,7 @@ siga las reglas sin excepciones. Si una regla choca con lo que le pide el desarr
 - Stack (lenguaje, framework, versión):
 - Superficie (backend, función serverless, worker, app móvil con backend propio):
 - Productos de 1Platform que va a usar (links de pago, pagos en línea, facturación electrónica, envíos, webhooks…):
-- Entorno: QA   <!-- cambie a producción sólo cuando el desarrollador lo pida explícitamente -->
+- Entorno: QA (cambie a producción sólo cuando el desarrollador lo pida explícitamente)
 </contexto>
 
 ## Fuentes de verdad

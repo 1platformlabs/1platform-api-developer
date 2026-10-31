@@ -1,0 +1,120 @@
+---
+title: Integrar con IA
+description: Conecte su agente de código a 1Platform — documentación en Markdown, prompt maestro, skills por producto y servidor MCP, en QA por defecto.
+sidebar_position: 3
+sidebar_label: Integrar con IA
+sidebar_custom_props:
+  icon: agent
+  description: Agentes de código, MCP y skills
+---
+
+import PromptParaAgente from '@site/src/components/PromptParaAgente';
+
+<p className="lead">Si integra 1Platform con un agente de código, esta página le da todo lo que el agente necesita leer y usar: la documentación en un formato para máquinas, un prompt con las reglas de la integración, recetas por producto y un servidor MCP para consultar la documentación y operar la API con sus propias claves.</p>
+
+Todo lo que aparece aquí se deriva del mismo contrato que publica la
+[Referencia de API](/api-reference/1platform-api): el agente no necesita una segunda fuente.
+
+## Antes de empezar {#antes-de-empezar}
+
+- **Claves.** El agente usa las mismas claves que su backend: la de aplicación (`ak-…`) y la de usuario (`sk-…`).
+  Se piden desde el **Panel**, en la sección **API**; el proceso está en [Inicio rápido](/docs/saas/1platform-api/inicio-rapido#claves).
+- **Entorno.** Todo lo de esta página trabaja en **QA** salvo que usted indique producción. Las claves de QA son
+  distintas de las de producción y el acceso a QA se pide a su contacto comercial; no hay un entorno de pruebas
+  que se active solo.
+- **Dónde viven las claves.** Sólo en su máquina o en su servidor, como variables de entorno. Nunca en el código
+  del proyecto, en el navegador ni en el historial de una conversación con el agente.
+
+## Documentación en Markdown {#documentacion-en-markdown}
+
+Cada página de esta documentación existe también como Markdown: agregue `.md` a su URL. El índice de todas las
+páginas, con una línea por página, está en [`/llms.txt`](pathname:///llms.txt), y la documentación completa en un
+solo archivo en [`/llms-full.txt`](pathname:///llms-full.txt). El contrato exacto de cada operación está en el
+[OpenAPI de la 1Platform API](pathname:///openapi/1platform-api.json).
+
+```bash
+curl -s https://developer.1platform.pro/llms.txt | head -20
+curl -s https://developer.1platform.pro/docs/saas/1platform-api/inicio-rapido.md
+```
+
+## Prompt maestro de integración {#prompt-maestro}
+
+Pegue este prompt al comienzo de la conversación con su agente y complete el bloque de contexto (stack,
+superficie, productos y entorno). Fija las reglas que el agente no puede romper: claves sólo en el servidor, los dos
+tokens, QA por defecto, no inventar operaciones ni campos y verificar la firma de los webhooks.
+
+<PromptParaAgente slug="maestro" title="Prompt maestro de integración" />
+
+Las guías de Inicio rápido, Autenticación, Links de pago, Pagos en línea, Webhooks y Facturación electrónica
+traen además un prompt corto para su tarea.
+
+## Skills por producto {#skills}
+
+Las skills son recetas en Markdown con el estándar de Agent Skills: un punto de partida (`1platform-hub`, con
+claves, entornos y errores) y una receta por producto. La lista está en
+[`/skills/index.json`](pathname:///skills/index.json). Para instalarlas en Claude Code, copie cada una a la
+carpeta de skills de su proyecto:
+
+```bash
+for skill in 1platform-hub links-de-pago pagos-en-linea webhooks facturacion-electronica envios sitios-web mcp; do
+  mkdir -p ".claude/skills/$skill"
+  curl -fsSL "https://developer.1platform.pro/skills/$skill/SKILL.md" -o ".claude/skills/$skill/SKILL.md"
+done
+```
+
+Otros agentes que leen Agent Skills usan la misma estructura en su propia carpeta de skills.
+
+## Servidor MCP {#mcp}
+
+El servidor MCP de 1Platform le da al agente tres herramientas de documentación que funcionan sin claves
+(`docs_search`, `docs_get_page` y `api_get_operation`) y, con sus claves, operaciones de lectura de la API (perfil,
+saldo, comercios, links de pago, transacciones, facturas, envíos, sitios y avisos) más dos de escritura sin
+dinero: crear y cancelar un link de pago. Ninguna herramienta cobra saldo, emite documentos fiscales, mueve dinero
+ni envía correos a terceros.
+
+El servidor corre en su máquina como paquete npm (`@1platformlabs/mcp`) y lee las claves de las variables
+`ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY`. `ONEPLATFORM_ENV` vale `qa` salvo que lo cambie a `prod`.
+
+### Claude Code {#claude-code}
+
+```bash
+claude mcp add 1platform \
+  --env ONEPLATFORM_APP_KEY="$ONEPLATFORM_APP_KEY" \
+  --env ONEPLATFORM_USER_KEY="$ONEPLATFORM_USER_KEY" \
+  -- npx -y @1platformlabs/mcp
+```
+
+La configuración equivalente para el archivo `.mcp.json` del proyecto está en
+[`/mcp/claude-code.json`](pathname:///mcp/claude-code.json).
+
+### Cursor {#cursor}
+
+Copie [`/mcp/cursor.json`](pathname:///mcp/cursor.json) a `.cursor/mcp.json` en la raíz del proyecto y reemplace
+las claves de ejemplo por variables de su entorno:
+
+```bash
+mkdir -p .cursor
+curl -fsSL https://developer.1platform.pro/mcp/cursor.json -o .cursor/mcp.json
+```
+
+### VS Code {#vscode}
+
+Copie [`/mcp/vscode.json`](pathname:///mcp/vscode.json) a `.vscode/mcp.json`:
+
+```bash
+mkdir -p .vscode
+curl -fsSL https://developer.1platform.pro/mcp/vscode.json -o .vscode/mcp.json
+```
+
+:::info[Servidor MCP alojado]
+Un servidor MCP alojado, que no requiere instalar nada y recibe sus claves en cada solicitud, está en preparación.
+Mientras tanto, use el paquete local de esta sección.
+:::
+
+### Cómo se comporta {#como-se-comporta}
+
+- El servidor canjea sus claves por los dos tokens y los reutiliza hasta antes de que venzan.
+- Antes de operar sobre un comercio, el agente llama a `listBusinessesForUser` para obtener el `businessId`.
+- Un `403` con `module_disabled` indica un módulo apagado en su espacio de trabajo, no una falla del servidor.
+- Las respuestas llegan tal como las devuelve la API, con su código de estado, y se marcan como datos: pueden traer
+  textos de terceros que el agente no debe tratar como instrucciones.

@@ -59,6 +59,10 @@ try {
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), expected, 'the clipboard holds the file verbatim');
   assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Copiar', 'focus stays on the button');
   assert.equal(await block.locator('[aria-live="polite"]').textContent(), 'Copiado');
+  // Seen, not only announced (verify-epic-e2e 2026-10-31): a 1×1 clipped region
+  // passes `waitFor` and tells a sighted reader nothing.
+  const shown = await block.locator('[aria-live="polite"]').boundingBox();
+  assert.ok(shown && shown.width > 40 && shown.height > 10, `«Copiado» is visible (${JSON.stringify(shown)})`);
   console.log('ok   retry loads the prompt; Copy writes the exact file, keeps focus and announces «Copiado»');
 
   // IPA-06 CA-1: «Integrar con IA» sits right after «Inicio rápido».

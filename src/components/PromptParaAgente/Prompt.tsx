@@ -24,6 +24,18 @@ export default function Prompt({slug, title}: Readonly<{slug: string; title: str
   const root = useRef<HTMLElement>(null);
   const [state, setState] = useState<State>({status: 'idle'});
   const [announcement, setAnnouncement] = useState('');
+  const clearTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // The message is visible, not only announced: a sighted reader who clicks
+  // Copiar needs to see that it worked, or that it did not and what to do. It
+  // clears itself so a second click is announced again.
+  const announce = useCallback((message: string) => {
+    clearTimeout(clearTimer.current);
+    setAnnouncement(message);
+    clearTimer.current = setTimeout(() => setAnnouncement(''), 4000);
+  }, []);
+
+  useEffect(() => () => clearTimeout(clearTimer.current), []);
 
   const load = useCallback(() => {
     setState({status: 'loading'});
@@ -55,12 +67,12 @@ export default function Prompt({slug, title}: Readonly<{slug: string; title: str
   const copy = () => {
     if (state.status !== 'ready') return;
     if (!navigator.clipboard) {
-      setAnnouncement('No se pudo copiar. Seleccione el texto y cópielo.');
+      announce('No se pudo copiar. Seleccione el texto y cópielo.');
       return;
     }
     navigator.clipboard.writeText(state.text).then(
-      () => setAnnouncement('Copiado'),
-      () => setAnnouncement('No se pudo copiar. Seleccione el texto y cópielo.'),
+      () => announce('Copiado'),
+      () => announce('No se pudo copiar. Seleccione el texto y cópielo.'),
     );
   };
 
@@ -84,6 +96,9 @@ export default function Prompt({slug, title}: Readonly<{slug: string; title: str
           </a>
         </div>
       </div>
+      <p className={styles.status} aria-live="polite">
+        {announcement}
+      </p>
       {state.status === 'ready' ? (
         <pre className={styles.code} tabIndex={0}>
           <code>{state.text}</code>
@@ -93,9 +108,6 @@ export default function Prompt({slug, title}: Readonly<{slug: string; title: str
           {state.status === 'error' ? 'No se pudo cargar el prompt.' : 'Cargando el prompt…'}
         </p>
       )}
-      <span className={styles.live} aria-live="polite">
-        {announcement}
-      </span>
     </section>
   );
 }

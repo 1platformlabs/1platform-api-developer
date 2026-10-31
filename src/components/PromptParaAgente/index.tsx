@@ -14,7 +14,7 @@ import styles from './styles.module.css';
  */
 const Prompt = lazy(() => import('./Prompt'));
 
-function Fallback({slug, title}: {slug: string; title: string}): ReactNode {
+function Fallback({slug, title}: Readonly<{slug: string; title: string}>): ReactNode {
   return (
     <section className={styles.block} aria-label={title}>
       <div className={styles.head}>
@@ -33,7 +33,7 @@ function Fallback({slug, title}: {slug: string; title: string}): ReactNode {
   );
 }
 
-export default function PromptParaAgente({slug, title = 'Prompt para su agente'}: {slug: string; title?: string}): ReactNode {
+export default function PromptParaAgente({slug, title = 'Prompt para su agente'}: Readonly<{slug: string; title?: string}>): ReactNode {
   return (
     <Suspense fallback={<Fallback slug={slug} title={title} />}>
       <Prompt slug={slug} title={title} />

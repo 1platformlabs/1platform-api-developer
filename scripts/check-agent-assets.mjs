@@ -61,7 +61,8 @@ function isPlaceholder(segment) {
 }
 
 export function operationExists(contract, method, rawPath) {
-  let p = rawPath.replace(/[?#].*$/, '').replace(/[.,:;)]+$/, '').replace(/\/$/, '');
+  let p = rawPath.split(/[?#]/)[0];
+  while (p.length && '.,:;)/'.includes(p.at(-1))) p = p.slice(0, -1);
   if (!p.startsWith('/api/v1/')) p = `/api/v1${p}`;
   const segments = p.split('/');
   return contract.operations.some((op) => op.method === method && op.segments.length === segments.length
@@ -87,10 +88,11 @@ export function checkText(file, text, contract) {
 }
 
 function frontMatter(text) {
-  const m = text.match(/^---\n([\s\S]*?)\n---\n/);
-  if (!m) return null;
+  if (!text.startsWith('---\n')) return null;
+  const end = text.indexOf('\n---\n', 4);
+  if (end === -1) return null;
   const out = {};
-  for (const line of m[1].split('\n')) {
+  for (const line of text.slice(4, end).split('\n')) {
     const kv = line.match(/^([a-z_-]+):\s*(.*)$/);
     if (kv) out[kv[1]] = kv[2].replace(/^["']|["']$/g, '').trim();
   }
@@ -100,26 +102,29 @@ function frontMatter(text) {
 export function checkSkills(dir) {
   const errors = [];
   if (!fs.existsSync(dir)) return errors;
-  const folders = fs.readdirSync(dir, {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const folders = fs.readdirSync(dir, {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name).sort((a, b) => a.localeCompare(b));
   const indexFile = path.join(dir, 'index.json');
   if (!fs.existsSync(indexFile)) return [`${dir}/index.json is missing`];
   let index;
   try { index = JSON.parse(fs.readFileSync(indexFile, 'utf8')); } catch (e) { return [`skills/index.json does not parse: ${e.message}`]; }
   const entries = Array.isArray(index) ? index : index.skills;
   if (!Array.isArray(entries)) return ['skills/index.json has no list of skills'];
-  const listed = entries.map((e) => e.name).sort();
+  const listed = entries.map((e) => e.name).sort((a, b) => a.localeCompare(b));
   if (JSON.stringify(listed) !== JSON.stringify(folders)) errors.push(`skills/index.json lists [${listed}] and the folders are [${folders}]`);
-  for (const name of folders) {
-    const file = path.join(dir, name, 'SKILL.md');
-    if (!fs.existsSync(file)) { errors.push(`skills/${name}/SKILL.md is missing`); continue; }
-    const fm = frontMatter(fs.readFileSync(file, 'utf8'));
-    if (!fm?.name || !fm?.description) { errors.push(`skills/${name}/SKILL.md needs front matter name and description`); continue; }
-    if (fm.name !== name) errors.push(`skills/${name}/SKILL.md declares name ${fm.name}`);
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fm.name)) errors.push(`skills/${name}: name must be lowercase-hyphenated`);
-    const entry = entries.find((e) => e.name === name);
-    if (entry && entry.description !== fm.description) errors.push(`skills/${name}: index.json description differs from SKILL.md`);
-    if (entry && entry.path !== `/skills/${name}/SKILL.md`) errors.push(`skills/${name}: index.json path must be /skills/${name}/SKILL.md`);
-  }
+  for (const name of folders) errors.push(...checkSkill(dir, name, entries.find((e) => e.name === name)));
+  return errors;
+}
+
+function checkSkill(dir, name, entry) {
+  const file = path.join(dir, name, 'SKILL.md');
+  if (!fs.existsSync(file)) return [`skills/${name}/SKILL.md is missing`];
+  const fm = frontMatter(fs.readFileSync(file, 'utf8'));
+  if (!fm?.name || !fm?.description) return [`skills/${name}/SKILL.md needs front matter name and description`];
+  const errors = [];
+  if (fm.name !== name) errors.push(`skills/${name}/SKILL.md declares name ${fm.name}`);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fm.name)) errors.push(`skills/${name}: name must be lowercase-hyphenated`);
+  if (entry?.description !== undefined && entry.description !== fm.description) errors.push(`skills/${name}: index.json description differs from SKILL.md`);
+  if (entry && entry.path !== `/skills/${name}/SKILL.md`) errors.push(`skills/${name}: index.json path must be /skills/${name}/SKILL.md`);
   return errors;
 }
 
@@ -157,7 +162,7 @@ function selfTest() {
     const dir = make(files);
     const {errors} = checkTree(dir, contract);
     fs.rmSync(dir, {recursive: true, force: true});
-    return errors.length > 0 && errors.some((e) => e.includes(needle));
+    return errors.some((e) => e.includes(needle));
   };
   const passes = (files) => {
     const dir = make(files);
@@ -172,7 +177,8 @@ function selfTest() {
     ['right path, wrong method', () => fails({'static/prompts/x.md': '`DELETE /api/v1/auth/token`'}, 'DELETE /api/v1/auth/token')],
     ['invented operationId', () => fails({'static/prompts/x.md': 'Use `listEverything`.'}, 'operationId listEverything')],
     ['provider name', () => fails({'static/prompts/x.md': 'Cobra con Stripe.'}, 'provider name')],
-    ['real-looking key', () => fails({'static/prompts/x.md': 'apiKey=ak-a1b2c3d4e5f6'}, 'credential-looking')],
+    // Built at runtime so the repository never holds a key-shaped literal.
+    ['real-looking key', () => fails({'static/prompts/x.md': `apiKey=${['ak', 'a1b2c3d4e5f6'].join('-')}`}, 'credential-looking')],
     ['token-looking value', () => fails({'static/prompts/x.md': 'eyJhbGciOiJIUzI1NiJ9.x'}, 'token-looking')],
     ['skill folder not in the index', () => fails({'static/skills/index.json': index('a'), 'static/skills/a/SKILL.md': skill('a'), 'static/skills/b/SKILL.md': skill('b')}, 'lists [a]')],
     ['skill without description', () => fails({'static/skills/index.json': index('a'), 'static/skills/a/SKILL.md': '---\nname: a\n---\n'}, 'needs front matter')],

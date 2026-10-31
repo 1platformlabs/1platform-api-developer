@@ -19,7 +19,7 @@ import styles from './styles.module.css';
  */
 type State = {status: 'idle' | 'loading' | 'error'} | {status: 'ready'; text: string};
 
-export default function Prompt({slug, title}: {slug: string; title: string}): ReactNode {
+export default function Prompt({slug, title}: Readonly<{slug: string; title: string}>): ReactNode {
   const href = `/prompts/${slug}.md`;
   const root = useRef<HTMLElement>(null);
   const [state, setState] = useState<State>({status: 'idle'});
@@ -54,12 +54,11 @@ export default function Prompt({slug, title}: {slug: string; title: string}): Re
 
   const copy = () => {
     if (state.status !== 'ready') return;
-    const write = navigator.clipboard?.writeText(state.text);
-    if (!write) {
+    if (!navigator.clipboard) {
       setAnnouncement('No se pudo copiar. Seleccione el texto y cópielo.');
       return;
     }
-    write.then(
+    navigator.clipboard.writeText(state.text).then(
       () => setAnnouncement('Copiado'),
       () => setAnnouncement('No se pudo copiar. Seleccione el texto y cópielo.'),
     );

@@ -28,7 +28,8 @@ function walk(dir, keep) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, {withFileTypes: true}).flatMap((e) => {
     const p = path.join(dir, e.name);
-    return e.isDirectory() ? walk(p, keep) : keep(p) ? [p] : [];
+    if (e.isDirectory()) return walk(p, keep);
+    return keep(p) ? [p] : [];
   });
 }
 
@@ -127,7 +128,10 @@ function selfTest() {
       fs.writeFileSync(path.join(dir, 'build/llms-full.txt'), pages.map((p) => `<!-- ${ORIGIN}${p} -->`).join('\n'));
       for (const p of pages) {
         fs.writeFileSync(path.join(dir, 'build', p), `${INDEX_LINE}\n\n# x\n`);
-        if (p !== '/docs/p0.md') fs.mkdirSync(path.join(dir, 'build', p.replace(/\.md$/, '')), {recursive: true}), fs.writeFileSync(path.join(dir, 'build', p.replace(/\.md$/, ''), 'index.html'), '');
+        if (p !== '/docs/p0.md') {
+          fs.mkdirSync(path.join(dir, 'build', p.replace(/\.md$/, '')), {recursive: true});
+          fs.writeFileSync(path.join(dir, 'build', p.replace(/\.md$/, ''), 'index.html'), '');
+        }
       }
       const {errors} = checkBuild(dir);
       fs.rmSync(dir, {recursive: true, force: true});

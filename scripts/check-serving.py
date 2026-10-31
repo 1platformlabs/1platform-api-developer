@@ -90,16 +90,17 @@ try:
     css = "/" + next(p for p in assets if p.suffix == ".css").relative_to(ROOT / "build").as_posix()
     js = "/" + next(p for p in assets if p.suffix == ".js").relative_to(ROOT / "build").as_posix()
     md = GUIDE + ".md"
+    markdown = "text/markdown; charset=utf-8"
     expected = {
         "/llms.txt": ("text/plain; charset=utf-8", "gzip"),
         "/llms-full.txt": ("text/plain; charset=utf-8", "gzip"),
-        md: ("text/markdown; charset=utf-8", "gzip"),
+        md: (markdown, "gzip"),
         GUIDE: ("text/html; charset=utf-8", "gzip"),
         css: ("text/css", "gzip"),
         js: ("application/javascript; charset=utf-8", "gzip"),
         "/fonts/manrope-variable.woff2": ("font/woff2", None),
     }
-    for extra, content_type in (("/skills/index.json", "application/json"), ("/skills/1platform-hub/SKILL.md", "text/markdown; charset=utf-8"), ("/prompts/maestro.md", "text/markdown; charset=utf-8")):
+    for extra, content_type in (("/skills/index.json", "application/json"), ("/skills/1platform-hub/SKILL.md", markdown), ("/prompts/maestro.md", markdown)):
         if (ROOT / "build" / extra.lstrip("/")).is_file():
             expected[extra] = (content_type, "gzip")
     for path, (content_type, encoding) in expected.items():

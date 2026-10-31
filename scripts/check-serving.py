@@ -99,9 +99,9 @@ try:
         js: ("application/javascript; charset=utf-8", "gzip"),
         "/fonts/manrope-variable.woff2": ("font/woff2", None),
     }
-    for extra in ("/skills/index.json",):
+    for extra, content_type in (("/skills/index.json", "application/json"), ("/skills/1platform-hub/SKILL.md", "text/markdown; charset=utf-8"), ("/prompts/maestro.md", "text/markdown; charset=utf-8")):
         if (ROOT / "build" / extra.lstrip("/")).is_file():
-            expected[extra] = ("application/json", "gzip")
+            expected[extra] = (content_type, "gzip")
     for path, (content_type, encoding) in expected.items():
         status, got_type, got_encoding = headers(path)
         assert status == 200, (path, status)

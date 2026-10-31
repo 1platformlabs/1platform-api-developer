@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {chromium} from 'playwright';
 import {serveBuild} from './build-server.mjs';
+import {checkPromptVisual} from './check-prompt-visual.mjs';
 
 const PAGE = '/docs/saas/1platform-api/inicio-rapido';
 const PROMPT = '/prompts/inicio-rapido.md';
@@ -47,6 +48,7 @@ try {
   release();
   const retry = block.getByRole('button', {name: 'Reintentar'});
   await retry.waitFor();
+  assert.equal(await block.getByRole('alert').count(), 1, 'a failed prompt load is announced as an alert');
   console.log('ok   disabled while loading; a failed fetch offers Reintentar and the raw link');
 
   fail = false;
@@ -86,6 +88,7 @@ try {
   console.log('ok   without JavaScript the raw link is present');
   const raw = await (await fetch(origin + PROMPT)).text();
   assert.equal(raw, expected, 'the build serves the static prompt');
+  await checkPromptVisual(browser, origin);
 } finally {
   await browser.close();
   await close();

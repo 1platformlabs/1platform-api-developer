@@ -96,7 +96,7 @@ export default function Prompt({slug, title}: Readonly<{slug: string; title: str
           </a>
         </div>
       </div>
-      <p className={styles.status} aria-live="polite">
+      <p className={styles.status} aria-live="polite" hidden={state.status !== 'ready'}>
         {announcement}
       </p>
       {state.status === 'ready' ? (
@@ -104,7 +104,7 @@ export default function Prompt({slug, title}: Readonly<{slug: string; title: str
           <code>{state.text}</code>
         </pre>
       ) : (
-        <p className={styles.note}>
+        <p className={styles.note} role={state.status === 'error' ? 'alert' : 'status'}>
           {state.status === 'error' ? 'No se pudo cargar el prompt.' : 'Cargando el prompt…'}
         </p>
       )}

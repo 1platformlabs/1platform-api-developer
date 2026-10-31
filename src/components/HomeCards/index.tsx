@@ -6,6 +6,7 @@ import type {PropSidebarItem} from '@docusaurus/plugin-content-docs';
 
 import Icon, {toIconName, type IconName} from '@site/src/components/Icon';
 import styles from './styles.module.css';
+import quickLinks from './quick.json';
 
 /**
  * The home (Inicio) grids, modelled on a payments developer portal: products on
@@ -63,12 +64,13 @@ export function ProductCards(): ReactNode {
 export function QuickCards(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   const website = String(siteConfig.customFields?.websiteUrl ?? 'https://1platform.pro');
-  const quick: Card[] = [
-    {icon: 'launch', title: 'Inicio rápido', desc: 'Sus credenciales y su primera llamada autenticada.', href: '/docs/saas/1platform-api/inicio-rapido'},
-    {icon: 'code', title: 'Referencia de API', desc: 'Explore endpoints y esquemas, y pruébelos en vivo.', href: '/api-reference/1platform-api'},
-    {icon: 'clock', title: 'Cambios', desc: 'Lanzamientos, cambios incompatibles y novedades.', href: `${website}/es/novedades/`},
-    {icon: 'support', title: 'Soporte', desc: 'Hable con el equipo de integraciones.', href: `${website}/es/contacto/`},
-  ];
+  // Shared with the Markdown the agents read (plugins/agent-docs): one list, two renderings.
+  const quick: Card[] = quickLinks.map((q) => ({
+    icon: toIconName(q.icon) ?? 'launch',
+    title: q.title,
+    desc: q.desc,
+    href: q.href.replace('{website}', website),
+  }));
   return (
     <div className={styles.quickList}>
       {quick.map((c) => (

@@ -149,12 +149,22 @@ jobs:
           bash -n deploy/cpanel/qa-health-config.sh
           bash -n deploy/cpanel/activate-docs.sh
 
+      # The MDX → Markdown converter for agents and its gate, watched failing on
+      # every seeded case first (épica infraestructura-para-agentes-ia, IPA-01).
+      - name: Agent docs — self-test
+        run: pnpm check:agent-docs:self-test
+
       # onBrokenLinks:'throw' — a bad internal link fails here.
       - name: Build
         shell: bash
         run: |
           set -euo pipefail
           pnpm build
+
+      # llms.txt, llms-full.txt and one <permalink>.md per sidebar page, read
+      # from the build — plus raw links to non-route files in the MDX sources.
+      - name: Agent docs
+        run: pnpm check:agent-docs
 
       # Reads the generated pages, not the source approximation: canonical and
       # hreflang, real CTA hrefs, search/keyboard controls, reduced motion,

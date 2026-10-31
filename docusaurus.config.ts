@@ -241,6 +241,10 @@ const config: Config = {
 
   // ─── Plugins ──────────────────────────────────────────────────────────────
   plugins: [
+    // llms.txt, llms-full.txt and one <permalink>.md per sidebar page, for coding
+    // agents (épica infraestructura-para-agentes-ia, D-1). A build hook, so no
+    // `docusaurus build` can skip it; an unknown component fails the build.
+    './plugins/agent-docs/index.cjs',
     // SaaS API references (one Scalar instance per API).
     scalarPlugin(
       '1platform-api',

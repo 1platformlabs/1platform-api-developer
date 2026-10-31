@@ -12,6 +12,9 @@ El servidor MCP expone la documentación y un conjunto acotado de operaciones de
   links de pago, transacciones, facturas, envíos, sitios, avisos) y dos de escritura sin dinero: crear y cancelar un
   link de pago. Ninguna cobra saldo, emite documentos fiscales ni mueve dinero.
 - Entorno: QA salvo `ONEPLATFORM_ENV=prod`.
+- Alojado, sin instalar nada: `https://mcp-qa.1platform.pro/mcp` (QA) o `https://mcp.1platform.pro/mcp`
+  (producción), con las llaves en las cabeceras `X-OnePlatform-App-Key` y `X-OnePlatform-User-Key`. La URL fija el
+  entorno.
 
 Reglas al usarlo:
 

@@ -72,8 +72,9 @@ saldo, comercios, links de pago, transacciones, facturas, envíos, sitios y avis
 dinero: crear y cancelar un link de pago. Ninguna herramienta cobra saldo, emite documentos fiscales, mueve dinero
 ni envía correos a terceros.
 
-El servidor corre en su máquina como paquete npm (`@oneplatformlabs/mcp`) y lee las claves de las variables
-`ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY`. `ONEPLATFORM_ENV` vale `qa` salvo que lo cambie a `prod`.
+Puede correrlo en su máquina como paquete npm (`@oneplatformlabs/mcp`), que lee las claves de las variables
+`ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY` (`ONEPLATFORM_ENV` vale `qa` salvo que lo cambie a `prod`), o
+conectar el agente al [servidor alojado](#alojado), sin instalar nada.
 
 ### Claude Code {#claude-code}
 
@@ -106,10 +107,26 @@ mkdir -p .vscode
 curl -fsSL https://developer.1platform.pro/mcp/vscode.json -o .vscode/mcp.json
 ```
 
-:::info[Servidor MCP alojado]
-Un servidor MCP alojado, que no requiere instalar nada y recibe sus claves en cada solicitud, está en preparación.
-Mientras tanto, use el paquete local de esta sección.
-:::
+### Servidor alojado {#alojado}
+
+El servidor alojado no requiere instalar nada: recibe sus claves en cada solicitud y no las guarda.
+
+| URL | API |
+|---|---|
+| `https://mcp-qa.1platform.pro/mcp` | QA |
+| `https://mcp.1platform.pro/mcp` | Producción |
+
+La URL decide el entorno; ninguna cabecera ni parámetro lo cambia.
+
+```bash
+claude mcp add --transport http oneplatform https://mcp-qa.1platform.pro/mcp \
+  --header "X-OnePlatform-App-Key: $ONEPLATFORM_APP_KEY" \
+  --header "X-OnePlatform-User-Key: $ONEPLATFORM_USER_KEY"
+```
+
+En otros clientes que aceptan servidores remotos por HTTP, use la misma URL con las cabeceras
+`X-OnePlatform-App-Key` y `X-OnePlatform-User-Key`. El servidor admite 30 solicitudes por minuto desde una misma IP
+y 120 por par de claves.
 
 ### Cómo se comporta {#como-se-comporta}
 

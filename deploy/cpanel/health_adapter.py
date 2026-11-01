@@ -54,7 +54,21 @@ def publish_verified(current, backup, adapter, upload, download, rename):
         raise ValueError("Installed adapter changed after promotion; inspect remote entry")
 
 
-def ftp(commands):
+def transport_failure_category(output):
+    """Only emit allowlisted categories; remote paths and credentials stay private."""
+    lowered = output.lower()
+    for category, markers in (
+        ("authentication", ("login failed", "530 ")),
+        ("missing-or-denied", ("550 ", "no such file", "permission denied")),
+        ("tls", ("certificate", "ssl_connect", "tls handshake")),
+        ("connection", ("timed out", "connection refused", "host not found", "connection reset")),
+    ):
+        if any(marker in lowered for marker in markers):
+            return category
+    return "unclassified"
+
+
+def ftp(commands, operation):
     credentials = [os.environ.get(name, "") for name in ("CPANEL_FTP_HOST", "CPANEL_FTP_USER", "CPANEL_FTP_PASS")]
     if not all(credentials):
         raise ValueError("Incomplete FTPS configuration")
@@ -65,7 +79,8 @@ def ftp(commands):
     result = subprocess.run(["lftp", "-u", user + "," + password, host],
                             input=config + commands + "\nbye\n", capture_output=True, text=True)
     if result.returncode:
-        raise ValueError("Private FTPS operation failed; remote output withheld")
+        category = transport_failure_category(result.stdout + result.stderr)
+        raise ValueError(f"Private FTPS operation failed: {operation}; category={category}; exit={result.returncode}; remote output withheld")
     return result.stdout
 
 
@@ -74,14 +89,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix="docs-health-") as temporary:
         folder = pathlib.Path(temporary)
         current_path, backup_path = folder / "current", folder / "backup"
-        listing = ftp("cd .deploy/bin\ncls -1")
+        listing = ftp("cd .deploy/bin\ncls -1", "inspect-directory")
         backup_exists = CORE_NAME in [pathlib.PurePosixPath(line.strip()).name for line in listing.splitlines()]
         commands = "cd .deploy\nget bin/activate.sh -o " + quote(current_path)
         commands += "\nget .health_url -o " + quote(folder / "url")
         commands += "\nget .health_marker -o " + quote(folder / "marker")
         if backup_exists:
             commands += "\nget bin/" + CORE_NAME + " -o " + quote(backup_path)
-        ftp(commands)
+        ftp(commands, "read-health-and-activator")
         url = (folder / "url").read_text().strip()
         marker = (folder / "marker").read_text().strip()
         index = pathlib.Path("cpanel-dist/public/index.html").read_text()
@@ -96,13 +111,13 @@ def main():
         def upload(name, content):
             path = folder / ("upload-" + name)
             path.write_bytes(content)
-            ftp("cd .deploy/bin\nput " + quote(path) + " -o " + quote(name) + "\nchmod 700 " + quote(name))
+            ftp("cd .deploy/bin\nput " + quote(path) + " -o " + quote(name) + "\nchmod 700 " + quote(name), "stage-verified-file")
         def download(name):
             path = folder / ("read-" + name)
-            ftp("cd .deploy/bin\nget " + quote(name) + " -o " + quote(path))
+            ftp("cd .deploy/bin\nget " + quote(name) + " -o " + quote(path), "readback-verified-file")
             return path.read_bytes()
         def rename(source, destination):
-            ftp("cd .deploy/bin\nmv " + quote(source) + " " + quote(destination))
+            ftp("cd .deploy/bin\nmv " + quote(source) + " " + quote(destination), "promote-verified-file")
         publish_verified(current, backup, adapter, upload, download, rename)
         print("::notice::QA health adapter installed; original core backup preserved byte-for-byte; cron unchanged")
 

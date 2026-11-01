@@ -56,7 +56,7 @@ claves, entornos y errores) y una receta por producto. La lista está en
 carpeta de skills de su proyecto:
 
 ```bash
-for skill in 1platform-hub links-de-pago pagos-en-linea webhooks facturacion-electronica envios sitios-web mcp; do
+for skill in 1platform-hub agentes-de-ia analitica contenido correo-transaccional dominios-y-correo envios facturacion-electronica links-de-pago mcp pagos-en-linea retiros sitios-web suscripciones telemetria terminal-de-tarjetas ventas webhooks; do
   mkdir -p ".claude/skills/$skill"
   curl -fsSL "https://developer.1platform.pro/skills/$skill/SKILL.md" -o ".claude/skills/$skill/SKILL.md"
 done
@@ -67,10 +67,34 @@ Otros agentes que leen Agent Skills usan la misma estructura en su propia carpet
 ## Servidor MCP {#mcp}
 
 El servidor MCP de OnePlatform le da al agente tres herramientas de documentación que funcionan sin claves
-(`docs_search`, `docs_get_page` y `api_get_operation`) y, con sus claves, operaciones de lectura de la API (perfil,
-saldo, comercios, links de pago, transacciones, facturas, envíos, sitios y avisos) más dos de escritura sin
-dinero: crear y cancelar un link de pago. Ninguna herramienta cobra saldo, emite documentos fiscales, mueve dinero
-ni envía correos a terceros.
+(`docs_search`, `docs_get_page` y `api_get_operation`) y, con sus claves, las operaciones de la API agrupadas por
+producto (*toolset*):
+
+| Toolset | Qué puede hacer el agente |
+|---|---|
+| `cuenta` | Perfil, saldo, consumo, comercios y avisos. Siempre activo: de aquí sale el `businessId` |
+| `pagos` | Links de pago (listar, ver, crear y cancelar) y transacciones |
+| `retiros` | Saldo retirable, movimientos y retiros (sólo lectura) |
+| `suscripciones` | Planes, suscripciones y clientes |
+| `terminal` | Solicitudes de terminal de tarjetas y su estado |
+| `facturacion` | Facturas electrónicas (sólo lectura) |
+| `envios` | Envíos (sólo lectura) |
+| `sitios` | Sitios, artículos, trabajos de generación, categorías y rendimiento de búsqueda |
+| `analitica` | Métricas del sitio, ingresos y alertas de anuncios, mapas de calor |
+| `correo` | Correo transaccional (remitentes, plantillas, cupos, mensajes) y conversaciones del correo del negocio |
+| `dominios` | Dominios, disponibilidad, precios, transferencias y registros de correo (sólo lectura) |
+| `telemetria` | Proyectos, errores, registros, rendimiento y uso; marcar un error como resuelto o ignorado |
+| `ventas` | Preparación, canales, ofertas, prospectos, tablero y reporte |
+| `agentes` | Agentes, catálogo, herramientas, presupuesto, ejecuciones y acciones; detener una ejecución |
+
+Las escrituras (crear y cancelar un link de pago, detener una ejecución de un agente y cambiar el estado de un error)
+no mueven dinero y el cliente pide confirmación antes de ejecutarlas. Ninguna herramienta cobra saldo, emite
+documentos fiscales, mueve dinero ni envía mensajes a terceros: eso se hace con la API, siguiendo la skill de cada
+producto.
+
+Por defecto el servidor lista todos los toolsets. Si su cliente admite pocas herramientas, elija los productos que usa
+con la variable `ONEPLATFORM_TOOLSETS` (paquete local) o la cabecera `X-OnePlatform-Toolsets` (servidor alojado), por
+ejemplo `pagos,envios`. `cuenta` y la documentación se listan siempre.
 
 Puede correrlo en su máquina como paquete npm (`@oneplatformlabs/mcp`), que lee las claves de las variables
 `ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY` (`ONEPLATFORM_ENV` vale `qa` salvo que lo cambie a `prod`), o
@@ -84,6 +108,8 @@ claude mcp add oneplatform \
   --env ONEPLATFORM_USER_KEY="$ONEPLATFORM_USER_KEY" \
   -- npx -y @oneplatformlabs/mcp
 ```
+
+Para listar sólo algunos productos, agregue `--env ONEPLATFORM_TOOLSETS=pagos,envios` al mismo comando.
 
 La configuración equivalente para el archivo `.mcp.json` del proyecto está en
 [`/mcp/claude-code.json`](pathname:///mcp/claude-code.json).
@@ -121,8 +147,11 @@ La URL decide el entorno; ninguna cabecera ni parámetro lo cambia.
 ```bash
 claude mcp add --transport http oneplatform https://mcp-qa.1platform.pro/mcp \
   --header "X-OnePlatform-App-Key: $ONEPLATFORM_APP_KEY" \
-  --header "X-OnePlatform-User-Key: $ONEPLATFORM_USER_KEY"
+  --header "X-OnePlatform-User-Key: $ONEPLATFORM_USER_KEY" \
+  --header "X-OnePlatform-Toolsets: pagos,envios"
 ```
+
+La última cabecera es opcional: sin ella se listan todos los toolsets.
 
 En otros clientes que aceptan servidores remotos por HTTP, use la misma URL con las cabeceras
 `X-OnePlatform-App-Key` y `X-OnePlatform-User-Key`. El servidor admite 30 solicitudes por minuto desde una misma IP

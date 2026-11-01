@@ -8,9 +8,13 @@ description: Conectar el servidor MCP de OnePlatform para consultar la documenta
 El servidor MCP expone la documentación y un conjunto acotado de operaciones de la API.
 
 - Sin llaves: `docs_search`, `docs_get_page` y `api_get_operation`.
-- Con llaves (`ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY`): operaciones de lectura (perfil, saldo, comercios,
-  links de pago, transacciones, facturas, envíos, sitios, avisos) y dos de escritura sin dinero: crear y cancelar un
-  link de pago. Ninguna cobra saldo, emite documentos fiscales ni mueve dinero.
+- Con llaves (`ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY`): las operaciones de la API agrupadas por producto
+  (toolsets): `cuenta`, `pagos`, `retiros`, `suscripciones`, `terminal`, `facturacion`, `envios`, `sitios`,
+  `analitica`, `correo`, `dominios`, `telemetria`, `ventas` y `agentes`. Escrituras sin dinero: crear y cancelar un
+  link de pago, detener una ejecución de un agente y cambiar el estado de un error de telemetría. Ninguna cobra
+  saldo, emite documentos fiscales, mueve dinero ni envía mensajes a terceros.
+- Acotar productos: `ONEPLATFORM_TOOLSETS=pagos,envios` (local) o la cabecera `X-OnePlatform-Toolsets` (alojado).
+  `cuenta` y la documentación se listan siempre.
 - Entorno: QA salvo `ONEPLATFORM_ENV=prod`.
 - Alojado, sin instalar nada: `https://mcp-qa.1platform.pro/mcp` (QA) o `https://mcp.1platform.pro/mcp`
   (producción), con las llaves en las cabeceras `X-OnePlatform-App-Key` y `X-OnePlatform-User-Key`. La URL fija el

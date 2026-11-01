@@ -95,3 +95,7 @@ for diagnostic, category in [
             assert f"category={category}" in message and "inspect-directory" in message
             assert "private-" not in message
 print("health adapter: 5 private transport diagnostics discriminate without leaking remote values")
+
+with patch.dict(os.environ, dict(CPANEL_FTP_HOST="private-host", CPANEL_FTP_USER="private-user", CPANEL_FTP_PASS="private-password")), patch.object(module.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "verified-state", "")):
+    assert module.ftp("cls -1") == "verified-state"
+print("health adapter: legacy activation-state reader call remains compatible")

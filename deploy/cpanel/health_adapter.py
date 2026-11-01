@@ -68,7 +68,7 @@ def transport_failure_category(output):
     return "unclassified"
 
 
-def ftp(commands, operation):
+def ftp(commands, operation="private-operation"):
     credentials = [os.environ.get(name, "") for name in ("CPANEL_FTP_HOST", "CPANEL_FTP_USER", "CPANEL_FTP_PASS")]
     if not all(credentials):
         raise ValueError("Incomplete FTPS configuration")

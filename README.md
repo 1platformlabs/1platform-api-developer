@@ -33,6 +33,10 @@ La identidad vigente usa Manrope, navy opaco y tokens compartidos con el website
 No sustituya el renderer de Scalar ni retire su búsqueda, autenticación o esquemas
 para aproximar una captura. La revisión visual se hace por separado de los guards.
 
+`pnpm check:docs-runtime` incluye el contraste efectivo del índice móvil a
+320/390 px, categorías abiertas, foco y Escape; el control negativo reintroduce
+la tinta anterior para comprobar que la regresión se detecta.
+
 La capa de integración cambia únicamente el anfitrión de las rutas del plugin;
 no vuelve a implementar operaciones. El HTML inicial tiene el título de la página.
 Al cargar, Scalar agrega su título y el título Markdown del contrato: la referencia

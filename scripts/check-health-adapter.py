@@ -4,6 +4,7 @@ import os
 import pathlib
 import subprocess
 import tempfile
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("health_adapter", ROOT / "deploy/cpanel/health_adapter.py")
@@ -76,3 +77,25 @@ exit "${TEST_CORE_EXIT:-0}"
     (folder / ".health_marker").write_text("\n")
     assert run().returncode != 0
 print("health adapter: 15 install/staged-truncation/idempotency/foreign-state/config/exit-status checks passed; no network")
+
+# Report a bounded diagnosis, never the remote output or configured values.
+for diagnostic, category in [
+    ("530 Login failed private-user", "authentication"),
+    ("550 private/path: Permission denied", "missing-or-denied"),
+    ("Certificate validation private-host", "tls"),
+    ("Connection reset private-host", "connection"),
+    ("unknown private-password", "unclassified"),
+]:
+    with patch.dict(os.environ, dict(CPANEL_FTP_HOST="private-host", CPANEL_FTP_USER="private-user", CPANEL_FTP_PASS="private-password")), patch.object(module.subprocess, "run", return_value=subprocess.CompletedProcess([], 1, "private-stdout", diagnostic)):
+        try:
+            module.ftp("cls -1", "inspect-directory")
+            raise AssertionError("Transport failure must stop the adapter")
+        except ValueError as error:
+            message = str(error)
+            assert f"category={category}" in message and "inspect-directory" in message
+            assert "private-" not in message
+print("health adapter: 5 private transport diagnostics discriminate without leaking remote values")
+
+with patch.dict(os.environ, dict(CPANEL_FTP_HOST="private-host", CPANEL_FTP_USER="private-user", CPANEL_FTP_PASS="private-password")), patch.object(module.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "verified-state", "")):
+    assert module.ftp("cls -1") == "verified-state"
+print("health adapter: legacy activation-state reader call remains compatible")

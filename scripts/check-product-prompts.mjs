@@ -41,8 +41,11 @@ try {
         if (evidence) await page.screenshot({path: join(evidence, `${label}.png`)});
         continue;
       }
-      await region.first().scrollIntoViewIfNeeded();
+      // The lazy chunk loads on mount and REPLACES the SSR fallback region, so
+      // acting on the fallback can hit a detached node (CI run 41871825572).
+      // Wait for the hydrated block (the one with a live region) and act on it.
       await block.waitFor();
+      await block.scrollIntoViewIfNeeded();
       const pre = block.locator('pre'); await pre.waitFor();
       await block.evaluate(el => el.scrollIntoView({block:'start'}));
       const code = await pre.textContent();

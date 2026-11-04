@@ -5,6 +5,17 @@ description: Registrar sitios web propios, consultarlos y crear sitios servidos 
 
 # Sitios web
 
+## Consulta con el MCP
+
+Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+`/docs/saas/1platform-api/sitios-web-y-contenido` mediante `docs_get_page`.
+Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
+documentación no requieren claves. Si el MCP no está conectado, siga
+https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md y consulte las fuentes públicas;
+indique esa limitación. No invente herramientas operativas: compruebe cuáles lista el MCP y use REST para las demás.
+Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el código ya esté preparado.
+
+
 Requiere la skill `1platform-hub`.
 
 1. `GET /api/v1/users/websites/mine` (`listMyWebsites`) para los sitios del usuario y
@@ -17,3 +28,5 @@ Requiere la skill `1platform-hub`.
    el resultado se consulta con `GET /api/v1/posts/content/jobs/{job_id}`.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/sitios-web-y-contenido.md
+
+El toolset `sitios` sólo consulta sitios y contenido; no registra sitios ni ejecuta generación.

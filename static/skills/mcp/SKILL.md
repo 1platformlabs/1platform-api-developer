@@ -5,6 +5,17 @@ description: Conectar el servidor MCP de OnePlatform para consultar la documenta
 
 # Servidor MCP de OnePlatform
 
+## Consulta con el MCP
+
+Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+`/docs/saas/1platform-api/integrar-con-ia` mediante `docs_get_page`.
+Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
+documentación no requieren claves. Si el MCP no está conectado, siga
+https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md y consulte las fuentes públicas;
+indique esa limitación. No invente herramientas operativas: compruebe cuáles lista el MCP y use REST para las demás.
+Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el código ya esté preparado.
+
+
 El servidor MCP expone la documentación y un conjunto acotado de operaciones de la API.
 
 - Sin llaves: `docs_search`, `docs_get_page` y `api_get_operation`.

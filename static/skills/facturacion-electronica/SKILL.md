@@ -5,6 +5,17 @@ description: Emitir, consultar y anular facturas electrónicas FEL de Guatemala 
 
 # Facturación electrónica (FEL, Guatemala)
 
+## Consulta con el MCP
+
+Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+`/docs/saas/1platform-api/facturacion-electronica/emitir-una-factura` mediante `docs_get_page`.
+Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
+documentación no requieren claves. Si el MCP no está conectado, siga
+https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md y consulte las fuentes públicas;
+indique esa limitación. No invente herramientas operativas: compruebe cuáles lista el MCP y use REST para las demás.
+Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el código ya esté preparado.
+
+
 Requiere la skill `1platform-hub`. Emitir y anular son actos fiscales: escriba ese código sólo con confirmación
 explícita del desarrollador.
 
@@ -18,3 +29,5 @@ explícita del desarrollador.
 6. `DELETE /api/v1/businesses/{businessId}/invoices/{invoiceId}` (`cancelInvoice`) para anular.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/facturacion-electronica/emitir-una-factura.md
+
+El toolset `facturacion` sólo consulta facturas; no emite ni anula documentos fiscales.

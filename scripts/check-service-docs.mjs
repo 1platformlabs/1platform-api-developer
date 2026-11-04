@@ -12,7 +12,7 @@ const docsRoot = join(root, 'docs/saas/1platform-api');
 const eventNames = new Set(['content_published', 'content_updated', 'comment_received', 'seo_action', 'keyword_research']);
 const excluded = ['Contenido', 'SEO', 'Imágenes', 'Ingresos publicitarios', 'Link building'];
 const required = ['plataforma/index.mdx', 'plataforma/webhooks.mdx', 'reference/retry-and-delivery.mdx',
-  'analitica/index.mdx', 'analitica/google-analytics.mdx', 'analitica/mapas-de-calor.mdx',
+  'nube/index.mdx', 'nube/_category_.json', 'analitica/index.mdx', 'analitica/google-analytics.mdx', 'analitica/mapas-de-calor.mdx',
   'agentes-de-ia/integrar-en-su-aplicacion.mdx', 'ventas/index.mdx'];
 for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas']) {
   required.push(`${product}/index.mdx`, `${product}/_category_.json`);
@@ -37,42 +37,47 @@ function eventErrors(example) {
   return errors;
 }
 
-export function audit(docs, spec) {
-  const bad = [];
-  const fail = (rule, path, detail) => bad.push(`${rule} ${path}: ${detail}`);
-  for (const path of required) if (!docs[path]) fail('corpus', path, 'documento requerido ausente');
-  const prose = path => markdownProse(docs[path] ?? '').replace(/[*_`]/g, '').replace(/\s+/g, ' ');
-  const requireClaim = (rule, path, pattern, detail) => {
-    if (!pattern.test(prose(path))) fail(rule, path, detail);
-  };
-  for (const [path, source] of Object.entries(docs)) {
-    if (/article_published/.test(source)) fail('DOC-02', path, 'evento obsoleto');
-    if (/webhook|retry-and-delivery/.test(path)) {
-      for (const sentence of prose(path).split(/(?<=[.!?;])\s+/)) {
-        const guarantee = /(?:at.least.once|al menos una vez|at.most.once|exactly.once|exactamente una vez)/i;
-        // Explicit denials stay useful; a later positive sentence still fails.
-        if (guarantee.test(sentence) && !/\b(?:no (?:hay |existe |se ofrece |se garantiza |garantiza )?|sin )[^.!?;]{0,60}(?:garant|entrega|exactamente|al menos)/i.test(sentence)) {
-          fail('DOC-06', path, 'garantía de entrega no acreditada');
-        }
-      }
-    }
-    if (/analitica\//.test(path)) {
-      for (const sentence of prose(path).split(/(?<=[.!?;])\s+/)) {
-        if (/ranking|páginas más/.test(sentence) && /visitas|visitantes/.test(sentence) &&
-            !/\bno (?:mide|representa|cuenta|son)\b/.test(sentence)) {
-          fail('DOC-07', path, 'ranking de muestras presentado como visitas');
-        }
-      }
-    }
-    // Keep historical product docs. Only new-offer claims are forbidden.
-    for (const sentence of prose(path).split(/(?<=[.!?;])\s+/)) {
-      const offering = /(?:Contenido|SEO|Imágenes|Ingresos publicitarios|Link building|Cloud as a Service)/i.test(sentence);
-      const promise = /(?:nueva[s]? oferta[s]?|nuevo[s]? servicio[s]?|ya (?:está|están) disponible|ahora (?:ofrecemos|incluye|puede contratar))/i.test(sentence);
-      if (offering && promise && !/\bno (?:se incorpora|se añade|son|es|forma|incluye)/i.test(sentence)) {
-        fail('alcance', path, 'oferta excluida incorporada como nueva');
-      }
+function auditDelivery(path, sentences, fail) {
+  for (const sentence of sentences) {
+    const guarantee = /(?:at.least.once|al menos una vez|at.most.once|exactly.once|exactamente una vez)/i;
+    // Explicit denials stay useful; a later positive sentence still fails.
+    if (guarantee.test(sentence) && !/\b(?:no (?:hay |existe |se ofrece |se garantiza |garantiza )?|sin )[^.!?;]{0,60}(?:garant|entrega|exactamente|al menos)/i.test(sentence)) {
+      fail('DOC-06', path, 'garantía de entrega no acreditada');
     }
   }
+}
+
+function auditRankings(path, sentences, fail) {
+  for (const sentence of sentences) {
+    if (/ranking|páginas más/.test(sentence) && /visitas|visitantes/.test(sentence) &&
+        !/\bno (?:mide|representa|cuenta|son)\b/.test(sentence)) {
+      fail('DOC-07', path, 'ranking de muestras presentado como visitas');
+    }
+  }
+}
+
+function auditOffers(path, sentences, fail) {
+  // Keep historical product docs. Only new-offer claims are forbidden.
+  for (const sentence of sentences) {
+    const offering = /(?:Contenido|SEO|Imágenes|Ingresos publicitarios|Link building)/i.test(sentence);
+    const promise = /(?:nueva[s]? oferta[s]?|nuevo[s]? servicio[s]?|ya (?:está|están) disponible|ahora (?:ofrecemos|incluye|puede contratar))/i.test(sentence);
+    if (offering && promise && !/\bno (?:se incorpora|se añade|son|es|forma|incluye)/i.test(sentence)) {
+      fail('alcance', path, 'oferta excluida incorporada como nueva');
+    }
+  }
+}
+
+function auditSources(docs, prose, fail) {
+  for (const [path, source] of Object.entries(docs)) {
+    if (/article_published/.test(source)) fail('DOC-02', path, 'evento obsoleto');
+    const sentences = prose(path).split(/(?<=[.!?;])\s+/);
+    if (/webhook|retry-and-delivery/.test(path)) auditDelivery(path, sentences, fail);
+    if (/analitica\//.test(path)) auditRankings(path, sentences, fail);
+    auditOffers(path, sentences, fail);
+  }
+}
+
+function auditAvailability(docs, requireClaim, fail) {
   for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas']) {
     for (const name of ['index.mdx', '_category_.json']) {
       const path = `${product}/${name}`;
@@ -87,11 +92,22 @@ export function audit(docs, spec) {
     requireClaim('DOC-09', path, /WhatsApp.*?en preparación/, 'WhatsApp no acredita mensajería cliente disponible');
     requireClaim('DOC-09', path, /operación interna.*?no (?:es|habilita)/, 'falta frontera entre API interna e integración cliente');
   }
+}
+
+function auditCloud(docs, prose, requireClaim, fail) {
   const scope = prose('plataforma/index.mdx');
   if (!/catálogo previo/.test(scope) || !excluded.every(name => scope.includes(name)) ||
-      !/Cloud as a Service.*?fuera.*?otra épica/.test(scope)) {
-    fail('alcance', 'plataforma/index.mdx', 'falta catálogo previo o límite de Cloud');
+      !/Nube.*?servidores y bases de datos/.test(scope)) {
+    fail('alcance', 'plataforma/index.mdx', 'falta catálogo previo o enlace de Nube');
   }
+  requireClaim('NUBE', 'nube/index.mdx', /servicio de Nube está disponible/, 'falta disponibilidad de Nube');
+  if (!docs['plataforma/index.mdx']?.includes('/docs/saas/1platform-api/nube')) fail('NUBE', 'plataforma/index.mdx', 'falta enlace de Nube');
+  for (const path of ['nube/index.mdx', 'nube/_category_.json']) {
+    if (/en preparación|en desarrollo/i.test(docs[path] ?? '')) fail('NUBE', path, 'disponibilidad obsoleta');
+  }
+}
+
+function auditAnalytics(docs, spec, fail) {
   const analytics = docs['analitica/google-analytics.mdx'] ?? '';
   const sampleEvents = [...analytics.matchAll(/"event_name"\s*:\s*"([^"]+)"/g)].map(match => match[1]);
   if (!sampleEvents.length || sampleEvents.some(name => !eventNames.has(name))) fail('DOC-02', 'analitica/google-analytics.mdx', 'ejemplo no válido');
@@ -99,6 +115,20 @@ export function audit(docs, spec) {
     fail('DOC-02', 'analitica/google-analytics.mdx', 'catálogo o límites de parámetros ausentes');
   }
   for (const error of eventErrors(spec.components?.schemas?.MPEventRequest?.example)) fail('DOC-02', 'OpenAPI.MPEventRequest.example', error);
+}
+
+export function audit(docs, spec) {
+  const bad = [];
+  const fail = (rule, path, detail) => bad.push(`${rule} ${path}: ${detail}`);
+  for (const path of required) if (!docs[path]) fail('corpus', path, 'documento requerido ausente');
+  const prose = path => markdownProse(docs[path] ?? '').replace(/[*_`]/g, '').replace(/\s+/g, ' ');
+  const requireClaim = (rule, path, pattern, detail) => {
+    if (!pattern.test(prose(path))) fail(rule, path, detail);
+  };
+  auditSources(docs, prose, fail);
+  auditAvailability(docs, requireClaim, fail);
+  auditCloud(docs, prose, requireClaim, fail);
+  auditAnalytics(docs, spec, fail);
   return bad;
 }
 
@@ -119,7 +149,8 @@ if (process.argv.includes('--self-test')) {
     ['DOC-09', 'ventas/index.mdx', s => s.replaceAll('en preparación', 'disponible')],
     ['DOC-09', 'agentes-de-ia/integrar-en-su-aplicacion.mdx', s => s.replace('no es un requisito universal', 'es un requisito universal')],
     ['alcance', 'plataforma/index.mdx', s => s.replace('catálogo previo', 'catálogo actual')],
-    ['alcance', 'plataforma/index.mdx', s => `${s}\nCloud as a Service ya está disponible.`],
+    ['NUBE', 'nube/index.mdx', s => s.replace('servicio de Nube está disponible', 'servicio de Nube está en preparación')],
+    ['NUBE', 'plataforma/index.mdx', s => s.replace('/docs/saas/1platform-api/nube', '/docs/no-existe')],
     ...excluded.map(name => ['alcance', 'plataforma/index.mdx', s => `${s}\n${name} es una nueva oferta.`]),
     ['corpus', 'analitica/mapas-de-calor.mdx', () => ''],
   ];

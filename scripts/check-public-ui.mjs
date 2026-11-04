@@ -32,8 +32,11 @@ const BOOT_JS_BUDGET = 180 * 1024;
 // The 2026-10-20 code-grounded audit corrected all 63 pages: 468,566 gzip bytes
 // (453,307 before), the growth spread over per-page doc chunks; main.js and
 // runtime~main.js did not grow. Raised to 470 KiB by owner decision.
+// 2026-11-04: the AI/MCP integration (#90) left main at the limit and the Nube
+// guide (#91) adds its own 2,596-byte doc chunk: 483,816 gzip bytes. Raised to
+// 475 KiB by owner decision.
 // This content allowance does not raise the boot or CSS budgets.
-const TOTAL_JS_BUDGET = 470 * 1024;
+const TOTAL_JS_BUDGET = 475 * 1024;
 const CSS_BUDGET = 25 * 1024;
 
 const SNAPSHOT_REQUIREMENTS = [

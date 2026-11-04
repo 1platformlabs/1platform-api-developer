@@ -37,42 +37,47 @@ function eventErrors(example) {
   return errors;
 }
 
-export function audit(docs, spec) {
-  const bad = [];
-  const fail = (rule, path, detail) => bad.push(`${rule} ${path}: ${detail}`);
-  for (const path of required) if (!docs[path]) fail('corpus', path, 'documento requerido ausente');
-  const prose = path => markdownProse(docs[path] ?? '').replace(/[*_`]/g, '').replace(/\s+/g, ' ');
-  const requireClaim = (rule, path, pattern, detail) => {
-    if (!pattern.test(prose(path))) fail(rule, path, detail);
-  };
-  for (const [path, source] of Object.entries(docs)) {
-    if (/article_published/.test(source)) fail('DOC-02', path, 'evento obsoleto');
-    if (/webhook|retry-and-delivery/.test(path)) {
-      for (const sentence of prose(path).split(/(?<=[.!?;])\s+/)) {
-        const guarantee = /(?:at.least.once|al menos una vez|at.most.once|exactly.once|exactamente una vez)/i;
-        // Explicit denials stay useful; a later positive sentence still fails.
-        if (guarantee.test(sentence) && !/\b(?:no (?:hay |existe |se ofrece |se garantiza |garantiza )?|sin )[^.!?;]{0,60}(?:garant|entrega|exactamente|al menos)/i.test(sentence)) {
-          fail('DOC-06', path, 'garantía de entrega no acreditada');
-        }
-      }
-    }
-    if (/analitica\//.test(path)) {
-      for (const sentence of prose(path).split(/(?<=[.!?;])\s+/)) {
-        if (/ranking|páginas más/.test(sentence) && /visitas|visitantes/.test(sentence) &&
-            !/\bno (?:mide|representa|cuenta|son)\b/.test(sentence)) {
-          fail('DOC-07', path, 'ranking de muestras presentado como visitas');
-        }
-      }
-    }
-    // Keep historical product docs. Only new-offer claims are forbidden.
-    for (const sentence of prose(path).split(/(?<=[.!?;])\s+/)) {
-      const offering = /(?:Contenido|SEO|Imágenes|Ingresos publicitarios|Link building)/i.test(sentence);
-      const promise = /(?:nueva[s]? oferta[s]?|nuevo[s]? servicio[s]?|ya (?:está|están) disponible|ahora (?:ofrecemos|incluye|puede contratar))/i.test(sentence);
-      if (offering && promise && !/\bno (?:se incorpora|se añade|son|es|forma|incluye)/i.test(sentence)) {
-        fail('alcance', path, 'oferta excluida incorporada como nueva');
-      }
+function auditDelivery(path, sentences, fail) {
+  for (const sentence of sentences) {
+    const guarantee = /(?:at.least.once|al menos una vez|at.most.once|exactly.once|exactamente una vez)/i;
+    // Explicit denials stay useful; a later positive sentence still fails.
+    if (guarantee.test(sentence) && !/\b(?:no (?:hay |existe |se ofrece |se garantiza |garantiza )?|sin )[^.!?;]{0,60}(?:garant|entrega|exactamente|al menos)/i.test(sentence)) {
+      fail('DOC-06', path, 'garantía de entrega no acreditada');
     }
   }
+}
+
+function auditRankings(path, sentences, fail) {
+  for (const sentence of sentences) {
+    if (/ranking|páginas más/.test(sentence) && /visitas|visitantes/.test(sentence) &&
+        !/\bno (?:mide|representa|cuenta|son)\b/.test(sentence)) {
+      fail('DOC-07', path, 'ranking de muestras presentado como visitas');
+    }
+  }
+}
+
+function auditOffers(path, sentences, fail) {
+  // Keep historical product docs. Only new-offer claims are forbidden.
+  for (const sentence of sentences) {
+    const offering = /(?:Contenido|SEO|Imágenes|Ingresos publicitarios|Link building)/i.test(sentence);
+    const promise = /(?:nueva[s]? oferta[s]?|nuevo[s]? servicio[s]?|ya (?:está|están) disponible|ahora (?:ofrecemos|incluye|puede contratar))/i.test(sentence);
+    if (offering && promise && !/\bno (?:se incorpora|se añade|son|es|forma|incluye)/i.test(sentence)) {
+      fail('alcance', path, 'oferta excluida incorporada como nueva');
+    }
+  }
+}
+
+function auditSources(docs, prose, fail) {
+  for (const [path, source] of Object.entries(docs)) {
+    if (/article_published/.test(source)) fail('DOC-02', path, 'evento obsoleto');
+    const sentences = prose(path).split(/(?<=[.!?;])\s+/);
+    if (/webhook|retry-and-delivery/.test(path)) auditDelivery(path, sentences, fail);
+    if (/analitica\//.test(path)) auditRankings(path, sentences, fail);
+    auditOffers(path, sentences, fail);
+  }
+}
+
+function auditAvailability(docs, requireClaim, fail) {
   for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas']) {
     for (const name of ['index.mdx', '_category_.json']) {
       const path = `${product}/${name}`;
@@ -87,6 +92,9 @@ export function audit(docs, spec) {
     requireClaim('DOC-09', path, /WhatsApp.*?en preparación/, 'WhatsApp no acredita mensajería cliente disponible');
     requireClaim('DOC-09', path, /operación interna.*?no (?:es|habilita)/, 'falta frontera entre API interna e integración cliente');
   }
+}
+
+function auditCloud(docs, prose, requireClaim, fail) {
   const scope = prose('plataforma/index.mdx');
   if (!/catálogo previo/.test(scope) || !excluded.every(name => scope.includes(name)) ||
       !/Nube.*?servidores y bases de datos/.test(scope)) {
@@ -97,6 +105,9 @@ export function audit(docs, spec) {
   for (const path of ['nube/index.mdx', 'nube/_category_.json']) {
     if (/en preparación|en desarrollo/i.test(docs[path] ?? '')) fail('NUBE', path, 'disponibilidad obsoleta');
   }
+}
+
+function auditAnalytics(docs, spec, fail) {
   const analytics = docs['analitica/google-analytics.mdx'] ?? '';
   const sampleEvents = [...analytics.matchAll(/"event_name"\s*:\s*"([^"]+)"/g)].map(match => match[1]);
   if (!sampleEvents.length || sampleEvents.some(name => !eventNames.has(name))) fail('DOC-02', 'analitica/google-analytics.mdx', 'ejemplo no válido');
@@ -104,6 +115,20 @@ export function audit(docs, spec) {
     fail('DOC-02', 'analitica/google-analytics.mdx', 'catálogo o límites de parámetros ausentes');
   }
   for (const error of eventErrors(spec.components?.schemas?.MPEventRequest?.example)) fail('DOC-02', 'OpenAPI.MPEventRequest.example', error);
+}
+
+export function audit(docs, spec) {
+  const bad = [];
+  const fail = (rule, path, detail) => bad.push(`${rule} ${path}: ${detail}`);
+  for (const path of required) if (!docs[path]) fail('corpus', path, 'documento requerido ausente');
+  const prose = path => markdownProse(docs[path] ?? '').replace(/[*_`]/g, '').replace(/\s+/g, ' ');
+  const requireClaim = (rule, path, pattern, detail) => {
+    if (!pattern.test(prose(path))) fail(rule, path, detail);
+  };
+  auditSources(docs, prose, fail);
+  auditAvailability(docs, requireClaim, fail);
+  auditCloud(docs, prose, requireClaim, fail);
+  auditAnalytics(docs, spec, fail);
   return bad;
 }
 

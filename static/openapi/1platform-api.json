@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.131.0"
+    "version": "PRODv5.132.0"
   },
   "servers": [
     {
@@ -67467,6 +67467,2056 @@
         ]
       }
     },
+    "/api/v1/studio/templates": {
+      "get": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Catalog of creative studio templates",
+        "description": "Published templates visible to your workspace, with a short-lived sample link and the price of one piece in your balance currency (fee included). `price` is null when prices are not configured.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listStudioTemplates",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(video|image)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "video | image",
+              "title": "Kind"
+            },
+            "description": "video | image"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "id": "6710aa000000000000000f01",
+                      "kind": "video",
+                      "category": "ugc",
+                      "title": "Presentadora en tienda",
+                      "description": "Una presentadora cuenta tu producto en 15 segundos.",
+                      "sample_url": "https://files.example/s.mp4",
+                      "sample_content_type": "video/mp4",
+                      "inputs": {
+                        "photos_min": 1,
+                        "photos_max": 5,
+                        "prompt_required": true
+                      },
+                      "options": {
+                        "durations": [
+                          15
+                        ],
+                        "aspects": [
+                          "9:16"
+                        ]
+                      },
+                      "price": {
+                        "amount": "7.05",
+                        "currency": "USD"
+                      }
+                    }
+                  ],
+                  "msg": "Catalog retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The creative studio is switched off for this workspace",
+            "x-error-codes": [
+              "module_disabled",
+              "studio_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/studio/orders": {
+      "post": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Order a piece from a template",
+        "description": "Multipart: `template_id`, `prompt`, `options` (JSON), `expected_amount` (the price you were shown), optional `recreation_of` and 1-5 `photos` (JPEG/PNG/WebP, ≤10 MB each, checked by their bytes). Nothing is charged now: the price is sealed and charged when the piece is delivered. Send an `Idempotency-Key` header (16-64 printable characters) to retry safely: the same key and content return the same order.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "createStudioOrder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "16-64 characters",
+              "title": "Idempotency-Key"
+            },
+            "description": "16-64 characters"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_createStudioOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "template_id": "6710aa000000000000000f01",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "status": "received",
+                    "prompt": "Vendedora en mostrador, tono cercano",
+                    "options": {
+                      "duration": 15,
+                      "aspect": "9:16"
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "eta_minutes": 15,
+                    "created_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Order already received"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Order received",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "template_id": "6710aa000000000000000f01",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "status": "received",
+                    "prompt": "Vendedora en mostrador, tono cercano",
+                    "options": {
+                      "duration": 15,
+                      "aspect": "9:16"
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "eta_minutes": 15,
+                    "created_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Order received"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Available balance is short",
+            "x-error-codes": [
+              "studio_insufficient_balance"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "403": {
+            "description": "The creative studio is switched off for this workspace",
+            "x-error-codes": [
+              "module_disabled",
+              "studio_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Template or source order not found",
+            "x-error-codes": [
+              "studio_template_not_found",
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Debt, limit, price changed, expired upload or key reused",
+            "x-error-codes": [
+              "studio_payer_debt",
+              "studio_open_orders_limit",
+              "studio_price_changed",
+              "studio_upload_expired",
+              "studio_idempotency_conflict"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid field or file",
+            "x-error-codes": [
+              "studio_input_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error",
+            "x-error-codes": [
+              "studio_error"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "x-error-codes": [
+              "studio_busy",
+              "studio_unavailable",
+              "studio_price_missing",
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "10/minute"
+        ]
+      },
+      "get": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Your creative studio orders",
+        "description": "Your orders, newest first (page ≤ 50). In progress orders carry `eta_minutes` (~15).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listStudioOrders",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(received|processing|delivered|cancelled)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "State",
+              "title": "Status"
+            },
+            "description": "State"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orders",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f01",
+                        "template_id": "6710aa000000000000000f01",
+                        "title": "Presentadora en tienda",
+                        "kind": "video",
+                        "category": "ugc",
+                        "status": "received",
+                        "prompt": "Vendedora en mostrador, tono cercano",
+                        "options": {
+                          "duration": 15,
+                          "aspect": "9:16"
+                        },
+                        "photos": 2,
+                        "price": {
+                          "amount": "7.05",
+                          "currency": "USD"
+                        },
+                        "eta_minutes": 15,
+                        "created_at": "2026-11-03T15:00:00Z"
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "msg": "Orders retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/studio/orders/{order_id}": {
+      "get": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "One of your creative studio orders",
+        "description": "404 when it is not yours.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "getStudioOrder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "template_id": "6710aa000000000000000f01",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "status": "received",
+                    "prompt": "Vendedora en mostrador, tono cercano",
+                    "options": {
+                      "duration": 15,
+                      "aspect": "9:16"
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "eta_minutes": 15,
+                    "created_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Order retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/studio/assets": {
+      "get": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Your creative studio library",
+        "description": "Delivered pieces, newest first (page ≤ 50).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listStudioAssets",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Library",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f02",
+                        "order_id": "6710aa000000000000000f01",
+                        "kind": "video",
+                        "content_type": "video/mp4",
+                        "bytes": 4200000,
+                        "filename": "ugc-000f01.mp4",
+                        "title": "Presentadora en tienda",
+                        "template_id": "6710aa000000000000000f03",
+                        "created_at": "2026-11-03T15:14:00Z"
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "msg": "Library retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/studio/assets/{asset_id}/url": {
+      "get": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Signed link to view or download a piece",
+        "description": "300 s link; `disposition=attachment` downloads with the piece's own name.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "getStudioAssetUrl",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Piece id",
+              "title": "Asset Id"
+            },
+            "description": "Piece id"
+          },
+          {
+            "name": "disposition",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(inline|attachment)$",
+              "description": "inline | attachment",
+              "default": "inline",
+              "title": "Disposition"
+            },
+            "description": "inline | attachment"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "url": "https://files.example/p.mp4",
+                    "expires_in": 300
+                  },
+                  "msg": "Link created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_asset_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/studio/charges": {
+      "get": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Your unpaid creative studio pieces",
+        "description": "Open debts: a piece delivered when your balance was short. An open debt blocks new orders until it is paid.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listStudioDebts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debts",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f04",
+                        "order_id": "6710aa000000000000000f01",
+                        "amount": "7.05",
+                        "currency": "USD",
+                        "state": "debt",
+                        "created_at": "2026-11-03T15:14:00Z"
+                      }
+                    ]
+                  },
+                  "msg": "Debts retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/studio/charges/{charge_id}/pay": {
+      "post": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Pay an unpaid piece with your balance",
+        "description": "402 when your available balance is short.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "payStudioDebt",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "charge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Charge id",
+              "title": "Charge Id"
+            },
+            "description": "Charge id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paid",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f04",
+                    "order_id": "6710aa000000000000000f01",
+                    "amount": "7.05",
+                    "currency": "USD",
+                    "state": "charged",
+                    "created_at": "2026-11-03T15:14:00Z"
+                  },
+                  "msg": "Debt paid"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Available balance is short",
+            "x-error-codes": [
+              "studio_insufficient_balance"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_charge_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "x-error-codes": [
+              "studio_unavailable",
+              "studio_busy"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "30/minute"
+        ]
+      }
+    },
+    "/api/v1/integrations/studio/orders/actionable": {
+      "get": {
+        "tags": [
+          "Creative Studio Agent"
+        ],
+        "summary": "Orders the agent may produce",
+        "description": "`received` orders of agent templates, oldest first. No links to photos.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `studio.produce` and platform scope.",
+        "operationId": "listStudioAgentOrders",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 5,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
+              "title": "Authorization"
+            },
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orders",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "id": "6710aa000000000000000f01",
+                      "template_id": "6710aa000000000000000f01",
+                      "kind": "video",
+                      "created_at": "2026-11-03T15:00:00Z"
+                    }
+                  ],
+                  "msg": "Orders retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid service credential",
+            "x-error-codes": [
+              "service_key_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "403": {
+            "description": "Missing capability or wrong scope",
+            "x-error-codes": [
+              "service_capability_missing",
+              "service_scope_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/integrations/studio/orders/{order_id}/claim": {
+      "post": {
+        "tags": [
+          "Creative Studio Agent"
+        ],
+        "summary": "Claim an order (agent)",
+        "description": "10-minute lease, renewable with heartbeat up to 2 h from the claim. Returns the photos (600 s links), the template's agent parameters and a previous generation reference if any.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `studio.produce` and platform scope.",
+        "operationId": "claimStudioAgentOrder",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
+              "title": "Authorization"
+            },
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Claimed",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "claim_id": "c1a2b3c4d5e6f708",
+                    "lease_until": "2026-11-03T15:10:00Z",
+                    "prompt": "Vendedora",
+                    "options": {
+                      "duration": 15
+                    },
+                    "agent_params": {
+                      "preset": "ugc"
+                    },
+                    "inputs": [
+                      {
+                        "url": "https://files.example/i.png",
+                        "content_type": "image/png",
+                        "bytes": 120000
+                      }
+                    ]
+                  },
+                  "msg": "Order claimed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid service credential",
+            "x-error-codes": [
+              "service_key_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "403": {
+            "description": "Missing capability or wrong scope",
+            "x-error-codes": [
+              "service_capability_missing",
+              "service_scope_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "404": {
+            "description": "Not found or not an agent template",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Already taken",
+            "x-error-codes": [
+              "studio_order_taken"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/integrations/studio/orders/{order_id}/heartbeat": {
+      "post": {
+        "tags": [
+          "Creative Studio Agent"
+        ],
+        "summary": "Renew the lease and record the generation",
+        "description": "Send `provider_job_ref` BEFORE waiting for the result, so a restart resumes it.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `studio.produce` and platform scope.",
+        "operationId": "heartbeatStudioAgentOrder",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
+              "title": "Authorization"
+            },
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentHeartbeatIn"
+              },
+              "example": {
+                "claim_id": "c1a2b3c4d5e6f708",
+                "provider_job_ref": "job-123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Renewed",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "lease_until": "2026-11-03T15:20:00Z"
+                  },
+                  "msg": "Lease renewed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid service credential",
+            "x-error-codes": [
+              "service_key_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "403": {
+            "description": "Missing capability or wrong scope",
+            "x-error-codes": [
+              "service_capability_missing",
+              "service_scope_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Claim lost",
+            "x-error-codes": [
+              "studio_claim_lost"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/integrations/studio/orders/{order_id}/release": {
+      "post": {
+        "tags": [
+          "Creative Studio Agent"
+        ],
+        "summary": "Give an order back to the team",
+        "description": "With a note the team sees in the console.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `studio.produce` and platform scope.",
+        "operationId": "releaseStudioAgentOrder",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
+              "title": "Authorization"
+            },
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentReleaseIn"
+              },
+              "example": {
+                "claim_id": "c1a2b3c4d5e6f708",
+                "note": "La generación falló dos veces"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Released",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "status": "received"
+                  },
+                  "msg": "Order released"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid service credential",
+            "x-error-codes": [
+              "service_key_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "403": {
+            "description": "Missing capability or wrong scope",
+            "x-error-codes": [
+              "service_capability_missing",
+              "service_scope_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Claim lost",
+            "x-error-codes": [
+              "studio_claim_lost"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/integrations/studio/orders/{order_id}/deliver": {
+      "post": {
+        "tags": [
+          "Creative Studio Agent"
+        ],
+        "summary": "Deliver by link (agent)",
+        "description": "Same rules as the console delivery: allowed https hosts, ≤ 90 MB, bytes, antivirus, one charge.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `studio.produce` and platform scope.",
+        "operationId": "deliverStudioAgentOrder",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
+              "title": "Authorization"
+            },
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffDeliverUrlIn"
+              },
+              "example": {
+                "claim_id": "c1a2b3c4d5e6f708",
+                "source_url": "https://cdn.example.net/piece.mp4"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivered",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "status": "delivered"
+                  },
+                  "msg": "Order delivered"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid service credential",
+            "x-error-codes": [
+              "service_key_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "403": {
+            "description": "Missing capability or wrong scope",
+            "x-error-codes": [
+              "service_capability_missing",
+              "service_scope_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Claim lost or delivery in progress",
+            "x-error-codes": [
+              "studio_claim_lost",
+              "studio_delivery_in_progress"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Link or file refused",
+            "x-error-codes": [
+              "studio_source_refused",
+              "studio_source_expired",
+              "studio_piece_too_large",
+              "studio_piece_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "x-error-codes": [
+              "studio_source_unavailable",
+              "studio_scan_unavailable",
+              "studio_storage_unavailable",
+              "studio_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
     "/api/v1/conversions/inbound/{inbound_token}": {
       "post": {
         "tags": [
@@ -114387,6 +116437,2762 @@
         ]
       }
     },
+    "/api/v1/platform/studio/templates": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Studio templates (staff)",
+        "description": "Every template with its internal recipe.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "listStaffStudioTemplates",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(draft|published|archived)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "State",
+              "title": "Status"
+            },
+            "description": "State"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(video|image)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "video | image",
+              "title": "Kind"
+            },
+            "description": "video | image"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Templates",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f03",
+                        "kind": "video",
+                        "category": "ugc",
+                        "title_es": "Presentadora en tienda",
+                        "title_en": "Presenter in store",
+                        "description_es": "",
+                        "description_en": "",
+                        "cost_millicredits": 105000,
+                        "inputs": {
+                          "photos_min": 1,
+                          "photos_max": 5,
+                          "prompt_required": true
+                        },
+                        "options": {
+                          "durations": [
+                            15
+                          ],
+                          "aspects": [
+                            "9:16"
+                          ]
+                        },
+                        "status": "draft",
+                        "producer": "manual",
+                        "recipe": {
+                          "reference_url": "https://example.com/r",
+                          "notes": ""
+                        },
+                        "brand_free_confirmed": false,
+                        "price_usd": "6.78",
+                        "created_at": "2026-11-03T15:00:00Z",
+                        "updated_at": "2026-11-03T15:00:00Z"
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "msg": "Templates retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be stored or signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      },
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Create a studio template (draft)",
+        "description": "Created as a draft.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "createStudioTemplate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffTemplateCreate"
+              },
+              "example": {
+                "kind": "video",
+                "category": "ugc",
+                "title_es": "Presentadora en tienda",
+                "title_en": "Presenter in store",
+                "cost_millicredits": 105000,
+                "recipe": {
+                  "reference_url": "https://example.com/r",
+                  "notes": "Cierre azul"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f03",
+                    "kind": "video",
+                    "category": "ugc",
+                    "title_es": "Presentadora en tienda",
+                    "title_en": "Presenter in store",
+                    "description_es": "",
+                    "description_en": "",
+                    "cost_millicredits": 105000,
+                    "inputs": {
+                      "photos_min": 1,
+                      "photos_max": 5,
+                      "prompt_required": true
+                    },
+                    "options": {
+                      "durations": [
+                        15
+                      ],
+                      "aspects": [
+                        "9:16"
+                      ]
+                    },
+                    "status": "draft",
+                    "producer": "manual",
+                    "recipe": {
+                      "reference_url": "https://example.com/r",
+                      "notes": ""
+                    },
+                    "brand_free_confirmed": false,
+                    "price_usd": "6.78",
+                    "created_at": "2026-11-03T15:00:00Z",
+                    "updated_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Template created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid template",
+            "x-error-codes": [
+              "studio_template_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/templates/{template_id}": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "One studio template",
+        "description": "**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "getStudioTemplate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Template id",
+              "title": "Template Id"
+            },
+            "description": "Template id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f03",
+                    "kind": "video",
+                    "category": "ugc",
+                    "title_es": "Presentadora en tienda",
+                    "title_en": "Presenter in store",
+                    "description_es": "",
+                    "description_en": "",
+                    "cost_millicredits": 105000,
+                    "inputs": {
+                      "photos_min": 1,
+                      "photos_max": 5,
+                      "prompt_required": true
+                    },
+                    "options": {
+                      "durations": [
+                        15
+                      ],
+                      "aspects": [
+                        "9:16"
+                      ]
+                    },
+                    "status": "draft",
+                    "producer": "manual",
+                    "recipe": {
+                      "reference_url": "https://example.com/r",
+                      "notes": ""
+                    },
+                    "brand_free_confirmed": false,
+                    "price_usd": "6.78",
+                    "created_at": "2026-11-03T15:00:00Z",
+                    "updated_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Template retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "x-error-codes": [
+              "studio_template_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be stored or signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Edit, publish or move back to draft",
+        "description": "Publishing needs a sample, `brand_free_confirmed` and — for agent templates — `recipe.agent_params` (422 otherwise).\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "updateStudioTemplate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Template id",
+              "title": "Template Id"
+            },
+            "description": "Template id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffTemplatePatch"
+              },
+              "example": {
+                "brand_free_confirmed": true,
+                "status": "published"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f03",
+                    "kind": "video",
+                    "category": "ugc",
+                    "title_es": "Presentadora en tienda",
+                    "title_en": "Presenter in store",
+                    "description_es": "",
+                    "description_en": "",
+                    "cost_millicredits": 105000,
+                    "inputs": {
+                      "photos_min": 1,
+                      "photos_max": 5,
+                      "prompt_required": true
+                    },
+                    "options": {
+                      "durations": [
+                        15
+                      ],
+                      "aspects": [
+                        "9:16"
+                      ]
+                    },
+                    "status": "draft",
+                    "producer": "manual",
+                    "recipe": {
+                      "reference_url": "https://example.com/r",
+                      "notes": ""
+                    },
+                    "brand_free_confirmed": false,
+                    "price_usd": "6.78",
+                    "created_at": "2026-11-03T15:00:00Z",
+                    "updated_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Template updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "x-error-codes": [
+              "studio_template_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid or not publishable",
+            "x-error-codes": [
+              "studio_template_invalid",
+              "studio_template_not_publishable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/templates/{template_id}/sample": {
+      "put": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Upload the template's sample",
+        "description": "Multipart `file`: a video (mp4/mov/webm ≤ 90 MB) or an image (jpeg/png/webp ≤ 10 MB) matching the template kind, checked by its bytes and stored under our own name.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "uploadStudioTemplateSample",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Template id",
+              "title": "Template Id"
+            },
+            "description": "Template id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_uploadStudioTemplateSample"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f03",
+                    "kind": "video",
+                    "category": "ugc",
+                    "title_es": "Presentadora en tienda",
+                    "title_en": "Presenter in store",
+                    "description_es": "",
+                    "description_en": "",
+                    "cost_millicredits": 105000,
+                    "inputs": {
+                      "photos_min": 1,
+                      "photos_max": 5,
+                      "prompt_required": true
+                    },
+                    "options": {
+                      "durations": [
+                        15
+                      ],
+                      "aspects": [
+                        "9:16"
+                      ]
+                    },
+                    "status": "draft",
+                    "producer": "manual",
+                    "recipe": {
+                      "reference_url": "https://example.com/r",
+                      "notes": ""
+                    },
+                    "brand_free_confirmed": false,
+                    "price_usd": "6.78",
+                    "created_at": "2026-11-03T15:00:00Z",
+                    "updated_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Sample stored"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "x-error-codes": [
+              "studio_template_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Not a valid sample",
+            "x-error-codes": [
+              "studio_input_invalid",
+              "studio_template_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be stored or signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/templates/{template_id}/archive": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Archive a studio template",
+        "description": "Orders in progress keep their snapshot.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "archiveStudioTemplate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Template id",
+              "title": "Template Id"
+            },
+            "description": "Template id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archived",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f03",
+                    "kind": "video",
+                    "category": "ugc",
+                    "title_es": "Presentadora en tienda",
+                    "title_en": "Presenter in store",
+                    "description_es": "",
+                    "description_en": "",
+                    "cost_millicredits": 105000,
+                    "inputs": {
+                      "photos_min": 1,
+                      "photos_max": 5,
+                      "prompt_required": true
+                    },
+                    "options": {
+                      "durations": [
+                        15
+                      ],
+                      "aspects": [
+                        "9:16"
+                      ]
+                    },
+                    "status": "archived",
+                    "producer": "manual",
+                    "recipe": {
+                      "reference_url": "https://example.com/r",
+                      "notes": ""
+                    },
+                    "brand_free_confirmed": false,
+                    "price_usd": "6.78",
+                    "created_at": "2026-11-03T15:00:00Z",
+                    "updated_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Template archived"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "x-error-codes": [
+              "studio_template_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/orders": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Production queue",
+        "description": "Open orders by default (oldest first); filter by `status`.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "listStudioQueue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(received|processing|delivered|cancelled)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "State",
+              "title": "Status"
+            },
+            "description": "State"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f01",
+                        "app_id": "6710aa000000000000000a01",
+                        "user_id": "6710aa000000000000000b01",
+                        "template_id": "6710aa000000000000000f03",
+                        "title": "Presentadora en tienda",
+                        "kind": "video",
+                        "category": "ugc",
+                        "producer": "manual",
+                        "status": "processing",
+                        "prompt": "Vendedora en mostrador",
+                        "options": {
+                          "duration": 15
+                        },
+                        "photos": 2,
+                        "price": {
+                          "amount": "7.05",
+                          "currency": "USD"
+                        },
+                        "claim_id": "c1a2b3c4d5e6f708",
+                        "claimed_by": {
+                          "kind": "staff",
+                          "ref": "6710aa000000000000000c01"
+                        },
+                        "claimed_at": "2026-11-03T15:01:00Z",
+                        "has_provider_job": false,
+                        "created_at": "2026-11-03T15:00:00Z"
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "msg": "Queue retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/orders/{order_id}": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Order detail (staff)",
+        "description": "Recipe and 600 s links to the customer's photos.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "getStudioQueueOrder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "template_id": "6710aa000000000000000f03",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "producer": "manual",
+                    "status": "processing",
+                    "prompt": "Vendedora en mostrador",
+                    "options": {
+                      "duration": 15
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "claim_id": "c1a2b3c4d5e6f708",
+                    "claimed_by": {
+                      "kind": "staff",
+                      "ref": "6710aa000000000000000c01"
+                    },
+                    "claimed_at": "2026-11-03T15:01:00Z",
+                    "has_provider_job": false,
+                    "created_at": "2026-11-03T15:00:00Z",
+                    "recipe": {
+                      "reference_url": "https://example.com/r",
+                      "notes": ""
+                    },
+                    "inputs": [
+                      {
+                        "url": "https://files.example/i.png",
+                        "content_type": "image/png",
+                        "bytes": 120000
+                      }
+                    ]
+                  },
+                  "msg": "Order retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be stored or signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/orders/{order_id}/claim": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Take an order",
+        "description": "`received → processing`; the customer sees «Se está procesando · ~15 min». 409 when someone else (or the agent) took it first.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "claimStudioOrder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Taken",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "template_id": "6710aa000000000000000f03",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "producer": "manual",
+                    "status": "processing",
+                    "prompt": "Vendedora en mostrador",
+                    "options": {
+                      "duration": 15
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "claim_id": "c1a2b3c4d5e6f708",
+                    "claimed_by": {
+                      "kind": "staff",
+                      "ref": "6710aa000000000000000c01"
+                    },
+                    "claimed_at": "2026-11-03T15:01:00Z",
+                    "has_provider_job": false,
+                    "created_at": "2026-11-03T15:00:00Z",
+                    "recipe": {
+                      "reference_url": "https://example.com/r",
+                      "notes": ""
+                    },
+                    "inputs": [
+                      {
+                        "url": "https://files.example/i.png",
+                        "content_type": "image/png",
+                        "bytes": 120000
+                      }
+                    ]
+                  },
+                  "msg": "Order taken"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Already taken",
+            "x-error-codes": [
+              "studio_order_taken"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be stored or signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/orders/{order_id}/release": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Give an order back",
+        "description": "Only the holder of `claim_id`.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "releaseStudioOrder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffClaimIn"
+              },
+              "example": {
+                "claim_id": "c1a2b3c4d5e6f708"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Released",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "template_id": "6710aa000000000000000f03",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "producer": "manual",
+                    "status": "received",
+                    "prompt": "Vendedora en mostrador",
+                    "options": {
+                      "duration": 15
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "claim_id": "c1a2b3c4d5e6f708",
+                    "claimed_by": {
+                      "kind": "staff",
+                      "ref": "6710aa000000000000000c01"
+                    },
+                    "claimed_at": "2026-11-03T15:01:00Z",
+                    "has_provider_job": false,
+                    "created_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Order released"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Claim lost",
+            "x-error-codes": [
+              "studio_claim_lost"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/orders/{order_id}/force-release": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Force a stale staff claim back to the queue",
+        "description": "Only a STAFF claim older than 30 minutes, logged. An agent claim with a live lease cannot be forced (409 `studio_claim_live`): it expires on its own.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "forceReleaseStudioOrder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Released",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "template_id": "6710aa000000000000000f03",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "producer": "manual",
+                    "status": "received",
+                    "prompt": "Vendedora en mostrador",
+                    "options": {
+                      "duration": 15
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "claim_id": "c1a2b3c4d5e6f708",
+                    "claimed_by": {
+                      "kind": "staff",
+                      "ref": "6710aa000000000000000c01"
+                    },
+                    "claimed_at": "2026-11-03T15:01:00Z",
+                    "has_provider_job": false,
+                    "created_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Order released"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Not forceable",
+            "x-error-codes": [
+              "studio_claim_lost",
+              "studio_claim_live"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/orders/{order_id}/cancel": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Cancel an order",
+        "description": "A `received` or `processing` order; nothing is charged.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "cancelStudioOrder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffCancelIn"
+              },
+              "example": {
+                "reason": "Fotos ilegibles"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cancelled",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "template_id": "6710aa000000000000000f03",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "producer": "manual",
+                    "status": "cancelled",
+                    "prompt": "Vendedora en mostrador",
+                    "options": {
+                      "duration": 15
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "claim_id": "c1a2b3c4d5e6f708",
+                    "claimed_by": {
+                      "kind": "staff",
+                      "ref": "6710aa000000000000000c01"
+                    },
+                    "claimed_at": "2026-11-03T15:01:00Z",
+                    "has_provider_job": false,
+                    "created_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Order cancelled"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Already delivered or cancelled",
+            "x-error-codes": [
+              "studio_order_not_cancellable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/orders/{order_id}/deliver": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Deliver an order from a link",
+        "description": "The server downloads `source_url` (https, allowed hosts only, ≤ 90 MB), checks it is a video/image by its bytes, scans it and stores it under our own name; then delivers and charges the sealed price ONCE. A retry after a cut, with the same claim, answers 200 without downloading.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "deliverStudioOrder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffDeliverUrlIn"
+              },
+              "example": {
+                "claim_id": "c1a2b3c4d5e6f708",
+                "source_url": "https://cdn.example.net/piece.mp4"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivered",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "template_id": "6710aa000000000000000f03",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "producer": "manual",
+                    "status": "delivered",
+                    "prompt": "Vendedora en mostrador",
+                    "options": {
+                      "duration": 15
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "claim_id": "c1a2b3c4d5e6f708",
+                    "claimed_by": {
+                      "kind": "staff",
+                      "ref": "6710aa000000000000000c01"
+                    },
+                    "claimed_at": "2026-11-03T15:01:00Z",
+                    "has_provider_job": false,
+                    "created_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Order delivered"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Claim lost or another delivery in progress",
+            "x-error-codes": [
+              "studio_claim_lost",
+              "studio_delivery_in_progress"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Link or file refused",
+            "x-error-codes": [
+              "studio_source_refused",
+              "studio_source_expired",
+              "studio_piece_too_large",
+              "studio_piece_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "x-error-codes": [
+              "studio_source_unavailable",
+              "studio_scan_unavailable",
+              "studio_storage_unavailable",
+              "studio_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio/orders/{order_id}/deliver-file": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Deliver an order uploading the file",
+        "description": "Multipart `claim_id` + `file` (≤ 90 MB). Same checks and charge as the link delivery.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "deliverStudioOrderFile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id",
+              "title": "Order Id"
+            },
+            "description": "Order id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_deliverStudioOrderFile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivered",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f01",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "template_id": "6710aa000000000000000f03",
+                    "title": "Presentadora en tienda",
+                    "kind": "video",
+                    "category": "ugc",
+                    "producer": "manual",
+                    "status": "delivered",
+                    "prompt": "Vendedora en mostrador",
+                    "options": {
+                      "duration": 15
+                    },
+                    "photos": 2,
+                    "price": {
+                      "amount": "7.05",
+                      "currency": "USD"
+                    },
+                    "claim_id": "c1a2b3c4d5e6f708",
+                    "claimed_by": {
+                      "kind": "staff",
+                      "ref": "6710aa000000000000000c01"
+                    },
+                    "claimed_at": "2026-11-03T15:01:00Z",
+                    "has_provider_job": false,
+                    "created_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Order delivered"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "x-error-codes": [
+              "studio_order_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Claim lost or another delivery in progress",
+            "x-error-codes": [
+              "studio_claim_lost",
+              "studio_delivery_in_progress"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Link or file refused",
+            "x-error-codes": [
+              "studio_source_refused",
+              "studio_source_expired",
+              "studio_piece_too_large",
+              "studio_piece_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "x-error-codes": [
+              "studio_source_unavailable",
+              "studio_scan_unavailable",
+              "studio_storage_unavailable",
+              "studio_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio-admin/settings": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Studio platform settings",
+        "description": "Prices, caps, delivery hosts and when the production agent was last seen.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "getStudioSettings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "settings": {
+                      "cost_per_credit_micro_usd": 43000,
+                      "price_multiplier_bps": 15000,
+                      "min_price_cents": 200,
+                      "delivery_hosts": [
+                        "cdn.example.net"
+                      ],
+                      "max_piece_bytes": 94371840,
+                      "scan_enabled": true,
+                      "open_orders_cap": 3
+                    },
+                    "agent_last_seen_at": "2026-11-03T15:00:00Z"
+                  },
+                  "msg": "Settings retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Write studio platform settings",
+        "description": "Writes platform-only leaves of `studio`: `cost_per_credit_micro_usd` (1..1000000), `price_multiplier_bps` (10000..50000), `min_price_cents` (50..10000), `open_orders_cap` (1..20), `max_piece_bytes` (≤ 90 MB), `scan_enabled`, `enabled` (platform default of the module) and `delivery_hosts` (1-20 hosts of three labels or more, never a public suffix). Unknown keys or invalid values answer 422 `studio_setting_invalid` and write nothing. Orders already placed keep their sealed price.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "setStudioSettings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "`{leaf: value}` of the studio namespace",
+                "title": "Body"
+              },
+              "example": {
+                "price_multiplier_bps": 15000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Applied",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "applied": {
+                      "price_multiplier_bps": 15000
+                    }
+                  },
+                  "msg": "Studio settings updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid setting",
+            "x-error-codes": [
+              "studio_setting_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Platform settings document missing",
+            "x-error-codes": [
+              "platform_settings_missing"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio-admin/charges": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Open studio debts",
+        "description": "Pieces delivered when the payer's balance was short.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "listStudioPlatformDebts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debts",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f04",
+                        "app_id": "6710aa000000000000000a01",
+                        "order_id": "6710aa000000000000000f01",
+                        "payer_user_id": "6710aa000000000000000b01",
+                        "amount": "7.05",
+                        "currency": "USD",
+                        "state": "debt",
+                        "created_at": "2026-11-03T15:14:00Z"
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "msg": "Debts retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio-admin/charges/{charge_id}/write-off": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Write a studio debt off",
+        "description": "`debt → written_off`, logged with who did it; the payer can order again.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "writeOffStudioDebt",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "charge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Charge id",
+              "title": "Charge Id"
+            },
+            "description": "Charge id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Written off",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f04",
+                    "app_id": "6710aa000000000000000a01",
+                    "order_id": "6710aa000000000000000f01",
+                    "payer_user_id": "6710aa000000000000000b01",
+                    "amount": "7.05",
+                    "currency": "USD",
+                    "state": "written_off",
+                    "created_at": "2026-11-03T15:14:00Z"
+                  },
+                  "msg": "Debt written off"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not a debt",
+            "x-error-codes": [
+              "studio_charge_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "60/minute"
+        ]
+      }
+    },
     "/api/v1/platform/support/tickets": {
       "get": {
         "tags": [
@@ -152705,6 +157511,36 @@
         "type": "object",
         "title": "AgentDisableIn"
       },
+      "AgentHeartbeatIn": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Claim Id",
+            "description": "Claim id"
+          },
+          "provider_job_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Job Ref",
+            "description": "Identifier of the generation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "claim_id"
+        ],
+        "title": "AgentHeartbeatIn"
+      },
       "AgentListResponse": {
         "properties": {
           "agents": {
@@ -153419,6 +158255,30 @@
         "type": "object",
         "title": "AgentPersona",
         "description": "How a conversational agent sounds to the person on the other side.\n\nEvery field is nullable and ``None`` means \"the system default\", which is\nwhat makes VVO-05 CA-6 true without a migration: a workspace that never\nopened this screen gets exactly the prompt, tone and tool palette it would\nhave got with no persona at all.\n\nIt travels through the RUN CONTEXT and is never written into the persisted\nthread. That is the whole reason a change applies to the NEXT message rather\nthan to the next conversation: a persona baked into the history would freeze\nthe tone of every thread on the day it was first spoken."
+      },
+      "AgentReleaseIn": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Claim Id",
+            "description": "Claim id"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Note",
+            "description": "Why the agent gave the order back",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "claim_id"
+        ],
+        "title": "AgentReleaseIn"
       },
       "AgentReliabilityOutcomes": {
         "properties": {
@@ -158576,6 +163436,106 @@
         ],
         "title": "BoardOut"
       },
+      "Body_createStudioOrder": {
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "maxLength": 24,
+            "title": "Template Id",
+            "description": "Template id"
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Prompt",
+            "description": "What you want (≤2000)",
+            "default": ""
+          },
+          "options": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options",
+            "description": "JSON options: duration, aspect"
+          },
+          "expected_amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Amount",
+            "description": "Price you were shown"
+          },
+          "recreation_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 24
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recreation Of",
+            "description": "Order to recreate"
+          },
+          "photos": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "contentMediaType": "application/octet-stream"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photos",
+            "description": "1-5 product photos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template_id"
+        ],
+        "title": "Body_createStudioOrder"
+      },
+      "Body_deliverStudioOrderFile": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Claim Id",
+            "description": "Claim id"
+          },
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "Finished piece"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_id",
+          "file"
+        ],
+        "title": "Body_deliverStudioOrderFile"
+      },
       "Body_repairInvoicingCertificate": {
         "properties": {
           "signatureFile": {
@@ -158716,6 +163676,21 @@
           "file"
         ],
         "title": "Body_uploadSocialMedia"
+      },
+      "Body_uploadStudioTemplateSample": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "Sample file"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_uploadStudioTemplateSample"
       },
       "Body_uploadTaskAttachment": {
         "properties": {
@@ -189994,6 +194969,68 @@
         "title": "StaffAccessUpdate",
         "description": "Set a member's console access: `{\"access\":\"full\"}` or\n`{\"access\":\"modules\",\"modules\":[...]}`.\n\nDiscriminated by `access` and strict about the pair: a `full` body carrying\nmodules, or a restriction to nothing, is a client confused about what it is\nasking for, and guessing would be worse than a 422."
       },
+      "StaffCancelIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Internal reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StaffCancelIn"
+      },
+      "StaffClaimIn": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Claim Id",
+            "description": "Claim id returned by the claim"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "claim_id"
+        ],
+        "title": "StaffClaimIn"
+      },
+      "StaffDeliverUrlIn": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Claim Id",
+            "description": "Claim id returned by the claim"
+          },
+          "source_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Source Url",
+            "description": "https link of the finished piece"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "claim_id",
+          "source_url"
+        ],
+        "title": "StaffDeliverUrlIn"
+      },
       "StaffDemoAccountIn": {
         "properties": {
           "user_id": {
@@ -190514,6 +195551,46 @@
         "title": "StaffProfile",
         "description": "Who the caller is. The console's whole authorisation answer.\n\nCarries NO tenant, no roles and no permissions — there is nothing to scope:\na staff member reaches the platform surface and nothing else, and the server\nis what enforces that on every request."
       },
+      "StaffRecipeIn": {
+        "properties": {
+          "reference_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Url",
+            "description": "https link used to recreate the template"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Notes",
+            "description": "Production notes",
+            "default": ""
+          },
+          "agent_params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Params",
+            "description": "Parameters for the production agent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StaffRecipeIn"
+      },
       "StaffRef": {
         "properties": {
           "id": {
@@ -190804,6 +195881,325 @@
         "additionalProperties": false,
         "type": "object",
         "title": "StaffSymbolPatchIn"
+      },
+      "StaffTemplateCreate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "video",
+              "image"
+            ],
+            "title": "Kind",
+            "description": "video | image"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "ugc",
+              "tiktok",
+              "product_photo",
+              "poster",
+              "marketplace",
+              "motion"
+            ],
+            "title": "Category",
+            "description": "Catalog category"
+          },
+          "title_es": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title Es",
+            "description": "Spanish title"
+          },
+          "title_en": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title En",
+            "description": "English title"
+          },
+          "description_es": {
+            "type": "string",
+            "maxLength": 400,
+            "title": "Description Es",
+            "description": "Spanish description",
+            "default": ""
+          },
+          "description_en": {
+            "type": "string",
+            "maxLength": 400,
+            "title": "Description En",
+            "description": "English description",
+            "default": ""
+          },
+          "cost_millicredits": {
+            "type": "integer",
+            "maximum": 10000000,
+            "exclusiveMinimum": 0,
+            "title": "Cost Millicredits",
+            "description": "Real cost in thousandths of a credit"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs",
+            "description": "photos_min, photos_max, prompt_required"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options",
+            "description": "durations, aspects"
+          },
+          "visible_app_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible App Ids",
+            "description": "Workspaces that see it; null = all"
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "agent"
+            ],
+            "title": "Producer",
+            "description": "manual | agent",
+            "default": "manual"
+          },
+          "recipe": {
+            "$ref": "#/components/schemas/StaffRecipeIn",
+            "description": "Internal recipe"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "category",
+          "title_es",
+          "title_en",
+          "cost_millicredits"
+        ],
+        "title": "StaffTemplateCreate"
+      },
+      "StaffTemplatePatch": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ugc",
+                  "tiktok",
+                  "product_photo",
+                  "poster",
+                  "marketplace",
+                  "motion"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "description": "Catalog category"
+          },
+          "title_es": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Es",
+            "description": "Spanish title"
+          },
+          "title_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title En",
+            "description": "English title"
+          },
+          "description_es": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Es",
+            "description": "Spanish description"
+          },
+          "description_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description En",
+            "description": "English description"
+          },
+          "cost_millicredits": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000000,
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Millicredits",
+            "description": "Real cost in thousandths of a credit"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs",
+            "description": "photos_min, photos_max, prompt_required"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options",
+            "description": "durations, aspects"
+          },
+          "visible_app_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible App Ids",
+            "description": "Workspaces that see it; [] clears to all"
+          },
+          "producer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "manual",
+                  "agent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Producer",
+            "description": "manual | agent"
+          },
+          "recipe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaffRecipeIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Internal recipe"
+          },
+          "brand_free_confirmed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Free Confirmed",
+            "description": "The sample carries no real brands"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "published"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Publish or move back to draft"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StaffTemplatePatch"
       },
       "StaffTokenPair": {
         "properties": {
@@ -219450,6 +224846,14 @@
     {
       "name": "Plates",
       "description": "NFC and QR plates that send a customer to one destination link (a review page, a profile, a menu). Owners order packs paid from their balance, follow each plate through design, production and delivery, and change where a plate points at any time. Workspace administrators attend orders and listing requests under `/plates/manage`; the public short link answers a redirect or one neutral page. The workspace switch is read from the caller's own workspace."
+    },
+    {
+      "name": "Creative Studio",
+      "description": "Marketing videos and product images for a business, made from the studio's templates. A member picks a template, sends product photos and a short text and sees the price first; the price is sealed when ordering and charged from the balance when the piece is delivered. Delivered pieces live in the member's library. The workspace switch is read from the caller's own workspace."
+    },
+    {
+      "name": "Creative Studio Agent",
+      "description": "The surface the studio production agent uses. Authenticated with a service credential alone (`Authorization: Bearer SERVICE_API_KEY_EXAMPLE`), platform scope and capability `studio.produce`: list actionable orders (no links), claim with a renewable lease, record the generation, give an order back with a note, and deliver by link."
     },
     {
       "name": "Heatmaps",

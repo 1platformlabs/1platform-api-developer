@@ -5,6 +5,17 @@ description: Configurar planes y clientes de un comercio y emitir invitaciones a
 
 # Suscripciones
 
+## Consulta con el MCP
+
+Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+`/docs/saas/1platform-api/suscripciones` mediante `docs_get_page`.
+Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
+documentación no requieren claves. Si el MCP no está conectado, siga
+https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md y consulte las fuentes públicas;
+indique esa limitación. No invente herramientas operativas: compruebe cuáles lista el MCP y use REST para las demás.
+Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el código ya esté preparado.
+
+
 Requiere la skill `1platform-hub`. Viene apagado: mientras tanto, las operaciones bajo `/businesses/{businessId}/…`
 responden `503` `subscriptions_disabled`. El cobro recurrente está en preparación: no prometa renovaciones.
 

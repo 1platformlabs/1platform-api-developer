@@ -5,6 +5,17 @@ description: Enviar avisos individuales desde una dirección verificada, con ide
 
 # Correo transaccional
 
+## Consulta con el MCP
+
+Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+`/docs/saas/1platform-api/correo-transaccional` mediante `docs_get_page`.
+Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
+documentación no requieren claves. Si el MCP no está conectado, siga
+https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md y consulte las fuentes públicas;
+indique esa limitación. No invente herramientas operativas: compruebe cuáles lista el MCP y use REST para las demás.
+Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el código ya esté preparado.
+
+
 Requiere la skill `1platform-hub`. El servicio viene apagado: mientras no esté habilitado, admitir un aviso responde
 `503` `transactional_email_disabled`.
 

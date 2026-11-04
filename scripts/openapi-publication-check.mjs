@@ -8,7 +8,14 @@ import {isDeepStrictEqual} from 'node:util';
 const root = new URL('../', import.meta.url);
 const servicePaths = JSON.parse(readFileSync(new URL('./fixtures/service-example-paths.json', import.meta.url), 'utf8'));
 const SERVICE_MARKER = 'SERVICE_API_KEY_EXAMPLE';
-const valueAt = (spec, path) => path.reduce((value, key) => value?.[key], spec);
+const valueAt = (spec, path) => path.reduce((value, key) => {
+  if (key && typeof key === 'object') {
+    const matches = Array.isArray(value) ? value.filter(item => item?.name === key.name) : [];
+    assert.equal(matches.length, 1, 'Named service example must exist exactly once; values withheld');
+    return matches[0];
+  }
+  return value?.[key];
+}, spec);
 
 export function checkServiceExamples(spec) {
   // Sanitized APP markers cannot be classified again. Pin the documented
@@ -25,6 +32,12 @@ export function checkOpenApiPublication() {
   ]));
   const core = fixtures['1platform-api'];
   checkServiceExamples(core);
+  const reordered = structuredClone(core);
+  reordered.tags.reverse();
+  checkServiceExamples(reordered);
+  const missingTagMarker = structuredClone(core);
+  missingTagMarker.tags.find(tag => tag.name === 'Trading Agent').description = 'APP_API_KEY_EXAMPLE';
+  assert.throws(() => checkServiceExamples(missingTagMarker), /Service example marker missing/);
   const stale = structuredClone(core);
   const first = servicePaths[0];
   valueAt(stale, first.slice(0, -1))[first.at(-1)] = 'APP_API_KEY_EXAMPLE';

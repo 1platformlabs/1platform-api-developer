@@ -5,6 +5,17 @@ description: Registrar o conectar dominios, administrar su DNS y usar el correo 
 
 # Dominios y correo
 
+## Consulta con el MCP
+
+Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+`/docs/saas/1platform-api/dominios-y-correo` mediante `docs_get_page`.
+Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
+documentación no requieren claves. Si el MCP no está conectado, siga
+https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md y consulte las fuentes públicas;
+indique esa limitación. No invente herramientas operativas: compruebe cuáles lista el MCP y use REST para las demás.
+Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el código ya esté preparado.
+
+
 Requiere la skill `1platform-hub`. Sin los módulos de Dominios y Correo, la respuesta es `403` `module_disabled`.
 
 1. `GET /api/v1/domains/check` para disponibilidad y precio, y `GET /api/v1/domains` para los dominios del usuario.

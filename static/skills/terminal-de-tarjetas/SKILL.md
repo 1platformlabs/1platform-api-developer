@@ -5,6 +5,17 @@ description: Solicitar una terminal de tarjetas para un comercio y seguir su alt
 
 # Terminal de tarjetas
 
+## Consulta con el MCP
+
+Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+`/docs/saas/1platform-api/terminal-de-tarjetas` mediante `docs_get_page`.
+Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
+documentación no requieren claves. Si el MCP no está conectado, siga
+https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md y consulte las fuentes públicas;
+indique esa limitación. No invente herramientas operativas: compruebe cuáles lista el MCP y use REST para las demás.
+Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el código ya esté preparado.
+
+
 Requiere la skill `1platform-hub`. El cobro presencial está en preparación: el alta no da una API de cargos.
 
 1. `GET /api/v1/businesses` (`listBusinessesForUser`) para el `businessId`. El comercio necesita NIT y usted, rol de

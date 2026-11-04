@@ -1,10 +1,12 @@
-# Canal cPanel — QA activo y fallback de producción
+# Canal cPanel — fallback de producción (QA ya no lo usa)
 
 El canal **activo de producción** desde el 14 de agosto de 2026 es
 `deploy_hetzner` en `prod.yml`: imagen `nginx:1.27-alpine`, configuración
 `deploy/docker/nginx.conf` y healthcheck de `docker-compose.prod.yml`. El job
 cPanel de producción conserva `if: false`. No habilitarlo para esta épica.
-QA sí utiliza este canal cPanel en `developer-qa.1platform.pro`.
+QA dejó de usar este canal el 2026-11-04 (#92: cuenta `karefxzp` suspendida;
+cPanel retirado por decisión del dueño). Hoy `qa.yml` publica al dedicado por
+un receptor SSH restringido; ver el encabezado de `.github/workflows/qa.yml`.
 
 El fallback histórico de producción apunta a la cuenta compartida **`mascehgw`** en
 `business138.web-hosting.com` (origen `66.29.132.45`), la misma donde ya viven

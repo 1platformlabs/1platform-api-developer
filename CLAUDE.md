@@ -179,7 +179,9 @@ también dispara build/deploy de QA (`developer-qa.1platform.pro`) automáticame
 El merge a main dispara producción: no mergear como parte de implementación.
 La versión de publicación se calcula desde tags en el pipeline productivo, sin
 reescribir `package.json`; no adelantar ese bump en un PR de implementación.
-QA usa cPanel. PROD usa nginx/SSH; el job cPanel productivo tiene `if: false`.
+QA y PROD usan el dedicado: QA por el receptor SSH restringido
+(`developer-qa-receive`, contenedor `1platform-api-developer-qa` en :3050; cPanel
+retirado el 2026-11-04, #92) y PROD por nginx/SSH; el job cPanel productivo tiene `if: false`.
 El probe de QA compara `index_sha` contra `/index.html` explícitamente y exige
 `.deployed_version` exacta, sin cuarentena de esa versión. El adaptador propio
 de QA hace efectiva su configuración y conserva el core original como backup;

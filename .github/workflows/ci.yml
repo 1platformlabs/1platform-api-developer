@@ -156,6 +156,11 @@ jobs:
       - name: Agent assets — self-test
         run: pnpm check:agent-assets:self-test
 
+      - name: Product prompts and MCP instructions
+        run: |
+          pnpm check:agent-coverage:self-test
+          pnpm check:agent-coverage
+
       - name: Agent assets
         run: pnpm check:agent-assets
 
@@ -207,7 +212,20 @@ jobs:
       # Disabled until the text loads, exact clipboard copy, focus kept, live
       # announcement, retry on failure and the raw link without JavaScript.
       - name: Agent prompt block runtime
-        run: pnpm check:prompt-runtime
+        env:
+          PROMPT_MATRIX_EVIDENCE: test-results/product-prompts
+        run: |
+          pnpm check:prompt-runtime
+          pnpm check:product-prompts
+
+      - name: Product prompt browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-prompts-${{ github.sha }}
+          path: test-results/product-prompts/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Production nginx routing (isolated local container)
         run: pnpm check:serving

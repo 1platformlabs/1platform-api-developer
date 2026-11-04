@@ -12,7 +12,7 @@ const docsRoot = join(root, 'docs/saas/1platform-api');
 const eventNames = new Set(['content_published', 'content_updated', 'comment_received', 'seo_action', 'keyword_research']);
 const excluded = ['Contenido', 'SEO', 'Imágenes', 'Ingresos publicitarios', 'Link building'];
 const required = ['plataforma/index.mdx', 'plataforma/webhooks.mdx', 'reference/retry-and-delivery.mdx',
-  'analitica/index.mdx', 'analitica/google-analytics.mdx', 'analitica/mapas-de-calor.mdx',
+  'nube/index.mdx', 'nube/_category_.json', 'analitica/index.mdx', 'analitica/google-analytics.mdx', 'analitica/mapas-de-calor.mdx',
   'agentes-de-ia/integrar-en-su-aplicacion.mdx', 'ventas/index.mdx'];
 for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas']) {
   required.push(`${product}/index.mdx`, `${product}/_category_.json`);
@@ -66,7 +66,7 @@ export function audit(docs, spec) {
     }
     // Keep historical product docs. Only new-offer claims are forbidden.
     for (const sentence of prose(path).split(/(?<=[.!?;])\s+/)) {
-      const offering = /(?:Contenido|SEO|Imágenes|Ingresos publicitarios|Link building|Cloud as a Service)/i.test(sentence);
+      const offering = /(?:Contenido|SEO|Imágenes|Ingresos publicitarios|Link building)/i.test(sentence);
       const promise = /(?:nueva[s]? oferta[s]?|nuevo[s]? servicio[s]?|ya (?:está|están) disponible|ahora (?:ofrecemos|incluye|puede contratar))/i.test(sentence);
       if (offering && promise && !/\bno (?:se incorpora|se añade|son|es|forma|incluye)/i.test(sentence)) {
         fail('alcance', path, 'oferta excluida incorporada como nueva');
@@ -89,8 +89,13 @@ export function audit(docs, spec) {
   }
   const scope = prose('plataforma/index.mdx');
   if (!/catálogo previo/.test(scope) || !excluded.every(name => scope.includes(name)) ||
-      !/Cloud as a Service.*?fuera.*?otra épica/.test(scope)) {
-    fail('alcance', 'plataforma/index.mdx', 'falta catálogo previo o límite de Cloud');
+      !/Nube.*?servidores y bases de datos/.test(scope)) {
+    fail('alcance', 'plataforma/index.mdx', 'falta catálogo previo o enlace de Nube');
+  }
+  requireClaim('NUBE', 'nube/index.mdx', /servicio de Nube está disponible/, 'falta disponibilidad de Nube');
+  if (!docs['plataforma/index.mdx']?.includes('/docs/saas/1platform-api/nube')) fail('NUBE', 'plataforma/index.mdx', 'falta enlace de Nube');
+  for (const path of ['nube/index.mdx', 'nube/_category_.json']) {
+    if (/en preparación|en desarrollo/i.test(docs[path] ?? '')) fail('NUBE', path, 'disponibilidad obsoleta');
   }
   const analytics = docs['analitica/google-analytics.mdx'] ?? '';
   const sampleEvents = [...analytics.matchAll(/"event_name"\s*:\s*"([^"]+)"/g)].map(match => match[1]);
@@ -119,7 +124,8 @@ if (process.argv.includes('--self-test')) {
     ['DOC-09', 'ventas/index.mdx', s => s.replaceAll('en preparación', 'disponible')],
     ['DOC-09', 'agentes-de-ia/integrar-en-su-aplicacion.mdx', s => s.replace('no es un requisito universal', 'es un requisito universal')],
     ['alcance', 'plataforma/index.mdx', s => s.replace('catálogo previo', 'catálogo actual')],
-    ['alcance', 'plataforma/index.mdx', s => `${s}\nCloud as a Service ya está disponible.`],
+    ['NUBE', 'nube/index.mdx', s => s.replace('servicio de Nube está disponible', 'servicio de Nube está en preparación')],
+    ['NUBE', 'plataforma/index.mdx', s => s.replace('/docs/saas/1platform-api/nube', '/docs/no-existe')],
     ...excluded.map(name => ['alcance', 'plataforma/index.mdx', s => `${s}\n${name} es una nueva oferta.`]),
     ['corpus', 'analitica/mapas-de-calor.mdx', () => ''],
   ];

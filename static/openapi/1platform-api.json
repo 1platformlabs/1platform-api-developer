@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.141.0"
+    "version": "PRODv5.143.1"
   },
   "servers": [
     {
@@ -44132,6 +44132,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -44852,6 +44855,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -46371,6 +46377,7 @@
                         "reservation_currency": "USD",
                         "reservation_status": "active",
                         "reservation_url": "https://pay.1platform.pro/r/0000aaaa",
+                        "can_reset": true,
                         "window_expires_at": "2026-09-05T10:55:00Z",
                         "last_message_at": "2026-09-04T10:55:00Z",
                         "created_at": "2026-09-03T18:40:00Z",
@@ -46547,6 +46554,7 @@
                     "reservation_currency": "USD",
                     "reservation_status": "active",
                     "reservation_url": "https://pay.1platform.pro/r/0000aaaa",
+                    "can_reset": true,
                     "window_expires_at": "2026-09-05T10:55:00Z",
                     "last_message_at": "2026-09-04T10:55:00Z",
                     "created_at": "2026-09-03T18:40:00Z",
@@ -46613,6 +46621,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -47010,6 +47021,7 @@
                             "reservation_currency": "USD",
                             "reservation_status": "active",
                             "reservation_url": "https://pay.1platform.pro/r/0000aaaa",
+                            "can_reset": true,
                             "window_expires_at": "2026-09-05T10:55:00Z",
                             "last_message_at": "2026-09-04T10:55:00Z",
                             "created_at": "2026-09-03T18:40:00Z",
@@ -47202,6 +47214,7 @@
                     "reservation_currency": "USD",
                     "reservation_status": "active",
                     "reservation_url": "https://pay.1platform.pro/r/0000aaaa",
+                    "can_reset": true,
                     "window_expires_at": "2026-09-05T10:55:00Z",
                     "last_message_at": "2026-09-04T10:55:00Z",
                     "created_at": "2026-09-03T18:40:00Z",
@@ -47386,6 +47399,7 @@
                     "reservation_currency": "USD",
                     "reservation_status": "active",
                     "reservation_url": "https://pay.1platform.pro/r/0000aaaa",
+                    "can_reset": true,
                     "window_expires_at": "2026-09-05T10:55:00Z",
                     "last_message_at": "2026-09-04T10:55:00Z",
                     "created_at": "2026-09-03T18:40:00Z",
@@ -47452,6 +47466,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -47620,6 +47637,7 @@
                     "reservation_currency": "USD",
                     "reservation_status": "active",
                     "reservation_url": "https://pay.1platform.pro/r/0000aaaa",
+                    "can_reset": true,
                     "window_expires_at": "2026-09-05T10:55:00Z",
                     "last_message_at": "2026-09-04T10:55:00Z",
                     "created_at": "2026-09-03T18:40:00Z",
@@ -47686,6 +47704,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -47856,6 +47877,7 @@
                     "reservation_currency": "USD",
                     "reservation_status": "active",
                     "reservation_url": "https://pay.1platform.pro/r/0000aaaa",
+                    "can_reset": true,
                     "window_expires_at": "2026-09-05T10:55:00Z",
                     "last_message_at": "2026-09-04T10:55:00Z",
                     "created_at": "2026-09-03T18:40:00Z",
@@ -47922,6 +47944,256 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
+              "lead_not_manual_control",
+              "channel_account_already_connected",
+              "outside_conversation_window",
+              "reservation_not_configured",
+              "reservation_not_applicable",
+              "reservation_settlement_unresolvable",
+              "sales_agent_unavailable",
+              "sales_channel_credential_rejected",
+              "sales_channel_account_restricted",
+              "sales_channel_template_not_usable",
+              "sales_channel_recipient_unreachable",
+              "offer_has_live_appointments",
+              "lead_has_live_appointment",
+              "sales_health_claims_unreviewed",
+              "sales_attachment_not_available"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "The request is not a valid funnel, stage or payload",
+            "x-error-codes": [
+              "channel_credential_managed_by_social",
+              "offer_stages_invalid",
+              "lead_stage_unknown",
+              "sales_assignee_invalid",
+              "sales_settlement_business_invalid",
+              "sales_settlement_currency_mismatch",
+              "sales_attention_cursor_invalid",
+              "sales_agent_invalid",
+              "sales_channel_payload_rejected",
+              "offer_appointment_stages_invalid",
+              "offer_appointment_stage_missing",
+              "offer_checkout_link_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
+        ]
+      }
+    },
+    "/api/v1/sales/leads/{leadId}/reset": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "summary": "Reset the conversation so the person starts over",
+        "description": "Nothing is deleted. The lead keeps its messages, its thread and its visits; its channel identities are released, so the next message from that person opens a NEW lead with a new number and an empty conversation.\n\nThe lead closes in the offer's lost stage, as when it is marked lost, and its booking link is revoked. A lead already lost stays where it is.\n\n`can_reset` on the lead says whether a reset is allowed. 409 `lead_already_reset` once reset; `lead_reset_not_allowed` for a WON lead or one with a live visit (both are still written to through the address a reset releases) and for one with no channel conversation; `lead_reset_conflict` when the lead kept changing during the reset — try again.",
+        "operationId": "resetSalesLead",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "leadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identifier of the lead.",
+              "title": "Leadid"
+            },
+            "description": "Identifier of the lead."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LeadResetRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              },
+              "example": {
+                "reason": "Prueba interna del agente"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conversation reset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "66dd00000000000000000021",
+                    "short_id": 148,
+                    "offer_id": "66aa00000000000000000001",
+                    "display_name": "Luis Barrientos",
+                    "phone": "+50241286690",
+                    "email": "luis.barrientos@example.com",
+                    "entry_channel": "whatsapp",
+                    "origin": "meta_ads",
+                    "campaign": "Septiembre — tiendas",
+                    "ad_referral": {
+                      "ad_id": "1200000000000001",
+                      "ad_title": "Tu tienda en línea en 7 días",
+                      "click_id": "AR-0000000000000001",
+                      "source_url": "https://ejemplo.example/tiendas"
+                    },
+                    "tags": [
+                      "prioridad_alta"
+                    ],
+                    "stage": "perdido",
+                    "stage_changed_at": "2026-09-04T11:02:00Z",
+                    "assigned_user_id": "66ee00000000000000000003",
+                    "qualification": {
+                      "presupuesto": "500 a 2000"
+                    },
+                    "capabilities_interest": [
+                      "online_payments",
+                      "website"
+                    ],
+                    "score": 4,
+                    "control": "auto",
+                    "reservation_amount": "50.00",
+                    "reservation_currency": "USD",
+                    "reservation_status": "active",
+                    "reservation_url": "https://pay.1platform.pro/r/0000aaaa",
+                    "lost_reason": "Prueba interna del agente",
+                    "reset_at": "2026-09-04T11:30:00Z",
+                    "can_reset": false,
+                    "window_expires_at": "2026-09-05T10:55:00Z",
+                    "last_message_at": "2026-09-04T10:55:00Z",
+                    "created_at": "2026-09-03T18:40:00Z",
+                    "updated_at": "2026-09-04T11:02:00Z"
+                  },
+                  "msg": "Conversation reset"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The sales vertical is switched off for this workspace, or the caller is not a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "sales_disabled",
+              "channel_signature_invalid",
+              "channel_account_not_granted"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such offer, lead or channel in THIS workspace",
+            "x-error-codes": [
+              "offer_not_found",
+              "lead_not_found",
+              "sales_attention_disabled",
+              "channel_not_found",
+              "channel_app_not_found",
+              "sales_attachment_not_found",
+              "conversion_source_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "The request conflicts with the state the workspace is in",
+            "x-error-codes": [
+              "sales_error",
+              "sales_social_channels_disabled",
+              "offer_slug_taken",
+              "offer_stage_in_use",
+              "lead_won_stage_forbidden",
+              "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -48358,6 +48630,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -48594,6 +48869,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -48949,6 +49227,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -49608,6 +49889,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -50008,6 +50292,9 @@
               "offer_stage_in_use",
               "lead_won_stage_forbidden",
               "lead_identity_taken",
+              "lead_already_reset",
+              "lead_reset_not_allowed",
+              "lead_reset_conflict",
               "lead_not_manual_control",
               "channel_account_already_connected",
               "outside_conversation_window",
@@ -179627,6 +179914,27 @@
         ],
         "title": "LeadMessageSendRequest",
         "description": "``POST /sales/leads/{leadId}/messages`` — an advisor writes to the prospect.\n\nOnly the text. WHO is writing comes from the authenticated user and WHERE it\ngoes comes from the lead's own channel: neither is a field, because both are\nfacts the server already holds and a client that could supply them could\nwrite to somebody else's conversation as somebody else."
+      },
+      "LeadResetRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the conversation is reset. Kept on the lead and in the thread's internal note."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LeadResetRequest",
+        "description": "``POST /sales/leads/{leadId}/reset`` — close the conversation so the person starts over."
       },
       "LeadUpdateRequest": {
         "properties": {

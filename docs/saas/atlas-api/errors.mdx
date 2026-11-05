@@ -25,7 +25,7 @@ La forma **anidada en `detail`** es la más frecuente: la usan casi todos los er
 derechos de acceso, claves de integración y webhooks. Algunos errores anidados traen campos extra junto al código (por
 ejemplo, la capacidad que falta o la fecha de vencimiento de una clave). La forma **plana** aparece en otros errores de
 dominio, como los de búsqueda y algunos de entrega, y también en `SESSION_REVOKED`, `TENANT_SWITCH_FORBIDDEN`,
-`TENANT_SWITCH_INVALID` y el `429 RATE_LIMITED`. No suponga la forma por el tipo de error: léala como en el ejemplo de
+`TENANT_SWITCH_INVALID` y el `429 RATE_LIMITED` (`{"code": "RATE_LIMITED", "message": "Too many requests"}`). No suponga la forma por el tipo de error: léala como en el ejemplo de
 abajo.
 
 La tercera forma son los **fallos de validación** (`422`) de parámetros o cuerpos mal formados: `detail` es una **lista** de
@@ -69,7 +69,7 @@ La Atlas API no usa el envoltorio `{ success, data, msg }` de la 1Platform API.
 | `OPTIMISTIC_LOCK_FAILED` | 409 | Alguien cambió el registro a la vez: vuelva a leerlo y reintente. |
 | `SEARCH_QUERY_EMPTY` / `SEARCH_QUERY_TOO_LONG` | 400 | Corrija la consulta de autocompletado. |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Revise secreto, timestamp y bytes firmados ([Webhooks](/docs/saas/atlas-api/webhooks)). |
-| `RATE_LIMITED` / `DOWNLOAD_RATE_LIMITED` | 429 | Espere y reintente ([Límites de uso](/docs/saas/atlas-api/rate-limits)). |
+| `RATE_LIMITED` / `DOWNLOAD_RATE_LIMITED` | 429 | Espere lo que indique `Retry-After` y reintente ([Límites de uso](/docs/saas/atlas-api/rate-limits)). |
 | `CATALOG_BUSY` | 503 | Espere lo que indique `Retry-After` y reintente. |
 | `EMAIL_DELIVERY_FAILED` | 503 | El correo no salió: pida un enlace nuevo pasado el `Retry-After`. |
 | `PROVIDER_UNAVAILABLE` / `MEDIA_UNAVAILABLE` | 503 | Falla transitoria de un servicio externo: reintente con espera creciente. |

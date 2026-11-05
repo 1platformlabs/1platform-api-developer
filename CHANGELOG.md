@@ -2,6 +2,20 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Límites de uso de Atlas
+
+- El `429 RATE_LIMITED` de la Atlas API trae ahora `Retry-After` (segundos hasta que
+  se reinicia la ventana superada, al menos 1) y un cuerpo único
+  `{"code": "RATE_LIMITED", "message": "Too many requests"}`. QA responde igual que
+  producción, así que ya sirve para probar el manejo del `429`.
+- `GET /tenants/by-host` y `POST /events` cuentan por la dirección real del cliente,
+  tomada de `X-Forwarded-For` sólo cuando la solicitud llega desde un proxy de
+  confianza; ya no comparten un único límite entre todos los clientes.
+- Los contadores se comparten entre todas las instancias del servicio: el límite
+  publicado es el efectivo, y un cliente que antes lo superaba sin recibir `429`
+  puede verlo con hasta 4 veces menos solicitudes que las observadas hasta ahora.
+  Guías actualizadas: Límites de uso, Entornos, Buenas prácticas y Errores (Refs #95).
+
 ## [Unreleased] — Índice móvil legible
 
 - El índice de documentación usa tintas legibles sobre el fondo oscuro del menú

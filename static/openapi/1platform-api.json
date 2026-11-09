@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.143.1"
+    "version": "PRODv5.160.0"
   },
   "servers": [
     {
@@ -11138,7 +11138,9 @@
                 "merchant_reference": "order_abc123",
                 "branch_id": "6a5f8e7d93f925bfb527997a",
                 "return_url": "https://shop.example.com/checkout/result?order={{merchant_reference}}",
-                "customer_email": "ana@example.com"
+                "customer_email": "ana@example.com",
+                "customer_ip": "203.0.113.7",
+                "shield_scope": "store:abc:product:xyz"
               }
             }
           }
@@ -11193,9 +11195,10 @@
             }
           },
           "403": {
-            "description": "Your role on the commerce that owns the branch named by `branch_id` does not allow taking payments (a viewer cannot charge). Also `module_disabled` when `branch_id` is sent by an account that was not granted any of the commerce modules (businesses, payment links, terminal).",
+            "description": "Your role on the commerce that owns the branch named by `branch_id` does not allow taking payments (a viewer cannot charge). Also `module_disabled` when `branch_id` is sent by an account that was not granted any of the commerce modules (businesses, payment links, terminal). `charge_collections_blocked` (in `data.code`) means the platform has blocked new charges for this account; no checkout was created.",
             "x-error-codes": [
-              "module_disabled"
+              "module_disabled",
+              "charge_collections_blocked"
             ],
             "content": {
               "application/json": {
@@ -11204,7 +11207,7 @@
                 }
               }
             },
-            "x-error-code-location": "data"
+            "x-error-code-location": "root_or_data"
           },
           "404": {
             "description": "Billing record not found for user. Also returned when `branch_id` is malformed, names no branch, or belongs to a commerce that is not yours — deliberately the same status, so the response cannot be used to confirm a branch or commerce exists — and when you hold no balance in the commerce's currency (the message names it).",
@@ -11243,14 +11246,19 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "Rate limit exceeded, or the payment protection refused to start a checkout — inspect `data.code` and wait the `Retry-After` seconds. `charge_shield_velocity`: too many checkouts in a short window for this account, resource (`shield_scope`) or buyer (`customer_ip`, or `customer_email` without it). `charge_shield_paused`: new checkouts are paused for a while after an abnormal pattern of declined payments. Neither creates a checkout nor consumes the `Idempotency-Key`: retry later with the same key.",
+            "x-error-codes": [
+              "charge_shield_velocity",
+              "charge_shield_paused"
+            ],
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "x-error-code-location": "root_or_data"
           },
           "503": {
             "description": "Payment provider temporarily unavailable",
@@ -11522,14 +11530,18 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "Rate limit exceeded, or `charge_shield_velocity` (in `data.code`): too many top-up checkouts in a short window. No checkout was created; retry after `Retry-After` seconds.",
+            "x-error-codes": [
+              "charge_shield_velocity"
+            ],
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "x-error-code-location": "root_or_data"
           },
           "503": {
             "description": "Payment service temporarily unavailable",
@@ -21002,7 +21014,7 @@
           "Agents CRUD"
         ],
         "summary": "Update an agent",
-        "description": "Update an existing agent definition. All fields are optional.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 120 req/min\n- `mode` switches the agent between task work and conversations (VVO-11 CA-6). Omitting it — or sending `null` — leaves it as it is; there is no way to unset it, because the agent always has one.\n- `persona` is replaced wholesale by what you send. `null` is the explicit way back to every system default. Its `disabled_tools` may not contain `sales_escalate_to_human`; a body that names it is refused with 422.\n- A persona change applies to the NEXT message, not to the next conversation: it travels with the run and is never written into the thread the model is replayed from.",
+        "description": "Update an existing agent definition. All fields are optional.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 120 req/min\n- `mode` switches the agent between task work and conversations (VVO-11 CA-6). Omitting it — or sending `null` — leaves it as it is; there is no way to unset it, because the agent always has one.\n- `persona` is replaced wholesale by what you send. `null` is the explicit way back to every system default. Its `disabled_tools` may not contain `sales_escalate_to_human`; a body that names it is refused with 422.\n- A persona change applies to the NEXT message, not to the next conversation: it travels with the run and is never written into the thread the model is replayed from.\n- `visit_reminder` (conversational agents only) decides whether visits booked through this agent are reminded and how many hours before (1–72). `null` goes back to the workspace's calendar setting. The platform switch for reminders still has the last word. A `whatsapp_channel_id` that is not a WhatsApp channel of the agent's workspace is refused with 404 `reminder_channel_not_found`; a reminder on a task agent with 409 `reminder_needs_conversational_agent`.",
         "operationId": "updateAgent",
         "security": [
           {
@@ -21062,6 +21074,11 @@
                   "disabled_tools": [
                     "sales_schedule_followup"
                   ]
+                },
+                "visit_reminder": {
+                  "enabled": true,
+                  "lead_hours": 4,
+                  "whatsapp_channel_id": "6a714bdd0000000000000001"
                 }
               }
             }
@@ -21099,6 +21116,11 @@
                       "disabled_tools": [
                         "sales_schedule_followup"
                       ]
+                    },
+                    "visit_reminder": {
+                      "enabled": true,
+                      "lead_hours": 4,
+                      "whatsapp_channel_id": "6a714bdd0000000000000001"
                     },
                     "created_at": "2026-04-30T12:00:00Z",
                     "updated_at": "2026-04-30T12:30:00Z"
@@ -21143,14 +21165,32 @@
             "x-error-code-location": "data"
           },
           "404": {
-            "description": "Agent not found",
+            "description": "Agent not found, or the reminder's WhatsApp channel is not one of the agent's workspace",
+            "x-error-codes": [
+              "reminder_channel_not_found"
+            ],
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "A visit reminder on an agent that does not hold conversations",
+            "x-error-codes": [
+              "reminder_needs_conversational_agent"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
           },
           "422": {
             "description": "Validation Error",
@@ -44164,6 +44204,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -44887,6 +44928,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -45669,6 +45711,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -46424,6 +46467,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -46653,6 +46697,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -47088,6 +47133,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -47498,6 +47544,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -47736,6 +47783,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -47976,6 +48024,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -48223,6 +48272,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -48662,6 +48712,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -49259,6 +49310,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -49921,6 +49973,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -50324,6 +50377,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -50525,7 +50579,7 @@
           "Sales"
         ],
         "summary": "Change a channel",
-        "description": "Workspace admins only, sparse patch. A secret the body omits is PRESERVED and never blanked: reading it from the body instead is how a patch of the display name silently disconnects a channel.\n\nThe account cannot be changed. It is the key inbound messages are attributed by, and re-pointing it would move an existing conversation history onto a different number.\n\nA channel with `source: social` has no credential of its own: sending `access_token`, `app_secret` or `verify_token` for it answers 422 `channel_credential_managed_by_social`. Choosing its `offer_id` clears `offer_confirmation_required`.",
+        "description": "Workspace admins only, sparse patch. A secret the body omits is PRESERVED and never blanked: reading it from the body instead is how a patch of the display name silently disconnects a channel.\n\nThe account cannot be changed. It is the key inbound messages are attributed by, and re-pointing it would move an existing conversation history onto a different number.\n\nA channel with `source: social` has no credential of its own: sending `access_token`, `app_secret` or `verify_token` for it answers 422 `channel_credential_managed_by_social`. Choosing its `offer_id` clears `offer_confirmation_required`.\n\n`team_alert_channel_id` names the WhatsApp channel that sends this channel's team alerts — how a Messenger or Instagram conversation reaches the team by WhatsApp. Anything but another active WhatsApp channel of this workspace, connected directly, answers 422 `team_alert_channel_invalid`.",
         "operationId": "updateSalesChannel",
         "security": [
           {
@@ -50687,6 +50741,7 @@
             "description": "The request is not a valid funnel, stage or payload",
             "x-error-codes": [
               "channel_credential_managed_by_social",
+              "team_alert_channel_invalid",
               "offer_stages_invalid",
               "lead_stage_unknown",
               "sales_assignee_invalid",
@@ -51099,7 +51154,8 @@
                     "updated_at": "2026-10-06T15:00:00Z",
                     "public_booking_enabled": false,
                     "contact_email_enabled": false,
-                    "external_sync_enabled": false
+                    "external_sync_enabled": false,
+                    "reminder_enabled": true
                   },
                   "msg": "Calendar retrieved"
                 }
@@ -51241,7 +51297,8 @@
                     "updated_at": "2026-10-06T15:00:00Z",
                     "public_booking_enabled": false,
                     "contact_email_enabled": false,
-                    "external_sync_enabled": false
+                    "external_sync_enabled": false,
+                    "reminder_enabled": true
                   },
                   "msg": "Calendar updated"
                 }
@@ -51427,6 +51484,7 @@
                         "name": "Ana López",
                         "phone": "+50255550100",
                         "contact_email": "ana@example.com",
+                        "meeting_url": "https://meet.google.com/abc-defg-hij",
                         "availability": [
                           {
                             "weekday": 0,
@@ -51585,6 +51643,7 @@
                     "name": "Ana López",
                     "phone": "+50255550100",
                     "contact_email": "ana@example.com",
+                    "meeting_url": "https://meet.google.com/abc-defg-hij",
                     "availability": [
                       {
                         "weekday": 0,
@@ -51774,6 +51833,7 @@
                       "name": "Ana López",
                       "phone": "+50255550100",
                       "contact_email": "ana@example.com",
+                      "meeting_url": "https://meet.google.com/abc-defg-hij",
                       "availability": [
                         {
                           "weekday": 0,
@@ -68319,7 +68379,7 @@
           "Creative Studio"
         ],
         "summary": "Order a piece from a template",
-        "description": "Multipart: `template_id`, `prompt`, `options` (JSON), `expected_amount` (the price you were shown), optional `recreation_of` and 1-5 `photos` (JPEG/PNG/WebP, ≤10 MB each, checked by their bytes). Nothing is charged now: the price is sealed and charged when the piece is delivered. Send an `Idempotency-Key` header (16-64 printable characters) to retry safely: the same key and content return the same order.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "description": "Multipart: `template_id`, `prompt`, `options` (JSON), `expected_amount` (the price you were shown), optional `recreation_of`, optional `presenter_id` (one of YOUR approved presenters, when the template takes one) and 1-5 `photos` (JPEG/PNG/WebP, ≤10 MB each, checked by their bytes). Nothing is charged now: the price is sealed and charged when the piece is delivered. Send an `Idempotency-Key` header (16-64 printable characters) to retry safely: the same key and content return the same order.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
         "operationId": "createStudioOrder",
         "security": [
           {
@@ -68478,10 +68538,11 @@
             "x-error-code-location": "root_or_data"
           },
           "404": {
-            "description": "Template or source order not found",
+            "description": "Template, source order or presenter not found",
             "x-error-codes": [
               "studio_template_not_found",
-              "studio_order_not_found"
+              "studio_order_not_found",
+              "studio_presenter_not_found"
             ],
             "content": {
               "application/json": {
@@ -68493,13 +68554,14 @@
             "x-error-code-location": "root_or_data"
           },
           "409": {
-            "description": "Debt, limit, price changed, expired upload or key reused",
+            "description": "Debt, limit, price changed, expired upload, key reused or presenter not approved",
             "x-error-codes": [
               "studio_payer_debt",
               "studio_open_orders_limit",
               "studio_price_changed",
               "studio_upload_expired",
-              "studio_idempotency_conflict"
+              "studio_idempotency_conflict",
+              "studio_presenter_not_approved"
             ],
             "content": {
               "application/json": {
@@ -68511,9 +68573,11 @@
             "x-error-code-location": "root_or_data"
           },
           "422": {
-            "description": "Invalid field or file",
+            "description": "Invalid field or file, or a presenter the template does not accept or needs",
             "x-error-codes": [
-              "studio_input_invalid"
+              "studio_input_invalid",
+              "studio_presenter_required",
+              "studio_presenter_not_allowed"
             ],
             "content": {
               "application/json": {
@@ -69436,6 +69500,559 @@
         ]
       }
     },
+    "/api/v1/studio/presenters": {
+      "get": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Your presenters",
+        "description": "The faces you registered to appear in your pieces, newest first, with their review state. Deleted presenters are not listed.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listStudioPresenters",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presenters",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f05",
+                        "name": "Ana (dueña)",
+                        "status": "pending_review",
+                        "created_at": "2026-11-07T15:00:00Z",
+                        "has_photo": true
+                      }
+                    ]
+                  },
+                  "msg": "Presenters retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The creative studio is switched off for this workspace",
+            "x-error-codes": [
+              "module_disabled",
+              "studio_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      },
+      "post": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Register a presenter",
+        "description": "Multipart: `name` (1-60), `relationship` (`self` = it is your face, `authorized` = you have the person's written permission), `consent_version` (the version of the consent text you were shown), `consent_accepted=true` and one `photo` of the face (JPEG/PNG/WebP, ≤ 10 MB, checked by its bytes). The presenter starts `pending_review`: our team reviews it before you can choose it in an order.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "createStudioPresenter",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_createStudioPresenter"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registered",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f05",
+                    "name": "Ana (dueña)",
+                    "status": "pending_review",
+                    "created_at": "2026-11-07T15:00:00Z",
+                    "has_photo": true
+                  },
+                  "msg": "Presenter registered"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The creative studio is switched off for this workspace",
+            "x-error-codes": [
+              "module_disabled",
+              "studio_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Limit reached, no balance account or expired upload",
+            "x-error-codes": [
+              "studio_presenter_limit",
+              "studio_billing_missing",
+              "studio_upload_expired"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Consent missing or invalid field or file",
+            "x-error-codes": [
+              "studio_consent_required",
+              "studio_input_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "x-error-codes": [
+              "studio_busy",
+              "studio_unavailable",
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "20/minute"
+        ]
+      }
+    },
+    "/api/v1/studio/presenters/{presenter_id}/photo": {
+      "get": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Signed link to a presenter's photo",
+        "description": "300 s link. 404 when it is not yours or the photo was already deleted.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "getStudioPresenterPhoto",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "presenter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Presenter id",
+              "title": "Presenter Id"
+            },
+            "description": "Presenter id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "url": "https://files.example/f.jpg",
+                    "expires_in": 300
+                  },
+                  "msg": "Link created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_presenter_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/studio/presenters/{presenter_id}": {
+      "delete": {
+        "tags": [
+          "Creative Studio"
+        ],
+        "summary": "Delete a presenter",
+        "description": "Hides it at once and deletes its photo within the hour. 409 while an order in progress uses it. Pieces already delivered stay in your library. Copies kept by our generation provider are deleted by our team by hand.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "deleteStudioPresenter",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "presenter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Presenter id",
+              "title": "Presenter Id"
+            },
+            "description": "Presenter id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f05",
+                    "name": "Ana (dueña)",
+                    "status": "deleted",
+                    "created_at": "2026-11-07T15:00:00Z",
+                    "has_photo": false
+                  },
+                  "msg": "Presenter deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_presenter_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Used by an order in progress",
+            "x-error-codes": [
+              "studio_presenter_in_use"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "x-error-codes": [
+              "studio_busy",
+              "studio_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
     "/api/v1/integrations/studio/orders/actionable": {
       "get": {
         "tags": [
@@ -69669,9 +70286,10 @@
             "x-error-code-location": "root_or_data"
           },
           "409": {
-            "description": "Already taken",
+            "description": "Already taken, or its presenter is no longer available",
             "x-error-codes": [
-              "studio_order_taken"
+              "studio_order_taken",
+              "studio_presenter_unavailable"
             ],
             "content": {
               "application/json": {
@@ -70198,6 +70816,148 @@
               }
             },
             "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      }
+    },
+    "/api/v1/integrations/studio/presenters/{presenter_id}/provider-ref": {
+      "post": {
+        "tags": [
+          "Creative Studio Agent"
+        ],
+        "summary": "Record a generator copy of a presenter's face",
+        "description": "Send `upload` (the media uploaded with the face) BEFORE creating anything from it, and `ref` (the generator reference created from it) right after. Recorded in ANY state, also once the presenter was deleted, so every copy reaches the team's deletion queue. Idempotent. Returns the reference to use (`active_ref`, the first one recorded) and whether the presenter is still approved (`usable`).\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `studio.produce` and platform scope.",
+        "operationId": "recordStudioPresenterProviderRef",
+        "parameters": [
+          {
+            "name": "presenter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Presenter id",
+              "title": "Presenter Id"
+            },
+            "description": "Presenter id"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`",
+              "title": "Authorization"
+            },
+            "description": "Service credential: `Bearer SERVICE_API_KEY_EXAMPLE`"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentProviderRefIn"
+              },
+              "example": {
+                "ref": "av-123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "active_ref": "av-123",
+                    "usable": true
+                  },
+                  "msg": "Reference recorded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid service credential",
+            "x-error-codes": [
+              "service_key_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "403": {
+            "description": "Missing capability or wrong scope",
+            "x-error-codes": [
+              "service_capability_missing",
+              "service_scope_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_presenter_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Send ref or upload",
+            "x-error-codes": [
+              "studio_input_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-rate-limit": [
@@ -79366,6 +80126,16 @@
           "302": {
             "description": "Redirect to the hosted checkout"
           },
+          "403": {
+            "description": "New charges are blocked for this merchant (status page)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Unknown token",
             "content": {
@@ -79382,6 +80152,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests, or the payment protection paused new checkouts for a while (status page with `Retry-After`)",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -79408,7 +80188,7 @@
           "Files"
         ],
         "summary": "Open an attachment (capability link)",
-        "description": "Serves one sales or task attachment through the API, decrypting it on the fly when it is stored encrypted. The link comes from the attachment's `…/url` endpoint, which keeps the two-token authentication and records who asked for it; it lives as long as that endpoint says.\n\n- **Auth:** none — the token is the capability.\n- **Range:** a single `bytes=` range answers 206; a range past the end answers 416.\n- **Caching:** never (`Cache-Control: private, no-store`).\n- **Rate limit:** 2400 req/min per client.",
+        "description": "Serves one sales or task attachment through the API, decrypting it on the fly when it is stored encrypted. The link comes from the attachment's `…/url` endpoint, which keeps the two-token authentication and records who asked for it; it lives as long as that endpoint says.\n\n- **Auth:** none — the token is the capability.\n- **Range:** a single `bytes=` range answers 206; a range past the end answers 416.\n- **Caching:** never, and never transformed (`Cache-Control: private, no-store, no-transform`).\n- **Rate limit:** 2400 req/min per client.",
         "operationId": "openProtectedFile",
         "parameters": [
           {
@@ -85593,7 +86373,7 @@
           "Onboarding"
         ],
         "summary": "Register Account",
-        "description": "Create a new user registration session and return a payment URL where the user completes checkout. Once payment is confirmed, the account is created and an API key becomes available via the status endpoint.\n\n- **Auth:** `Authorization: Bearer <app_token>` (no user token required)\n- **Rate limit:** 80 req/min\n- Minimum amount: $5.00 USD (configurable)\n- Sessions expire after 24 hours.",
+        "description": "Create a new user registration session and return a payment URL where the user completes checkout. Once payment is confirmed, the account is created and an API key becomes available via the status endpoint.\n\n- **Auth:** `Authorization: Bearer <app_token>` (no user token required)\n- **Rate limit:** 80 req/min per app token, and 10 req/min per app and client address\n- Minimum amount: $5.00 USD (configurable)\n- Sessions expire after 24 hours.",
         "operationId": "registerAccount",
         "requestBody": {
           "content": {
@@ -85672,14 +86452,25 @@
             "x-error-code-location": "data"
           },
           "409": {
-            "description": "Email already registered",
+            "description": "Email already registered (no `data.code`), or the registration changed while its checkout was being prepared (`data.code`: `onboarding_checkout_race`) — retry the same request.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "onboarding_checkout_race"
+                  },
+                  "msg": "The registration changed while its checkout was being prepared. Try again."
                 }
               }
-            }
+            },
+            "x-error-codes": [
+              "onboarding_checkout_race"
+            ],
+            "x-error-code-location": "data"
           },
           "422": {
             "description": "Invalid email format",
@@ -85692,14 +86483,19 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded",
+            "description": "Rate limit exceeded (per app token, or per app and client address), or the payment protection refused to start a registration checkout (`data.code`: `charge_shield_velocity` or `charge_shield_paused`). Retry after `Retry-After` seconds.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "x-error-codes": [
+              "charge_shield_velocity",
+              "charge_shield_paused"
+            ],
+            "x-error-code-location": "root_or_data"
           },
           "503": {
             "description": "Registration temporarily disabled",
@@ -85718,6 +86514,7 @@
           }
         ],
         "x-rate-limit": [
+          "10/minute",
           "80/minute"
         ]
       }
@@ -107108,6 +107905,1261 @@
         ]
       }
     },
+    "/api/v1/platform/apps/{app_id}/config/charge_shield": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Read one workspace's payment protection configuration (staff)",
+        "description": "Every key of `charge_shield` for the workspace: the value the protection applies to its users' charges, where it comes from (`app` / `platform` / `default`), the workspace's own override and the bounds a write is checked against. Includes the workspace's kill switch `collections_blocked`.\n\nThe workspace itself never sees this namespace: it is redacted from `GET /admin/app`.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "getAppChargeShieldConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Workspace (App) ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "App Id"
+            },
+            "description": "Workspace (App) ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workspace's payment protection keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ChargeShieldConfigOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "keys": {
+                      "collections_blocked": {
+                        "value": false,
+                        "source": "default",
+                        "default": false,
+                        "kind": "bool"
+                      },
+                      "max_mints_per_scope": {
+                        "value": 30,
+                        "source": "platform",
+                        "default": 30,
+                        "kind": "int",
+                        "min": 1,
+                        "max": 1000000
+                      }
+                    }
+                  },
+                  "msg": "Payment protection configuration"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace",
+            "x-error-codes": [
+              "charge_shield_app_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_app_not_found"
+                  },
+                  "msg": "App not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "200/minute"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Write one workspace's payment protection overrides and kill switch (staff)",
+        "description": "Writes keys of `App.config[\"charge_shield\"]` for the workspace in the path. **Partial and per key**: only what is sent changes, `null` removes the override so the key inherits the platform value again, and nothing else in the namespace is touched.\n\n`collections_blocked: true` is the workspace's kill switch: every new third-party charge of its users answers 403 `charge_collections_blocked` without reaching the gateway; `false` reopens at once. Takes effect on the next charge.\n\nA value of the wrong type is 422 (schema); out of its bounds, 422 `charge_shield_config_invalid` — one bad key refuses the whole write. Every write leaves an audit row with each key's old and new value.\n\nThe workspace cannot reach this: `PATCH /admin/app` refuses `charge_shield`.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "setAppChargeShieldConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Workspace (App) ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "App Id"
+            },
+            "description": "Workspace (App) ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeShieldAppConfigPatch"
+              },
+              "example": {
+                "collections_blocked": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Written; the workspace's keys as they are now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ChargeShieldConfigOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "keys": {
+                      "collections_blocked": {
+                        "value": false,
+                        "source": "default",
+                        "default": false,
+                        "kind": "bool"
+                      },
+                      "max_mints_per_scope": {
+                        "value": 30,
+                        "source": "platform",
+                        "default": 30,
+                        "kind": "int",
+                        "min": 1,
+                        "max": 1000000
+                      }
+                    },
+                    "changed": [
+                      "collections_blocked"
+                    ]
+                  },
+                  "msg": "Payment protection configuration updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace",
+            "x-error-codes": [
+              "charge_shield_app_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_app_not_found"
+                  },
+                  "msg": "App not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "A key this pen does not write, or a value out of its bounds",
+            "x-error-codes": [
+              "charge_shield_config_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_config_invalid"
+                  },
+                  "msg": "'window_minutes' must be an integer from 1 to 1440"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/config/charge_shield": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Read the platform's payment protection configuration (staff)",
+        "description": "The platform-wide `charge_shield` values every workspace inherits, each with the value applied, what is stored and its bounds. The kill switch is per workspace and is not listed here.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "getPlatformChargeShieldConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The platform keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ChargeShieldConfigOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "keys": {
+                      "max_mints_per_scope": {
+                        "value": 30,
+                        "source": "platform",
+                        "default": 30,
+                        "kind": "int",
+                        "min": 1,
+                        "max": 1000000
+                      }
+                    }
+                  },
+                  "msg": "Payment protection configuration"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "200/minute"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Write the platform's payment protection configuration (staff)",
+        "description": "Writes keys of the platform `charge_shield` namespace, per key (`null` puts a key back to its default). `enabled: false` is the protection's rollback lever: nothing is counted nor refused for velocity, while manual pauses and each workspace's `collections_blocked` still apply.\n\nTakes effect in this worker at once and in the others with the platform-config refresh. Every write leaves an audit row. `collections_blocked` is not accepted here (it is per workspace).\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "setPlatformChargeShieldConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeShieldPlatformConfigPatch"
+              },
+              "example": {
+                "enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Written; the platform keys as they are now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ChargeShieldConfigOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "keys": {
+                      "max_mints_per_scope": {
+                        "value": 30,
+                        "source": "platform",
+                        "default": 30,
+                        "kind": "int",
+                        "min": 1,
+                        "max": 1000000
+                      }
+                    },
+                    "changed": [
+                      "max_mints_per_scope"
+                    ]
+                  },
+                  "msg": "Payment protection configuration updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A key this pen does not write, or a value out of its bounds",
+            "x-error-codes": [
+              "charge_shield_config_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_config_invalid"
+                  },
+                  "msg": "'window_minutes' must be an integer from 1 to 1440"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The platform settings document does not exist",
+            "x-error-codes": [
+              "charge_shield_settings_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/charge-shield/trips": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "List the payment protection's pauses (staff)",
+        "description": "`status=active` (default): the pauses blocking right now, the ones ending last first. `status=all`: every pause kept (closed ones are kept 180 days), active first and then the most recent. Each row carries the integrator, the resource, why it opened, the window's counts and when it ends. Paginated with `limit` (at most 100) and `skip`.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "listChargeShieldTrips",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "active",
+                "all"
+              ],
+              "type": "string",
+              "description": "`active` (blocking now) or `all`.",
+              "default": "active",
+              "title": "Status"
+            },
+            "description": "`active` (blocking now) or `all`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Page size (1–100).",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size (1–100)."
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "description": "Rows to skip.",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Rows to skip."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of pauses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ChargeShieldTripListOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f02",
+                        "key": "scope:69fbef16a1b2c3d4e5f60718:tenant:abc:product:xyz",
+                        "key_kind": "scope",
+                        "user_id": "69fbef16a1b2c3d4e5f60718",
+                        "app_id": "507f1f77bcf86cd799439011",
+                        "shield_scope": "tenant:abc:product:xyz",
+                        "reason": "denial_ratio",
+                        "mints": 40,
+                        "denials": 31,
+                        "active": true,
+                        "in_force": true,
+                        "opened_at": "2026-11-07T17:40:00+00:00",
+                        "expires_at": "2026-11-07T18:10:00+00:00"
+                      }
+                    ],
+                    "total": 1,
+                    "limit": 50,
+                    "skip": 0
+                  },
+                  "msg": "Payment protection pauses"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "200/minute"
+        ]
+      },
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Open a manual pause on one key (staff)",
+        "description": "Pauses new charges of one key for `cooldown_minutes` (1–1440), with a required note:\n\n* `scope:<user_id>:<resource>` — one resource of an integrator;\n* `user:<user_id>` — the whole integrator (its own top-ups keep working);\n* `app:<app_id>:onboarding` — a workspace's paid sign-up (`POST /onboarding/`).\n\nThe user or workspace must exist; any other key — `buyer:` included, which is counted but never paused — is 422 `charge_shield_trip_key_invalid`. A manual pause applies even while the automatic protection is off. If the key already has a pause in force the answer is 409 `charge_shield_trip_active` with its id in `data.active_trip_id`: extend that one instead. For a cut with no end, use the workspace's `collections_blocked`.\n\nNotifies staff and the integrator like an automatic pause, and leaves an audit row.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "openChargeShieldTrip",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeShieldTripOpenRequest"
+              },
+              "example": {
+                "key": "app:507f1f77bcf86cd799439011:onboarding",
+                "cooldown_minutes": 60,
+                "note": "Sign-up abuse from one network; cut while we review."
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Opened",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ChargeShieldTripOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f02",
+                    "key": "scope:69fbef16a1b2c3d4e5f60718:tenant:abc:product:xyz",
+                    "key_kind": "scope",
+                    "user_id": "69fbef16a1b2c3d4e5f60718",
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "shield_scope": "tenant:abc:product:xyz",
+                    "reason": "manual",
+                    "mints": 0,
+                    "denials": 0,
+                    "active": true,
+                    "in_force": true,
+                    "opened_at": "2026-11-07T17:40:00+00:00",
+                    "expires_at": "2026-11-07T18:10:00+00:00"
+                  },
+                  "msg": "Pause opened"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The key already has a pause in force (its id in `data.active_trip_id`)",
+            "x-error-codes": [
+              "charge_shield_trip_active"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_trip_active",
+                    "active_trip_id": "6710aa000000000000000f02"
+                  },
+                  "msg": "This key already has an active pause. Extend it instead."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "Unknown key shape, `buyer:` key, a `topup`/`onboarding` resource, unknown user or workspace, cooldown out of 1–1440, or empty note",
+            "x-error-codes": [
+              "charge_shield_trip_key_invalid",
+              "charge_shield_config_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_trip_key_invalid"
+                  },
+                  "msg": "This key cannot be paused"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/charge-shield/trips/{trip_id}/extend": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Extend a pause still in force (staff)",
+        "description": "Adds `minutes` (1–1440) to the end of a pause that is still blocking, atomically. A pause already closed or past its end is 409 `charge_shield_trip_closed`: open a new one instead. Leaves an audit row with the old and new end.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "extendChargeShieldTrip",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Pause ID",
+              "examples": [
+                "6710aa000000000000000f02"
+              ],
+              "title": "Trip Id"
+            },
+            "description": "Pause ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeShieldTripExtendRequest"
+              },
+              "example": {
+                "minutes": 60
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Extended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ChargeShieldTripOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f02",
+                    "key": "scope:69fbef16a1b2c3d4e5f60718:tenant:abc:product:xyz",
+                    "key_kind": "scope",
+                    "user_id": "69fbef16a1b2c3d4e5f60718",
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "shield_scope": "tenant:abc:product:xyz",
+                    "reason": "denial_ratio",
+                    "mints": 40,
+                    "denials": 31,
+                    "active": true,
+                    "in_force": true,
+                    "opened_at": "2026-11-07T17:40:00+00:00",
+                    "expires_at": "2026-11-07T18:10:00+00:00"
+                  },
+                  "msg": "Pause extended"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such pause",
+            "x-error-codes": [
+              "charge_shield_trip_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_trip_not_found"
+                  },
+                  "msg": "Pause not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "409": {
+            "description": "The pause is closed or no longer in force",
+            "x-error-codes": [
+              "charge_shield_trip_closed"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_trip_closed"
+                  },
+                  "msg": "This pause is no longer in force; open a new one instead"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "`minutes` out of 1–1440",
+            "x-error-codes": [
+              "charge_shield_config_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/charge-shield/trips/{trip_id}/close": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Close a pause with a note (staff)",
+        "description": "Closes a pause now — new charges of its key are accepted again at once — with a required note kept on the pause. A pause already closed is 409 `charge_shield_trip_closed`. Leaves an audit row.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "operationId": "closeChargeShieldTrip",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Pause ID",
+              "examples": [
+                "6710aa000000000000000f02"
+              ],
+              "title": "Trip Id"
+            },
+            "description": "Pause ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeShieldTripCloseRequest"
+              },
+              "example": {
+                "note": "False positive: product launch."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ChargeShieldTripOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f02",
+                    "key": "scope:69fbef16a1b2c3d4e5f60718:tenant:abc:product:xyz",
+                    "key_kind": "scope",
+                    "user_id": "69fbef16a1b2c3d4e5f60718",
+                    "app_id": "507f1f77bcf86cd799439011",
+                    "shield_scope": "tenant:abc:product:xyz",
+                    "reason": "denial_ratio",
+                    "mints": 40,
+                    "denials": 31,
+                    "active": false,
+                    "in_force": false,
+                    "opened_at": "2026-11-07T17:40:00+00:00",
+                    "expires_at": "2026-11-07T18:10:00+00:00",
+                    "closed_at": "2026-11-07T17:40:00+00:00",
+                    "closed_by": "6710aa000000000000000a01",
+                    "close_note": "False positive: product launch."
+                  },
+                  "msg": "Pause closed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such pause",
+            "x-error-codes": [
+              "charge_shield_trip_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_trip_not_found"
+                  },
+                  "msg": "Pause not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "409": {
+            "description": "The pause is already closed",
+            "x-error-codes": [
+              "charge_shield_trip_closed"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "code": "charge_shield_trip_closed"
+                  },
+                  "msg": "This pause is no longer active"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "Empty note",
+            "x-error-codes": [
+              "charge_shield_config_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
     "/api/v1/platform/apps/{app_id}/users/{user_id}/collection-fee": {
       "get": {
         "tags": [
@@ -120890,6 +122942,761 @@
         ]
       }
     },
+    "/api/v1/platform/studio-admin/presenters": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Presenters by review state",
+        "description": "Faces registered by accounts, oldest first, with a 300 s link to the photo, the declared relationship, the consent version, the account and the workspace. Default `pending_review`.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "listStudioPresenterReviews",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(pending_review|approved|rejected|deleted)$",
+              "description": "State",
+              "default": "pending_review",
+              "title": "Status"
+            },
+            "description": "State"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presenters",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f05",
+                        "name": "Ana (dueña)",
+                        "status": "pending_review",
+                        "created_at": "2026-11-07T15:00:00Z",
+                        "photo_url": "https://files.example/f.jpg",
+                        "relationship": "self",
+                        "consent_version": "2026-11-v1",
+                        "consent_accepted_at": "2026-11-07T15:00:00Z",
+                        "app_id": "6710aa000000000000000a01",
+                        "user_id": "6710aa000000000000000b01",
+                        "space_name": "Weddimi",
+                        "user_email": "ana@example.com",
+                        "provider_refs": [],
+                        "provider_uploads": [],
+                        "provider_seq": 0
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "msg": "Presenters retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Files cannot be signed right now",
+            "x-error-codes": [
+              "studio_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio-admin/presenters/{presenter_id}/approve": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Approve a presenter",
+        "description": "`pending_review → approved`: the account can choose it in its orders and gets an email and a bell notice. 409 when it is no longer waiting (someone else reviewed it first).\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "approveStudioPresenter",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "presenter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Presenter id",
+              "title": "Presenter Id"
+            },
+            "description": "Presenter id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Approved",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f05",
+                    "name": "Ana (dueña)",
+                    "status": "approved",
+                    "created_at": "2026-11-07T15:00:00Z",
+                    "photo_url": "https://files.example/f.jpg",
+                    "relationship": "self",
+                    "consent_version": "2026-11-v1",
+                    "consent_accepted_at": "2026-11-07T15:00:00Z",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "space_name": "Weddimi",
+                    "user_email": "ana@example.com",
+                    "provider_refs": [],
+                    "provider_uploads": [],
+                    "provider_seq": 0
+                  },
+                  "msg": "Presenter approved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_presenter_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Not waiting for review",
+            "x-error-codes": [
+              "studio_presenter_not_pending"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio-admin/presenters/{presenter_id}/reject": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Reject a presenter",
+        "description": "`pending_review → rejected` with a reason the account sees. The photo is deleted within the hour.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "rejectStudioPresenter",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "presenter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Presenter id",
+              "title": "Presenter Id"
+            },
+            "description": "Presenter id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffPresenterRejectIn"
+              },
+              "example": {
+                "reason": "No se ve el rostro"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rejected",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f05",
+                    "name": "Ana (dueña)",
+                    "status": "rejected",
+                    "review_note": "No se ve el rostro",
+                    "created_at": "2026-11-07T15:00:00Z",
+                    "relationship": "self",
+                    "consent_version": "2026-11-v1",
+                    "consent_accepted_at": "2026-11-07T15:00:00Z",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "space_name": "Weddimi",
+                    "user_email": "ana@example.com",
+                    "provider_refs": [],
+                    "provider_uploads": [],
+                    "provider_seq": 0
+                  },
+                  "msg": "Presenter rejected"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_presenter_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Not waiting for review",
+            "x-error-codes": [
+              "studio_presenter_not_pending"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid reason",
+            "x-error-codes": [
+              "studio_input_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "x-error-codes": [
+              "studio_busy",
+              "studio_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio-admin/presenter-deletions": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Generator copies to delete by hand",
+        "description": "Deleted presenters whose face still has copies at the generation provider (`provider_refs`, `provider_uploads`). The provider has no deletion API: delete them there, then mark them with `provider-deleted`.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "listStudioPresenterDeletions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6710aa000000000000000f05",
+                        "name": "Ana (dueña)",
+                        "status": "deleted",
+                        "created_at": "2026-11-07T15:00:00Z",
+                        "relationship": "self",
+                        "consent_version": "2026-11-v1",
+                        "consent_accepted_at": "2026-11-07T15:00:00Z",
+                        "app_id": "6710aa000000000000000a01",
+                        "user_id": "6710aa000000000000000b01",
+                        "space_name": "Weddimi",
+                        "user_email": "ana@example.com",
+                        "provider_refs": [
+                          "av-123"
+                        ],
+                        "provider_uploads": [],
+                        "provider_seq": 2,
+                        "deleted_at": "2026-11-08T10:00:00Z"
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "msg": "Queue retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/studio-admin/presenters/{presenter_id}/provider-deleted": {
+      "post": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Mark the generator copies as deleted",
+        "description": "Send back the `provider_seq` you saw. 409 when a copy arrived after you loaded the queue (reload it) or it is no longer in the queue.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>` — full access only",
+        "operationId": "markStudioPresenterProviderDeleted",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "presenter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Presenter id",
+              "title": "Presenter Id"
+            },
+            "description": "Presenter id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffPresenterProviderDeletedIn"
+              },
+              "example": {
+                "provider_seq": 2
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Marked",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6710aa000000000000000f05",
+                    "name": "Ana (dueña)",
+                    "status": "deleted",
+                    "created_at": "2026-11-07T15:00:00Z",
+                    "relationship": "self",
+                    "consent_version": "2026-11-v1",
+                    "consent_accepted_at": "2026-11-07T15:00:00Z",
+                    "app_id": "6710aa000000000000000a01",
+                    "user_id": "6710aa000000000000000b01",
+                    "space_name": "Weddimi",
+                    "user_email": "ana@example.com",
+                    "provider_refs": [
+                      "av-123"
+                    ],
+                    "provider_uploads": [],
+                    "provider_seq": 2,
+                    "provider_deleted_at": "2026-11-08T11:00:00Z",
+                    "deleted_at": "2026-11-08T10:00:00Z"
+                  },
+                  "msg": "Marked as deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthHTTPErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "studio_presenter_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Stale queue",
+            "x-error-codes": [
+              "studio_presenter_provider_stale"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      }
+    },
     "/api/v1/platform/support/tickets": {
       "get": {
         "tags": [
@@ -126159,6 +128966,194 @@
         },
         "x-rate-limit": [
           "240/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/qa/recent-errors": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Last errors per route in QA (staff)",
+        "description": "Per route template, the most recent requests that answered 5xx or logged at ERROR in QA: status, request id and up to five error records (logger, level, exception class and the message template — never its values). Rows expire after seven days.\n\n**QA only:** any other environment answers 404 `qa_error_feed_unavailable`.\n\nFilterable by workspace (`app_id`) and route template (`route`). Each read is recorded in the platform audit (`qa_errors.read`) with its filters.\n\nFull console access only.\n\n- **Auth:** app token of the console workspace + staff session token",
+        "operationId": "getQaRecentErrors",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{24}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this workspace (its id).",
+              "title": "App Id"
+            },
+            "description": "Only this workspace (its id)."
+          },
+          {
+            "name": "route",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this route template, e.g. `/api/v1/users/transactions`.",
+              "title": "Route"
+            },
+            "description": "Only this route template, e.g. `/api/v1/users/transactions`."
+          },
+          {
+            "name": "per_route",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Requests per route, newest first (1–50).",
+              "default": 10,
+              "title": "Per Route"
+            },
+            "description": "Requests per route, newest first (1–50)."
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The last errors per route",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_QaRecentErrorsOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "routes": [
+                      {
+                        "route": "/api/v1/users/transactions",
+                        "total": 2,
+                        "last_at": "2026-11-03T15:04:05Z",
+                        "requests": [
+                          {
+                            "at": "2026-11-03T15:04:05Z",
+                            "app_id": "6720f1a9c0ffee0000000001",
+                            "method": "POST",
+                            "status_code": 503,
+                            "request_id": "7f0c2a52-5d0e-4a0e-9a35-3b1f7d2c9e10",
+                            "messages": [
+                              {
+                                "logger": "app.services.billing.transaction_service",
+                                "level": "ERROR",
+                                "message": "charge.gateway_timeout after %ss for app %s",
+                                "exc_type": "ReadTimeout"
+                              }
+                            ],
+                            "dropped_messages": 0
+                          }
+                        ]
+                      }
+                    ],
+                    "truncated": false
+                  },
+                  "msg": "Recent QA errors"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not QA: the feed does not exist here",
+            "x-error-codes": [
+              "qa_error_feed_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "200/minute"
         ]
       }
     },
@@ -135209,6 +138204,7 @@
             "description": "Malformed address, or a workspace that cannot have one",
             "x-error-codes": [
               "platform_dashboard_host_invalid",
+              "platform_dashboard_host_wrong_environment",
               "platform_dashboard_host_forbidden_app"
             ],
             "content": {
@@ -136960,6 +139956,50 @@
         ],
         "parameters": [
           {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "active",
+                "all"
+              ],
+              "type": "string",
+              "description": "`active`: still authenticates (active and not expired). `all`: every key.",
+              "default": "all",
+              "title": "Status"
+            },
+            "description": "`active`: still authenticates (active and not expired). `all`: every key."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "description": "Keys to skip.",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Keys to skip."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Page size (1–200).",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size (1–200)."
+          },
+          {
             "name": "x-user-token",
             "in": "header",
             "required": false,
@@ -137002,9 +140042,13 @@
                         "expired": false,
                         "expires_at": "2026-11-14T00:00:00Z",
                         "created_at": "2026-10-31T00:00:00Z",
-                        "note": "staging"
+                        "note": "staging",
+                        "issued_via": "console"
                       }
                     ],
+                    "total": 1,
+                    "offset": 0,
+                    "limit": 50,
                     "console_issuable": [
                       "ai.structured",
                       "whatsapp.send"
@@ -137134,6 +140178,7 @@
                     "expires_at": "2026-11-14T00:00:00Z",
                     "created_at": "2026-10-31T00:00:00Z",
                     "note": "staging",
+                    "issued_via": "console",
                     "secret": "SERVICE_API_KEY_EXAMPLE"
                   },
                   "msg": "Service key issued"
@@ -137171,10 +140216,35 @@
             },
             "x-error-code-location": "root"
           },
+          "409": {
+            "description": "The vendor already holds the maximum of live keys. Keys minted outside the console count toward it; `data.outside_console` says how many only an operator can revoke",
+            "x-error-codes": [
+              "service_key_vendor_cap_reached"
+            ],
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "data": {
+                    "vendor": "weddimi",
+                    "cap": 3,
+                    "outside_console": 1
+                  },
+                  "msg": "This vendor already holds the maximum of live service keys. Keys minted outside the console count toward it and only an operator can revoke them; revoke one minted here or ask an operator",
+                  "code": "service_key_vendor_cap_reached"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root"
+          },
           "422": {
             "description": "The issuance rules refused it; `data.problems` says why",
             "x-error-codes": [
-              "service_key_issuance_refused"
+              "service_key_issuance_refused",
+              "service_key_vendor_unknown"
             ],
             "content": {
               "application/json": {
@@ -137236,7 +140306,7 @@
           "Platform Admin"
         ],
         "summary": "Revoke a service key (staff)",
-        "description": "Stops the key in the path from authenticating, effective on its next call. Idempotent: revoking a revoked key answers the same. Any key can be revoked here, including the ones the operator script minted. Every revocation emails the full-access staff.\n\nFull console access only.\n\n- **Auth:** app token of the console workspace + staff session token",
+        "description": "Stops the key in the path from authenticating, effective on its next call. Idempotent: revoking a revoked key answers the same. Only keys this console minted (`issued_via: console`); a script key answers 403 `service_key_not_console_issued` and is revoked by the script. Every revocation emails the full-access staff.\n\nFull console access only.\n\n- **Auth:** app token of the console workspace + staff session token",
         "operationId": "revokeServiceKey",
         "security": [
           {
@@ -137296,7 +140366,8 @@
                     "expired": false,
                     "expires_at": "2026-11-14T00:00:00Z",
                     "created_at": "2026-10-31T00:00:00Z",
-                    "note": "staging"
+                    "note": "staging",
+                    "issued_via": "console"
                   },
                   "msg": "Service key revoked"
                 }
@@ -137314,14 +140385,23 @@
             }
           },
           "403": {
-            "description": "Staff without full console access",
+            "description": "A key the operator script minted (revoked there), or staff without full console access",
+            "x-error-codes": [
+              "service_key_not_console_issued"
+            ],
             "content": {
               "application/json": {
+                "example": {
+                  "success": false,
+                  "msg": "This key was minted by the operator script and is revoked there",
+                  "code": "service_key_not_console_issued"
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "x-error-code-location": "root"
           },
           "404": {
             "description": "No such key",
@@ -137365,6 +140445,287 @@
         },
         "x-rate-limit": [
           "80/minute"
+        ]
+      }
+    },
+    "/api/v1/platform/config/ai-structured": {
+      "get": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Read the structured-output route's platform configuration (staff, QA)",
+        "description": "The platform-level `ai_structured` leaves the console may write: the daily cap and the model tier, each with the value the route applies, what is stored and why.\n\n**QA only.** Full console access only.\n\n- **Auth:** app token of the console workspace + staff session token",
+        "operationId": "getPlatformAIStructuredConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The namespace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AIStructuredConfigOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "keys": {
+                      "max_calls_per_day": {
+                        "value": 50,
+                        "stored": 50,
+                        "source": "platform",
+                        "description": "Calls per `purpose` and UTC day (0 stops the route)."
+                      },
+                      "model_tier": {
+                        "value": "fast",
+                        "stored": "fast",
+                        "source": "platform",
+                        "description": "Capacity tier the route runs on: `fast`, `standard` or `advanced`."
+                      }
+                    }
+                  },
+                  "msg": "Structured-output configuration"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not QA: production is written by the operator",
+            "x-error-codes": [
+              "ai_structured_config_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "200/minute"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Platform Admin"
+        ],
+        "summary": "Write the structured-output route's platform configuration (staff, QA)",
+        "description": "Writes leaves of the platform `ai_structured` namespace: `max_calls_per_day` (integer 0–10 000) and `model_tier` (`fast`, `standard`, `advanced`). `null` puts a key back to its default. Per leaf: nothing else in the namespace is touched.\n\nTakes effect in this worker at once and in the others with the platform-config refresh. Every write leaves an audit row.\n\n**QA only.** Full console access only.\n\n- **Auth:** app token of the console workspace + staff session token",
+        "operationId": "setPlatformAIStructuredConfig",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Staff session token",
+              "title": "X-User-Token"
+            },
+            "description": "Staff session token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIStructuredConfigPatchRequest"
+              },
+              "example": {
+                "values": {
+                  "max_calls_per_day": 50,
+                  "model_tier": "fast"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Written; the namespace as it is now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AIStructuredConfigOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "keys": {
+                      "max_calls_per_day": {
+                        "value": 50,
+                        "stored": 50,
+                        "source": "platform",
+                        "description": "Calls per `purpose` and UTC day (0 stops the route)."
+                      },
+                      "model_tier": {
+                        "value": "fast",
+                        "stored": "fast",
+                        "source": "platform",
+                        "description": "Capacity tier the route runs on: `fast`, `standard` or `advanced`."
+                      }
+                    }
+                  },
+                  "msg": "Structured-output configuration updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid staff session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Staff without full console access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not QA: production is written by the operator",
+            "x-error-codes": [
+              "ai_structured_config_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Unknown key or invalid value",
+            "x-error-codes": [
+              "ai_structured_config_key_unknown",
+              "ai_structured_config_value_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The platform settings document does not exist",
+            "x-error-codes": [
+              "ai_structured_config_settings_missing"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
         ]
       }
     },
@@ -155762,6 +159123,54 @@
         "title": "AIOutputSchema",
         "description": "The structure the answer must have: a name and its JSON Schema."
       },
+      "AIStructuredConfigOut": {
+        "properties": {
+          "keys": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EffectiveKeyOut"
+            },
+            "type": "object",
+            "title": "Keys",
+            "description": "Each writable key."
+          }
+        },
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "title": "AIStructuredConfigOut"
+      },
+      "AIStructuredConfigPatchRequest": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "maxProperties": 10,
+            "minProperties": 1,
+            "title": "Values",
+            "description": "Keys to write. `null` puts a key back to its default.",
+            "examples": [
+              {
+                "max_calls_per_day": 50,
+                "model_tier": "fast"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "title": "AIStructuredConfigPatchRequest"
+      },
       "AIStructuredRequest": {
         "properties": {
           "purpose": {
@@ -160555,6 +163964,41 @@
         "title": "AgentPersona",
         "description": "How a conversational agent sounds to the person on the other side.\n\nEvery field is nullable and ``None`` means \"the system default\", which is\nwhat makes VVO-05 CA-6 true without a migration: a workspace that never\nopened this screen gets exactly the prompt, tone and tool palette it would\nhave got with no persona at all.\n\nIt travels through the RUN CONTEXT and is never written into the persisted\nthread. That is the whole reason a change applies to the NEXT message rather\nthan to the next conversation: a persona baked into the history would freeze\nthe tone of every thread on the day it was first spoken."
       },
+      "AgentProviderRefIn": {
+        "properties": {
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref",
+            "description": "Generator reference created from the face"
+          },
+          "upload": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upload",
+            "description": "Media uploaded to the generator with the face"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentProviderRefIn"
+      },
       "AgentReleaseIn": {
         "properties": {
           "claim_id": {
@@ -160998,6 +164442,17 @@
               }
             ],
             "description": "Voice and tool palette of a conversational agent, or null for every system default"
+          },
+          "visit_reminder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentVisitReminder"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Visit reminder of a conversational agent, or null to use the workspace's calendar setting"
           },
           "created_at": {
             "type": "string",
@@ -161721,6 +165176,50 @@
             "create_task"
           ]
         }
+      },
+      "AgentVisitReminder": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether visits booked through this agent get a reminder.",
+            "default": false,
+            "examples": [
+              true
+            ]
+          },
+          "lead_hours": {
+            "type": "integer",
+            "maximum": 72,
+            "minimum": 1,
+            "title": "Lead Hours",
+            "description": "How many hours before the visit the reminder goes out (1–72).",
+            "default": 24,
+            "examples": [
+              4
+            ]
+          },
+          "whatsapp_channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{24}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Channel Id",
+            "description": "WhatsApp channel of the workspace that sends the reminder to prospects who wrote through Messenger or Instagram. Null uses the workspace's only WhatsApp channel when there is exactly one.",
+            "examples": [
+              "6a714bdd0000000000000001"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentVisitReminder",
+        "description": "RCA-01 · Whether this conversational agent reminds a booked visit, and when.\n\nLives ON the agent (D-1) because the workspace asked for it per agent: two\nagents of one workspace sell different things and their visits need\ndifferent notice. ``None`` on the agent means \"use the workspace's\ncalendar setting\" — exactly the behaviour before this field existed, so no\nmigration is needed and every agent written before reads back unchanged.\n\nThe Console switch (``calendar.reminder_enabled``) is still the master\n(D-2): this config only decides *when* and *through which number* once the\nplatform has turned reminders on for the workspace."
       },
       "AgentWebsitesResponse": {
         "properties": {
@@ -165804,6 +169303,19 @@
             ],
             "title": "Photos",
             "description": "1-5 product photos"
+          },
+          "presenter_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 24
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presenter Id",
+            "description": "Your approved presenter"
           }
         },
         "type": "object",
@@ -165811,6 +169323,61 @@
           "template_id"
         ],
         "title": "Body_createStudioOrder"
+      },
+      "Body_createStudioPresenter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Name",
+            "description": "Name shown in your panel"
+          },
+          "relationship": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Relationship",
+            "description": "self | authorized"
+          },
+          "photo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Photo",
+            "description": "One photo of the face"
+          },
+          "consent_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Version",
+            "description": "Version of the consent text accepted"
+          },
+          "consent_accepted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Accepted",
+            "description": "Must be true"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "relationship",
+          "photo"
+        ],
+        "title": "Body_createStudioPresenter"
       },
       "Body_deliverStudioOrderFile": {
         "properties": {
@@ -167647,6 +171214,693 @@
         ],
         "title": "ChannelConnectExchangeRequest",
         "description": "``POST /sales/channels/connect/exchange`` — redeem the dialog's one-time code."
+      },
+      "ChargeShieldAppConfigPatch": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled",
+            "description": "Turns the automatic protection on (velocity caps and automatic pauses). Off, only manual pauses and `collections_blocked` apply. `null` clears the value at this level so it inherits again."
+          },
+          "window_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Minutes",
+            "description": "Length of the fixed counting window, in minutes. `null` clears the value at this level so it inherits again."
+          },
+          "max_mints_per_user": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mints Per User",
+            "description": "Most checkouts one integrator may open per window, across all its resources. `null` clears the value at this level so it inherits again."
+          },
+          "max_mints_per_scope": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mints Per Scope",
+            "description": "Most checkouts one resource (or an App's sign-up) may open per window. `null` clears the value at this level so it inherits again."
+          },
+          "max_mints_per_buyer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mints Per Buyer",
+            "description": "Most checkouts one buyer may open per window. `null` clears the value at this level so it inherits again."
+          },
+          "trip_min_denials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Min Denials",
+            "description": "Verified declines a resource needs in a window before it can be paused. `null` clears the value at this level so it inherits again."
+          },
+          "trip_denial_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Denial Ratio",
+            "description": "Share of declined checkouts (greater than 0, at most 1) that pauses a resource or an integrator. `null` clears the value at this level so it inherits again."
+          },
+          "trip_abs_denials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Abs Denials",
+            "description": "Verified declines that pause a resource whatever the share. `null` clears the value at this level so it inherits again."
+          },
+          "trip_user_min_denials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip User Min Denials",
+            "description": "Verified declines an integrator needs in a window before it can be paused whole. `null` clears the value at this level so it inherits again."
+          },
+          "trip_user_abs_denials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip User Abs Denials",
+            "description": "Verified declines that pause a whole integrator whatever the share. `null` clears the value at this level so it inherits again."
+          },
+          "cooldown_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Minutes",
+            "description": "How long an automatic pause lasts, in minutes. `null` clears the value at this level so it inherits again."
+          },
+          "collections_blocked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collections Blocked",
+            "description": "Kill switch of THIS workspace: `true` refuses every new third-party charge of its users (403 `charge_collections_blocked`) without reaching the gateway; their own top-ups and the sign-up are not affected. `false` reopens at once. `null` clears the value at this level so it inherits again."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ChargeShieldAppConfigPatch",
+        "description": "Per-workspace overrides of `charge_shield`, plus the workspace's kill switch.",
+        "example": {
+          "collections_blocked": true
+        }
+      },
+      "ChargeShieldConfigLeafOut": {
+        "properties": {
+          "value": {
+            "title": "Value",
+            "description": "The value the protection applies (out-of-bounds stored values fall back to the default)."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "app",
+              "platform",
+              "default"
+            ],
+            "title": "Source",
+            "description": "Where `value` comes from: the workspace override, the platform value or the built-in default."
+          },
+          "stored": {
+            "title": "Stored",
+            "description": "What this level (the workspace, or the platform in the global view) holds; `null` when nothing."
+          },
+          "default": {
+            "title": "Default",
+            "description": "The built-in default."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bool",
+              "int",
+              "ratio"
+            ],
+            "title": "Kind",
+            "description": "Type a write must carry: boolean, integer, or a share greater than 0 and at most 1."
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min",
+            "description": "Lowest accepted value (exclusive for `ratio`), or `null` for booleans."
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max",
+            "description": "Highest accepted value, or `null` for booleans."
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "source",
+          "default",
+          "kind"
+        ],
+        "title": "ChargeShieldConfigLeafOut"
+      },
+      "ChargeShieldConfigOut": {
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id",
+            "description": "The workspace of the per-workspace view; `null` in the platform view."
+          },
+          "keys": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ChargeShieldConfigLeafOut"
+            },
+            "type": "object",
+            "title": "Keys",
+            "description": "Each writable key at this level."
+          },
+          "changed": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed",
+            "description": "Keys this write changed (only on PATCH)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "title": "ChargeShieldConfigOut"
+      },
+      "ChargeShieldPlatformConfigPatch": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled",
+            "description": "Turns the automatic protection on (velocity caps and automatic pauses). Off, only manual pauses and `collections_blocked` apply. `null` clears the value at this level so it inherits again."
+          },
+          "window_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Minutes",
+            "description": "Length of the fixed counting window, in minutes. `null` clears the value at this level so it inherits again."
+          },
+          "max_mints_per_user": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mints Per User",
+            "description": "Most checkouts one integrator may open per window, across all its resources. `null` clears the value at this level so it inherits again."
+          },
+          "max_mints_per_scope": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mints Per Scope",
+            "description": "Most checkouts one resource (or an App's sign-up) may open per window. `null` clears the value at this level so it inherits again."
+          },
+          "max_mints_per_buyer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Mints Per Buyer",
+            "description": "Most checkouts one buyer may open per window. `null` clears the value at this level so it inherits again."
+          },
+          "trip_min_denials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Min Denials",
+            "description": "Verified declines a resource needs in a window before it can be paused. `null` clears the value at this level so it inherits again."
+          },
+          "trip_denial_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Denial Ratio",
+            "description": "Share of declined checkouts (greater than 0, at most 1) that pauses a resource or an integrator. `null` clears the value at this level so it inherits again."
+          },
+          "trip_abs_denials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Abs Denials",
+            "description": "Verified declines that pause a resource whatever the share. `null` clears the value at this level so it inherits again."
+          },
+          "trip_user_min_denials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip User Min Denials",
+            "description": "Verified declines an integrator needs in a window before it can be paused whole. `null` clears the value at this level so it inherits again."
+          },
+          "trip_user_abs_denials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip User Abs Denials",
+            "description": "Verified declines that pause a whole integrator whatever the share. `null` clears the value at this level so it inherits again."
+          },
+          "cooldown_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Minutes",
+            "description": "How long an automatic pause lasts, in minutes. `null` clears the value at this level so it inherits again."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ChargeShieldPlatformConfigPatch",
+        "description": "Platform-wide `charge_shield` values. No kill switch here: it is per workspace.",
+        "example": {
+          "enabled": true,
+          "max_mints_per_scope": 30
+        }
+      },
+      "ChargeShieldTripCloseRequest": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Note",
+            "description": "Why the pause is closed. Required; kept on the pause."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "ChargeShieldTripCloseRequest",
+        "example": {
+          "note": "False positive: product launch."
+        }
+      },
+      "ChargeShieldTripExtendRequest": {
+        "properties": {
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes",
+            "description": "Minutes added to the pause's current end (1–1440). Only a pause still in force can be extended."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "minutes"
+        ],
+        "title": "ChargeShieldTripExtendRequest",
+        "example": {
+          "minutes": 60
+        }
+      },
+      "ChargeShieldTripListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChargeShieldTripOut"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Active pauses first, then the most recent history."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Pauses matching the filter."
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Page size applied (at most 100)."
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip",
+            "description": "Rows skipped."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "skip"
+        ],
+        "title": "ChargeShieldTripListOut"
+      },
+      "ChargeShieldTripOpenRequest": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Key",
+            "description": "What to pause: `scope:<user_id>:<resource>` (one resource of an integrator), `user:<user_id>` (the whole integrator) or `app:<app_id>:onboarding` (a workspace's paid sign-up). The user or workspace must exist. `buyer:` keys, and the resources `topup` and `onboarding` (never read as a pause), are refused."
+          },
+          "cooldown_minutes": {
+            "type": "integer",
+            "title": "Cooldown Minutes",
+            "description": "How long the pause lasts, in minutes (1–1440)."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Note",
+            "description": "Why the pause is opened. Required; kept on the pause."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "cooldown_minutes",
+          "note"
+        ],
+        "title": "ChargeShieldTripOpenRequest",
+        "example": {
+          "cooldown_minutes": 60,
+          "key": "app:507f1f77bcf86cd799439011:onboarding",
+          "note": "Sign-up abuse from one network; cut while we review."
+        }
+      },
+      "ChargeShieldTripOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Pause id."
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The paused key (`scope:…`, `user:…` or `app:…:onboarding`)."
+          },
+          "key_kind": {
+            "type": "string",
+            "title": "Key Kind",
+            "description": "What the key pauses: `scope` (a resource), `user` (a whole integrator) or `app` (a workspace's sign-up). Read it as an open set: a value written by a newer release is passed through as is."
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "The integrator whose charges are paused; `null` for a sign-up pause."
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id",
+            "description": "The integrator's workspace (or the workspace of the sign-up)."
+          },
+          "shield_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shield Scope",
+            "description": "The resource label; `*` for a whole integrator."
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why it opened: `denial_ratio`, `denial_absolute`, `integrator` or `manual`. Read it as an open set: a value written by a newer release is passed through as is."
+          },
+          "mints": {
+            "type": "integer",
+            "title": "Mints",
+            "description": "Checkouts of the window when it opened (0 for a manual pause)."
+          },
+          "denials": {
+            "type": "integer",
+            "title": "Denials",
+            "description": "Verified declines of the window when it opened (0 for a manual pause)."
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Not closed yet. See `in_force`: an active pause past its end no longer blocks."
+          },
+          "in_force": {
+            "type": "boolean",
+            "title": "In Force",
+            "description": "Blocking right now: active and before `expires_at`."
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At",
+            "description": "When it opened (UTC)."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At",
+            "description": "When it stops blocking on its own (UTC)."
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At",
+            "description": "When it was closed (UTC)."
+          },
+          "closed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed By",
+            "description": "`expired`, or the id of the staff member who closed it."
+          },
+          "close_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Note",
+            "description": "The closing note."
+          },
+          "opened_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened By",
+            "description": "The staff member who opened a manual pause."
+          },
+          "open_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Note",
+            "description": "The opening note of a manual pause."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "key_kind",
+          "reason",
+          "mints",
+          "denials",
+          "active",
+          "in_force",
+          "opened_at",
+          "expires_at"
+        ],
+        "title": "ChargeShieldTripOut"
       },
       "ClearLogsRequest": {
         "properties": {
@@ -174394,6 +178648,21 @@
             "title": "Ready By",
             "description": "Estimated completion of a registration still being processed"
           },
+          "delegation_nameservers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Delegation Nameservers",
+            "description": "For a registration fulfilled on the customer's behalf: the nameservers the domain must delegate to so it becomes active (shown so the holder can load them at the registry). Empty for every other domain.",
+            "examples": [
+              [
+                "ns1.example.net",
+                "ns2.example.net"
+              ]
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -174732,6 +179001,46 @@
         ],
         "title": "EarningsReportResponse",
         "description": "Custom AdSense report for the connected account, shaped by the dimensions/metrics requested in `EarningsReportRequest`."
+      },
+      "EffectiveKeyOut": {
+        "properties": {
+          "value": {
+            "title": "Value",
+            "description": "The value the route applies."
+          },
+          "stored": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored",
+            "description": "What the namespace holds for the key, `null` when nothing is written."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "platform",
+              "default",
+              "invalid"
+            ],
+            "title": "Source",
+            "description": "`platform`: the stored value applies as is. `default`: nothing is stored, the default applies. `invalid`: the stored value is out of range or of the wrong kind; `value` is what the route applies instead (clamped or the default)."
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What the key controls."
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "source",
+          "description"
+        ],
+        "title": "EffectiveKeyOut"
       },
       "EmailBrandingOut": {
         "properties": {
@@ -188944,6 +193253,169 @@
         "example": "5eb7cf5a86d9755df3a6c593",
         "description": "Internal document identifier, rendered as its 24-character lowercase hex string."
       },
+      "QaErrorMessageOut": {
+        "properties": {
+          "logger": {
+            "type": "string",
+            "title": "Logger",
+            "description": "Where it was logged, e.g. `app.services.billing` — a provider adapter shows its domain (`providers.payment`)."
+          },
+          "level": {
+            "type": "string",
+            "title": "Level",
+            "description": "`ERROR` or `CRITICAL`."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "The message TEMPLATE as the code wrote it (`charge failed for %s`), never its values; `[mensaje omitido]` when the record was logged without arguments (an f-string or built text, whose content may be anything). Vendor names appear as `[provider]`."
+          },
+          "exc_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exc Type",
+            "description": "Exception class, when the record carried one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "logger",
+          "level",
+          "message"
+        ],
+        "title": "QaErrorMessageOut"
+      },
+      "QaFailedRequestOut": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At",
+            "description": "When the request finished (UTC)."
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id",
+            "description": "Workspace the request operated as; `null` if it failed before that was known."
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "description": "HTTP method."
+          },
+          "status_code": {
+            "type": "integer",
+            "title": "Status Code",
+            "description": "Status it answered."
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "`X-Request-ID`, to find the rest in the container log."
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/QaErrorMessageOut"
+            },
+            "type": "array",
+            "title": "Messages",
+            "description": "Up to five ERROR records of the request."
+          },
+          "dropped_messages": {
+            "type": "integer",
+            "title": "Dropped Messages",
+            "description": "ERROR records beyond the five kept."
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "method",
+          "status_code",
+          "messages",
+          "dropped_messages"
+        ],
+        "title": "QaFailedRequestOut"
+      },
+      "QaRecentErrorsOut": {
+        "properties": {
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/QaRouteErrorsOut"
+            },
+            "type": "array",
+            "title": "Routes",
+            "description": "Routes with failures, the most recently failed first."
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "More routes failed than this answer holds (at most 200)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "routes",
+          "truncated"
+        ],
+        "title": "QaRecentErrorsOut"
+      },
+      "QaRouteErrorsOut": {
+        "properties": {
+          "route": {
+            "type": "string",
+            "title": "Route",
+            "description": "Route template — never the real path."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Failed requests of this route kept in the last seven days (capture is capped per route and minute)."
+          },
+          "last_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last At",
+            "description": "Its most recent failure."
+          },
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/QaFailedRequestOut"
+            },
+            "type": "array",
+            "title": "Requests",
+            "description": "The most recent ones, newest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "route",
+          "total",
+          "last_at",
+          "requests"
+        ],
+        "title": "QaRouteErrorsOut"
+      },
       "RealtimeCountryItem": {
         "properties": {
           "country": {
@@ -190624,6 +195096,86 @@
             ],
             "title": "Template Language",
             "description": "Replacement approval language for the templates, or omitted to leave unchanged."
+          },
+          "team_alerts_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Alerts Enabled",
+            "description": "Turn the team's WhatsApp alert on or off (it needs the `team_handover` template). Omitted leaves it unchanged."
+          },
+          "team_alert_phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 24,
+                "pattern": "^\\s*(\\+\\s*[1-9][\\d\\s()-]{6,20})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Alert Phone",
+            "description": "Fallback number for the team's alert, starting with «+» and the country code (e.g. +502 5555 1234). Blank removes it; omitted leaves it unchanged."
+          },
+          "team_alert_kinds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "new_lead",
+                    "sale",
+                    "handover"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Alert Kinds",
+            "description": "Events that also reach the team by WhatsApp (`handover` uses `team_handover`; `new_lead` and `sale` use `team_notice`). Omitted leaves it unchanged."
+          },
+          "email_notice_kinds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "new_lead",
+                    "sale"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Notice Kinds",
+            "description": "Optional team emails for this channel's conversations. An empty list turns both off; the handover email is always sent. Omitted leaves it unchanged."
+          },
+          "team_alert_channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Alert Channel Id",
+            "description": "WhatsApp channel of this workspace that sends this channel's team alerts — how a Messenger or Instagram conversation reaches the team by WhatsApp. It must be an active WhatsApp channel connected directly, other than this one; anything else answers 422 `team_alert_channel_invalid`. Null or blank removes it; omitted leaves it unchanged."
           }
         },
         "additionalProperties": false,
@@ -192561,7 +197113,7 @@
             "minLength": 1,
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
             "title": "Vendor",
-            "description": "Who holds the key, for attribution in the logs.",
+            "description": "Who holds the key, for attribution in the logs. One of `service_keys.known_vendors`.",
             "examples": [
               "weddimi"
             ]
@@ -192685,6 +197237,11 @@
             "title": "Note",
             "description": "Free text left at issuance."
           },
+          "issued_via": {
+            "type": "string",
+            "title": "Issued Via",
+            "description": "`console` or `script`: the door that minted it. The console revokes only its own."
+          },
           "secret": {
             "type": "string",
             "title": "Secret",
@@ -192702,6 +197259,7 @@
           "expired",
           "expires_at",
           "created_at",
+          "issued_via",
           "secret"
         ],
         "title": "ServiceKeyIssuedView"
@@ -192714,7 +197272,22 @@
             },
             "type": "array",
             "title": "Keys",
-            "description": "Every key, newest first. No secret, no digest."
+            "description": "This page of keys, newest first. No secret, no digest."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Keys that match the filter, across every page."
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "Position of the first key of this page."
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Page size asked for."
           },
           "console_issuable": {
             "items": {
@@ -192728,6 +197301,9 @@
         "type": "object",
         "required": [
           "keys",
+          "total",
+          "offset",
+          "limit",
           "console_issuable"
         ],
         "title": "ServiceKeyListView"
@@ -192820,6 +197396,11 @@
             ],
             "title": "Note",
             "description": "Free text left at issuance."
+          },
+          "issued_via": {
+            "type": "string",
+            "title": "Issued Via",
+            "description": "`console` or `script`: the door that minted it. The console revokes only its own."
           }
         },
         "type": "object",
@@ -192832,7 +197413,8 @@
           "status",
           "expired",
           "expires_at",
-          "created_at"
+          "created_at",
+          "issued_via"
         ],
         "title": "ServiceKeyView"
       },
@@ -198455,6 +203037,39 @@
         ],
         "title": "StaffPauseCreateIn"
       },
+      "StaffPresenterProviderDeletedIn": {
+        "properties": {
+          "provider_seq": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Provider Seq",
+            "description": "`provider_seq` of the row you saw"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider_seq"
+        ],
+        "title": "StaffPresenterProviderDeletedIn"
+      },
+      "StaffPresenterRejectIn": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Reason shown to the account"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "StaffPresenterRejectIn"
+      },
       "StaffProfile": {
         "properties": {
           "id": {
@@ -200262,6 +204877,38 @@
         ],
         "title": "SuccessResponse",
         "description": "Typed success response wrapper for OpenAPI documentation.\n\nUse as response_model=SuccessResponse[MyModel] on endpoints.\nRuntime still returns ResponseWrapper; FastAPI uses this for schema generation."
+      },
+      "SuccessResponse_AIStructuredConfigOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AIStructuredConfigOut",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AIStructuredConfigOut]"
       },
       "SuccessResponse_ActivationStatusResponse_": {
         "properties": {
@@ -202278,6 +206925,102 @@
           "msg"
         ],
         "title": "SuccessResponse[CatalogTemplateResponse]"
+      },
+      "SuccessResponse_ChargeShieldConfigOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChargeShieldConfigOut",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[ChargeShieldConfigOut]"
+      },
+      "SuccessResponse_ChargeShieldTripListOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChargeShieldTripListOut",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[ChargeShieldTripListOut]"
+      },
+      "SuccessResponse_ChargeShieldTripOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChargeShieldTripOut",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[ChargeShieldTripOut]"
       },
       "SuccessResponse_ClientLogBatchResponse_": {
         "properties": {
@@ -205158,6 +209901,38 @@
           "msg"
         ],
         "title": "SuccessResponse[PublicTrackingResponse]"
+      },
+      "SuccessResponse_QaRecentErrorsOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/QaRecentErrorsOut",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[QaRecentErrorsOut]"
       },
       "SuccessResponse_RealtimeResponse_": {
         "properties": {
@@ -217680,6 +222455,36 @@
             "examples": [
               "ana@example.com"
             ]
+          },
+          "customer_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Ip",
+            "description": "The IP address of YOUR BUYER (IPv4 or IPv6), as your server saw it. Optional. When present, the platform limits how many checkouts one buyer can start in a short window, so a bot that hammers your checkout cannot use your account to test cards. IPv6 addresses are grouped by their /64.\n\nIt is never stored and never echoed back: only a keyed, one-way fingerprint is kept for the limit. Without it the buyer is identified by `customer_email`; without either, only the per-resource and per-account limits apply. A non-public address (private, loopback, link-local, reserved) does not identify a buyer and is treated as absent.\n\nA value that is not a valid IP address is refused with `400` before any checkout is created.",
+            "examples": [
+              "203.0.113.7"
+            ]
+          },
+          "shield_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shield Scope",
+            "description": "The RESOURCE being bought — a product, a plan, a store — as an identifier of your choosing: 1-96 characters of letters, digits, `:`, `_` and `-` (e.g. `store:abc:product:xyz`). Optional.\n\nLimits and automatic pauses apply per resource: if one product starts receiving an abnormal number of declined payments, only that product is paused for a while and the rest of your account keeps collecting. Without it, your whole account is one resource.\n\nThe names `topup`, `onboarding`, `_default` and `link`, and any value starting with `link:`, are reserved by the platform.\n\nA value outside that shape, or a reserved name, is refused with `400` before any checkout is created. It is never echoed back.",
+            "examples": [
+              "store:abc:product:xyz"
+            ]
           }
         },
         "type": "object",
@@ -219613,6 +224418,17 @@
               }
             ],
             "description": "Voice and tool palette for a conversational agent. Send null explicitly to clear it back to the system defaults."
+          },
+          "visit_reminder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentVisitReminder"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Visit reminder of a conversational agent, replaced wholesale. Send null explicitly to go back to the workspace's calendar setting."
           }
         },
         "type": "object",
@@ -220751,6 +225567,19 @@
             "title": "User Id",
             "description": "Optional active, verified member of this workspace who receives the visit notices."
           },
+          "meeting_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meeting Url",
+            "description": "Optional https video-call link (Google Meet, Zoom…). Sent to the person only when their visit is by video."
+          },
           "availability": {
             "items": {
               "$ref": "#/components/schemas/WeeklyWindow"
@@ -220840,6 +225669,19 @@
             ],
             "title": "User Id",
             "description": "New linked user (active and verified, same workspace); null unlinks."
+          },
+          "meeting_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meeting Url",
+            "description": "New https video-call link; null or blank removes it."
           },
           "availability": {
             "anyOf": [

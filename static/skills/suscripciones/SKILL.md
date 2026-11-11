@@ -1,6 +1,6 @@
 ---
 name: suscripciones
-description: Configurar planes y clientes de un comercio y emitir invitaciones a un plan con la 1Platform API; el cobro recurrente sigue en preparación.
+description: Configurar planes y clientes de un comercio, emitir invitaciones a un plan y seguir sus cobros recurrentes con la 1Platform API.
 ---
 
 # Suscripciones
@@ -17,7 +17,7 @@ Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el c
 
 
 Requiere la skill `1platform-hub`. Viene apagado: mientras tanto, las operaciones bajo `/businesses/{businessId}/…`
-responden `503` `subscriptions_disabled`. El cobro recurrente está en preparación: no prometa renovaciones.
+responden `503` `subscriptions_disabled`. Las renovaciones se cobran automáticamente según la frecuencia del plan publicado.
 
 1. `GET /api/v1/businesses` (`listBusinessesForUser`) para el `businessId`.
 2. `POST /api/v1/businesses/{businessId}/subscription-plans` crea el plan en borrador y

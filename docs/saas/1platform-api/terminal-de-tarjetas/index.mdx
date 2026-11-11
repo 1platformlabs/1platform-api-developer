@@ -1,6 +1,6 @@
 ---
 title: Terminal de tarjetas
-description: Solicite una terminal y siga su alta; el cobro presencial permanece en preparación.
+description: Solicite una terminal, actívela en el teléfono del comercio y cobre con tarjeta presente.
 sidebar_position: 1
 ---
 
@@ -14,7 +14,7 @@ import PromptParaAgente from '@site/src/components/PromptParaAgente';
 
 ## Disponibilidad
 
-El **alta de terminal está disponible** para espacios habilitados. El **cobro presencial está en preparación**: abrir o aprobar una solicitud y obtener un código de activación no equivale a disponer de una API para hacer cargos con tarjeta presente. No existe una operación para cobrar con la terminal. Lo que la API prevé es recibir los cobros que la terminal ya hizo: un administrador del espacio de trabajo vincula la solicitud aprobada con los identificadores de la terminal y el equipo de la plataforma confirma esa conexión. Desde entonces, cada cobro aparece en el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros) con el canal `terminal`. Que ese dinero se acredite a su saldo retirable depende de una habilitación de la plataforma, apagada por defecto. Confirme con la plataforma el estado de su espacio antes de prometer cobros presenciales.
+El **alta de terminal y el cobro presencial están disponibles**. El comercio cobra con tarjeta presente en la app de la terminal, instalada en su propio teléfono. El cargo se hace en la app, no por la API: no existe una operación para iniciar un cobro con la terminal. Para que los cobros lleguen a su cuenta, un administrador del espacio de trabajo vincula la solicitud aprobada con los identificadores de la terminal y el equipo de la plataforma confirma esa conexión. Desde entonces, cada cobro se registra con un aviso firmado, aparece en el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros) con el canal `terminal` y se consulta con `GET /users/terminal-payments/{paymentId}`.
 
 ## Cómo funciona
 
@@ -51,6 +51,7 @@ Un administrador del espacio de trabajo registra el resultado de cada solicitud 
 | `GET /businesses/{businessId}/terminal-requests` | Listar las solicitudes del comercio |
 | `POST /businesses/{businessId}/terminal-requests/{requestId}/cancel` | Retirar una solicitud que todavía no se resolvió |
 | `GET /terminal-app/{platform}` | Enlace público a la app de la terminal en la tienda |
+| `GET /users/terminal-payments/{paymentId}` | Consultar un cobro hecho con la terminal |
 
 Todas las operaciones, incluidas las del administrador del espacio de trabajo: [Referencia de API → Payment Terminals](/api-reference/1platform-api#tag/payment-terminals).
 

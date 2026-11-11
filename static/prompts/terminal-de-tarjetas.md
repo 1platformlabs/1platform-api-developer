@@ -19,7 +19,8 @@ mensajes o comprometa dinero requiere un pedido explícito; no confunda preparar
 
 ## Implementación
 
-Use la skill `1platform-hub`. El cobro presencial está en preparación: el alta no da una API de cargos.
+Use la skill `1platform-hub`. El cobro presencial está disponible y se hace en la app de la terminal, en el teléfono
+del comercio: no hay una operación para iniciar un cargo; la API registra y consulta los cobros ya hechos.
 
 1. `GET /api/v1/businesses` (`listBusinessesForUser`) para el `businessId`. El comercio necesita NIT y usted, rol de
    administrador en la sucursal.
@@ -29,6 +30,7 @@ Use la skill `1platform-hub`. El cobro presencial está en preparación: el alta
 3. `POST /api/v1/businesses/{businessId}/terminal-requests/{requestId}/submit` la envía.
 4. `GET /api/v1/businesses/{businessId}/terminal-requests/{requestId}` muestra el estado, lo que falta y, si se aprobó,
    el código de activación.
+5. `GET /api/v1/users/terminal-payments/{paymentId}` (`getTerminalPayment`) consulta un cobro hecho con la terminal.
 
 Con el servidor MCP (toolset `terminal`): solicitudes y su estado, sólo lectura.
 

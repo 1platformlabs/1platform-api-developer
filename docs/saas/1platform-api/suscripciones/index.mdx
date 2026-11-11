@@ -1,6 +1,6 @@
 ---
 title: Suscripciones
-description: Configure planes y clientes; consulte los requisitos de habilitación del cobro recurrente, que permanece en preparación.
+description: Venda planes con cobro recurrente; publique el plan, invite al cliente y las renovaciones se cobran automáticamente.
 sidebar_position: 1
 ---
 
@@ -8,7 +8,7 @@ import PromptParaAgente from '@site/src/components/PromptParaAgente';
 
 # Suscripciones
 
-<p className="lead">Organice planes, clientes e invitaciones de su comercio. Los cobros recurrentes permanecen en preparación: la existencia de estas operaciones no confirma que las renovaciones estén habilitadas para su espacio de trabajo.</p>
+<p className="lead">Venda suscripciones desde su comercio: cree y publique planes, invite a cada cliente con un link de pago y deje que las renovaciones se cobren automáticamente según la frecuencia del plan.</p>
 
 <PromptParaAgente slug="suscripciones" />
 
@@ -16,7 +16,7 @@ import PromptParaAgente from '@site/src/components/PromptParaAgente';
 |---|---|
 | Gestión de planes y clientes | Requiere que la plataforma habilite Suscripciones para su espacio de trabajo, además del módulo y los permisos del comercio |
 | Invitaciones de pago | Requieren, además, el servicio de cobro configurado |
-| Renovaciones automáticas | En preparación; requieren habilitación y aceptación de la integración |
+| Renovaciones automáticas | Disponibles: se cobran en cada fecha del plan, sin llamadas de su integración |
 
 El tag **Subscriptions** de la Referencia de API mezcla dos cosas distintas:
 
@@ -25,10 +25,10 @@ El tag **Subscriptions** de la Referencia de API mezcla dos cosas distintas:
 
 ## Cómo funciona
 
-1. **Plan.** Cree un plan para un comercio. La moneda es la del comercio. El plan nace en `draft` y no se puede cobrar hasta que lo **publica**. Ya publicado, el monto y la frecuencia quedan fijos: sólo cambian el nombre y la descripción. Para cobrar otro monto, archive el plan y cree uno nuevo.
+1. **Plan.** Cree un plan para un comercio. La moneda es la del comercio. El plan nace en `draft` y no se puede cobrar hasta que lo **publica**. Ya publicado, el monto y la frecuencia quedan fijos. Para cobrar otro monto u otra frecuencia, archive el plan y cree uno nuevo.
 2. **Cliente.** Registre al cliente en la libreta de clientes del comercio. El correo lo identifica dentro de ese comercio y no se puede editar.
 3. **Invitación.** Emita una invitación de un solo uso para un plan publicado. Es un link de pago por el monto del plan. Cada invitación sirve para un solo cliente y vence a los 7 días, salvo que la plataforma haya fijado otra vigencia.
-4. **Suscripción.** Cuando el cliente paga la invitación, nace la suscripción. En espacios con la integración de cobro recurrente habilitada, el servicio de cobro administra la tarjeta y el calendario de renovaciones. Confirme esa habilitación antes de ofrecerlas a sus clientes.
+4. **Suscripción.** Cuando el cliente paga la invitación, se registran el cliente y su suscripción. Desde entonces, cada renovación se cobra automáticamente en la fecha que marca la frecuencia del plan. La suscripción se actualiza con avisos firmados del servicio de cobro y con una conciliación periódica que recupera lo que un aviso no haya traído.
 5. **Estados de la suscripción.**
    - `active`: está al día.
    - `past_due`: pasó una fecha de renovación sin noticias del cobro. Puede volver a `active`.
@@ -49,7 +49,7 @@ Archivar un plan no cancela las suscripciones que ya se vendieron con él. Cance
 | Operación | Para qué |
 |---|---|
 | `POST /businesses/{businessId}/subscription-plans` | Crear un plan en borrador |
-| `PATCH /businesses/{businessId}/subscription-plans/{planId}` | Editar un plan |
+| `PATCH /businesses/{businessId}/subscription-plans/{planId}` | Editar un plan antes de publicarlo |
 | `POST /businesses/{businessId}/subscription-plans/{planId}/publish` | Publicar el plan para poder cobrarlo |
 | `POST /businesses/{businessId}/subscription-plans/{planId}/archive` | Archivar el plan para que no reciba invitaciones nuevas |
 | `GET /businesses/{businessId}/subscription-plans` | Listar los planes del comercio |

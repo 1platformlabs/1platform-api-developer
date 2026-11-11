@@ -78,13 +78,17 @@ function auditSources(docs, prose, fail) {
 }
 
 function auditAvailability(docs, requireClaim, fail) {
-  for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas']) {
-    for (const name of ['index.mdx', '_category_.json']) {
-      const path = `${product}/${name}`;
-      if (!/en preparación/i.test(docs[path] ?? '')) fail('DOC-01', path, 'falta disponibilidad en preparación');
+  for (const name of ['index.mdx', '_category_.json']) {
+    const path = `publicidad/${name}`;
+    if (!/en preparación/i.test(docs[path] ?? '')) fail('DOC-01', path, 'falta disponibilidad en preparación');
+    // Available since 2026-11 (owner decision): a stale "en preparación" is drift.
+    for (const product of ['suscripciones', 'terminal-de-tarjetas']) {
+      if (/en preparación/i.test(docs[`${product}/${name}`] ?? '')) fail('DOC-01', `${product}/${name}`, 'disponibilidad obsoleta');
     }
   }
-  requireClaim('DOC-01', 'terminal-de-tarjetas/index.mdx', /alta de terminal está disponible/, 'se debe distinguir alta de cobro presencial');
+  requireClaim('DOC-01', 'terminal-de-tarjetas/index.mdx', /cobro presencial están disponibles/, 'falta disponibilidad del cobro presencial');
+  requireClaim('DOC-01', 'terminal-de-tarjetas/index.mdx', /no existe una operación para iniciar un cobro/, 'el cobro se hace en la app, no por la API');
+  requireClaim('DOC-01', 'suscripciones/index.mdx', /Renovaciones automáticas \| Disponibles/, 'falta disponibilidad de las renovaciones');
   requireClaim('DOC-06', 'reference/retry-and-delivery.mdx', /eventos no entregados.*[Cc]onciliación/, 'falta límite de entrega y conciliación');
   requireClaim('DOC-07', 'analitica/mapas-de-calor.mdx', /muestras de interacción/, 'falta unidad del mapa');
   requireClaim('DOC-09', 'agentes-de-ia/integrar-en-su-aplicacion.mdx', /no es un requisito universal/, 'sitio no universal para agentes');
@@ -141,7 +145,11 @@ if (process.argv.includes('--self-test')) {
   assert.deepEqual(audit(docs, fixture), [], 'real prose with valid illustrative API event');
   const negatives = [
     ['DOC-02', 'analitica/google-analytics.mdx', s => s.replaceAll('content_published', 'article_published')],
-    ['DOC-01', 'suscripciones/index.mdx', s => s.replaceAll(/en preparación/gi, 'disponible')],
+    ['DOC-01', 'suscripciones/index.mdx', s => s.replace('Disponibles: se cobran', 'En preparación; se cobrarán')],
+    ['DOC-01', 'suscripciones/_category_.json', s => s.replace('automáticos', 'en preparación')],
+    ['DOC-01', 'terminal-de-tarjetas/index.mdx', s => s.replace('están disponibles', 'están en preparación')],
+    ['DOC-01', 'terminal-de-tarjetas/index.mdx', s => s.replace('no existe una operación para iniciar un cobro', 'existe una operación para iniciar un cobro')],
+    ['DOC-01', 'publicidad/index.mdx', s => s.replaceAll(/en preparación/gi, 'disponible')],
     ['DOC-01', 'publicidad/_category_.json', s => s.replaceAll('en preparación', 'disponible')],
     ['DOC-06', 'plataforma/webhooks.mdx', s => `${s}\nGarantizamos la entrega al menos una vez.`],
     ['DOC-06', 'reference/retry-and-delivery.mdx', s => `${s}\nEntrega exactamente una vez.`],

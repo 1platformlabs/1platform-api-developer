@@ -20,7 +20,7 @@ mensajes o comprometa dinero requiere un pedido explícito; no confunda preparar
 ## Implementación
 
 Use la skill `1platform-hub`. Viene apagado: mientras tanto, las operaciones bajo `/businesses/{businessId}/…`
-responden `503` `subscriptions_disabled`. El cobro recurrente está en preparación: no prometa renovaciones.
+responden `503` `subscriptions_disabled`. Las renovaciones se cobran automáticamente según la frecuencia del plan publicado.
 
 1. `GET /api/v1/businesses` (`listBusinessesForUser`) para el `businessId`.
 2. `POST /api/v1/businesses/{businessId}/subscription-plans` crea el plan en borrador y

@@ -16648,6 +16648,22 @@
         "operationId": "admin.members.invite",
         "parameters": [
           {
+            "name": "accept-language",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          },
+          {
             "name": "x-tenant-slug",
             "in": "header",
             "required": false,
@@ -16789,6 +16805,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The member row exists but the invitation e-mail could not be delivered. Transient — retry with ``POST /members/{id}/reinvite``.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "EMAIL_DELIVERY_FAILED"
+                  }
                 }
               }
             }
@@ -16965,6 +16993,213 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/members/{member_id}/reinvite": {
+      "post": {
+        "tags": [
+          "admin",
+          "admin-members"
+        ],
+        "summary": "Reinvite Member",
+        "description": "Re-send the invitation e-mail to a member still ``invited``.",
+        "operationId": "admin.members.reinvite",
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "accept-language",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          },
+          {
+            "name": "x-tenant-slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Slug"
+            }
+          },
+          {
+            "name": "host",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "X-Admin-Tenant-Slug",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Tenant-Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "atlas_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atlas Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "``UNAUTHORIZED`` — no valid session credential (``{\"detail\": {\"code\": \"UNAUTHORIZED\"}}``). ``SESSION_REVOKED`` — the token predates the member's session revocation; sign in again (flat: ``{\"code\": \"SESSION_REVOKED\", \"message\": ...}``).",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "UNAUTHORIZED"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "``TENANT_SWITCH_FORBIDDEN`` — ``X-Admin-Tenant-Slug`` names a tenant the caller may not switch into (flat envelope).",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "TENANT_SWITCH_FORBIDDEN"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No member with that id for this tenant.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "MEMBER_NOT_FOUND"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The member already accepted (status is not ``invited``).",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "MEMBER_ALREADY_ACTIVE"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The member row exists but the invitation e-mail could not be delivered. Transient — retry with ``POST /members/{id}/reinvite``.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "EMAIL_DELIVERY_FAILED"
+                  }
                 }
               }
             }

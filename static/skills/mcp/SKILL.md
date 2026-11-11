@@ -21,9 +21,11 @@ El servidor MCP expone la documentación y un conjunto acotado de operaciones de
 - Sin llaves: `docs_search`, `docs_get_page` y `api_get_operation`.
 - Con llaves (`ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY`): las operaciones de la API agrupadas por producto
   (toolsets): `cuenta`, `pagos`, `retiros`, `suscripciones`, `terminal`, `facturacion`, `envios`, `sitios`,
-  `analitica`, `correo`, `dominios`, `telemetria`, `ventas` y `agentes`. Escrituras sin dinero: crear y cancelar un
-  link de pago, detener una ejecución de un agente y cambiar el estado de un error de telemetría. Ninguna cobra
-  saldo, emite documentos fiscales, mueve dinero ni envía mensajes a terceros.
+    `analitica`, `correo`, `dominios`, `telemetria`, `ventas`, `agentes`, `agenda`, `redes`, `tareas` y `estudio`.
+  Las escrituras no cobran saldo en el acto, no emiten documentos fiscales ni mueven dinero: links de pago, planes,
+  clientes y suscripciones, solicitudes de terminal, visitas de la agenda, borradores y publicaciones programadas de
+  redes, tareas y subtareas, detener una ejecución de un agente y el estado de un error de telemetría. Agendar, mover
+  o cancelar una visita avisa a la persona y al asesor; una publicación programada se cobra cuando sale en la red.
 - Acotar productos: `ONEPLATFORM_TOOLSETS=pagos,envios` (local) o la cabecera `X-OnePlatform-Toolsets` (alojado).
   `cuenta` y la documentación se listan siempre.
 - Entorno: QA salvo `ONEPLATFORM_ENV=prod`.

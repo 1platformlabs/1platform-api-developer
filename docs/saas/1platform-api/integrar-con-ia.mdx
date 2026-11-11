@@ -67,23 +67,29 @@ por producto (*toolset*):
 |---|---|
 | `cuenta` | Perfil, saldo, consumo, comercios y avisos. Siempre activo: de aquí sale el `businessId` |
 | `pagos` | Links de pago (listar, ver, crear y cancelar) y transacciones |
-| `retiros` | Saldo retirable, movimientos y retiros (sólo lectura) |
-| `suscripciones` | Planes, suscripciones y clientes |
-| `terminal` | Solicitudes de terminal de tarjetas y su estado |
+| `retiros` | Saldo retirable, movimientos, retiros, métodos de retiro (enmascarados) y cobros que pueden pasar al saldo retirable (sólo lectura) |
+| `suscripciones` | Planes, suscripciones y clientes; **crear, editar, publicar y archivar** planes, **crear y editar** clientes, **emitir** una invitación y **cancelar** una suscripción |
+| `terminal` | Solicitudes de terminal de tarjetas, su estado y el detalle de un pago con terminal; **crear, corregir y retirar** una solicitud (el envío y los documentos siguen en el panel) |
 | `facturacion` | Facturas electrónicas (sólo lectura) |
 | `envios` | Envíos (sólo lectura) |
 | `sitios` | Sitios, artículos, trabajos de generación, categorías y rendimiento de búsqueda |
-| `analitica` | Métricas del sitio, ingresos y alertas de anuncios, mapas de calor |
+| `analitica` | Estado, propiedad, flujos, dimensiones, eventos clave, etiqueta y métricas de analítica; ingresos, alertas y problemas de políticas de anuncios; mapas de calor (sólo lectura) |
 | `correo` | Correo transaccional (remitentes, plantillas, cupos, mensajes) y conversaciones del correo del negocio |
 | `dominios` | Dominios, disponibilidad, precios, transferencias y registros de correo (sólo lectura) |
 | `telemetria` | Proyectos, errores, registros, rendimiento y uso; marcar un error como resuelto o ignorado |
 | `ventas` | Preparación, canales, ofertas, prospectos, tablero y reporte |
-| `agentes` | Agentes, catálogo, herramientas, presupuesto, ejecuciones y acciones; detener una ejecución |
+| `agentes` | Agentes, catálogo, herramientas, presupuesto, ejecuciones y acciones; **detener** una ejecución |
+| `agenda` | Calendario, visitas, horarios libres, asesores y enlaces de reserva; **agendar, mover, reasignar, completar y cancelar** una visita; **obtener** un enlace de reserva |
+| `redes` | Configuración, portafolios, cuentas conectadas, publicaciones, calendario, comentarios, analítica y aprobaciones; **crear y editar** un borrador, **programar**, **mover** y **cancelar** una publicación |
+| `tareas` | Tareas, subtareas, bandeja de subtareas disponibles y archivos; **crear, editar y asignar** tareas, **crear** subtareas y **tomar o completar** una subtarea |
+| `estudio` | Plantillas, pedidos, piezas entregadas, deudas y presentadores del estudio creativo (sólo lectura) |
 
-Las escrituras (crear y cancelar un link de pago, detener una ejecución de un agente y cambiar el estado de un error)
-no mueven dinero y el cliente pide confirmación antes de ejecutarlas. Ninguna herramienta cobra saldo, emite
-documentos fiscales, mueve dinero ni envía mensajes a terceros: eso se hace con la API, siguiendo la skill de cada
-producto.
+Las escrituras (en negrita) no cobran saldo en el acto, no emiten documentos fiscales ni mueven dinero, y el cliente
+pide confirmación antes de ejecutarlas. Dos excepciones, iguales a las del panel: agendar, mover o cancelar una visita
+envía los avisos de la agenda a la persona y al asesor, y programar una publicación la deja en cola para salir en la
+red en la fecha elegida, cuando se cobra (cancelarla antes no cobra nada). Publicar al instante, aprobar, responder
+comentarios, encargar piezas del estudio, cobrar, emitir documentos fiscales y mover dinero se hacen con la API,
+siguiendo la skill de cada producto. En `redes` las herramientas trabajan sobre el portafolio propio de la persona.
 
 Por defecto el servidor lista todos los toolsets. Si su cliente admite pocas herramientas, elija los productos que usa
 con la variable `ONEPLATFORM_TOOLSETS` (paquete local) o la cabecera `X-OnePlatform-Toolsets` (servidor alojado), por

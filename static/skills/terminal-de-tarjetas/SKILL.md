@@ -29,6 +29,7 @@ del comercio: no hay una operación para iniciar un cargo; la API registra y con
    el código de activación.
 5. `GET /api/v1/users/terminal-payments/{paymentId}` (`getTerminalPayment`) consulta un cobro hecho con la terminal.
 
-Con el servidor MCP (toolset `terminal`): solicitudes y su estado, sólo lectura.
+Con el servidor MCP (toolset `terminal`): solicitudes, su estado y el detalle de un pago con terminal; crear,
+corregir y retirar una solicitud. El envío y los documentos se completan en el panel.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/terminal-de-tarjetas.md

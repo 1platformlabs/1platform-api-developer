@@ -1,6 +1,6 @@
 ---
 name: publicidad
-description: Preparar campañas publicitarias, consultar sus límites y seguir su publicación con la 1Platform API, sólo en espacios habilitados.
+description: Crear, financiar y publicar campañas publicitarias, consultar sus límites y medir sus resultados con la 1Platform API.
 ---
 
 # Publicidad
@@ -16,8 +16,8 @@ indique esa limitación. No invente herramientas operativas: compruebe cuáles l
 Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el código ya esté preparado.
 
 
-Requiere la skill `1platform-hub`. La integración publicitaria sigue en preparación: un borrador o una operación
-documentada no acreditan campañas operativas. Compruebe la habilitación del espacio antes de comprometer presupuesto.
+Requiere la skill `1platform-hub`. La integración publicitaria está disponible en espacios con la publicidad
+encendida: borradores, presupuesto, publicación, resultados y cierre con liquidación.
 
 1. Consulte `GET /api/v1/ads/settings` y `GET /api/v1/ads/objectives` para límites y objetivos.
 2. La persona conecta su cuenta mediante `GET /api/v1/ads/connection/authorize` y elige su marca con

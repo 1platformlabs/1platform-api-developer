@@ -19,8 +19,8 @@ mensajes o comprometa dinero requiere un pedido explícito; no confunda preparar
 
 ## Implementación
 
-Use la skill `1platform-hub`. La integración publicitaria sigue en preparación: un borrador o una operación
-documentada no acreditan campañas operativas. Compruebe la habilitación del espacio antes de comprometer presupuesto.
+Use la skill `1platform-hub`. La integración publicitaria está disponible en espacios con la publicidad
+encendida: borradores, presupuesto, publicación, resultados y cierre con liquidación.
 
 1. Consulte `GET /api/v1/ads/settings` y `GET /api/v1/ads/objectives` para límites y objetivos.
 2. La persona conecta su cuenta mediante `GET /api/v1/ads/connection/authorize` y elige su marca con

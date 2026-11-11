@@ -78,14 +78,13 @@ function auditSources(docs, prose, fail) {
 }
 
 function auditAvailability(docs, requireClaim, fail) {
-  for (const name of ['index.mdx', '_category_.json']) {
-    const path = `publicidad/${name}`;
-    if (!/en preparación/i.test(docs[path] ?? '')) fail('DOC-01', path, 'falta disponibilidad en preparación');
-    // Available since 2026-11 (owner decision): a stale "en preparación" is drift.
-    for (const product of ['suscripciones', 'terminal-de-tarjetas']) {
+  // Available since 2026-11 (owner decision): a stale "en preparación" is drift.
+  for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas']) {
+    for (const name of ['index.mdx', '_category_.json']) {
       if (/en preparación/i.test(docs[`${product}/${name}`] ?? '')) fail('DOC-01', `${product}/${name}`, 'disponibilidad obsoleta');
     }
   }
+  requireClaim('DOC-01', 'publicidad/index.mdx', /integración publicitaria está disponible/, 'falta disponibilidad de la publicidad');
   requireClaim('DOC-01', 'terminal-de-tarjetas/index.mdx', /cobro presencial están disponibles/, 'falta disponibilidad del cobro presencial');
   requireClaim('DOC-01', 'terminal-de-tarjetas/index.mdx', /no existe una operación para iniciar un cobro/, 'el cobro se hace en la app, no por la API');
   requireClaim('DOC-01', 'suscripciones/index.mdx', /Renovaciones automáticas \| Disponibles/, 'falta disponibilidad de las renovaciones');
@@ -149,8 +148,8 @@ if (process.argv.includes('--self-test')) {
     ['DOC-01', 'suscripciones/_category_.json', s => s.replace('automáticos', 'en preparación')],
     ['DOC-01', 'terminal-de-tarjetas/index.mdx', s => s.replace('están disponibles', 'están en preparación')],
     ['DOC-01', 'terminal-de-tarjetas/index.mdx', s => s.replace('no existe una operación para iniciar un cobro', 'existe una operación para iniciar un cobro')],
-    ['DOC-01', 'publicidad/index.mdx', s => s.replaceAll(/en preparación/gi, 'disponible')],
-    ['DOC-01', 'publicidad/_category_.json', s => s.replaceAll('en preparación', 'disponible')],
+    ['DOC-01', 'publicidad/index.mdx', s => s.replace('integración publicitaria está disponible', 'integración publicitaria está en preparación')],
+    ['DOC-01', 'publicidad/_category_.json', s => s.replace('campañas publicitarias.', 'campañas publicitarias; en preparación.')],
     ['DOC-06', 'plataforma/webhooks.mdx', s => `${s}\nGarantizamos la entrega al menos una vez.`],
     ['DOC-06', 'reference/retry-and-delivery.mdx', s => `${s}\nEntrega exactamente una vez.`],
     ['DOC-07', 'analitica/mapas-de-calor.mdx', s => s.replace('el ranking de páginas no mide visitas ni personas únicas', 'el ranking de páginas mide visitas y personas únicas')],

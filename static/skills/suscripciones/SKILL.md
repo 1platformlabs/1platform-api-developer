@@ -29,6 +29,7 @@ responden `503` `subscriptions_disabled`. Las renovaciones se cobran automática
 5. `GET /api/v1/businesses/{businessId}/subscriptions` y
    `GET /api/v1/businesses/{businessId}/subscriptions/{subscriptionId}` para lo vendido.
 
-Con el servidor MCP (toolset `suscripciones`): planes, suscripciones y clientes, sólo lectura.
+Con el servidor MCP (toolset `suscripciones`): leer planes, suscripciones y clientes; crear, editar, publicar y
+archivar planes, crear y editar clientes, emitir una invitación y cancelar una suscripción.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/suscripciones.md

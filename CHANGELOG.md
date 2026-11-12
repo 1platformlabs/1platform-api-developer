@@ -2,6 +2,13 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Varias direcciones de correo por dominio
+
+- Dominios y correo: un dominio admite varias direcciones, cada una se desactiva por
+  separado. Nuevos desenlaces de `POST /domains/{domain_id}/mail/addresses`:
+  `409` `mail_address_limit` (tope por dominio, en `data.limit`) y `409`
+  `mail_provider_domain_limit` (el dominio no se pudo habilitar; no queda dirección).
+
 ## [Unreleased] — Límites de uso de Atlas
 
 - El `429 RATE_LIMITED` de la Atlas API trae ahora `Retry-After` (segundos hasta que

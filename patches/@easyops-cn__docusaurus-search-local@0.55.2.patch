@@ -2,7 +2,26 @@ diff --git a/dist/client/client/theme/SearchBar/SearchBar.jsx b/dist/client/clie
 index 14f54733d9e4851dd7f82ccd8fcb1b2896632b70..4a2f76701c8efedd28c5c87b2897212706eafc36 100644
 --- a/dist/client/client/theme/SearchBar/SearchBar.jsx
 +++ b/dist/client/client/theme/SearchBar/SearchBar.jsx
-@@ -395,7 +395,11 @@ export default function SearchBar({ handleSearchBarToggle, }) {
+@@ -179,6 +179,9 @@ export default function SearchBar({ handleSearchBarToggle, }) {
+             });
+             return a;
+         };
++        // Capture focus before autocomplete reparents the input. A late index
++        // must not steal focus from navigation or content the visitor moved to.
++        const restoreInputFocus = focusAfterIndexLoaded.current && document.activeElement === searchBarRef.current;
+         search.current = autoComplete(searchBarRef.current, {
+             hint: false,
+             autoselect: true,
+@@ -262,7 +265,7 @@ export default function SearchBar({ handleSearchBarToggle, }) {
+         });
+         indexStateMap.current.set(searchContext, "done");
+         setLoading(false);
+-        if (focusAfterIndexLoaded.current) {
++        if (restoreInputFocus) {
+             const input = searchBarRef.current;
+             if (input.value) {
+                 search.current?.autocomplete.open();
+@@ -395,7 +398,11 @@ export default function SearchBar({ handleSearchBarToggle, }) {
              id: "theme.SearchBar.label",
              message: "Search",
              description: "The ARIA label and placeholder for search button",

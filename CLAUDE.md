@@ -1,6 +1,6 @@
 # 1Platform API Developer
 
-Portal técnico de una sola identidad pública: **1Platform**. No resuelve tenants
+Portal técnico de una sola identidad pública: **One Platform**. No resuelve tenants
 ni permite elegir marca. La entrada es la **portada (Inicio)** en
 `/docs/saas/1platform-api/getting-started` —la URL histórica se conserva porque la
 raíz, `/docs`, los 301 del servidor y los healthchecks apuntan ahí—; las guías de
@@ -21,6 +21,7 @@ como parte de un ajuste visual. Instalar con `pnpm install --frozen-lockfile`.
 - `pnpm check:tells`, `pnpm check:chrome-contrast`, `pnpm check:contract`,
   `pnpm check:anchors`, `pnpm check:openapi-examples`, `pnpm check:public-ui`
 - Cada guard tiene `:self-test`; ejecutar ambos antes de abrir PR
+- `pnpm check:brand-layout`: navbar, búsqueda, menú y enlace MCP en nueve anchos
 - `pnpm check:reference`: valida aliases de operaciones contra ambos contratos;
   incluye sus casos sintéticos en el mismo comando
 - `pnpm check:scalar-environment`: prueba configuración y aislamiento de servidores,

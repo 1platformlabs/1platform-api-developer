@@ -2,6 +2,12 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — One Platform
+
+- La cabecera, el footer y la portada usan One Platform con el símbolo original. Se conserva la razón social y las rutas técnicas.
+- El footer enlaza directamente a la guía MCP. El navbar reserva espacio para el nombre completo y la búsqueda en pantallas de laptop.
+- El menú compacto mantiene su posición al salir de la búsqueda; la carga tardía del índice conserva el foco elegido por el visitante.
+
 ## [Unreleased] — Límites de uso de Atlas
 
 - El `429 RATE_LIMITED` de la Atlas API trae ahora `Retry-After` (segundos hasta que

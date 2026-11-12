@@ -16,8 +16,8 @@ export default function DocRootLayout(props: Props): ReactNode {
     {entry && <section className="docs-masthead" aria-labelledby="getting-started-title">
       <img src="/img/docs-infrastructure.webp" alt="" fetchPriority="high" />
       <div className="brand-wrap"><p className="eyebrow">DOCUMENTACIÓN PARA DESARROLLADORES</p>
-        <h1 id="getting-started-title">Documentación para desarrolladores de 1Platform</h1>
-        <p>Todo lo que necesita para integrar 1Platform: autenticación, una API REST por producto, webhooks y guías paso a paso.</p>
+        <h1 id="getting-started-title">Documentación para desarrolladores de One Platform</h1>
+        <p>Todo lo que necesita para integrar One Platform: autenticación, una API REST por producto, webhooks y guías paso a paso.</p>
         <div className="docs-masthead__actions">
           <Link className="docs-masthead__primary" to="/docs/saas/1platform-api/inicio-rapido">Empezar integración</Link>
           <Link className="docs-masthead__secondary" to="/api-reference/1platform-api">Referencia de API</Link>

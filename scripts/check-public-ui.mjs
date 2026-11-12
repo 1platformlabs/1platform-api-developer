@@ -117,7 +117,7 @@ function audit({docsHtml, quickHtml, apiHtml, css, bootJs, totalJs, totalCss, sn
     docsHtml,
     'Referencia de API</a>',
   );
-  requireText('DOC_LEAD', docsHtml, 'Todo lo que necesita para integrar 1Platform');
+  requireText('DOC_LEAD', docsHtml, 'Todo lo que necesita para integrar One Platform');
   // The home is a product index; the credentials and the first call live on
   // Inicio rápido, which is where the guide checks below read.
   requireText('DOC_PRODUCTS', docsHtml, 'Productos disponibles');

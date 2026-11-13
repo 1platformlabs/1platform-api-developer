@@ -5,13 +5,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 import styles from './styles.module.css';
 
-/**
- * Swizzled Logo — the brand mark shared with 1platform.pro.
- *
- * Use the unchanged digital v2 artwork shared with the marketing website.
- * Its CSS module frames the transparent margins and makes the mark white on
- * the dark navbar/footer; destinations come from the configured website origin.
- */
+/** Shared One Platform wordmark; preserve the original symbol artwork. */
 export default function Logo({className = ''}: {className?: string}): ReactNode {
   const ref = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
@@ -23,12 +17,13 @@ export default function Logo({className = ''}: {className?: string}): ReactNode 
     return () => window.removeEventListener('scroll', update);
   }, []);
   const {siteConfig} = useDocusaurusContext();
-  const logoUrl = useBaseUrl('/img/brand/1platform-logo-v2-digital.png');
+  const logoUrl = useBaseUrl('/img/brand/one-platform-symbol.png');
   return (
-    <Link target="_self" ref={ref} to={`${String(siteConfig.customFields?.websiteUrl)}/es/`} className={`navbar__brand ${styles.logo} ${className}`} aria-label="1Platform, inicio">
+    <Link target="_self" ref={ref} to={`${String(siteConfig.customFields?.websiteUrl)}/es/`} className={`navbar__brand ${styles.logo} ${className}`} aria-label="One Platform, inicio">
       <span className={styles.logoFrame} aria-hidden="true">
-        <img className={styles.logoImage} src={logoUrl} alt="" width={2042} height={770} />
+        <img className={styles.logoImage} src={logoUrl} alt="" width={1254} height={1254} />
       </span>
+      <span className={styles.name}>One Platform</span>
     </Link>
   );
 }

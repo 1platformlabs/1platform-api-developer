@@ -157,8 +157,8 @@ const JOURNEY_MOVES: Array<[string, string]> = [
 ];
 
 const config: Config = {
-  title: 'Documentación para desarrolladores de 1Platform',
-  tagline: 'Integre los servicios de 1Platform en su producto',
+  title: 'Documentación para desarrolladores de One Platform',
+  tagline: 'Integre los servicios de One Platform en su producto',
   favicon: 'img/brand/1platform-favicon-v2-digital.ico',
 
   future: {
@@ -248,7 +248,7 @@ const config: Config = {
     // SaaS API references (one Scalar instance per API).
     scalarPlugin(
       '1platform-api',
-      '1Platform API',
+      'One Platform API',
       '/api-reference/1platform-api',
       '/openapi/1platform-api.json',
     ),

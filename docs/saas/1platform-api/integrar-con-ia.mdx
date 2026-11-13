@@ -69,7 +69,7 @@ por producto (*toolset*):
 | `pagos` | Links de pago (listar, ver, crear y cancelar) y transacciones |
 | `retiros` | Saldo retirable, movimientos, retiros, métodos de retiro (enmascarados) y cobros que pueden pasar al saldo retirable (sólo lectura) |
 | `suscripciones` | Planes, suscripciones y clientes; **crear, editar, publicar y archivar** planes, **crear y editar** clientes, **emitir** una invitación y **cancelar** una suscripción |
-| `terminal` | Solicitudes de terminal de tarjetas, su estado y el detalle de un pago con terminal; **crear, corregir y retirar** una solicitud (el envío y los documentos siguen en el panel) |
+| `terminal` | Solicitudes de terminal de tarjetas, su estado y el detalle de un pago con terminal; **crear, corregir y retirar** una solicitud (el envío y los documentos siguen en el panel). Terminales conectadas y cobros remotos: **enviar** un cobro a una terminal, consultarlo, listarlos y **cancelarlo** |
 | `facturacion` | Facturas electrónicas (sólo lectura) |
 | `envios` | Envíos (sólo lectura) |
 | `sitios` | Sitios, artículos, trabajos de generación, categorías y rendimiento de búsqueda |
@@ -85,9 +85,13 @@ por producto (*toolset*):
 | `estudio` | Plantillas, pedidos, piezas entregadas, deudas y presentadores del estudio creativo (sólo lectura) |
 
 Las escrituras (en negrita) no cobran saldo en el acto, no emiten documentos fiscales ni mueven dinero, y el cliente
-pide confirmación antes de ejecutarlas. Dos excepciones, iguales a las del panel: agendar, mover o cancelar una visita
-envía los avisos de la agenda a la persona y al asesor, y programar una publicación la deja en cola para salir en la
-red en la fecha elegida, cuando se cobra (cancelarla antes no cobra nada). Publicar al instante, aprobar, responder
+pide confirmación antes de ejecutarlas. Tres excepciones, iguales a las del panel: agendar, mover o cancelar una visita
+envía los avisos de la agenda a la persona y al asesor; programar una publicación la deja en cola para salir en la
+red en la fecha elegida, cuando se cobra (cancelarla antes no cobra nada); y enviar un
+[cobro remoto](/docs/saas/1platform-api/terminal-de-tarjetas/cobros-remotos) hace sonar la terminal del comercio con
+un monto. Ese cobro no toca su saldo ni tiene costo, y no se cobra nada hasta que el pagador acerca su tarjeta a la
+terminal. La herramienta advierte que para reintentar tras un rechazo hace falta una clave de idempotencia nueva y que
+un cobro en `timeout` todavía puede aprobarse. Publicar al instante, aprobar, responder
 comentarios, encargar piezas del estudio, cobrar, emitir documentos fiscales y mover dinero se hacen con la API,
 siguiendo la skill de cada producto. En `redes` las herramientas trabajan sobre el portafolio propio de la persona.
 

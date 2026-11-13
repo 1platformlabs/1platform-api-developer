@@ -24,6 +24,12 @@ Implemente en QA; ejecutar escrituras requiere un pedido explícito, aunque el c
    duplicado sin reprocesarlo.
 5. Responda `2xx` rápido y haga el trabajo en segundo plano; la plataforma reintenta lo que no recibe.
 6. La configuración de las URL se consulta con `GET /api/v1/webhooks/config/` y se administra desde el Panel.
+7. Hay ocho eventos: siete de transacciones (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`,
+   `on_dismiss`, `on_refunded`, `on_reversed`) y `on_terminal_charge_completed`, el final de un cobro remoto a
+   terminal. Este último trae `{"event": "terminal_charge.completed", "data": {...}}` con `amount` como texto y un
+   `status` final (`approved`, `denied`, `cancelled`, `expired`, `timeout` o `unreconciled`); puede llegar un segundo
+   evento `approved` del mismo cobro. Deduplíquelo por `X-1Platform-Event-Id`. Cuerpo:
+   https://developer.1platform.pro/docs/saas/1platform-api/reference/webhooks-payload.md
 
 Seguridad y ejemplos: https://developer.1platform.pro/docs/saas/1platform-api/reference/webhooks-security.md
 

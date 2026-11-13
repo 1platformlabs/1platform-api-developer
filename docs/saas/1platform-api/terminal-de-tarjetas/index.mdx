@@ -14,7 +14,7 @@ import PromptParaAgente from '@site/src/components/PromptParaAgente';
 
 ## Disponibilidad
 
-El **alta de terminal y el cobro presencial están disponibles**. El comercio cobra con tarjeta presente en la app de la terminal, instalada en su propio teléfono. El cargo se hace en la app, no por la API: no existe una operación para iniciar un cobro con la terminal. Para que los cobros lleguen a su cuenta, un administrador del espacio de trabajo vincula la solicitud aprobada con los identificadores de la terminal y el equipo de la plataforma confirma esa conexión. Desde entonces, cada cobro se registra con un aviso firmado, aparece en el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros) con el canal `terminal` y se consulta con `GET /users/terminal-payments/{paymentId}`.
+El **alta de terminal y el cobro presencial están disponibles**. El comercio cobra con tarjeta presente en la app de la terminal, instalada en su propio teléfono. El cajero completa cada cargo en la app con la tarjeta presente. La API no cobra la tarjeta por su cuenta: envía un cobro remoto a una terminal conectada, con el monto y la referencia de su pedido, y el cajero lo cobra en la app (ver [Cobros remotos a terminal](/docs/saas/1platform-api/terminal-de-tarjetas/cobros-remotos); la plataforma habilita esa función para todos los espacios de trabajo y, mientras tanto, el envío responde `403` con `code` = `terminal_charges_disabled`). Para que los cobros lleguen a su cuenta, un administrador del espacio de trabajo vincula la solicitud aprobada con los identificadores de la terminal y el equipo de la plataforma confirma esa conexión. Desde entonces, cada cobro se registra con un aviso firmado, aparece en el [reporte de cobros](/docs/saas/1platform-api/pagos-en-linea#reporte-de-cobros) con el canal `terminal` y se consulta con `GET /users/terminal-payments/{paymentId}`.
 
 ## Cómo funciona
 
@@ -52,9 +52,19 @@ Un administrador del espacio de trabajo registra el resultado de cada solicitud 
 | `POST /businesses/{businessId}/terminal-requests/{requestId}/cancel` | Retirar una solicitud que todavía no se resolvió |
 | `GET /terminal-app/{platform}` | Enlace público a la app de la terminal en la tienda |
 | `GET /users/terminal-payments/{paymentId}` | Consultar un cobro hecho con la terminal |
+| `GET /businesses/{business_id}/terminals` | Listar las terminales conectadas del comercio y saber si los cobros remotos están habilitados |
+| `POST /businesses/{business_id}/terminal-charges` | Enviar un cobro remoto a una terminal conectada (idempotente por `idempotency_key`) |
+| `GET /businesses/{business_id}/terminal-charges/{charge_id}` | Consultar el estado de un cobro remoto |
+| `GET /businesses/{business_id}/terminal-charges` | Listar los cobros remotos del comercio |
+| `POST /businesses/{business_id}/terminal-charges/{charge_id}/cancel` | Cancelar un cobro remoto que el cajero todavía no tomó |
 
 Todas las operaciones, incluidas las del administrador del espacio de trabajo: [Referencia de API → Payment Terminals](/api-reference/1platform-api#tag/payment-terminals).
 
+## Eventos
+
+Cuando un cobro remoto termina, 1Platform puede avisarle con el evento `on_terminal_charge_completed`. Se configura en [Webhooks](/docs/saas/1platform-api/plataforma/webhooks#eventos) y su cuerpo está en [Webhooks: cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload#terminal-charge-completed).
+
 ## Guías
 
+- [Cobros remotos a terminal](/docs/saas/1platform-api/terminal-de-tarjetas/cobros-remotos): enviar un monto a una terminal conectada, seguir su estado y no cobrar dos veces el mismo pedido.
 - Para crear el comercio y su sucursal, siga el paso 1 de [Emitir una factura](/docs/saas/1platform-api/facturacion-electronica/emitir-una-factura).

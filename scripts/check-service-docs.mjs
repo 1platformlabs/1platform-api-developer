@@ -13,7 +13,7 @@ const eventNames = new Set(['content_published', 'content_updated', 'comment_rec
 const excluded = ['Contenido', 'SEO', 'Imágenes', 'Ingresos publicitarios', 'Link building'];
 const required = ['plataforma/index.mdx', 'plataforma/webhooks.mdx', 'reference/retry-and-delivery.mdx',
   'nube/index.mdx', 'nube/_category_.json', 'analitica/index.mdx', 'analitica/google-analytics.mdx', 'analitica/mapas-de-calor.mdx',
-  'agentes-de-ia/integrar-en-su-aplicacion.mdx', 'ventas/index.mdx'];
+  'agentes-de-ia/integrar-en-su-aplicacion.mdx', 'ventas/index.mdx', 'terminal-de-tarjetas/cobros-remotos.mdx'];
 for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas']) {
   required.push(`${product}/index.mdx`, `${product}/_category_.json`);
 }
@@ -87,7 +87,13 @@ function auditAvailability(docs, requireClaim, fail) {
     }
   }
   requireClaim('DOC-01', 'terminal-de-tarjetas/index.mdx', /cobro presencial están disponibles/, 'falta disponibilidad del cobro presencial');
-  requireClaim('DOC-01', 'terminal-de-tarjetas/index.mdx', /no existe una operación para iniciar un cobro/, 'el cobro se hace en la app, no por la API');
+  // Remote charges (épica cobros-remotos-a-terminal): the API SENDS a charge to a
+  // connected terminal; the card is still charged in the app, card present.
+  requireClaim('DOC-01', 'terminal-de-tarjetas/index.mdx', /La API no cobra la tarjeta por su cuenta: envía un cobro remoto a una terminal conectada/, 'falta el envío de cobros remotos por la API');
+  if (/no existe una operación para iniciar un cobro/i.test(docs['terminal-de-tarjetas/index.mdx'] ?? '')) fail('DOC-01', 'terminal-de-tarjetas/index.mdx', 'afirma que no hay operación para iniciar un cobro (obsoleto: existen los cobros remotos)');
+  requireClaim('DOC-01', 'terminal-de-tarjetas/cobros-remotos.mdx', /en preparación/, 'falta disponibilidad en preparación de los cobros remotos');
+  requireClaim('DOC-01', 'terminal-de-tarjetas/cobros-remotos.mdx', /No confirmado: revise el pago/, 'falta el estado unreconciled');
+  requireClaim('DOC-01', 'terminal-de-tarjetas/cobros-remotos.mdx', /todavía puede aprobarse/, 'falta el aviso de doble cobro tras un timeout');
   requireClaim('DOC-01', 'suscripciones/index.mdx', /Renovaciones automáticas \| Disponibles/, 'falta disponibilidad de las renovaciones');
   requireClaim('DOC-06', 'reference/retry-and-delivery.mdx', /eventos no entregados.*[Cc]onciliación/, 'falta límite de entrega y conciliación');
   requireClaim('DOC-07', 'analitica/mapas-de-calor.mdx', /muestras de interacción/, 'falta unidad del mapa');
@@ -148,7 +154,12 @@ if (process.argv.includes('--self-test')) {
     ['DOC-01', 'suscripciones/index.mdx', s => s.replace('Disponibles: se cobran', 'En preparación; se cobrarán')],
     ['DOC-01', 'suscripciones/_category_.json', s => s.replace('automáticos', 'en preparación')],
     ['DOC-01', 'terminal-de-tarjetas/index.mdx', s => s.replace('están disponibles', 'están en preparación')],
-    ['DOC-01', 'terminal-de-tarjetas/index.mdx', s => s.replace('no existe una operación para iniciar un cobro', 'existe una operación para iniciar un cobro')],
+    ['DOC-01', 'terminal-de-tarjetas/index.mdx', s => s.replace('envía un cobro remoto a una terminal conectada', 'no envía nada')],
+    ['DOC-01', 'terminal-de-tarjetas/index.mdx', s => `${s}\nNo existe una operación para iniciar un cobro con la terminal.`],
+    ['DOC-01', 'terminal-de-tarjetas/cobros-remotos.mdx', s => s.replaceAll(/en preparación/g, 'disponibles')],
+    ['DOC-01', 'terminal-de-tarjetas/cobros-remotos.mdx', s => s.replaceAll('No confirmado: revise el pago', 'Sin estado')],
+    ['DOC-01', 'terminal-de-tarjetas/cobros-remotos.mdx', s => s.replaceAll('todavía puede aprobarse', 'es definitivo')],
+    ['corpus', 'terminal-de-tarjetas/cobros-remotos.mdx', () => ''],
     ['DOC-01', 'publicidad/index.mdx', s => s.replaceAll(/en preparación/gi, 'disponible')],
     ['DOC-01', 'publicidad/_category_.json', s => s.replaceAll('en preparación', 'disponible')],
     ['DOC-06', 'plataforma/webhooks.mdx', s => `${s}\nGarantizamos la entrega al menos una vez.`],

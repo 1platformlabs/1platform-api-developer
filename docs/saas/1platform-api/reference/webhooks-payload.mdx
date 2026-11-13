@@ -38,8 +38,9 @@ Si configuró un `body_template`, recibe lo que definió en él: el cuerpo canó
 plantilla. Ver [Plantilla del cuerpo](#body-template).
 
 `status` es el estado al que pasó la transacción con ese cambio y coincide con `event`: `on_approved` viaja con
-`"status": "approved"`, `on_refunded` con `"refunded"`, y así con los siete. Los reintentos de una misma entrega
-repiten los mismos bytes del cuerpo. Aun así, enrute por `event`.
+`"status": "approved"`, `on_refunded` con `"refunded"`, y así con los siete eventos de transacciones. Los reintentos
+de una misma entrega repiten los mismos bytes del cuerpo. Aun así, enrute por `event`. El octavo evento,
+`on_terminal_charge_completed`, tiene otra forma: ver [Cobro remoto a terminal](#terminal-charge-completed).
 
 ## Campos
 
@@ -105,6 +106,46 @@ En la plantilla, `currency` es **su** moneda y `currency_provider` la de la pasa
 `merchant_reference` y `metadata` no son variables: si su receptor necesita el evento, escríbalo como texto fijo en la
 plantilla de cada evento o use una URL distinta por evento.
 
+## Cobro remoto a terminal {#terminal-charge-completed}
+
+Cuando un [cobro remoto a terminal](/docs/saas/1platform-api/terminal-de-tarjetas/cobros-remotos) llega a un estado
+final, el evento `on_terminal_charge_completed` envía este cuerpo. Es fijo: `body_template` no se aplica.
+
+```json
+{
+  "event": "terminal_charge.completed",
+  "data": {
+    "id": "6730aaaaaaaaaaaaaaaaaaaa",
+    "business_id": "66f0bbbbbbbbbbbbbbbbbbbb",
+    "terminal_id": 388,
+    "amount": "125.50",
+    "currency": "GTQ",
+    "reference": "8841",
+    "status": "approved",
+    "cancelled_by": null,
+    "terminal_payment_id": "6730cccccccccccccccccccc",
+    "reference_conflict": false,
+    "resolved_at": "2026-11-12T15:01:30+00:00"
+  }
+}
+```
+
+- `event` es siempre `terminal_charge.completed` (no el nombre de la configuración, `on_terminal_charge_completed`).
+- `data` repite los campos del cobro tal como estaban al llegar a ese estado. `amount` es un **texto** decimal, en la
+  moneda de la terminal; `currency` es `null` si el cobro no se ligó a un pago.
+- `status` es `approved`, `denied`, `cancelled`, `expired`, `timeout` o `unreconciled` (no confirmado: revise el pago
+  antes de volver a cobrar). `cancelled_by` dice quién canceló: `integrator`, `cashier` o `system`.
+- `terminal_payment_id` es el pago con terminal que produjo un `approved`
+  (`GET /users/terminal-payments/{paymentId}`); `null` en los demás estados.
+- `reference_conflict: true` marca que el pedido se cobró dos veces: otro cobro de la misma referencia también se
+  aprobó.
+- Un `denied`, `cancelled` o `timeout` puede aprobarse después. Entonces llega un segundo evento del mismo cobro con
+  `status` = `approved`. Cada estado final tiene su propio `X-1Platform-Event-Id`: deduplique por esa cabecera, no por
+  el `id` del cobro.
+
+Este evento sólo se entrega con el historial durable habilitado y a espacios de trabajo propios. No hay versión con
+plantilla.
+
 ## Sin sobre de respuesta
 
 Los webhooks **no** vienen en `{ success, data, msg }`: son objetos planos, canónicos o con plantilla. Eso es lo
@@ -116,7 +157,7 @@ que permite calcular la firma sobre el cuerpo crudo. Ver
 La entrega tiene reintentos limitados y requiere conciliación; ver
 [Reintentos y entrega](/docs/saas/1platform-api/reference/retry-and-delivery). Su receptor **debe** deduplicar.
 
-Deduplique siempre por `(transaction_id, event)`. `merchant_reference` sirve para encontrar su pedido, no para
+En los eventos de transacciones, deduplique siempre por `(transaction_id, event)`. `merchant_reference` sirve para encontrar su pedido, no para
 deduplicar: una misma transacción emite varios eventos con la misma referencia.
 
 En el historial durable habilitado, `X-1Platform-Event-Id` es la identidad estable para deduplicar; conserva el mismo payload durante los reintentos. La firma y el timestamp pueden cambiar por intento. Consulte [Entrega y recuperación](/docs/saas/1platform-api/plataforma/webhooks-entregas).

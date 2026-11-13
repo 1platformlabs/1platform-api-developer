@@ -30,6 +30,12 @@ Implemente un receptor de webhooks de la 1Platform API:
 4. Responda `2xx` rápido y haga el trabajo pesado en segundo plano; la plataforma reintenta lo que no recibe.
 5. El secreto vive sólo en el servidor y la configuración de las URL se consulta con
    `GET /api/v1/webhooks/config/`.
+6. Hay ocho eventos: siete de transacciones (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`,
+   `on_dismiss`, `on_refunded`, `on_reversed`) y `on_terminal_charge_completed`, el final de un cobro remoto a
+   terminal. Este último trae `{"event": "terminal_charge.completed", "data": {...}}` con `amount` como texto y un
+   `status` final (`approved`, `denied`, `cancelled`, `expired`, `timeout` o `unreconciled`); puede llegar un segundo
+   evento `approved` del mismo cobro. Deduplíquelo por `X-1Platform-Event-Id`. Cuerpo:
+   https://developer.1platform.pro/docs/saas/1platform-api/reference/webhooks-payload.md
 
 Firma y ejemplos en tres lenguajes:
 https://developer.1platform.pro/docs/saas/1platform-api/reference/webhooks-security.md

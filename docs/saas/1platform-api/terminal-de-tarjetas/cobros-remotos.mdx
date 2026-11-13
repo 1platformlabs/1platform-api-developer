@@ -1,0 +1,179 @@
+---
+title: Cobros remotos a terminal
+description: Envíe un monto a una terminal conectada del comercio desde su sistema, siga su estado y reciba el resultado por webhook sin cobrar dos veces el mismo pedido.
+sidebar_position: 2
+---
+
+# Cobros remotos a terminal
+
+Con esta guía su sistema (un punto de venta, una caja o un agente) envía un monto a una terminal conectada del
+comercio. La terminal muestra el cobro y el cajero lo completa con la tarjeta presente del comprador. La API no
+cobra la tarjeta por su cuenta: nada se cobra hasta que el pagador acerca su tarjeta a la terminal.
+
+El orden importa por dos razones. Primero, el resultado no llega en la respuesta del envío: llega después, cuando el
+cajero termina, y lo conoce por consulta o por webhook. Segundo, la terminal es un aparato físico: un cobro repetido
+por error suena en la caja y puede cobrarse dos veces. Por eso el envío es idempotente y cada referencia de pedido
+admite un solo cobro vivo o aprobado.
+
+Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN`, definidos en
+[Convenciones](/docs/saas/1platform-api/reference/convenciones), y `$BUSINESS_ID`, el id del comercio que devuelve
+`GET /businesses`.
+
+## Disponibilidad
+
+Los cobros remotos a terminal están **en preparación**: la plataforma los habilita para todos los espacios de
+trabajo cuando el servicio de terminales queda listo. Mientras no estén habilitados,
+`GET /businesses/{business_id}/terminals` responde `remote_charges_enabled: false` y el envío responde `403` con
+`code` = `terminal_charges_disabled`. Consultar, listar y cancelar los cobros ya enviados siguen funcionando.
+
+Enviar un cobro no tiene costo ni toca su saldo. El pago aprobado entra como cualquier
+[cobro con terminal](/docs/saas/1platform-api/terminal-de-tarjetas#disponibilidad): con un aviso firmado, en el
+reporte de cobros con el canal `terminal` y consultable con `GET /users/terminal-payments/{paymentId}`.
+
+## Qué necesita
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Rol de **administrador** o **cajero** en el comercio. La terminal es del comercio, no de una sucursal: un cajero de
+  cualquier sucursal puede cobrar en cualquiera de sus terminales. Sin ese rol recibe `403` con
+  `code` = `insufficient_branch_role`.
+- Una terminal **conectada**: la solicitud aprobada y vinculada como explica
+  [Terminal de tarjetas](/docs/saas/1platform-api/terminal-de-tarjetas). Si la conexión del comercio no está activa,
+  el envío responde `409` con `code` = `terminal_charge_connection_unavailable`.
+- El módulo de Terminal de tarjetas encendido para su espacio de trabajo y asignado a su cuenta. Si falta, recibe
+  `403` con `data.code` = `module_disabled`.
+
+## Paso 1 — Elija la terminal
+
+```bash
+curl "$BASE_URL/businesses/$BUSINESS_ID/terminals" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+`data.terminals` lista los `terminal_id` a los que puede enviar cobros y `data.remote_charges_enabled` dice si la
+plataforma ya habilitó la función. Una lista vacía significa que el comercio todavía no tiene una cuenta de terminal
+conectada.
+
+[Referencia de API → listBusinessTerminals](/api-reference/1platform-api#operation/listBusinessTerminals)
+
+## Paso 2 — Guarde el intento y envíe el cobro
+
+Antes de llamar, guarde en su base de datos el pedido con su referencia y una **clave de idempotencia para este
+intento**. La clave va en el cuerpo, no en una cabecera.
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/terminal-charges" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"terminal_id": 388, "amount": "125.50", "reference": "8841", "description": "Pedido mesa 4", "expires_in_seconds": 180, "idempotency_key": "pedido-8841-v1"}'
+```
+
+- `amount` es un **texto** decimal con hasta dos decimales, mayor que cero, nunca un número. Va en la **moneda de la
+  terminal**: la solicitud no lleva moneda, y `currency` del cobro es `null` hasta que se liga al pago.
+- `reference` identifica su pedido. Sólo puede haber un cobro vivo o aprobado por referencia y comercio.
+- `expires_in_seconds` es el plazo para que el cajero tome el cobro, entre 60 y 600 segundos (180 si lo omite).
+- `description` es opcional, de hasta 140 caracteres, sin caracteres de control ni de dirección de texto.
+
+Guarde `data.id` como `$CHARGE_ID` junto al pedido. La respuesta depende de lo que pasó:
+
+| Código | Qué significa | Qué hacer |
+|---|---|---|
+| `201` | El cobro se creó y espera en la terminal (`status` = `created`) | Siga el paso 3 |
+| `200` | Repitió la misma clave con el mismo cuerpo: es el **mismo** cobro, con la cabecera `Idempotent-Replayed: true`. No se envió otro | Trátelo como la respuesta original |
+| `202` | El servicio de terminales no respondió a tiempo y el resultado todavía no se conoce (`status` = `submitting`). La plataforma lo confirma en segundo plano en menos de un minuto | Consulte el cobro; **no** lo envíe de nuevo con otra clave |
+
+| Error | Causa |
+|---|---|
+| 403 | Los cobros remotos no están habilitados (`terminal_charges_disabled`), su rol no permite cobrar (`insufficient_branch_role`) o el módulo está apagado (`module_disabled` en `data.code`) |
+| 404 | El comercio no existe o no es suyo (`business_not_found`) |
+| 409 | La conexión de la terminal no está activa (`terminal_charge_connection_unavailable`), la terminal ya atiende otro cobro (`terminal_charge_terminal_busy`), la misma clave llegó con otro cuerpo (`terminal_charge_idempotency_conflict`), la misma clave todavía se está enviando (`terminal_charge_in_progress`, con `Retry-After: 5`), la referencia ya tiene un cobro vivo o aprobado (`terminal_charge_reference_in_use`) o el comercio está archivado (`business_archived`) |
+| 422 | Validación del cuerpo, terminal que no es del comercio (`terminal_charge_terminal_unknown`), terminal que no puede cobrar ahora (`terminal_charge_terminal_unavailable`) o cobro rechazado por inválido (`terminal_charge_invalid_request`) |
+| 429 | Superó un límite (ver [Límites](#límites)); la respuesta trae `Retry-After` |
+| 503 | El servicio de terminales no está disponible por ahora (`terminal_charge_upstream_unavailable`, con `data.retryable: true`) |
+
+Los errores del cobro traen el código en `code`, en la raíz de la respuesta. Un rechazo deja el cobro en `rejected`
+con `retryable: true` cuando la causa es pasajera.
+
+:::warning[Reintente con una clave nueva]
+La clave identifica **un intento**, no un pedido. Si el envío fue rechazado (por ejemplo, `422`, `503` o la terminal
+ocupada), repetirlo con la misma clave devuelve `200` con el mismo cobro `rejected`: no vuelve a intentarlo. Para
+reintentar, genere una clave **nueva**. Conserve la misma clave sólo cuando no sabe qué pasó: un corte de red, un
+`202` o un `409 terminal_charge_in_progress`.
+:::
+
+[Referencia de API → createTerminalCharge](/api-reference/1platform-api#operation/createTerminalCharge)
+
+## Paso 3 — Siga el estado del cobro
+
+```bash
+curl "$BASE_URL/businesses/$BUSINESS_ID/terminal-charges/$CHARGE_ID" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+| `status` | Significado | Qué hacer |
+|---|---|---|
+| `submitting` | El envío todavía no se confirmó | Vuelva a consultar en unos segundos |
+| `created` | El cobro espera en la terminal hasta `expires_at` | Espere o cancélelo (paso 4) |
+| `in_progress` | El cajero lo tomó y está cobrando | Espere; ya no se puede cancelar |
+| `approved` | El comprador pagó. `terminal_payment_id` liga el cobro con el pago de la terminal | Entregue el pedido |
+| `denied` | La tarjeta fue rechazada | Puede volver a cobrar con una clave nueva |
+| `cancelled` | Se canceló; `cancelled_by` dice quién: `integrator` (usted, por la API), `cashier` (en la terminal) o `system` | Puede volver a cobrar con una clave nueva |
+| `expired` | Nadie lo tomó antes de `expires_at` | Puede volver a cobrar con una clave nueva |
+| `timeout` | La terminal no respondió | **Consulte antes de volver a cobrar**: todavía puede aprobarse |
+| `rejected` | El envío fue rechazado; `retryable: true` indica que la causa era pasajera | Reintente con una clave nueva |
+| `unreconciled` | No confirmado: revise el pago. La plataforma no pudo confirmar si el envío llegó a la terminal | Compruebe en el reporte de cobros si hubo un pago con terminal por ese monto antes de volver a cobrar |
+
+Si un cobro sigue `created` más de 60 segundos después de `expires_at`, la API ya lo muestra como `expired`.
+`GET /businesses/{business_id}/terminal-charges` lista los cobros del comercio del más reciente al más antiguo, con
+`limit` (hasta 100, 20 por defecto), `skip` y filtro por `status`.
+
+:::warning[Un cobro sin respuesta todavía puede aprobarse]
+`timeout`, `denied` y `cancelled` no son definitivos: si el comprador llegó a pagar, el cobro pasa después a
+`approved`. Un `timeout` libera la referencia para que pueda cobrar de nuevo el mismo pedido, pero el cobro anterior
+puede aprobarse durante horas. Revise el estado antes de volver a cobrar. Si los dos se aprueban, el último trae
+`reference_conflict: true`: el pedido se cobró dos veces y usted decide si devuelve uno.
+:::
+
+[Referencia de API → getTerminalCharge](/api-reference/1platform-api#operation/getTerminalCharge) ·
+[Referencia de API → listTerminalCharges](/api-reference/1platform-api#operation/listTerminalCharges)
+
+## Paso 4 — Cancele si el cajero todavía no lo tomó
+
+```bash
+curl -X POST "$BASE_URL/businesses/$BUSINESS_ID/terminal-charges/$CHARGE_ID/cancel" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN"
+```
+
+Un cobro `created` queda `cancelled` con `cancelled_by` = `integrator`. Si todavía está `submitting`, la cancelación
+queda registrada (`cancel_requested: true`) y se aplica apenas se confirma el envío. Un cobro `in_progress` o ya
+terminado no se cancela: responde `409` con `code` = `terminal_charge_state`. Puede cancelar aunque el comercio esté
+archivado.
+
+[Referencia de API → cancelTerminalCharge](/api-reference/1platform-api#operation/cancelTerminalCharge)
+
+## Paso 5 — Reciba el resultado por webhook
+
+Cuando el cobro llega a un estado final (`approved`, `denied`, `cancelled`, `expired`, `timeout` o
+`unreconciled`), 1Platform envía el evento `on_terminal_charge_completed` a la URL que un administrador del espacio
+de trabajo configuró en [Webhooks](/docs/saas/1platform-api/plataforma/webhooks#eventos). El cuerpo tiene la forma
+`{"event": "terminal_charge.completed", "data": {...}}` y está descrito en
+[Webhooks: cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload#terminal-charge-completed).
+
+- Se entrega con el [historial durable](/docs/saas/1platform-api/plataforma/webhooks-entregas) habilitado y sólo a
+  espacios de trabajo propios, no al espacio compartido de la plataforma.
+- Una aprobación tardía produce otro evento del mismo cobro, con `status` = `approved`. Deduplique por la cabecera
+  `X-1Platform-Event-Id`, que es distinta para cada estado final.
+- La consulta del paso 3 sigue siendo la fuente para conciliar lo que no llegó.
+
+## Límites
+
+- Envío y cancelación: 20 solicitudes por minuto. Además, cada terminal acepta como máximo 6 cobros por minuto
+  (`429` con `code` = `terminal_charge_rate_limited`): cada envío hace sonar un aparato en la caja.
+- Hasta 20 cobros abiertos (`submitting`, `created` o `in_progress`) por comercio (`429` con
+  `code` = `terminal_charge_open_limit`).
+- Consultas y listados: 50 solicitudes por minuto.
+
+Todas las operaciones: [Referencia de API → Payment Terminals](/api-reference/1platform-api#tag/payment-terminals).

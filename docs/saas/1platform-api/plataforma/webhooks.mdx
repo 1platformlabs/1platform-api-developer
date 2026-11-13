@@ -57,9 +57,11 @@ quedan sin configurar en la misma operación: vuelva a asignarlos en el paso 2 s
 
 ## Paso 2 — Asignar una URL a cada evento {#eventos}
 
-El dominio registrado todavía no recibe nada: cada evento necesita su URL. Hay siete eventos —`on_approved`,
-`on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`, `on_refunded` y `on_reversed`— y pueden apuntar todos a la
-misma URL; el campo `event` del cuerpo le dice cuál llegó.
+El dominio registrado todavía no recibe nada: cada evento necesita su URL. Hay ocho eventos. Siete son de
+transacciones —`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`, `on_refunded` y
+`on_reversed`— y el octavo, `on_terminal_charge_completed`, avisa que terminó un
+[cobro remoto a terminal](/docs/saas/1platform-api/terminal-de-tarjetas/cobros-remotos). Pueden apuntar todos a la
+misma URL; el campo `event` del cuerpo le dice cuál llegó (en el octavo, `terminal_charge.completed`).
 
 ```bash
 curl -X PUT "$BASE_URL/webhooks/config/events" \
@@ -70,6 +72,7 @@ curl -X PUT "$BASE_URL/webhooks/config/events" \
 ```
 
 Sólo cambian los eventos que envía: los que omite conservan su configuración, y `null` en un evento lo elimina.
+`on_terminal_charge_completed` tiene un cuerpo fijo: ignora `body_template`.
 Repetir la misma llamada deja el mismo estado. `method` admite `GET`, `POST`, `PUT` o `PATCH` y, si lo omite, se usa
 `POST`. La URL debe ser `https://` y se usa tal cual, con su query string;
 de ella sólo se compara el host con los dominios registrados. El objeto opcional `headers` viaja en cada intento
@@ -89,6 +92,11 @@ Con dominio y eventos configurados, su endpoint recibe una solicitud firmada —
 `POST` por defecto— cada vez que una transacción llega a un estado final, o cuando un pago aprobado se reembolsa o se
 revierte. El estado inicial `created` nunca se notifica. Las recargas de su propio saldo y los cobros de
 [Links de pago](/docs/saas/1platform-api/links-de-pago) no se envían a estas URLs.
+
+`on_terminal_charge_completed` llega cuando un cobro remoto a terminal termina (`approved`, `denied`, `cancelled`,
+`expired`, `timeout` o `unreconciled`). Sólo se entrega con el
+[historial durable](/docs/saas/1platform-api/plataforma/webhooks-entregas) habilitado y a espacios de trabajo
+propios, no al espacio compartido de la plataforma.
 El cuerpo **no** viene en el sobre `{success, data, msg}` del resto de la API: es un objeto plano, el cuerpo
 canónico o el que definió con `body_template`. Su forma, los estados y cómo llevarlos a su propia máquina de
 estados están en [Webhooks — cuerpo saliente](/docs/saas/1platform-api/reference/webhooks-payload).

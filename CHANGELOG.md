@@ -8,6 +8,10 @@ All notable changes to the 1Platform API Developer Docs will be documented in th
   separado. Nuevos desenlaces de `POST /domains/{domain_id}/mail/addresses`:
   `409` `mail_address_limit` (tope por dominio, en `data.limit`) y `409`
   `mail_provider_domain_limit` (el dominio no se pudo habilitar; no queda dirección).
+- Bandeja por dirección: `GET /mail/threads` acepta `address_id` (sólo estrecha) y
+  `folder` (`inbox`, `unread`, `starred`, `sent`, `archived`); nueva
+  `GET /mail/threads/counts` con `{total, unread}` por carpeta; cada conversación
+  trae `address_id` y `starred`, y `PATCH /mail/threads/{thread_id}` acepta `starred`.
 
 ## [Unreleased] — Límites de uso de Atlas
 

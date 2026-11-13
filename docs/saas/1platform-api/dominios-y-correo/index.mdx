@@ -31,6 +31,8 @@ import PromptParaAgente from '@site/src/components/PromptParaAgente';
    Un dominio admite **varias direcciones** (`ventas@`, `soporte@`, …): cada una se crea con su propia llamada, comparte los registros del dominio y se desactiva por separado sin afectar a las demás. Crear una que ya existe devuelve la misma dirección. Hay un tope por dominio (50 por defecto): al alcanzarlo, crear otra responde `409` `mail_address_limit`, con el tope en `data.limit`; desactivar una libera su lugar. Si el servicio de correo no puede habilitar el dominio por ahora, la respuesta es `409` `mail_provider_domain_limit` y no queda ninguna dirección creada.
 2. Cada dirección tiene dos verificaciones independientes: recibir y enviar. Hasta que la de envío esté lista, iniciar o responder una conversación responde `409` `mail_send_not_verified`. En Correo, el código de error viaja en `code`, en la raíz de la respuesta, no dentro de `data`.
 3. Los correos entrantes forman **conversaciones** (`/mail/threads`), que lee, marca como leídas o archiva, y responde desde la dirección del comercio. Un mensaje enviado nace en `sent` y sólo pasa a entregado cuando el servidor de destino lo confirma.
+
+   Cada conversación pertenece a **una dirección** (`address_id` en la respuesta). Para leer la bandeja de una sola dirección, pase `address_id` a `GET /mail/threads`: sólo estrecha lo que su sesión ya puede ver, y una dirección ajena devuelve una lista vacía. Con `folder` el servidor aplica la carpeta: `inbox` (no archivadas que recibieron correo), `unread`, `starred`, `sent` (con al menos un mensaje enviado, archivadas o no) y `archived`; el filtrado, la paginación (`skip`/`limit`) y `total` son del servidor. `GET /mail/threads/counts?address_id=` devuelve `{total, unread}` de cada carpeta con el mismo criterio. Una conversación se destaca con `PATCH /mail/threads/{thread_id}` y `{"starred": true}`; un campo omitido no cambia.
 4. **Iniciar una conversación exige `Idempotency-Key`**, porque envía correo real a un cliente real. Sin ella responde `422` `mail_idempotency_key_required`. Si repite la clave, recibe la misma conversación y no se envía otro correo.
 5. Los adjuntos se suben primero con `POST /mail/attachments` (multipart, un solo `file`) y en el envío se nombra la `key` que devuelve esa subida. Cada archivo tiene un tope configurable (10 MB por defecto): un tipo no admitido responde `415` y uno demasiado grande, `413`.
 6. Apagar el correo de un dominio entero (`DELETE /domains/{domain_id}/mail`) primero retira el registro de correo entrante, luego congela las conversaciones en sólo lectura y luego retira las direcciones. Las conversaciones no se borran.
@@ -64,7 +66,9 @@ La configuración asistida del DNS (`…/mail/dns-assist`) está **apagada por d
 | `POST /domains/{domain_id}/renew` | Renovar de 1 a 10 años |
 | `POST /domains/{domain_id}/mail/addresses` | Crear una dirección de correo |
 | `GET /mail/threads` | Listar conversaciones |
+| `GET /mail/threads/counts` | Contadores por carpeta de una dirección |
 | `GET /mail/threads/{thread_id}` | Leer una conversación completa |
+| `PATCH /mail/threads/{thread_id}` | Marcar leída, archivar o destacar |
 | `POST /mail/threads` | Iniciar una conversación (con `Idempotency-Key`) |
 | `POST /mail/threads/{thread_id}/reply` | Responder desde la dirección del comercio |
 | `POST /mail/attachments` | Subir un adjunto y obtener su `key` |

@@ -16,11 +16,12 @@ export default function Footer(): ReactNode {
         <Link target="_self" to={`${website}/es/#inteligencia`}>IA</Link>
       </nav>
       <nav className={styles.column} aria-label="Recursos"><h2>RECURSOS</h2>
+        <Link target="_self" to="/docs/saas/1platform-api/integrar-con-ia#mcp">Integrar con MCP</Link>
         <Link target="_self" to="/docs/saas/1platform-api/getting-started">Documentación</Link>
         <Link target="_self" to={`${website}/es/blog/`}>Blog</Link>
         <Link target="_self" to="/api-reference/1platform-api">Referencia de API</Link>
       </nav>
-      <nav className={styles.column} aria-label="1Platform"><h2>1PLATFORM</h2>
+      <nav className={styles.column} aria-label="One Platform"><h2>ONE PLATFORM</h2>
         <Link target="_self" to={String(siteConfig.customFields?.contactUrl)}>Contacto</Link>
         <Link target="_self" to={`${website}/es/acceso/`}>Acceder</Link>
         <Link target="_self" to={`${website}/es/solicitar-acceso/`}>Solicitar acceso</Link>

@@ -69,9 +69,9 @@ export default function ApiReferencePage({route}: Props): ReactNode {
   return <Layout title={atlas ? 'Referencia de API de Atlas' : 'Referencia de API'} description="Explore los endpoints, parámetros, esquemas y respuestas de la API">
     <main className="api-reference-page">
       <section className="reference-intro brand-wrap">
-        <div><p className="eyebrow">DOCUMENTACIÓN · {atlas ? 'ATLAS' : '1PLATFORM'}</p>
+        <div><p className="eyebrow">DOCUMENTACIÓN · {atlas ? 'ATLAS' : 'ONE PLATFORM'}</p>
           <h1>{atlas ? 'Referencia de API de Atlas' : 'Referencia de API'}</h1>
-          <p>{atlas ? 'Entrega de contenido, dentro de su producto' : 'Los servicios de 1Platform, dentro de su producto'}</p>
+          <p>{atlas ? 'Entrega de contenido, dentro de su producto' : 'Los servicios de One Platform, dentro de su producto'}</p>
         </div>
         <nav className="reference-tabs" aria-label="Documentación técnica"><Link to={guide}>Primeros pasos</Link><a href={atlas ? '/api-reference/atlas-api' : '/api-reference/1platform-api'} aria-current="page">Referencia de API</a></nav>
       </section>

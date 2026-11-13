@@ -13278,7 +13278,7 @@
           "Webhook Configuration"
         ],
         "summary": "Update Webhook Events",
-        "description": "Update the webhook event configurations for the authenticated App (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`, `on_refunded`, `on_reversed`). Each event URL must use HTTPS and resolve either to a 1Platform domain or to a **registered** domain in this App's allowlist. Verification is not required: a registered-but-unverified domain is accepted and delivered to, because a tenant hosted on a PaaS subdomain could never verify one. A domain that was never registered is still rejected with 422 — register it first via `POST /webhooks/config/domains`. The URL is stored and requested **verbatim, query string included** — only its host is matched against the allowlist. `headers` are delivered with every attempt (up to 20); reserved names are rejected with 422 because the dispatcher sets them itself: `Authorization`, `Connection`, `Content-Length`, `Content-Type`, `Expect`, `Host`, `Keep-Alive`, `Proxy-Authenticate`, `Proxy-Authorization`, `TE`, `Trailer`, `Transfer-Encoding`, `Upgrade`, `X-Webhook-Signature`, `X-Webhook-Timestamp`. Authentication requires BOTH an app token (`Authorization: Bearer <app_token>`) and a tenant admin user token (`x-user-token`). The tenant acted on is the ADMIN's, never the app token's. Rate limit: 80 req/min.",
+        "description": "Update the webhook event configurations for the authenticated App (`on_approved`, `on_denied`, `on_cancelled`, `on_expired`, `on_dismiss`, `on_refunded`, `on_reversed`, `on_terminal_charge_completed`). Each event URL must use HTTPS and resolve either to a 1Platform domain or to a **registered** domain in this App's allowlist. Verification is not required: a registered-but-unverified domain is accepted and delivered to, because a tenant hosted on a PaaS subdomain could never verify one. A domain that was never registered is still rejected with 422 — register it first via `POST /webhooks/config/domains`. The URL is stored and requested **verbatim, query string included** — only its host is matched against the allowlist. `headers` are delivered with every attempt (up to 20); reserved names are rejected with 422 because the dispatcher sets them itself: `Authorization`, `Connection`, `Content-Length`, `Content-Type`, `Expect`, `Host`, `Keep-Alive`, `Proxy-Authenticate`, `Proxy-Authorization`, `TE`, `Trailer`, `Transfer-Encoding`, `Upgrade`, `X-Webhook-Signature`, `X-Webhook-Timestamp`. Authentication requires BOTH an app token (`Authorization: Bearer <app_token>`) and a tenant admin user token (`x-user-token`). The tenant acted on is the ADMIN's, never the app token's. Rate limit: 80 req/min.",
         "operationId": "updateWebhookEvents",
         "security": [
           {
@@ -155408,7 +155408,8 @@
                     "on_expired",
                     "on_dismiss",
                     "on_refunded",
-                    "on_reversed"
+                    "on_reversed",
+                    "on_terminal_charge_completed"
                   ],
                   "type": "string"
                 },
@@ -155416,10 +155417,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by any of the seven supported payment events.",
+              "description": "Filter by event: any of the seven payment events or `on_terminal_charge_completed` (a remote terminal charge finished).",
               "title": "Event"
             },
-            "description": "Filter by any of the seven supported payment events."
+            "description": "Filter by event: any of the seven payment events or `on_terminal_charge_completed` (a remote terminal charge finished)."
           },
           {
             "name": "from",
@@ -163322,6 +163323,978 @@
         },
         "x-rate-limit": [
           "120/minute"
+        ]
+      }
+    },
+    "/api/v1/businesses/{business_id}/terminals": {
+      "get": {
+        "tags": [
+          "Payment Terminals"
+        ],
+        "summary": "List the business's connected terminals",
+        "description": "Terminals a remote charge can be sent to: those of the business's connected card-terminal account, plus whether remote charges are switched on.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (business ADMIN or CASHIER)\n- **Rate limit:** 50 req/min\n- An empty list means no connected account (or none yet).",
+        "operationId": "listBusinessTerminals",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The business (commerce) id",
+              "title": "Business Id"
+            },
+            "description": "The business (commerce) id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Terminals listed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_BusinessTerminalsResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "terminals": [
+                      {
+                        "terminal_id": 388
+                      },
+                      {
+                        "terminal_id": 389
+                      }
+                    ],
+                    "remote_charges_enabled": true
+                  },
+                  "msg": "Terminals retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Module not available, role not allowed, or remote charges switched off",
+            "x-error-codes": [
+              "module_disabled",
+              "module_disabled",
+              "insufficient_branch_role"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Business or charge not found, or not yours",
+            "x-error-codes": [
+              "business_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Business without a workspace",
+            "x-error-codes": [
+              "terminal_tenant_required"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "50/minute"
+        ]
+      }
+    },
+    "/api/v1/businesses/{business_id}/terminal-charges": {
+      "post": {
+        "tags": [
+          "Payment Terminals"
+        ],
+        "summary": "Send a charge to a terminal",
+        "description": "Send an amount to one of the business's connected terminals; the cashier collects it there.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (business ADMIN or CASHIER)\n- **Rate limit:** 20 req/min, and at most 6 charges per terminal per minute.\n- **Idempotent** by `idempotency_key` (in the body): same key + same body answers 200 with the same charge and the `Idempotent-Replayed: true` header; same key + another body is 409.\n- **202 `submitting`**: the terminal service did not answer; the charge is confirmed in the background within a minute — read it back, do not send it again with a new key.\n- After a rejection, use a NEW key to try again (the same key replays the rejection).\n- A charge with no answer (`timeout`) can still be approved later: check before charging again.\n- No fee; the approved payment is credited like any card-terminal payment.",
+        "operationId": "createTerminalCharge",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The business (commerce) id",
+              "title": "Business Id"
+            },
+            "description": "The business (commerce) id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTerminalChargeRequest"
+              },
+              "example": {
+                "terminal_id": 388,
+                "amount": "125.50",
+                "reference": "8841",
+                "description": "Pedido mesa 4",
+                "expires_in_seconds": 180,
+                "idempotency_key": "pedido-8841-v1"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replay of an existing charge (`Idempotent-Replayed: true`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6730aaaaaaaaaaaaaaaaaaaa",
+                    "business_id": "66f0bbbbbbbbbbbbbbbbbbbb",
+                    "terminal_id": 388,
+                    "amount": "125.50",
+                    "reference": "8841",
+                    "description": "Pedido mesa 4",
+                    "status": "created",
+                    "expires_at": "2026-11-12T15:03:00+00:00",
+                    "reference_conflict": false,
+                    "retryable": false,
+                    "cancel_requested": false,
+                    "created_at": "2026-11-12T15:00:00+00:00"
+                  },
+                  "msg": "Terminal charge replayed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TerminalChargeResponse_"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Charge created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TerminalChargeResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6730aaaaaaaaaaaaaaaaaaaa",
+                    "business_id": "66f0bbbbbbbbbbbbbbbbbbbb",
+                    "terminal_id": 388,
+                    "amount": "125.50",
+                    "reference": "8841",
+                    "description": "Pedido mesa 4",
+                    "status": "created",
+                    "expires_at": "2026-11-12T15:03:00+00:00",
+                    "reference_conflict": false,
+                    "retryable": false,
+                    "cancel_requested": false,
+                    "created_at": "2026-11-12T15:00:00+00:00"
+                  },
+                  "msg": "Terminal charge created"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Outcome not confirmed yet (`status: submitting`)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6730aaaaaaaaaaaaaaaaaaaa",
+                    "business_id": "66f0bbbbbbbbbbbbbbbbbbbb",
+                    "terminal_id": 388,
+                    "amount": "125.50",
+                    "reference": "8841",
+                    "description": "Pedido mesa 4",
+                    "status": "submitting",
+                    "reference_conflict": false,
+                    "retryable": false,
+                    "cancel_requested": false,
+                    "created_at": "2026-11-12T15:00:00+00:00"
+                  },
+                  "msg": "Terminal charge submitted"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TerminalChargeResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The charge could not be processed",
+            "x-error-codes": [
+              "terminal_charge_error"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Module not available, role not allowed, or remote charges switched off",
+            "x-error-codes": [
+              "module_disabled",
+              "module_disabled",
+              "insufficient_branch_role",
+              "terminal_charges_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Business or charge not found, or not yours",
+            "x-error-codes": [
+              "business_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Not connected, terminal busy, key conflict or in progress, reference in use, archived",
+            "x-error-codes": [
+              "terminal_charge_connection_unavailable",
+              "terminal_charge_terminal_busy",
+              "terminal_charge_idempotency_conflict",
+              "terminal_charge_in_progress",
+              "terminal_charge_reference_in_use",
+              "terminal_tenant_required",
+              "business_archived"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation error, unknown terminal, terminal not able to charge now, or charge refused as invalid",
+            "x-error-codes": [
+              "terminal_charge_terminal_unknown",
+              "terminal_charge_terminal_unavailable",
+              "terminal_charge_invalid_request"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit, per-terminal limit or too many open charges",
+            "x-error-codes": [
+              "terminal_charge_rate_limited",
+              "terminal_charge_open_limit"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "503": {
+            "description": "Terminal service temporarily unavailable (`data.retryable`)",
+            "x-error-codes": [
+              "terminal_charge_upstream_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "20/minute"
+        ]
+      },
+      "get": {
+        "tags": [
+          "Payment Terminals"
+        ],
+        "summary": "List remote charges",
+        "description": "The business's remote charges, newest first.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (business ADMIN or CASHIER)\n- **Rate limit:** 50 req/min\n- `limit` up to 100 (default 20); filter by `status`.",
+        "operationId": "listTerminalCharges",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The business (commerce) id",
+              "title": "Business Id"
+            },
+            "description": "The business (commerce) id"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TerminalChargeStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only charges in this status",
+              "title": "Status"
+            },
+            "description": "Only charges in this status"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Page size (max 100)",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Page size (max 100)"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Charges listed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TerminalChargeListResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6730aaaaaaaaaaaaaaaaaaaa",
+                        "business_id": "66f0bbbbbbbbbbbbbbbbbbbb",
+                        "terminal_id": 388,
+                        "amount": "125.50",
+                        "reference": "8841",
+                        "description": "Pedido mesa 4",
+                        "status": "created",
+                        "expires_at": "2026-11-12T15:03:00+00:00",
+                        "reference_conflict": false,
+                        "retryable": false,
+                        "cancel_requested": false,
+                        "created_at": "2026-11-12T15:00:00+00:00"
+                      }
+                    ],
+                    "total": 1,
+                    "limit": 20,
+                    "skip": 0
+                  },
+                  "msg": "Terminal charges retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Module not available, role not allowed, or remote charges switched off",
+            "x-error-codes": [
+              "module_disabled",
+              "module_disabled",
+              "insufficient_branch_role"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Business or charge not found, or not yours",
+            "x-error-codes": [
+              "business_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Business without a workspace",
+            "x-error-codes": [
+              "terminal_tenant_required"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "50/minute"
+        ]
+      }
+    },
+    "/api/v1/businesses/{business_id}/terminal-charges/{charge_id}": {
+      "get": {
+        "tags": [
+          "Payment Terminals"
+        ],
+        "summary": "Get a remote charge",
+        "description": "The charge with its current status, synchronized with the terminal, and the linked payment once approved.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (business ADMIN or CASHIER)\n- **Rate limit:** 50 req/min\n- `currency` stays `null` until the payment is linked (the terminal's currency).",
+        "operationId": "getTerminalCharge",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The business (commerce) id",
+              "title": "Business Id"
+            },
+            "description": "The business (commerce) id"
+          },
+          {
+            "name": "charge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The remote charge id",
+              "title": "Charge Id"
+            },
+            "description": "The remote charge id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Charge retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TerminalChargeResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6730aaaaaaaaaaaaaaaaaaaa",
+                    "business_id": "66f0bbbbbbbbbbbbbbbbbbbb",
+                    "terminal_id": 388,
+                    "amount": "125.50",
+                    "reference": "8841",
+                    "description": "Pedido mesa 4",
+                    "status": "created",
+                    "expires_at": "2026-11-12T15:03:00+00:00",
+                    "reference_conflict": false,
+                    "retryable": false,
+                    "cancel_requested": false,
+                    "created_at": "2026-11-12T15:00:00+00:00"
+                  },
+                  "msg": "Terminal charge retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Module not available, role not allowed, or remote charges switched off",
+            "x-error-codes": [
+              "module_disabled",
+              "module_disabled",
+              "insufficient_branch_role"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Business or charge not found, or not yours",
+            "x-error-codes": [
+              "business_not_found",
+              "terminal_charge_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Business without a workspace",
+            "x-error-codes": [
+              "terminal_tenant_required"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "50/minute"
+        ]
+      }
+    },
+    "/api/v1/businesses/{business_id}/terminal-charges/{charge_id}/cancel": {
+      "post": {
+        "tags": [
+          "Payment Terminals"
+        ],
+        "summary": "Cancel a remote charge",
+        "description": "Cancel a charge the terminal has not picked up yet.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (business ADMIN or CASHIER)\n- **Rate limit:** 20 req/min\n- `created` ⇒ cancelled. While it is still being sent (`submitting`) the cancellation is recorded and applied as soon as the charge is confirmed. Once the cashier picked it up (`in_progress`) it can no longer be cancelled (409).\n- Allowed on an archived business. No request body.",
+        "operationId": "cancelTerminalCharge",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "business_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The business (commerce) id",
+              "title": "Business Id"
+            },
+            "description": "The business (commerce) id"
+          },
+          {
+            "name": "charge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The remote charge id",
+              "title": "Charge Id"
+            },
+            "description": "The remote charge id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Charge cancelled (or cancellation recorded)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_TerminalChargeResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6730aaaaaaaaaaaaaaaaaaaa",
+                    "business_id": "66f0bbbbbbbbbbbbbbbbbbbb",
+                    "terminal_id": 388,
+                    "amount": "125.50",
+                    "reference": "8841",
+                    "description": "Pedido mesa 4",
+                    "status": "cancelled",
+                    "expires_at": "2026-11-12T15:03:00+00:00",
+                    "cancelled_by": "integrator",
+                    "reference_conflict": false,
+                    "retryable": false,
+                    "cancel_requested": false,
+                    "resolved_at": "2026-11-12T15:01:00+00:00",
+                    "created_at": "2026-11-12T15:00:00+00:00"
+                  },
+                  "msg": "Terminal charge cancelled"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Module not available, role not allowed, or remote charges switched off",
+            "x-error-codes": [
+              "module_disabled",
+              "module_disabled",
+              "insufficient_branch_role"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Business or charge not found, or not yours",
+            "x-error-codes": [
+              "business_not_found",
+              "terminal_charge_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "The charge cannot be cancelled in its current status",
+            "x-error-codes": [
+              "terminal_charge_state",
+              "terminal_tenant_required"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Terminal service temporarily unavailable (`data.retryable`)",
+            "x-error-codes": [
+              "terminal_charge_upstream_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "20/minute"
         ]
       }
     }
@@ -181538,15 +182511,33 @@
               "on_expired",
               "on_dismiss",
               "on_refunded",
-              "on_reversed"
+              "on_reversed",
+              "on_terminal_charge_completed"
             ],
             "title": "Event",
             "description": "Payment status event delivered to the configured destination."
           },
-          "transaction_id": {
+          "subject_kind": {
             "type": "string",
+            "enum": [
+              "transaction",
+              "terminal_charge"
+            ],
+            "title": "Subject Kind",
+            "description": "What the delivery reports: `transaction` (a payment status change) or `terminal_charge` (a remote charge sent to a card terminal that finished).",
+            "default": "transaction"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Transaction Id",
-            "description": "Related transaction identifier; retries never reexecute it."
+            "description": "Related transaction identifier; retries never reexecute it. Null when `subject_kind` is `terminal_charge`."
           },
           "destination": {
             "type": "string",
@@ -182199,15 +183190,33 @@
               "on_expired",
               "on_dismiss",
               "on_refunded",
-              "on_reversed"
+              "on_reversed",
+              "on_terminal_charge_completed"
             ],
             "title": "Event",
             "description": "Payment status event delivered to the configured destination."
           },
-          "transaction_id": {
+          "subject_kind": {
             "type": "string",
+            "enum": [
+              "transaction",
+              "terminal_charge"
+            ],
+            "title": "Subject Kind",
+            "description": "What the delivery reports: `transaction` (a payment status change) or `terminal_charge` (a remote charge sent to a card terminal that finished).",
+            "default": "transaction"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Transaction Id",
-            "description": "Related transaction identifier; retries never reexecute it."
+            "description": "Related transaction identifier; retries never reexecute it. Null when `subject_kind` is `terminal_charge`."
           },
           "destination": {
             "type": "string",
@@ -230241,6 +231250,17 @@
               }
             ],
             "description": "Destination to notify when a previously approved payment is reversed (e.g. an issuer-side chargeback), or `null` to leave this event unconfigured."
+          },
+          "on_terminal_charge_completed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookEventConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Destination to notify when a remote charge sent to a card terminal of one of your businesses finishes (approved, denied, cancelled, expired, timeout or unreconciled), or `null` to leave this event unconfigured. The body is fixed (`body_template` is ignored)."
           }
         },
         "type": "object",
@@ -238102,6 +239122,418 @@
           "text"
         ],
         "title": "XMeasureBody"
+      },
+      "SuccessResponse_TerminalChargeResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/TerminalChargeResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[TerminalChargeResponse]"
+      },
+      "TerminalChargeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The charge id."
+          },
+          "business_id": {
+            "type": "string",
+            "title": "Business Id",
+            "description": "The business the charge belongs to."
+          },
+          "terminal_id": {
+            "type": "integer",
+            "title": "Terminal Id",
+            "description": "The terminal the charge was sent to."
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Amount as a decimal string.",
+            "examples": [
+              "125.50"
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Currency of the payment once it is linked; `null` until then (the terminal's currency)."
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference",
+            "description": "Your order reference."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "The text sent with the charge."
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "`submitting` (outcome still unknown) · `created` (waiting on the terminal) · `in_progress` (the cashier picked it up) · `approved` · `denied` · `cancelled` · `expired` · `timeout` (no answer from the terminal; it may still be approved) · `rejected` (the charge was refused when sent) · `unreconciled` (the send could not be confirmed: check the payment before charging again).",
+            "examples": [
+              "created"
+            ]
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At",
+            "description": "When the terminal can no longer pick the charge up."
+          },
+          "cancelled_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By",
+            "description": "Who cancelled it, as reported by the terminal service: `integrator` (through this API), `cashier` (at the terminal) or `system`."
+          },
+          "terminal_payment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Payment Id",
+            "description": "The card-terminal payment this charge produced, once linked."
+          },
+          "reference_conflict": {
+            "type": "boolean",
+            "title": "Reference Conflict",
+            "description": "True when a late approval landed while another charge of the same reference was live: review for a double charge.",
+            "default": false
+          },
+          "retryable": {
+            "type": "boolean",
+            "title": "Retryable",
+            "description": "On `rejected`: the refusal was temporary and a NEW idempotency key may succeed.",
+            "default": false
+          },
+          "cancel_requested": {
+            "type": "boolean",
+            "title": "Cancel Requested",
+            "description": "True when a cancellation was requested while the charge was still being sent (`submitting`): it is applied as soon as the charge is confirmed.",
+            "default": false
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At",
+            "description": "When the charge reached its final status."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the charge was created."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "business_id",
+          "terminal_id",
+          "amount",
+          "reference",
+          "status",
+          "created_at"
+        ],
+        "title": "TerminalChargeResponse"
+      },
+      "SuccessResponse_TerminalChargeListResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/TerminalChargeListResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[TerminalChargeListResponse]"
+      },
+      "TerminalChargeListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TerminalChargeResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Charges, newest first."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "How many charges match the filter."
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Page size used."
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip",
+            "description": "Offset used."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "skip"
+        ],
+        "title": "TerminalChargeListResponse"
+      },
+      "TerminalChargeStatus": {
+        "type": "string",
+        "enum": [
+          "submitting",
+          "created",
+          "in_progress",
+          "approved",
+          "denied",
+          "cancelled",
+          "expired",
+          "timeout",
+          "rejected",
+          "unreconciled"
+        ],
+        "title": "TerminalChargeStatus"
+      },
+      "CreateTerminalChargeRequest": {
+        "properties": {
+          "terminal_id": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Terminal Id",
+            "description": "A terminal connected to this business (see `listBusinessTerminals`)."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^(?=.*[1-9])\\d{1,16}(\\.\\d{1,2})?$",
+            "title": "Amount",
+            "description": "Amount to collect as a decimal STRING with up to two decimals, greater than zero, in the terminal's currency.",
+            "examples": [
+              "125.50"
+            ]
+          },
+          "reference": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,64}$",
+            "title": "Reference",
+            "description": "Your order reference. Only one live or approved charge per reference and business.",
+            "examples": [
+              "8841"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Optional text shown with the charge (≤140 characters, no control or direction characters).",
+            "examples": [
+              "Pedido mesa 4"
+            ]
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "maximum": 600,
+            "minimum": 60,
+            "title": "Expires In Seconds",
+            "description": "How long the terminal may take to pick the charge up (60-600 s).",
+            "default": 180
+          },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{8,64}$",
+            "title": "Idempotency Key",
+            "description": "Your key for THIS attempt. Same key + same body replays the charge; use a new key to try again after a rejection.",
+            "examples": [
+              "pedido-8841-v1"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "terminal_id",
+          "amount",
+          "reference",
+          "idempotency_key"
+        ],
+        "title": "CreateTerminalChargeRequest",
+        "description": "Send a charge to one of the business's connected terminals.",
+        "example": {
+          "amount": "125.50",
+          "description": "Pedido mesa 4",
+          "expires_in_seconds": 180,
+          "idempotency_key": "pedido-8841-v1",
+          "reference": "8841",
+          "terminal_id": 388
+        }
+      },
+      "SuccessResponse_BusinessTerminalsResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/BusinessTerminalsResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[BusinessTerminalsResponse]"
+      },
+      "BusinessTerminalsResponse": {
+        "properties": {
+          "terminals": {
+            "items": {
+              "$ref": "#/components/schemas/BusinessTerminal"
+            },
+            "type": "array",
+            "title": "Terminals",
+            "description": "Terminals of the business's connected card-terminal account. Empty when none is connected."
+          },
+          "remote_charges_enabled": {
+            "type": "boolean",
+            "title": "Remote Charges Enabled",
+            "description": "Whether remote charges can be sent right now. When false, creating one answers 403."
+          }
+        },
+        "type": "object",
+        "required": [
+          "terminals",
+          "remote_charges_enabled"
+        ],
+        "title": "BusinessTerminalsResponse"
+      },
+      "BusinessTerminal": {
+        "properties": {
+          "terminal_id": {
+            "type": "integer",
+            "title": "Terminal Id",
+            "description": "Terminal id to send charges to."
+          }
+        },
+        "type": "object",
+        "required": [
+          "terminal_id"
+        ],
+        "title": "BusinessTerminal"
       }
     },
     "securitySchemes": {

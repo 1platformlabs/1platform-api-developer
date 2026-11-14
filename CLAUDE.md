@@ -175,8 +175,10 @@ de idioma porque no existe una segunda traducción.
 
 ## CI y entrega
 
-PR: typecheck, build, guards+self-tests, CodeQL y SonarCloud informativo. El PR
-también dispara build/deploy de QA (`developer-qa.1platform.pro`) automáticamente.
+GitHub sólo construye y publica (decisión del dueño 2026-11-14, costo de Actions):
+typecheck, guards+self-tests, checks de runtime, serving y SonarCloud se corren en
+local (`/local-checks`) antes del PR y de nuevo en `/deploy-prod`. Todo PR
+(también borrador) dispara build/deploy de QA (`developer-qa.1platform.pro`) automáticamente.
 El merge a main dispara producción: no mergear como parte de implementación.
 La versión de publicación se calcula desde tags en el pipeline productivo, sin
 reescribir `package.json`; no adelantar ese bump en un PR de implementación.

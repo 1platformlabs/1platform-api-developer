@@ -57,7 +57,7 @@ Las URL configuradas requieren HTTPS excepto loopback HTTP, y rechazan credencia
 query y fragmentos. Si las variables no existen, se conservan el proxy y servidores
 públicos actuales. `pnpm check:scalar-environment` verifica estas reglas sin red.
 
-Los PRs ejecutan CI y el canal QA automáticamente. El merge despliega producción;
+Los PRs sólo construyen y publican en QA (la verificación corre en local con `/local-checks`). El merge despliega producción;
 la épica de branding entrega PR para revisión, sin merge ni despliegue productivo.
 QA usa cPanel y exige checksum + estado terminal del activador. Producción usa
 nginx; su canal cPanel permanece deshabilitado. `pnpm check:serving` requiere

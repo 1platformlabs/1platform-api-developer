@@ -71,7 +71,7 @@ async function fetchOne(spec) {
     writeFileSync(outPath, JSON.stringify(json, null, 2), 'utf-8');
     console.log(`[${spec.id}] saved → ${outPath}`);
   } catch {
-    // OPENAPI_FETCH_STRICT=1 (lo usa `.github/workflows/openapi-drift.yml`):
+    // OPENAPI_FETCH_STRICT=1 (lo usa la medición local de deriva, `node scripts/openapi-drift.mjs`):
     // caer a la copia versionada haría que el detector de deriva comparara la
     // copia contra sí misma y declarara «sin deriva» justo cuando el API no
     // respondió. Para el build, el respaldo sigue siendo el comportamiento por

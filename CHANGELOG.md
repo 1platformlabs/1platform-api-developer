@@ -2,6 +2,10 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Tiendas en dirección de la plataforma
+
+- «Sitios web y contenido» deja de decir que `POST /provisioning/tenants` es sólo para un dominio: una tienda puede crearse sin dominio, en una dirección de la plataforma. Nueva guía «Crear una tienda sin dominio propio» con `GET /provisioning/platform-address`, el alta sin dominio y `PUT|DELETE /users/websites/{website_id}/custom-domain` (errores, estados de la conexión y nameservers de ejemplo). Documenta una capacidad aún no publicada en el contrato de PROD: publicar después del deploy del API.
+
 ## [Unreleased] — One Platform
 
 - La cabecera, el footer y la portada usan One Platform con el símbolo original. Se conserva la razón social y las rutas técnicas.

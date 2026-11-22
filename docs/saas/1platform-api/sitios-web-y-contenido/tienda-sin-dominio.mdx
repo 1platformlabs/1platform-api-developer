@@ -1,6 +1,6 @@
 ---
 title: Crear una tienda sin dominio propio
-description: Cree una tienda en una dirección de la plataforma y conecte su dominio después, con la redirección de la dirección anterior.
+description: Cree una tienda en una dirección de la plataforma y conecte su dominio después, con la redirección de las páginas de la tienda.
 sidebar_position: 4
 ---
 
@@ -48,7 +48,7 @@ curl -G "$BASE_URL/provisioning/platform-address" \
 
 Cuando `available` es `false`, `reason` indica el motivo: `taken` (la dirección ya existe), `reserved` (el identificador no está disponible) o `invalid`. La respuesta nunca dice a quién pertenece una dirección ocupada; pida otro nombre. Si el nombre no produce un identificador válido, `slug` y `host` llegan vacíos con `reason` en `invalid`.
 
-La disponibilidad es una lectura de un instante: el alta la vuelve a comprobar y puede responder `409` aunque la consulta haya dicho `true`.
+Donde la capacidad no está disponible, esta consulta responde `403` con `PROVISIONING_PLATFORM_ADDRESS_DISABLED`. La disponibilidad es una lectura de un instante: el alta la vuelve a comprobar y puede responder `409` aunque la consulta haya dicho `true`.
 
 ## 2. Crear la tienda
 
@@ -90,6 +90,7 @@ La respuesta es `202` con el sitio serializado. Su campo `domain_connection` inf
 {
   "domain_connection": {
     "domain": "aurumlabs.com",
+    "platform_host": "aurum-labs.1platform.pro",
     "state": "pending",
     "nameservers": ["ns1.example-dns.net", "ns2.example-dns.net"],
     "last_error_code": null
@@ -104,7 +105,7 @@ La respuesta es `202` con el sitio serializado. Su campo `domain_connection` inf
 | `done` | El dominio propio es la dirección principal de la tienda |
 | `cancelling` | La cancelación está en curso |
 
-`nameservers` puede llegar vacío mientras la plataforma todavía no los asignó; consulte de nuevo `GET /users/websites/{website_id}`. Configure en el registro de su dominio los nameservers que la respuesta devuelva (los del ejemplo son ilustrativos). `last_error_code` guarda el último motivo de fallo de la verificación, si lo hubo.
+`nameservers` puede llegar vacío mientras la plataforma todavía no los asignó; consulte de nuevo `GET /users/websites/{website_id}`. Configure en el registro de su dominio los nameservers que la respuesta devuelva (los del ejemplo son ilustrativos). `platform_host` es la dirección de la plataforma de la tienda: cuando la conexión llega a `done`, esa dirección redirige al dominio. `last_error_code` guarda el último motivo de fallo de la verificación, si lo hubo, y es `null` si no lo hubo.
 
 :::warning
 
@@ -112,11 +113,11 @@ Delegar los nameservers mueve todo el DNS del dominio a la plataforma. Antes de 
 
 :::
 
-Cuando la conexión termina, la dirección de la plataforma redirige de forma permanente al dominio propio y conserva la ruta y los parámetros de cada solicitud. El dominio propio sigue sirviendo la misma tienda.
+Cuando la conexión termina, las páginas de la tienda en la dirección de la plataforma redirigen de forma permanente al dominio propio, conservando la ruta y los parámetros. Otras rutas técnicas, como `/sitemap.xml`, `/signout` y `/api/*`, siguen respondiendo en la dirección anterior. El dominio propio sirve la misma tienda.
 
 | Estado | `code` | Qué significa |
 |---|---|---|
-| `404` | | La tienda no existe o no es suya |
+| `404` | sin `code` | La tienda no existe o no es suya |
 | `409` | `WEBSITE_DOMAIN_TAKEN` | Ese dominio ya está en uso en otra tienda o sitio |
 | `409` | `WEBSITE_NOT_ON_PLATFORM_ADDRESS` | La tienda ya tiene dominio propio; no está en una dirección de la plataforma |
 | `409` | `WEBSITE_DOMAIN_PENDING` | Ya hay una conexión pendiente para esta tienda |
@@ -138,7 +139,7 @@ La respuesta es `202` con el sitio serializado: `domain_connection.state` queda 
 
 | Estado | `code` | Qué significa |
 |---|---|---|
-| `404` | | La tienda no existe o no es suya |
+| `404` | sin `code` | La tienda no existe o no es suya |
 | `409` | `WEBSITE_DOMAIN_PROMOTING` | La activación ya empezó y no puede cancelarse |
 | `409` | `WEBSITE_DOMAIN_NOT_PENDING` | No hay una conexión pendiente que cancelar |
 

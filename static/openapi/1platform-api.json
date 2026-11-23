@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.180.0"
+    "version": "PRODv5.181.0"
   },
   "servers": [
     {
@@ -2714,9 +2714,10 @@
             }
           },
           "409": {
-            "description": "The workspace's brand site is managed by the platform and cannot be deleted",
+            "description": "The workspace's brand site is managed by the platform and cannot be deleted (`WEBSITE_MANAGED_BY_PLATFORM`), or the store's own domain is being activated right now (`WEBSITE_DOMAIN_PROMOTING`)",
             "x-error-codes": [
-              "website_managed_by_platform"
+              "website_managed_by_platform",
+              "WEBSITE_DOMAIN_PROMOTING"
             ],
             "content": {
               "application/json": {
@@ -3013,6 +3014,358 @@
               }
             },
             "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
+        ]
+      }
+    },
+    "/api/v1/users/websites/{website_id}/custom-domain": {
+      "put": {
+        "tags": [
+          "Websites"
+        ],
+        "summary": "Connect your own domain to a store",
+        "description": "Connect the owner's domain to a store created at the platform address (`<name>.1platform.pro`). The store keeps serving at the platform address while the connection is pending; once the domain's nameservers point to the ones shown in `domain_connection.nameservers` and the store answers on the domain, the domain becomes the store's address automatically and the platform address redirects to it.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 80 req/min\n- Only the store's owner can connect a domain; the domain must be theirs (a registered domain that is active, or an external domain they verified).\n- Delegating the nameservers moves ALL the domain's DNS: records such as email must be recreated afterwards.\n- Free: nothing is charged.\n\n**cURL example:**\n```bash\ncurl -X PUT https://api.1platform.pro/api/v1/users/websites/<id>/custom-domain \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"domain\": \"aurumlabs.com\"}'\n```",
+        "operationId": "connectWebsiteCustomDomain",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebsiteCustomDomainRequest"
+              },
+              "example": {
+                "domain": "aurumlabs.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Connection started; the first check runs in the background",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_WebsiteResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "url": "https://aurum-labs.1platform.pro",
+                    "slug": "aurum-labs-1platform-pro",
+                    "active": true,
+                    "user_id": "507f1f77bcf86cd799439012",
+                    "lang": "es",
+                    "status": "active",
+                    "domain": "aurum-labs.1platform.pro",
+                    "site_name": "Aurum Labs",
+                    "site_type": "store",
+                    "created_at": "2026-11-21T10:30:00Z",
+                    "actions": {
+                      "search_console": {
+                        "verification": {
+                          "verified": false
+                        },
+                        "sitemaps": []
+                      }
+                    },
+                    "platform_address": true,
+                    "domain_connection": {
+                      "domain": "aurumlabs.com",
+                      "platform_host": "aurum-labs.1platform.pro",
+                      "state": "pending",
+                      "nameservers": [
+                        "ns1.example-dns.net",
+                        "ns2.example-dns.net"
+                      ]
+                    }
+                  },
+                  "msg": "Domain connection started"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Website not found (or it is not yours)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The domain is used by another site or store (`WEBSITE_DOMAIN_TAKEN`), the store already has its own domain (`WEBSITE_NOT_ON_PLATFORM_ADDRESS`), or a domain is already being connected to it (`WEBSITE_DOMAIN_PENDING`)",
+            "x-error-codes": [
+              "WEBSITE_DOMAIN_TAKEN",
+              "WEBSITE_NOT_ON_PLATFORM_ADDRESS",
+              "WEBSITE_DOMAIN_PENDING"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "The domain does not belong to the store's owner, is not active, or is not a registrable domain (`WEBSITE_DOMAIN_NOT_OWNED`); or the request body is invalid",
+            "x-error-codes": [
+              "WEBSITE_DOMAIN_NOT_OWNED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Websites"
+        ],
+        "summary": "Cancel connecting your own domain",
+        "description": "Cancel a PENDING own-domain connection: the store stays at its platform address. If you already delegated the nameservers, put back the ones your domain had before at your registrar. Once the domain is being activated (or is already the store's address) it can no longer be cancelled.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 80 req/min\n\n**cURL example:**\n```bash\ncurl -X DELETE https://api.1platform.pro/api/v1/users/websites/<id>/custom-domain \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```",
+        "operationId": "cancelWebsiteCustomDomain",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "website_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Website ID",
+              "examples": [
+                "507f1f77bcf86cd799439011"
+              ],
+              "title": "Website Id"
+            },
+            "description": "Website ID"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cancellation accepted; the store goes back to its platform address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_WebsiteResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "url": "https://aurum-labs.1platform.pro",
+                    "slug": "aurum-labs-1platform-pro",
+                    "active": true,
+                    "user_id": "507f1f77bcf86cd799439012",
+                    "lang": "es",
+                    "status": "active",
+                    "domain": "aurum-labs.1platform.pro",
+                    "site_name": "Aurum Labs",
+                    "site_type": "store",
+                    "created_at": "2026-11-21T10:30:00Z",
+                    "actions": {
+                      "search_console": {
+                        "verification": {
+                          "verified": false
+                        },
+                        "sitemaps": []
+                      }
+                    },
+                    "platform_address": true,
+                    "domain_connection": {
+                      "domain": "aurumlabs.com",
+                      "platform_host": "aurum-labs.1platform.pro",
+                      "state": "cancelling",
+                      "nameservers": [
+                        "ns1.example-dns.net",
+                        "ns2.example-dns.net"
+                      ]
+                    }
+                  },
+                  "msg": "Domain connection cancelled"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Website not found (or it is not yours)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The domain is being activated or is already the store's address (`WEBSITE_DOMAIN_PROMOTING`), or there is no pending connection (`WEBSITE_DOMAIN_NOT_PENDING`)",
+            "x-error-codes": [
+              "WEBSITE_DOMAIN_PROMOTING",
+              "WEBSITE_DOMAIN_NOT_PENDING"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           },
           "429": {
             "description": "Rate limit exceeded",
@@ -96930,7 +97283,7 @@
           "Provisioning"
         ],
         "summary": "Provision a new Atlas tenant (one click, async)",
-        "description": "Start the asynchronous provisioning of a new Atlas tenant (dashboard + app) for a domain.\n\n- **Without a domain:** where `GET /provisioning/options` answers `domain_optional: true` (never in production), send `site_name` instead of `domain`: the site is served on a preview address derived from that name, and `domain` on the job is that address. Elsewhere a body with `site_name` and no `domain` returns `422` `PROVISIONING_DOMAIN_REQUIRED`; a WordPress site always needs one (`422` `PROVISIONING_WORDPRESS_DOMAIN_REQUIRED`). A body with neither `domain` nor `site_name` (or with both) fails request validation: a `422` without `code`, whose `detail` names the problem.\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (any workspace user)\n- **Rate limit:** 20 req/min\n- **Owner:** defaults to the caller. Only an `app_admin` may pass `owner_user_id` for someone else, and only within their own workspace (`403` otherwise; `404` for a user outside the workspace).\n- **Quota:** each user may hold a limited number of websites (`provisioning.max_websites_per_user`); exceeding it returns `429`.\n- **Store look:** a `store` may carry `storefront` (`{preset, accentHex}`) to be created with that brand accent. Optional; omitted means the default look. Sending it on any other kind returns `422`, as does any key this body does not declare.\n- **Asynchronous failures** (DNS, hosting, app build, provisioning switched off) never answer this call: they show on the job (`GET /provisioning/tenants/{job_id}`).",
+        "description": "Start the asynchronous provisioning of a new Atlas tenant (dashboard + app) for a domain.\n\n- **Without a domain:** where `GET /provisioning/options` answers `domain_optional: true` (never in production), send `site_name` instead of `domain`: the site is served on a preview address derived from that name, and `domain` on the job is that address. Elsewhere a body with `site_name` and no `domain` returns `422` `PROVISIONING_DOMAIN_REQUIRED`; a WordPress site always needs one (`422` `PROVISIONING_WORDPRESS_DOMAIN_REQUIRED`). A body with neither `domain` nor `site_name` (or with both) fails request validation: a `422` without `code`, whose `detail` names the problem.\n- **Store on the platform address:** where `GET /provisioning/options` answers `platform_address` (production), a `store` sent with `site_name` and no `domain` is created at `<slug>.<apex>` (e.g. `aurum-labs.1platform.pro`), the slug derived from the name. There is no automatic `-2`: an address already in use answers `409` `PROVISIONING_SITE_NAME_TAKEN` (check it first with `GET /provisioning/platform-address`), and with the platform address switched off the request answers `403` `PROVISIONING_PLATFORM_ADDRESS_DISABLED`. A `domain` that is being connected to a store answers `409` `PROVISIONING_DOMAIN_RESERVED`.\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (any workspace user)\n- **Rate limit:** 20 req/min\n- **Owner:** defaults to the caller. Only an `app_admin` may pass `owner_user_id` for someone else, and only within their own workspace (`403` otherwise; `404` for a user outside the workspace).\n- **Quota:** each user may hold a limited number of websites (`provisioning.max_websites_per_user`); exceeding it returns `429`.\n- **Store look:** a `store` may carry `storefront` (`{preset, accentHex}`) to be created with that brand accent. Optional; omitted means the default look. Sending it on any other kind returns `422`, as does any key this body does not declare.\n- **Asynchronous failures** (DNS, hosting, app build, provisioning switched off) never answer this call: they show on the job (`GET /provisioning/tenants/{job_id}`).",
         "operationId": "startTenantProvisioning",
         "security": [
           {
@@ -97040,7 +97393,11 @@
             "x-error-code-location": "root_or_data"
           },
           "403": {
-            "description": "Only a workspace admin can create a website for another user",
+            "description": "Only a workspace admin can create a website for another user, or a store without a domain was requested while the platform address is switched off (`code: PROVISIONING_PLATFORM_ADDRESS_DISABLED`)",
+            "x-error-codes": [
+              "PROVISIONING_PLATFORM_ADDRESS_DISABLED",
+              "module_disabled"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -97048,10 +97405,7 @@
                 }
               }
             },
-            "x-error-codes": [
-              "module_disabled"
-            ],
-            "x-error-code-location": "data"
+            "x-error-code-location": "root_or_data"
           },
           "404": {
             "description": "Selected user not in this workspace, or domain not found in your account",
@@ -97064,9 +97418,10 @@
             }
           },
           "409": {
-            "description": "A provisioning for this domain is already in progress for another user, or every preview address derived from `site_name` is in use (`code: PROVISIONING_SITE_NAME_TAKEN`)",
+            "description": "A provisioning for this domain is already in progress for another user; the address derived from `site_name` is in use (`code: PROVISIONING_SITE_NAME_TAKEN`); or the domain is being connected to a store (`code: PROVISIONING_DOMAIN_RESERVED`)",
             "x-error-codes": [
-              "PROVISIONING_SITE_NAME_TAKEN"
+              "PROVISIONING_SITE_NAME_TAKEN",
+              "PROVISIONING_DOMAIN_RESERVED"
             ],
             "content": {
               "application/json": {
@@ -97517,7 +97872,7 @@
           "Provisioning"
         ],
         "summary": "What the create-website form may offer",
-        "description": "Tell the create form whether a site may be created WITHOUT a domain in the caller's workspace, and under which address it would be previewed.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (any workspace user)\n- **Rate limit:** 200 req/min\n- `domain_optional: true` means `POST /provisioning/tenants` accepts `site_name` instead of `domain`; the preview address is `<slug><preview_host_suffix>.<preview_apex>`. It is never true in production.\n- `blog_enabled: true` means the form may offer «Blog» (`POST /users/websites/blogs`); false while the platform has it switched off.",
+        "description": "Tell the create form whether a site may be created WITHOUT a domain in the caller's workspace, and under which address it would be previewed.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (any workspace user)\n- **Rate limit:** 200 req/min\n- `domain_optional: true` means `POST /provisioning/tenants` accepts `site_name` instead of `domain`; the preview address is `<slug><preview_host_suffix>.<preview_apex>`. It is never true in production.\n- `blog_enabled: true` means the form may offer «Blog» (`POST /users/websites/blogs`); false while the platform has it switched off.\n- `platform_address` (non-null) means a `store` may be created without a domain on `<slug><suffix>.<apex>` by sending `site_name`; null where that is not available. Read it apart from `domain_optional`.",
         "operationId": "getProvisioningOptions",
         "security": [
           {
@@ -97555,10 +97910,15 @@
                 "example": {
                   "success": true,
                   "data": {
-                    "domain_optional": true,
-                    "preview_host_suffix": "-qa",
-                    "preview_apex": "1platform.pro",
-                    "blog_enabled": true
+                    "domain_optional": false,
+                    "blog_enabled": true,
+                    "platform_address": {
+                      "apex": "1platform.pro",
+                      "suffix": "",
+                      "kinds": [
+                        "store"
+                      ]
+                    }
                   },
                   "msg": "OK"
                 }
@@ -97632,6 +97992,147 @@
         },
         "x-rate-limit": [
           "200/minute"
+        ]
+      }
+    },
+    "/api/v1/provisioning/platform-address": {
+      "get": {
+        "tags": [
+          "Provisioning"
+        ],
+        "summary": "Check the platform address a store name would get",
+        "description": "Tell whether a store created with this name, without a domain, can be served on the platform address `<slug>.<apex>` (e.g. `aurum-labs.1platform.pro`). The slug is derived from `site_name` exactly as `POST /provisioning/tenants` derives it, and the same rules decide: there is no automatic `-2`.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>` (any workspace user with the websites module)\n- **Rate limit:** 120 req/min\n- `available: false` comes with `reason`: `taken` (another site or store holds the address — never says which), `reserved` (a name the platform itself uses) or `invalid` (the name gives no usable address; `slug` and `host` are then empty).\n- Your own failed attempt on the same address counts as available: creating again reuses it.\n- Where the platform address is not available (`GET /provisioning/options` answers `platform_address: null`), `403` `PROVISIONING_PLATFORM_ADDRESS_DISABLED`.",
+        "operationId": "getStorePlatformAddressAvailability",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "The store name the address is derived from",
+              "examples": [
+                "Aurum Labs"
+              ],
+              "title": "Site Name"
+            },
+            "description": "The store name the address is derived from"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the derived platform address is available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_PlatformAddressAvailabilityOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "slug": "aurum-labs",
+                    "host": "aurum-labs.1platform.pro",
+                    "available": false,
+                    "reason": "taken"
+                  },
+                  "msg": "OK"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No workspace context for the current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The platform address is not available here (`code: PROVISIONING_PLATFORM_ADDRESS_DISABLED`), or the websites module is off",
+            "x-error-codes": [
+              "PROVISIONING_PLATFORM_ADDRESS_DISABLED",
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "`site_name` missing or too long",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
         ]
       }
     },
@@ -177474,6 +177975,26 @@
             ],
             "description": "Automatic catalog publishing settings. Absent means never enrolled."
           },
+          "platform_address": {
+            "type": "boolean",
+            "title": "Platform Address",
+            "description": "Whether this row is a store served at the platform address (`<name>.<platform domain>`, one level) — the only stores that can connect their own domain.",
+            "default": false,
+            "examples": [
+              true
+            ]
+          },
+          "domain_connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebsiteDomainConnectionView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most recent own-domain connection of this store that was not cancelled, or null."
+          },
           "owner": {
             "anyOf": [
               {
@@ -208081,6 +208602,103 @@
         ],
         "title": "PlatesCatalogOut"
       },
+      "PlatformAddressAvailabilityOut": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Identifier derived from the name; empty when none",
+            "examples": [
+              "aurum-labs"
+            ]
+          },
+          "host": {
+            "type": "string",
+            "title": "Host",
+            "description": "Address the store would be served on; empty when the name gives none",
+            "examples": [
+              "aurum-labs.1platform.pro"
+            ]
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "True when a store can be created on this address",
+            "examples": [
+              true
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "taken",
+                  "reserved",
+                  "invalid"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why it is not available: `taken` (another site or store holds it), `reserved` (the platform uses that name) or `invalid` (the name gives no usable address); null when available",
+            "examples": [
+              null
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "host",
+          "available"
+        ],
+        "title": "PlatformAddressAvailabilityOut",
+        "description": "Whether the platform address derived from a store name is free (TSP-02).\n\nNever says who holds an address: ``reason`` is ``taken`` for every holder."
+      },
+      "PlatformAddressOptionOut": {
+        "properties": {
+          "apex": {
+            "type": "string",
+            "title": "Apex",
+            "description": "Domain the platform addresses live under",
+            "examples": [
+              "1platform.pro"
+            ]
+          },
+          "suffix": {
+            "type": "string",
+            "title": "Suffix",
+            "description": "What follows the store slug before the apex (empty in production)",
+            "examples": [
+              ""
+            ]
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds",
+            "description": "Site kinds that may be created on the platform address",
+            "examples": [
+              [
+                "store"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "apex",
+          "suffix",
+          "kinds"
+        ],
+        "title": "PlatformAddressOptionOut",
+        "description": "The platform address a domain-less store is born on — tiendas-subdominio-plataforma."
+      },
       "PlatformAgentMemoryView": {
         "properties": {
           "app_id": {
@@ -212768,6 +213386,26 @@
             "default": false,
             "examples": [
               true
+            ]
+          },
+          "platform_address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlatformAddressOptionOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present when a store may be created WITHOUT a domain on the platform address (`<slug><suffix>.<apex>`): send `site_name` and no `domain`. Null when that is not available. Independent of `domain_optional`.",
+            "examples": [
+              {
+                "apex": "1platform.pro",
+                "kinds": [
+                  "store"
+                ],
+                "suffix": ""
+              }
             ]
           }
         },
@@ -217546,6 +218184,26 @@
               }
             ],
             "description": "Automatic catalog publishing settings. Absent means never enrolled."
+          },
+          "platform_address": {
+            "type": "boolean",
+            "title": "Platform Address",
+            "description": "Whether this row is a store served at the platform address (`<name>.<platform domain>`, one level) — the only stores that can connect their own domain.",
+            "default": false,
+            "examples": [
+              true
+            ]
+          },
+          "domain_connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebsiteDomainConnectionView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most recent own-domain connection of this store that was not cancelled, or null."
           },
           "provisioning": {
             "anyOf": [
@@ -230960,6 +231618,38 @@
           "msg"
         ],
         "title": "SuccessResponse[PlatesCatalogOut]"
+      },
+      "SuccessResponse_PlatformAddressAvailabilityOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlatformAddressAvailabilityOut",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[PlatformAddressAvailabilityOut]"
       },
       "SuccessResponse_PlatformAgentMemoryView_": {
         "properties": {
@@ -249107,6 +249797,98 @@
           "url": "https://example.com"
         }
       },
+      "WebsiteCustomDomainRequest": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "maxLength": 253,
+            "minLength": 3,
+            "title": "Domain",
+            "description": "The owner's domain to connect: a registered domain of the store's owner that is active, or an external domain they verified. The registrable name itself, not a subdomain.",
+            "examples": [
+              "aurumlabs.com"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "domain"
+        ],
+        "title": "WebsiteCustomDomainRequest",
+        "description": "Body for `PUT /users/websites/{id}/custom-domain` (tiendas-subdominio-plataforma)."
+      },
+      "WebsiteDomainConnectionView": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "The owner's domain being connected to the store",
+            "examples": [
+              "aurumlabs.com"
+            ]
+          },
+          "platform_host": {
+            "type": "string",
+            "title": "Platform Host",
+            "description": "The store's platform address. Once the connection is 'done' it redirects to `domain`; the row's own `domain` is then the owner's domain.",
+            "examples": [
+              "aurum-labs.1platform.pro"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "promoting",
+              "done",
+              "cancelling"
+            ],
+            "title": "State",
+            "description": "'pending' (waiting for the nameservers to be delegated and the store to answer on the domain), 'promoting' (the domain is being activated; it can no longer be cancelled), 'done' (the domain is the store's address and the platform address redirects to it), 'cancelling' (going back to the platform address).",
+            "examples": [
+              "pending"
+            ]
+          },
+          "nameservers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Nameservers",
+            "description": "Nameservers to delegate the domain to. Empty until the first check has run.",
+            "examples": [
+              [
+                "ns1.example-dns.net",
+                "ns2.example-dns.net"
+              ]
+            ]
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Code",
+            "description": "Stable code of the last check that did not complete (e.g. 'delegation_pending'), or null.",
+            "examples": [
+              "delegation_pending"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "platform_host",
+          "state"
+        ],
+        "title": "WebsiteDomainConnectionView",
+        "description": "The own-domain connection of a store born on the platform address (tiendas-subdominio-plataforma)."
+      },
       "WebsiteListItem": {
         "properties": {
           "id": {
@@ -249310,6 +250092,26 @@
               }
             ],
             "description": "Automatic catalog publishing settings. Absent means never enrolled."
+          },
+          "platform_address": {
+            "type": "boolean",
+            "title": "Platform Address",
+            "description": "Whether this row is a store served at the platform address (`<name>.<platform domain>`, one level) — the only stores that can connect their own domain.",
+            "default": false,
+            "examples": [
+              true
+            ]
+          },
+          "domain_connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebsiteDomainConnectionView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most recent own-domain connection of this store that was not cancelled, or null."
           }
         },
         "type": "object",
@@ -249800,6 +250602,26 @@
               }
             ],
             "description": "Automatic catalog publishing settings. Absent means never enrolled."
+          },
+          "platform_address": {
+            "type": "boolean",
+            "title": "Platform Address",
+            "description": "Whether this row is a store served at the platform address (`<name>.<platform domain>`, one level) — the only stores that can connect their own domain.",
+            "default": false,
+            "examples": [
+              true
+            ]
+          },
+          "domain_connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebsiteDomainConnectionView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most recent own-domain connection of this store that was not cancelled, or null."
           }
         },
         "type": "object",

@@ -26,4 +26,15 @@ Siga el trabajo y atienda los motivos de fallo que devuelve la API. Una solicitu
 
 Use el recorrido de publicación del tipo de sitio elegido y confirme su dominio, contenido y acceso público. Un sitio de marca administrado tiene restricciones distintas de un sitio del usuario; no aplique automáticamente las mismas acciones a ambos. La configuración de correo y la [analítica](/docs/saas/1platform-api/analitica/trafico-del-sitio) son integraciones posteriores, no una consecuencia automática de registrar el sitio.
 
+## Tienda sin dominio propio {#tienda-sin-dominio}
+
+Una tienda (`store`) puede crearse sin dominio, en una dirección de la plataforma con la forma `<identificador>.1platform.pro`, y conectar el suyo después. Todas las llamadas llevan los dos tokens. La capacidad se habilita por decisión de la plataforma: hoy la opción de dirección de la plataforma no está disponible para todas las cuentas y conectar un dominio propio requiere activación previa. Si no está habilitada para su cuenta, las llamadas responden `403` con `PROVISIONING_PLATFORM_ADDRESS_DISABLED`; consulte a su contacto de One Platform para activarla.
+
+1. **Comprobar la dirección.** `GET /provisioning/platform-address?site_name=Aurum%20Labs` devuelve `slug`, `host`, `available` y `reason` (`taken`, `reserved` o `invalid`). No reserva nada y nunca dice a quién pertenece una dirección ocupada.
+2. **Crear.** `POST /provisioning/tenants` con `kind` `store`, `site_name` y `language`, sin `domain`, responde `202` con el trabajo, que se consulta como en el paso 3. Un nombre ya tomado responde `409` con `PROVISIONING_SITE_NAME_TAKEN`. El sitio queda con `platform_address: true`; los cobros se configuran por separado.
+3. **Conectar su dominio.** `PUT /users/websites/{website_id}/custom-domain` con `{"domain": "aurumlabs.com"}` responde `202` con el sitio; `domain_connection` trae `domain`, `platform_host`, `state` (`pending`, `promoting`, `done` o `cancelling`), `nameservers` (por ejemplo `ns1.example-dns.net`; puede venir vacío al principio) y `last_error_code`. Configure esos nameservers en el registro del dominio. Delegarlos mueve todo su DNS: revise antes el correo y los demás servicios. Errores `409`: `WEBSITE_DOMAIN_TAKEN`, `WEBSITE_NOT_ON_PLATFORM_ADDRESS`, `WEBSITE_DOMAIN_PENDING`; `422`: `WEBSITE_DOMAIN_NOT_OWNED`; `404` sin `code` si la tienda no es suya.
+4. **Cancelar.** `DELETE /users/websites/{website_id}/custom-domain` mientras está `pending` responde `202`. Con la activación iniciada responde `409` con `WEBSITE_DOMAIN_PROMOTING`; sin conexión pendiente, `WEBSITE_DOMAIN_NOT_PENDING`. Si ya delegó los nameservers, restaure los anteriores.
+
+Al terminar la conexión, las páginas de la tienda en la dirección de la plataforma redirigen al dominio propio conservando la ruta y los parámetros; `/sitemap.xml`, `/signout` y `/api/*` siguen respondiendo en la dirección anterior.
+
 [Referencia de API → Sitios](/api-reference/1platform-api#tag/websites) · [Aprovisionamiento](/api-reference/1platform-api#tag/provisioning) · [Dominios](/api-reference/1platform-api#tag/domains).

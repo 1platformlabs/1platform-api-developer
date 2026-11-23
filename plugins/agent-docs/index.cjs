@@ -166,7 +166,7 @@ module.exports = function agentDocs(context) {
         ...sections.flatMap((s) => [`## ${s.name}`, '', ...s.lines, '']),
         '## Recursos para agentes',
         '',
-        `- [OpenAPI de la 1Platform API](${origin}/openapi/1platform-api.json): contrato completo de operaciones, parámetros y respuestas.`,
+        `- [OpenAPI de la One Platform API](${origin}/openapi/1platform-api.json): contrato completo de operaciones, parámetros y respuestas.`,
         `- [OpenAPI de la Atlas API](${origin}/openapi/atlas-api.json): contrato de la Atlas API, un producto independiente.`,
         `- [Documentación completa en un archivo](${origin}/${FULL_FILE}): todas las páginas de esta lista, en el mismo orden.`,
         `- [Prompt maestro de integración](${origin}/prompts/maestro.md): reglas para un agente de código que integra la API.`,

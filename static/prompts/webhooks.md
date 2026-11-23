@@ -1,8 +1,8 @@
-# Webhooks de la 1Platform API
+# Webhooks de la One Platform API
 
 ## Antes de implementar con el MCP
 
-Use el MCP de 1Platform antes de escribir código. Busque el producto con `docs_search`; use `docs_get_page`
+Use el MCP de One Platform antes de escribir código. Busque el producto con `docs_search`; use `docs_get_page`
 para leer `/docs/saas/1platform-api/plataforma/webhooks` y las skills `/skills/1platform-hub/SKILL`, `/skills/webhooks/SKILL`.
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
@@ -19,7 +19,7 @@ mensajes o comprometa dinero requiere un pedido explícito; no confunda preparar
 
 ## Implementación
 
-Implemente un receptor de webhooks de la 1Platform API:
+Implemente un receptor de webhooks de la One Platform API:
 
 1. Exponga un endpoint HTTPS `POST` que lea el **cuerpo crudo** antes de parsearlo.
 2. Verifique `X-Webhook-Signature` (`sha256=<hex>`): HMAC-SHA256 con el secreto del espacio de trabajo sobre

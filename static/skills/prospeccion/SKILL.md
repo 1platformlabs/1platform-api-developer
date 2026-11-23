@@ -1,13 +1,13 @@
 ---
 name: prospeccion
-description: Definir objetivos de prospección, cargar prospectos, revisar los borradores que prepara el agente y registrar envíos y respuestas con la 1Platform API.
+description: Definir objetivos de prospección, cargar prospectos, revisar los borradores que prepara el agente y registrar envíos y respuestas con la One Platform API.
 ---
 
 # Prospección
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/prospeccion` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

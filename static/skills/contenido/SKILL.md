@@ -1,13 +1,13 @@
 ---
 name: contenido
-description: Investigar keywords, generar artículos, seguir su trabajo y pedir la indexación de la página publicada con la 1Platform API.
+description: Investigar keywords, generar artículos, seguir su trabajo y pedir la indexación de la página publicada con la One Platform API.
 ---
 
 # Contenido
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/sitios-web-y-contenido/generar-contenido` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

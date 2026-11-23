@@ -2,6 +2,13 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Contenido con la marca One Platform
+
+- Las guías, referencias, prompts, skills y `llms.txt` dicen «One Platform» y «One Platform API». Se conservan «1Platform Labs» (razón social), las cabeceras `X-1Platform-*`, los dominios, las rutas, los nombres de skill y el spec versionado.
+- El encabezado «En qué se diferencia de la One Platform API» de Atlas conserva su ancla anterior.
+- Nueva tarjeta para compartir enlaces (antes era la de Docusaurus) y favicon de One Platform; se retiran los recursos por defecto de Docusaurus sin uso.
+- `check:brand-name` (y su self-test) impide que «1Platform» vuelva a las fuentes o al build.
+
 ## [Unreleased] — One Platform
 
 - La cabecera, el footer y la portada usan One Platform con el símbolo original. Se conserva la razón social y las rutas técnicas.

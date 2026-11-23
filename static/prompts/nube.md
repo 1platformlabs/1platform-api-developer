@@ -2,10 +2,10 @@
 
 ## Antes de implementar con el MCP
 
-Use el MCP de 1Platform antes de escribir código. Busque el producto con `docs_search` y use `docs_get_page`
+Use el MCP de One Platform antes de escribir código. Busque el producto con `docs_search` y use `docs_get_page`
 para leer `/docs/saas/1platform-api/nube` y la skill `/skills/1platform-hub/SKILL`.
 La Nube no tiene operaciones de API para crear servidores ni bases de datos: los recursos se acuerdan con el
-equipo de 1Platform. No invente operaciones de aprovisionamiento; si `api_get_operation` no encuentra un
+equipo de One Platform. No invente operaciones de aprovisionamiento; si `api_get_operation` no encuentra un
 `operationId`, esa operación no existe en el contrato.
 
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;

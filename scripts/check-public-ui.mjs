@@ -35,8 +35,11 @@ const BOOT_JS_BUDGET = 180 * 1024;
 // 2026-11-04: the AI/MCP integration (#90) left main at the limit and the Nube
 // guide (#91) adds its own 2,596-byte doc chunk: 483,816 gzip bytes. Raised to
 // 475 KiB by owner decision.
+// 2026-11-22: the Prospección product page (vertical-prospeccion, PRS-13) adds its
+// own doc chunk: 489,761 gzip bytes (main 484,088 with the same PROD OpenAPI).
+// Raised to 480 KiB by owner decision.
 // This content allowance does not raise the boot or CSS budgets.
-const TOTAL_JS_BUDGET = 475 * 1024;
+const TOTAL_JS_BUDGET = 480 * 1024;
 const CSS_BUDGET = 25 * 1024;
 
 const SNAPSHOT_REQUIREMENTS = [

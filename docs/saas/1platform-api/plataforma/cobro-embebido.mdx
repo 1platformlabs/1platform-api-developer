@@ -47,14 +47,60 @@ El `src` es la **`payment_url`** del cobro:
 Con un link de pago, **cada carga** de `GET /pay/{token}` abre un intento de cobro nuevo (con un tope de 30 por
 minuto). No recargue el iframe en un bucle ni ponga ese enlace donde se genere una vista previa automática.
 
-Agregue `allow="payment"` al iframe:
+## Cómo escribir el iframe
 
 ```html
-<iframe src="PAYMENT_URL" allow="payment" title="Pago"></iframe>
+<iframe src="PAYMENT_URL" allow="payment" title="Pago" style="width: 100%; min-height: 720px; border: 0;"></iframe>
 ```
+
+- **`allow="payment"` es obligatorio.** Sin este atributo el navegador bloquea Apple Pay y los pagos con la
+  billetera del dispositivo dentro del iframe.
+- **Si el iframe está dentro de otro iframe** (un modal de un tercero, un constructor de páginas, un widget), cada
+  `<iframe>` de la cadena necesita `allow="payment"`.
+- **No use `sandbox`.** Si su plataforma lo exige, incluya como mínimo
+  `allow-scripts allow-same-origin allow-forms allow-popups`.
+- **La página que contiene el iframe tiene que cargar por HTTPS.**
+
+Revise también las cabeceras que envía esa página:
+
+| Cabecera | Cómo debe quedar |
+|---|---|
+| `Permissions-Policy` | Sin `payment=()`. Si la usa, permita el origen de la `payment_url`: `payment=(self "https://<origen-de-la-payment_url>")` |
+| `Content-Security-Policy` | Si tiene `frame-src` o `child-src`, tiene que incluir el origen de la `payment_url` |
 
 Hasta que el dominio esté `active`, el cobro puede no cargar dentro de su sitio. 1Platform no verifica desde qué
 dominio se abre el iframe: la restricción la aplica la cuenta de cobro, y por eso hace falta registrar el dominio.
+
+## Apple Pay dentro del iframe
+
+Desde Safari 17, Apple Pay funciona dentro de un iframe de otro dominio sólo si el dominio de **su** página (la que
+contiene el iframe) está verificado ante Apple. Sin esa verificación, la hoja de Apple Pay se abre, muestra la
+tarjeta y termina en «Payment Not Completed», sin cobrar nada. Fuera del iframe el mismo cobro funciona.
+
+La verificación se hace una vez por cada dominio registrado (`www.ejemplo.com` y `ejemplo.com` son dos dominios):
+
+1. Al habilitar el dominio, el equipo de 1Platform le envía el archivo `apple-developer-merchantid-domain-association`.
+2. Usted lo publica **sin modificarlo** en
+   `https://<su-dominio>/.well-known/apple-developer-merchantid-domain-association`. Ese enlace tiene que responder por
+   HTTPS con código `200`, **sin redirecciones** y sin pedir sesión.
+3. Avísele al equipo. Cuando la verificación esté hecha, el equipo se lo confirma en la nota de la solicitud.
+
+Compruébelo antes de avisar:
+
+```bash
+curl -sI "https://<su-dominio>/.well-known/apple-developer-merchantid-domain-association"
+# Esperado: código 200 y ninguna cabecera "location"
+```
+
+Si su sitio es una aplicación de una sola página (React, Vue, Next, etc.), compruebe que esa ruta devuelva el archivo
+y no el `index.html` de la aplicación: es el error más común. No borre el archivo después; Apple lo vuelve a revisar.
+
+**Mientras el dominio no esté verificado**, abra el cobro fuera del iframe y Apple Pay funcionará. La pestaña se abre
+dentro del clic del usuario; si no, el navegador la bloquea:
+
+```js
+pagar.addEventListener("click", () => window.open(PAYMENT_URL, "_blank", "noopener"));
+```
 
 ## Estados
 

@@ -34,6 +34,9 @@ Implemente en el servidor la creación y el seguimiento de links de pago (QA por
 7. Si el cobro se muestra dentro de un sitio en un iframe, registre antes el dominio con
    `POST /api/v1/payment-embed-domains` (`registerEmbedDomain`) y espere a que su `status` sea `active`
    (`listEmbedDomains`). Cada carga de `GET /pay/{token}` abre un intento de cobro nuevo: no recargue el iframe.
+   El iframe lleva `allow="payment"` (en cada nivel si está anidado) y sin `sandbox`. Para Apple Pay dentro del
+   iframe, publique el archivo de verificación que envía el equipo en
+   `https://<dominio>/.well-known/apple-developer-merchantid-domain-association` (200, sin redirecciones).
 
 Campos y estados exactos: https://developer.1platform.pro/openapi/1platform-api.json. Guía:
 https://developer.1platform.pro/docs/saas/1platform-api/links-de-pago.md

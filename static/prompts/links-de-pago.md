@@ -31,6 +31,9 @@ Implemente en el servidor la creación y el seguimiento de links de pago (QA por
 5. Cancele un link activo con `POST /api/v1/businesses/{businessId}/payment-links/{linkId}/cancel`
    (`cancelPaymentLink`).
 6. Para enterarse del pago sin consultar, configure los webhooks y verifique su firma.
+7. Si el cobro se muestra dentro de un sitio en un iframe, registre antes el dominio con
+   `POST /api/v1/payment-embed-domains` (`registerEmbedDomain`) y espere a que su `status` sea `active`
+   (`listEmbedDomains`). Cada carga de `GET /pay/{token}` abre un intento de cobro nuevo: no recargue el iframe.
 
 Campos y estados exactos: https://developer.1platform.pro/openapi/1platform-api.json. Guía:
 https://developer.1platform.pro/docs/saas/1platform-api/links-de-pago.md

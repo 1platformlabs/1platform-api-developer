@@ -1,0 +1,96 @@
+---
+title: Cobro embebido
+description: Registre los dominios de su sitio donde va a mostrar el cobro dentro de un iframe, espere a que estén activos y sepa qué poner en el src.
+sidebar_position: 6
+---
+
+# Cobro embebido
+
+<p className="lead">Si muestra la página de pago dentro de su propio sitio, en un iframe, ese dominio tiene que estar habilitado en la cuenta de cobro de su espacio de trabajo. Regístrelo aquí: el equipo de 1Platform lo habilita y usted ve el estado de cada dominio.</p>
+
+**Quién puede hacerlo.** Un **administrador del espacio de trabajo**, con el módulo de API habilitado, y sólo en
+espacios de trabajo que tienen **cuenta de cobro propia**. Cada llamada lleva el token de aplicación **y** el token
+de usuario de ese administrador. Los ejemplos usan `$BASE_URL`, `$APP_TOKEN` y `$USER_TOKEN` como los define
+[Convenciones](/docs/saas/1platform-api/reference/convenciones).
+
+## Cómo funciona
+
+1. Registra el dominio con `POST /payment-embed-domains`. Nace en estado `pending` y se le pide al equipo que lo
+   habilite en su cuenta de cobro.
+2. El equipo lo habilita y el dominio pasa a `active`, o lo rechaza con una nota y pasa a `rejected`. Usted recibe un
+   aviso en el panel en los dos casos.
+3. Cuando ya no lo use, pide la baja con `DELETE`. Un dominio `active` pasa a `removal_pending` hasta que el equipo
+   lo quita; uno `rejected` se quita en el acto.
+
+Mientras haya una solicitud en curso (`pending` o `removal_pending`), el dominio no se puede dar de baja: el equipo
+puede estar operando en la cuenta de cobro. El dominio no se edita; para cambiarlo, dé de baja el anterior y
+registre otro. Lo único editable es la etiqueta (`label`).
+
+```bash
+curl -X POST "$BASE_URL/payment-embed-domains" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "checkout.su-sitio.com", "label": "checkout web"}'
+```
+
+La respuesta trae el dominio normalizado (en minúsculas, sin `https://` ni `/` final), su `status` y
+`last_request`, que es la última solicitud de ese dominio con su `status` y la nota del equipo cuando la hay.
+
+## Qué va en el `src` del iframe
+
+El `src` es la **`payment_url`** del cobro:
+
+- si cobra por API, la que devuelve `POST /users/transactions` ([Pagos en línea](/docs/saas/1platform-api/pagos-en-linea));
+- si cobra con un [link de pago](/docs/saas/1platform-api/links-de-pago), el enlace del link (`GET /pay/{token}`).
+
+Con un link de pago, **cada carga** de `GET /pay/{token}` abre un intento de cobro nuevo (con un tope de 30 por
+minuto). No recargue el iframe en un bucle ni ponga ese enlace donde se genere una vista previa automática.
+
+Agregue `allow="payment"` al iframe:
+
+```html
+<iframe src="PAYMENT_URL" allow="payment" title="Pago"></iframe>
+```
+
+Hasta que el dominio esté `active`, el cobro puede no cargar dentro de su sitio. 1Platform no verifica desde qué
+dominio se abre el iframe: la restricción la aplica la cuenta de cobro, y por eso hace falta registrar el dominio.
+
+## Estados
+
+| `status` | Qué significa |
+|---|---|
+| `pending` | Pedido; el equipo todavía no lo habilitó |
+| `active` | Habilitado en su cuenta de cobro |
+| `rejected` | No se habilitó; la razón está en `last_request.note`. Puede volver a registrarlo |
+| `removal_pending` | Pidió la baja; sigue habilitado hasta que el equipo lo quite |
+
+Un dominio dado de baja ya no aparece en la lista.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `GET /payment-embed-domains` | Listar los dominios del espacio de trabajo con su estado (`enabled` dice si hoy se pueden pedir altas) |
+| `POST /payment-embed-domains` | Registrar un dominio (`domain` y, si quiere, `label`) |
+| `GET /payment-embed-domains/{id}` | Consultar un dominio |
+| `PATCH /payment-embed-domains/{id}` | Cambiar sólo la etiqueta |
+| `DELETE /payment-embed-domains/{id}` | Pedir la baja (`202`) o quitar uno rechazado (`200`) |
+
+Todas las operaciones: [Referencia de API → Payment Embed Domains](/api-reference/1platform-api#tag/payment-embed-domains).
+
+## Errores
+
+| HTTP | `code` | Qué hacer |
+|---|---|---|
+| `409` | `embed_domain_already_registered` | Ese dominio ya está en la lista |
+| `409` | `embed_domain_limit_reached` | Llegó al máximo de dominios; dé de baja uno que no use |
+| `409` | `manual_request_open_limit` | Tiene demasiadas solicitudes en curso; espere la respuesta del equipo |
+| `409` | `embed_domain_request_in_progress` | Hay una solicitud en curso para ese dominio |
+| `422` | `embed_domain_invalid` | El dominio no es válido; `data.reason` dice por qué (`port`, `path`, `wildcard`, `non_ascii`, `private`, `tld`, `format`) |
+| `422` | `embed_domain_needs_dedicated_account` | Su espacio de trabajo cobra con la cuenta compartida (`data.reason` = `shared`) o no se pudo determinar cuál es su cuenta (`ambiguous`) |
+| `503` | `manual_requests_disabled` | La función no está disponible ahora |
+| `503` | `manual_requests_unavailable` | No disponible temporalmente; reintente |
+
+El `code` viaja en la raíz del cuerpo. Si un alta respondió con un error de red y la reintenta, puede recibir `409`
+`embed_domain_already_registered`: la primera llegó; confírmelo con `GET`.

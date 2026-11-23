@@ -28,6 +28,9 @@ Requiere la skill `1platform-hub` (tokens, entornos y errores).
 5. `POST /api/v1/businesses/{businessId}/payment-links/{linkId}/cancel` (`cancelPaymentLink`) para que deje de
    aceptar pagos.
 6. Para enterarse del pago sin consultar, use la skill `webhooks`.
+7. Para mostrar el cobro en un iframe de otro sitio: `POST /api/v1/payment-embed-domains` (`registerEmbedDomain`)
+   y esperar `status: "active"` en `GET /api/v1/payment-embed-domains` (`listEmbedDomains`). Cada carga de
+   `GET /pay/{token}` abre un intento de cobro nuevo. Guía: https://developer.1platform.pro/docs/saas/1platform-api/plataforma/cobro-embebido.md
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/links-de-pago.md
 

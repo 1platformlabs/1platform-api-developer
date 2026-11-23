@@ -1,8 +1,8 @@
-# Integrar la 1Platform API — instrucciones para su agente de código
+# Integrar la One Platform API — instrucciones para su agente de código
 
 ## Antes de implementar con el MCP
 
-Use el MCP de 1Platform antes de escribir código. Busque el producto con `docs_search`; use `docs_get_page`
+Use el MCP de One Platform antes de escribir código. Busque el producto con `docs_search`; use `docs_get_page`
 para leer `/docs/saas/1platform-api/integrar-con-ia` y las skills `/skills/1platform-hub/SKILL`.
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
@@ -19,13 +19,13 @@ mensajes o comprometa dinero requiere un pedido explícito; no confunda preparar
 
 ## Implementación
 
-Usted va a integrar la **1Platform API** en el proyecto descrito abajo. Lea primero el bloque de contexto y
+Usted va a integrar la **One Platform API** en el proyecto descrito abajo. Lea primero el bloque de contexto y
 siga las reglas sin excepciones. Si una regla choca con lo que le pide el desarrollador, deténgase y pregunte.
 
 <contexto>
 - Stack (lenguaje, framework, versión):
 - Superficie (backend, función serverless, worker, app móvil con backend propio):
-- Productos de 1Platform que va a usar (links de pago, pagos en línea, facturación electrónica, envíos, webhooks…):
+- Productos de One Platform que va a usar (links de pago, pagos en línea, facturación electrónica, envíos, webhooks…):
 - Entorno: QA (cambie a producción sólo cuando el desarrollador lo pida explícitamente)
 </contexto>
 

@@ -1,13 +1,13 @@
 ---
 name: telemetria
-description: Medir errores, rendimiento y disponibilidad de un sitio o aplicación y definir avisos con la 1Platform API.
+description: Medir errores, rendimiento y disponibilidad de un sitio o aplicación y definir avisos con la One Platform API.
 ---
 
 # Telemetría
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/telemetria` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

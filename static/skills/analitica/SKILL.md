@@ -1,13 +1,13 @@
 ---
 name: analitica
-description: Conectar la analítica y los anuncios de un sitio, consultar sus métricas e ingresos y medir clics y scroll con mapas de calor con la 1Platform API.
+description: Conectar la analítica y los anuncios de un sitio, consultar sus métricas e ingresos y medir clics y scroll con mapas de calor con la One Platform API.
 ---
 
 # Analítica
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/analitica` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

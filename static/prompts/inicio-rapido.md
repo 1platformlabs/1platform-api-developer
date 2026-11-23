@@ -1,8 +1,8 @@
-# Primera llamada a la 1Platform API
+# Primera llamada a la One Platform API
 
 ## Antes de implementar con el MCP
 
-Use el MCP de 1Platform antes de escribir código. Busque el producto con `docs_search`; use `docs_get_page`
+Use el MCP de One Platform antes de escribir código. Busque el producto con `docs_search`; use `docs_get_page`
 para leer `/docs/saas/1platform-api/inicio-rapido` y las skills `/skills/1platform-hub/SKILL`.
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
@@ -19,7 +19,7 @@ mensajes o comprometa dinero requiere un pedido explícito; no confunda preparar
 
 ## Implementación
 
-Escriba en el servidor del proyecto un cliente mínimo de la 1Platform API, en QA:
+Escriba en el servidor del proyecto un cliente mínimo de la One Platform API, en QA:
 
 1. Lea `ONEPLATFORM_APP_KEY` (`ak-XXXX…`) y `ONEPLATFORM_USER_KEY` (`sk-XXXX…`) de variables de entorno. Nunca las
    escriba en el código ni las mande al navegador.

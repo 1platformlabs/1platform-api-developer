@@ -2,7 +2,7 @@
 
 ## Antes de implementar con el MCP
 
-Use el MCP de 1Platform antes de escribir código. Busque el producto con `docs_search`; use `docs_get_page`
+Use el MCP de One Platform antes de escribir código. Busque el producto con `docs_search`; use `docs_get_page`
 para leer `/docs/saas/1platform-api/analitica` y las skills `/skills/1platform-hub/SKILL`, `/skills/analitica/SKILL`.
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.

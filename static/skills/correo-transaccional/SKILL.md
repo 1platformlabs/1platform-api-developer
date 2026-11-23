@@ -1,13 +1,13 @@
 ---
 name: correo-transaccional
-description: Enviar avisos individuales desde una dirección verificada, con idempotencia, y consultar cupos y entrega con la 1Platform API.
+description: Enviar avisos individuales desde una dirección verificada, con idempotencia, y consultar cupos y entrega con la One Platform API.
 ---
 
 # Correo transaccional
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/correo-transaccional` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

@@ -7,7 +7,7 @@ description: Conectar el servidor MCP de OnePlatform para consultar la documenta
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/integrar-con-ia` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga
@@ -21,7 +21,7 @@ El servidor MCP expone la documentación y un conjunto acotado de operaciones de
 - Sin llaves: `docs_search`, `docs_get_page` y `api_get_operation`.
 - Con llaves (`ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY`): las operaciones de la API agrupadas por producto
   (toolsets): `cuenta`, `pagos`, `retiros`, `suscripciones`, `terminal`, `facturacion`, `envios`, `sitios`,
-    `analitica`, `correo`, `dominios`, `telemetria`, `ventas`, `agentes`, `agenda`, `redes`, `tareas` y `estudio`.
+    `analitica`, `correo`, `dominios`, `telemetria`, `ventas`, `agentes`, `agenda`, `redes`, `tareas`, `estudio` y `prospeccion`.
   Las escrituras no cobran saldo en el acto, no emiten documentos fiscales ni mueven dinero: links de pago, planes,
   clientes y suscripciones, solicitudes de terminal, visitas de la agenda, borradores y publicaciones programadas de
   redes, tareas y subtareas, detener una ejecución de un agente y el estado de un error de telemetría. Agendar, mover

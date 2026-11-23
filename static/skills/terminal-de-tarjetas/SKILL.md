@@ -1,13 +1,13 @@
 ---
 name: terminal-de-tarjetas
-description: Solicitar una terminal de tarjetas para un comercio, activarla y consultar sus cobros presenciales con la 1Platform API.
+description: Solicitar una terminal de tarjetas para un comercio, activarla y consultar sus cobros presenciales con la One Platform API.
 ---
 
 # Terminal de tarjetas
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/terminal-de-tarjetas` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

@@ -159,7 +159,7 @@ const JOURNEY_MOVES: Array<[string, string]> = [
 const config: Config = {
   title: 'Documentación para desarrolladores de One Platform',
   tagline: 'Integre los servicios de One Platform en su producto',
-  favicon: 'img/brand/1platform-favicon-v2-digital.ico',
+  favicon: 'img/brand/one-platform-favicon.ico',
 
   future: {
     v4: true,
@@ -355,7 +355,7 @@ const config: Config = {
 
   // ─── Theme ────────────────────────────────────────────────────────────────
   themeConfig: {
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/brand/one-platform-social-card.png',
     colorMode: {
       defaultMode: 'light',
       disableSwitch: true,

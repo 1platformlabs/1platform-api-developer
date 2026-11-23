@@ -1,13 +1,13 @@
 ---
 name: sitios-web
-description: Registrar sitios web propios, consultarlos y crear sitios servidos por la plataforma con la 1Platform API.
+description: Registrar sitios web propios, consultarlos y crear sitios servidos por la plataforma con la One Platform API.
 ---
 
 # Sitios web
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/sitios-web-y-contenido` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

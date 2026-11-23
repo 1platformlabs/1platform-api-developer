@@ -2,9 +2,16 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Contenido con la marca One Platform
+
+- Las guías, referencias, prompts, skills y `llms.txt` dicen «One Platform» y «One Platform API». Se conservan «1Platform Labs» (razón social), las cabeceras `X-1Platform-*`, los dominios, las rutas, los nombres de skill y el spec versionado.
+- El encabezado «En qué se diferencia de la One Platform API» de Atlas conserva su ancla anterior.
+- Nueva tarjeta para compartir enlaces (antes era la de Docusaurus) y favicon de One Platform; se retiran los recursos por defecto de Docusaurus sin uso.
+- `check:brand-name` (y su self-test) impide que «1Platform» vuelva a las fuentes o al build.
+
 ## [Unreleased] — Tiendas en dirección de la plataforma
 
-- «Sitios web y contenido» deja de decir que `POST /provisioning/tenants` es sólo para un dominio: una tienda puede crearse sin dominio, en una dirección de la plataforma. Nueva sección «Tienda sin dominio propio» en «Publicar un sitio con su dominio» con `GET /provisioning/platform-address`, el alta sin dominio y `PUT|DELETE /users/websites/{website_id}/custom-domain` (errores, estados de la conexión y nameservers de ejemplo). Documenta una capacidad aún no publicada en el contrato de PROD: publicar después del deploy del API.
+- «Sitios web y contenido» deja de decir que `POST /provisioning/tenants` es sólo para un dominio: una tienda puede crearse sin dominio, en una dirección de la plataforma. Nueva sección «Tienda sin dominio propio» en «Publicar un sitio con su dominio» con `GET /provisioning/platform-address`, el alta sin dominio y `PUT|DELETE /users/websites/{website_id}/custom-domain` (errores, estados de la conexión y nameservers de ejemplo). Disponible según la decisión de la plataforma.
 
 ## [Unreleased] — One Platform
 

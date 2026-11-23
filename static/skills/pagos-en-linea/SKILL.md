@@ -1,13 +1,13 @@
 ---
 name: pagos-en-linea
-description: Cobrar a un tercero con checkout seguro, recibir el resultado por webhook y conciliar con la 1Platform API.
+description: Cobrar a un tercero con checkout seguro, recibir el resultado por webhook y conciliar con la One Platform API.
 ---
 
 # Pagos en línea
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

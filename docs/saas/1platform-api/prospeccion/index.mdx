@@ -1,0 +1,94 @@
+---
+title: Prospección
+description: Defina a quién quiere llegar, deje que el agente Sofia investigue empresas y prepare mensajes, y envíe sólo lo que una persona aprobó.
+sidebar_position: 1
+---
+
+import PromptParaAgente from '@site/src/components/PromptParaAgente';
+
+# Prospección
+
+<p className="lead">Un embudo de prospección con revisión humana: usted define un objetivo, el agente Sofia busca empresas que encajan, investiga sus sitios y prepara un borrador por prospecto, y una persona del espacio de trabajo aprueba cada mensaje antes de que salga.</p>
+
+<PromptParaAgente slug="prospeccion" />
+
+## Disponibilidad
+
+Prospección está **en preparación**: nace apagada en cada espacio de trabajo y sólo el equipo de la plataforma la habilita. Mientras esté apagada, todas las operaciones responden `403` con `data.code` = `prospecting_disabled`. El precio del diagnóstico que prepara el agente aún no está definido; hasta que lo esté, la herramienta de diagnóstico del agente se niega a trabajar en lugar de ejecutarse gratis.
+
+## Cómo funciona
+
+1. Cree un **objetivo** (`POST /prospecting/goals`): a quién busca (`audience`), qué descalifica, las señales que pesan, qué ofrece, el resultado que persigue (`meeting` o `reply`) y las reglas de redacción. Cada espacio de trabajo tiene un tope de objetivos; superarlo responde `409` `prospecting_goal_limit`.
+2. Todo objetivo nace en **modo borrador** (`mode: draft`). En ese modo se busca, se diagnostica, se redacta y se aprueba, pero **no se envía nada**. Sólo un administrador cambia a modo real (`POST /prospecting/goals/{goalId}/mode`, con `confirm: true`); mientras tanto, enviar responde `409` `prospecting_goal_in_draft`.
+3. Los **prospectos** entran de tres maneras: los encuentra el agente, los importa una persona (`POST /prospecting/goals/{goalId}/prospects/import`) o los crea a mano. Un prospecto se identifica por el sitio de la empresa o por su correo, así que repetirlo no lo duplica. Las empresas excluidas del espacio no entran.
+4. El agente **diagnostica** a cada prospecto: qué le falta, con una cita textual y la URL donde la encontró. El servidor lee esa página y comprueba que la cita aparece; sin evidencia verificada no hay diagnóstico del agente (`409` `prospecting_evidence_missing`). Una persona también puede escribir el diagnóstico.
+5. El agente deja un **borrador** por prospecto (`PUT /prospecting/prospects/{prospectId}/messages/{sequence}`). El servidor valida el texto: campos sin completar, largo, términos prohibidos, precios, firma, línea de baja y enlaces permitidos. Cada regla incumplida aparece en `checks`.
+6. Una persona **revisa y aprueba** (`POST /prospecting/messages/{messageId}/approve`, con el `content_hash` que revisó). Si el borrador cambió mientras lo leía, responde `409` `prospecting_message_changed` y debe revisarlo otra vez. **El agente nunca aprueba, envía, marca enviado ni clasifica respuestas.**
+7. Un mensaje aprobado sale por **correo** (`POST /prospecting/messages/{messageId}/send`) desde una dirección verificada del espacio de trabajo, o lo envía la persona por su cuenta y lo registra con `mark-sent`. Una respuesta del prospecto frena los seguimientos; una baja lo agrega a las empresas excluidas.
+8. Cuando el prospecto acepta, pasa a **reunión** con el calendario del espacio o se **traspasa a Ventas** como lead.
+
+## Qué necesita {#qué-necesitas}
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido).
+- Prospección habilitada en su espacio de trabajo y asignada a la cuenta; si no, `403` con `prospecting_disabled` o `module_disabled`. El token de usuario debe pertenecer a un espacio de trabajo.
+- Un **administrador** para cambiar el modo, borrar una exclusión y asignar el agente. El resto lo puede hacer cualquier persona con el módulo.
+- Para enviar por correo: una dirección verificada. Sin ella, el envío responde `409` `prospecting_channel_not_ready`; el canal asistido no lo requiere.
+- Saldo para lo que consume el agente. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `GET /prospecting/goals` · `POST /prospecting/goals` | Listar y crear objetivos |
+| `GET /prospecting/goals/{goalId}` · `PATCH /prospecting/goals/{goalId}` | Consultar y editar un objetivo; el modo no se cambia aquí |
+| `POST /prospecting/goals/{goalId}/mode` | Pasar de borrador a real, o volver (administrador) |
+| `GET /prospecting/goals/{goalId}/readiness` | Qué falta: canal, reunión, ventas, agente y precio |
+| `GET /prospecting/goals/{goalId}/board` | El tablero del embudo, columna por columna |
+| `GET /prospecting/goals/{goalId}/prospects` · `POST` | Listar y crear prospectos |
+| `POST /prospecting/goals/{goalId}/prospects/import` | Importar prospectos; informa creados, omitidos, excluidos y rechazados por fila |
+| `GET /prospecting/prospects/{prospectId}` · `PATCH` | Detalle y corrección de un prospecto, o confirmar su correo |
+| `POST /prospecting/prospects/{prospectId}/reply` | Registrar y clasificar la respuesta |
+| `POST /prospecting/prospects/{prospectId}/suppress` | Marcarlo como no contactar |
+| `POST /prospecting/prospects/{prospectId}/handoff` | Traspasarlo a Ventas |
+| `POST /prospecting/prospects/{prospectId}/reopen-diagnosis` | Permitir un nuevo diagnóstico |
+| `GET /prospecting/messages` | La cola de revisión (`status=draft`) |
+| `PUT /prospecting/prospects/{prospectId}/messages/{sequence}` | Crear o corregir un borrador |
+| `POST /prospecting/messages/{messageId}/approve` | Aprobar el borrador revisado |
+| `POST /prospecting/messages/{messageId}/discard` | Descartarlo con un motivo |
+| `POST /prospecting/messages/{messageId}/send` | Enviarlo por correo; tras un fallo exige confirmar el reintento |
+| `POST /prospecting/messages/{messageId}/mark-sent` | Registrar un envío hecho por la persona |
+| `PUT /prospecting/goals/{goalId}/agent` | Vincular el agente Sofia al objetivo (administrador) |
+| `GET /prospecting/goals/{goalId}/metrics` | Embudo y resultados por variante |
+| `GET /prospecting/suppressions` · `DELETE /prospecting/suppressions/{suppressionId}` | Empresas excluidas del espacio; borrar es de administrador |
+
+Todas las operaciones: [Referencia de API → Prospecting](/api-reference/1platform-api#tag/prospecting).
+
+## Errores
+
+Los errores llegan como `{"success": false, "data": {"code": "..."}, "msg": "..."}`. Los topes diarios responden `409` `prospecting_daily_cap`, no `429`. Una conexión que no está disponible responde `503` `prospecting_connection_unavailable`.
+
+| Código | Estado | Significa |
+|---|---|---|
+| `prospecting_disabled` | 403 | Prospección está apagada en el espacio de trabajo |
+| `prospecting_forbidden` | 403 | La operación exige administrador |
+| `prospecting_not_found` | 404 | No existe en su espacio de trabajo |
+| `prospecting_goal_limit` · `prospecting_prospect_limit` | 409 | Se alcanzó el tope de objetivos o de prospectos |
+| `prospecting_stage_not_allowed` | 409 | La etapa no admite ese cambio |
+| `prospecting_prospect_no_key` | 422 | Falta el sitio o el correo que identifica al prospecto |
+| `prospecting_goal_busy` | 409 | Hay envíos en curso; no se puede archivar |
+| `prospecting_goal_not_active` | 409 | El objetivo está pausado o archivado |
+| `prospecting_goal_in_draft` | 409 | El objetivo está en modo borrador: no se envía |
+| `prospecting_message_changed` | 409 | El borrador cambió desde que lo revisó |
+| `prospecting_checks_failed` | 409 | El borrador incumple reglas; corríjalo |
+| `prospecting_evidence_missing` | 409 | El diagnóstico no tiene evidencia verificada |
+| `prospecting_suppressed` | 409 | La empresa está en las excluidas |
+| `prospecting_contact_unconfirmed` | 409 | El correo del contacto no está confirmado |
+| `prospecting_retry_needs_confirm` | 409 | Un reintento tras un fallo exige confirmación |
+| `prospecting_channel_not_ready` | 409 | El canal de envío no está listo |
+| `prospecting_daily_cap` | 409 | Se alcanzó el tope diario |
+| `prospecting_prospect_ambiguous` | 409 | Hay más de un prospecto posible |
+| `prospecting_connection_unavailable` | 503 | La conexión necesaria no está disponible; reintente |
+
+## Con el servidor MCP
+
+El toolset `prospeccion` expone objetivos, preparación, embudo, métricas y el listado de prospectos **sin datos de contacto**, y permite dar de alta e importar prospectos. Aprobar, enviar, marcar enviado, cambiar el modo, traspasar a Ventas, excluir empresas y leer datos de contacto quedan fuera del MCP: esas decisiones las toma una persona en el panel.

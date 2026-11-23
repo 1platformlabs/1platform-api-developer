@@ -1,13 +1,13 @@
 ---
 name: retiros
-description: Consultar el saldo retirable, registrar dónde recibir el dinero y pedir retiros de lo cobrado con la 1Platform API.
+description: Consultar el saldo retirable, registrar dónde recibir el dinero y pedir retiros de lo cobrado con la One Platform API.
 ---
 
 # Retiros
 
 ## Consulta con el MCP
 
-Antes de implementar, use el MCP de 1Platform: busque el tema con `docs_search` y lea
+Antes de implementar, use el MCP de One Platform: busque el tema con `docs_search` y lea
 `/docs/saas/1platform-api/retiros` mediante `docs_get_page`.
 Use `api_get_operation` con cada `operationId` de la guía para comprobar el contrato vigente. Las consultas de
 documentación no requieren claves. Si el MCP no está conectado, siga

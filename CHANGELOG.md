@@ -11,7 +11,7 @@ All notable changes to the 1Platform API Developer Docs will be documented in th
 
 ## [Unreleased] — Tiendas en dirección de la plataforma
 
-- «Sitios web y contenido» deja de decir que `POST /provisioning/tenants` es sólo para un dominio: una tienda puede crearse sin dominio, en una dirección de la plataforma. Nueva sección «Tienda sin dominio propio» en «Publicar un sitio con su dominio» con `GET /provisioning/platform-address`, el alta sin dominio y `PUT|DELETE /users/websites/{website_id}/custom-domain` (errores, estados de la conexión y nameservers de ejemplo). Disponible según la decisión de la plataforma.
+- «Sitios web y contenido» deja de decir que `POST /provisioning/tenants` es sólo para un dominio: una tienda puede crearse sin dominio, en una dirección de la plataforma. Nueva sección «Tienda sin dominio propio» en «Publicar un sitio con su dominio» con `GET /provisioning/platform-address`, el alta sin dominio y `PUT|DELETE /users/websites/{website_id}/custom-domain` (errores, estados de la conexión y nameservers de ejemplo). Disponible según la decisión de la plataforma (hoy no todas las cuentas la tienen habilitada; conectar un dominio propio requiere activación).
 
 ## [Unreleased] — One Platform
 

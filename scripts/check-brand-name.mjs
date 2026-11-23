@@ -86,6 +86,13 @@ export function checkTree(root, {build}) {
   return {errors, files: files.length};
 }
 
+/** Exit code for a result: an empty surface or a finding fails, unless --report. */
+export function exitCode({errors, files}, {report = false} = {}) {
+  if (files === 0) return 1;
+  if (report) return 0;
+  return errors.length ? 1 : 0;
+}
+
 function selfTest() {
   const make = (files) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brand-name-'));
@@ -122,7 +129,12 @@ function selfTest() {
     ['build/openapi is out of scope', () => passes({'docs/a.mdx': 'ok', 'build/openapi/1platform-api.json': '{"title": "1Platform API"}'}, {build: true})],
     ['build js bundles are out of scope', () => passes({'docs/a.mdx': 'ok', 'build/assets/js/a.js': '"1Platform API"'}, {build: true})],
     ['missing build is an error', () => run({'docs/a.mdx': 'ok'}, {build: true}).missingBuild === true],
-    ['empty surface is an error', () => run({}).files === 0],
+    ['empty surface is an error', () => exitCode(run({})) === 1],
+    ['empty surface fails even in --report', () => exitCode(run({}), {report: true}) === 1],
+    ['findings fail, --report lists them and passes', () => {
+      const r = run({'docs/x.mdx': 'la 1Platform API'});
+      return exitCode(r) === 1 && exitCode(r, {report: true}) === 0;
+    }],
   ];
   let failed = 0;
   for (const [name, check] of cases) {
@@ -139,19 +151,13 @@ if (process.argv.includes('--self-test')) {
 } else {
   const build = !process.argv.includes('--sources');
   const report = process.argv.includes('--report');
-  const {errors, files} = checkTree(ROOT, {build});
-  if (files === 0 && !errors.length) {
-    console.error('check-brand-name: scanned zero files — the gate would pass on nothing');
-    process.exit(1);
-  }
+  const result = checkTree(ROOT, {build});
+  const {errors, files} = result;
+  if (files === 0 && !errors.length) console.error('check-brand-name: scanned zero files — the gate would pass on nothing');
   for (const e of errors) console.error(e);
   const scope = build ? 'sources + build/' : 'sources';
-  if (report) {
-    console.log(`check-brand-name (report): ${errors.length} findings in ${files} files (${scope})`);
-  } else if (errors.length) {
-    console.error(`check-brand-name: ${errors.length} occurrences of the old brand name (${scope})`);
-    process.exit(1);
-  } else {
-    console.log(`check-brand-name: ${files} files (${scope}) use «One Platform»`);
-  }
+  if (report) console.log(`check-brand-name (report): ${errors.length} findings in ${files} files (${scope})`);
+  else if (errors.length) console.error(`check-brand-name: ${errors.length} occurrences of the old brand name (${scope})`);
+  else if (files) console.log(`check-brand-name: ${files} files (${scope}) use «One Platform»`);
+  process.exit(exitCode(result, {report}));
 }

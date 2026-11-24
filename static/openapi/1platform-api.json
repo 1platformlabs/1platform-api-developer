@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.183.0"
+    "version": "PRODv5.185.0"
   },
   "servers": [
     {
@@ -78293,6 +78293,7 @@
                         "body": "Hola Laura, vi que en Clínica Sonrisa las citas se piden por teléfono… — Ana López",
                         "content_hash": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184",
                         "checks": [],
+                        "attachments": [],
                         "status": "draft",
                         "attempt": 0,
                         "updated_at": "2026-11-21T10:00:00Z"
@@ -78478,6 +78479,7 @@
                     "body": "Hola Laura, vi que en Clínica Sonrisa las citas se piden por teléfono… — Ana López",
                     "content_hash": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184",
                     "checks": [],
+                    "attachments": [],
                     "status": "draft",
                     "attempt": 0,
                     "updated_at": "2026-11-21T10:00:00Z"
@@ -78661,6 +78663,7 @@
                     "body": "Hola Laura, vi que en Clínica Sonrisa las citas se piden por teléfono… — Ana López",
                     "content_hash": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184",
                     "checks": [],
+                    "attachments": [],
                     "status": "approved",
                     "attempt": 0,
                     "updated_at": "2026-11-21T10:00:00Z"
@@ -78845,6 +78848,7 @@
                     "body": "Hola Laura, vi que en Clínica Sonrisa las citas se piden por teléfono… — Ana López",
                     "content_hash": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184",
                     "checks": [],
+                    "attachments": [],
                     "status": "discarded",
                     "attempt": 0,
                     "discard_reason": "No encaja",
@@ -79026,6 +79030,7 @@
                     "body": "Hola Laura, vi que en Clínica Sonrisa las citas se piden por teléfono… — Ana López",
                     "content_hash": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184",
                     "checks": [],
+                    "attachments": [],
                     "status": "sent",
                     "attempt": 0,
                     "sent_at": "2026-11-21T11:00:00Z",
@@ -79227,6 +79232,7 @@
                     "body": "Hola Laura, vi que en Clínica Sonrisa las citas se piden por teléfono… — Ana López",
                     "content_hash": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184",
                     "checks": [],
+                    "attachments": [],
                     "status": "sent",
                     "attempt": 1,
                     "sent_at": "2026-11-21T11:00:00Z",
@@ -79351,6 +79357,641 @@
         },
         "x-rate-limit": [
           "80/minute"
+        ]
+      }
+    },
+    "/api/v1/prospecting/prospects/{prospect_id}/messages/{sequence}/attachments": {
+      "post": {
+        "tags": [
+          "Prospecting"
+        ],
+        "summary": "Attach a file to an email message",
+        "description": "Uploads one file (`multipart/form-data`, a single `file` part) to touch `sequence` of the prospect. Only email messages carry files: GIF, PNG, JPG, WEBP or PDF, at most 3 per message and up to the workspace's per-file limit (3 MB by default). The goal needs its sending address, because the file goes out from that mailbox. The message must not be sent or being sent. Adding or removing a file is a change to the message: it goes back to draft, its `content_hash` and `checks` are recomputed and its approval is cleared, so it must be approved again. **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. The workspace is always the caller's own. Writing is for the goal's owner or a workspace administrator.",
+        "operationId": "uploadProspectingMessageAttachment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "prospect_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Prospect id",
+              "title": "Prospect Id"
+            },
+            "description": "Prospect id"
+          },
+          {
+            "name": "sequence",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 3,
+              "minimum": 1,
+              "description": "Touch number (1 = first)",
+              "title": "Sequence"
+            },
+            "description": "Touch number (1 = first)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_uploadProspectingMessageAttachment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Attached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_MessageResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6741a2b3c4d5e6f7a8b9c101",
+                    "goal_id": "6741a2b3c4d5e6f7a8b9c0d1",
+                    "prospect_id": "6741a2b3c4d5e6f7a8b9c0e1",
+                    "sequence": 1,
+                    "channel": "email",
+                    "to": "laura@clinicasonrisa.com",
+                    "subject": "Reservas en línea",
+                    "body": "Hola Laura, vi que en Clínica Sonrisa las citas se piden por teléfono… — Ana López",
+                    "content_hash": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184",
+                    "checks": [],
+                    "attachments": [
+                      {
+                        "key": "mail/6741a2b3c4d5e6f7a8b9c0a1/outbound/6741a2b3c4d5e6f7a8b9c0b1/6741a2b3c4d5e6f7a8b9c0c1/demo.gif",
+                        "filename": "demo.gif",
+                        "size": 2481152,
+                        "content_type": "image/gif"
+                      }
+                    ],
+                    "status": "draft",
+                    "attempt": 0,
+                    "updated_at": "2026-11-21T10:00:00Z"
+                  },
+                  "msg": "Attachment added"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Prospecting is off for this workspace, the account has no workspace, or the caller may not write this goal",
+            "x-error-codes": [
+              "module_disabled",
+              "prospecting_disabled",
+              "prospecting_forbidden"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Not found in your workspace",
+            "x-error-codes": [
+              "prospecting_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Not an email message, no sending address, already sent, changed meanwhile or archived goal",
+            "x-error-codes": [
+              "prospecting_attachment_not_allowed",
+              "prospecting_attachment_no_sender",
+              "prospecting_stage_not_allowed",
+              "prospecting_message_changed",
+              "prospecting_goal_not_active",
+              "prospecting_channel_not_ready"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "413": {
+            "description": "The file is larger than the per-file limit",
+            "x-error-codes": [
+              "prospecting_attachment_too_large"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "415": {
+            "description": "That kind of file cannot be attached, or the message already has 3 files",
+            "x-error-codes": [
+              "prospecting_attachment_type",
+              "prospecting_attachment_limit"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error (neutral code)",
+            "x-error-codes": [
+              "prospecting_error"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "503": {
+            "description": "The file could not be stored; nothing was attached",
+            "x-error-codes": [
+              "prospecting_connection_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
+        ]
+      }
+    },
+    "/api/v1/prospecting/prospects/{prospect_id}/messages/{sequence}/attachments/{attachment_key}": {
+      "delete": {
+        "tags": [
+          "Prospecting"
+        ],
+        "summary": "Remove a file from a message",
+        "description": "Takes one file off touch `sequence`. Adding or removing a file is a change to the message: it goes back to draft, its `content_hash` and `checks` are recomputed and its approval is cleared, so it must be approved again. A key that is not on the message is a 404. **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. The workspace is always the caller's own. Writing is for the goal's owner or a workspace administrator.",
+        "operationId": "removeProspectingMessageAttachment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "prospect_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Prospect id",
+              "title": "Prospect Id"
+            },
+            "description": "Prospect id"
+          },
+          {
+            "name": "sequence",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 3,
+              "minimum": 1,
+              "description": "Touch number (1 = first)",
+              "title": "Sequence"
+            },
+            "description": "Touch number (1 = first)"
+          },
+          {
+            "name": "attachment_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Attachment key, as returned in `attachments[].key`",
+              "title": "Attachment Key"
+            },
+            "description": "Attachment key, as returned in `attachments[].key`"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_MessageResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6741a2b3c4d5e6f7a8b9c101",
+                    "goal_id": "6741a2b3c4d5e6f7a8b9c0d1",
+                    "prospect_id": "6741a2b3c4d5e6f7a8b9c0e1",
+                    "sequence": 1,
+                    "channel": "email",
+                    "to": "laura@clinicasonrisa.com",
+                    "subject": "Reservas en línea",
+                    "body": "Hola Laura, vi que en Clínica Sonrisa las citas se piden por teléfono… — Ana López",
+                    "content_hash": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184",
+                    "checks": [],
+                    "attachments": [],
+                    "status": "draft",
+                    "attempt": 0,
+                    "updated_at": "2026-11-21T10:00:00Z"
+                  },
+                  "msg": "Attachment removed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Prospecting is off for this workspace, the account has no workspace, or the caller may not write this goal",
+            "x-error-codes": [
+              "module_disabled",
+              "prospecting_disabled",
+              "prospecting_forbidden"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Not found in your workspace",
+            "x-error-codes": [
+              "prospecting_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Already sent, changed meanwhile or archived goal",
+            "x-error-codes": [
+              "prospecting_stage_not_allowed",
+              "prospecting_message_changed",
+              "prospecting_goal_not_active"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error (neutral code)",
+            "x-error-codes": [
+              "prospecting_error"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
+        ]
+      },
+      "get": {
+        "tags": [
+          "Prospecting"
+        ],
+        "summary": "Get a link to a message's file",
+        "description": "Returns a short-lived link (5 minutes) to preview or download one file of touch `sequence`: images open in place, a PDF downloads. Open the link as is, without API headers. Any member of the workspace can read it; a key that is not on the message is a 404. **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. The workspace is always the caller's own. Writing is for the goal's owner or a workspace administrator.",
+        "operationId": "getProspectingMessageAttachment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "prospect_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Prospect id",
+              "title": "Prospect Id"
+            },
+            "description": "Prospect id"
+          },
+          {
+            "name": "sequence",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 3,
+              "minimum": 1,
+              "description": "Touch number (1 = first)",
+              "title": "Sequence"
+            },
+            "description": "Touch number (1 = first)"
+          },
+          {
+            "name": "attachment_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Attachment key, as returned in `attachments[].key`",
+              "title": "Attachment Key"
+            },
+            "description": "Attachment key, as returned in `attachments[].key`"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AttachmentDownloadResponse_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "url": "https://files.example/demo.gif?signature=example",
+                    "expires_in": 300
+                  },
+                  "msg": "Attachment link ready"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Prospecting is off for this workspace, the account has no workspace, or the caller may not write this goal",
+            "x-error-codes": [
+              "module_disabled",
+              "prospecting_disabled",
+              "prospecting_forbidden"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Not found in your workspace",
+            "x-error-codes": [
+              "prospecting_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "The sending channel is not connected",
+            "x-error-codes": [
+              "prospecting_channel_not_ready"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error (neutral code)",
+            "x-error-codes": [
+              "prospecting_error"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "503": {
+            "description": "The file is temporarily unavailable",
+            "x-error-codes": [
+              "prospecting_connection_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "200/minute"
         ]
       }
     },
@@ -80762,6 +81403,372 @@
             "description": "The issuing fee cannot be priced right now",
             "x-error-codes": [
               "COUPON_FEE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
+        ]
+      }
+    },
+    "/api/v1/coupons/stores/{slug}/coupons/{coupon_id}": {
+      "get": {
+        "tags": [
+          "Coupons"
+        ],
+        "summary": "One coupon of one of my stores",
+        "description": "A store that is not one of yours, or a coupon of another issuer (your own space included), answers 404.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. The issuer is always the caller's own space.",
+        "operationId": "getMyStoreCoupon",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Store slug",
+              "title": "Slug"
+            },
+            "description": "Store slug"
+          },
+          {
+            "name": "coupon_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Coupon id",
+              "title": "Coupon Id"
+            },
+            "description": "Coupon id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coupon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_CouponOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6740a1b2c3d4e5f600000001",
+                    "issuer": {
+                      "kind": "store",
+                      "store_slug": "aurum-labs"
+                    },
+                    "code": "AURUMWELCOME1010",
+                    "code_generated": false,
+                    "type": "percentage",
+                    "value_minor": 10,
+                    "currency": "GTQ",
+                    "max_uses": 1,
+                    "reserved_count": 0,
+                    "confirmed_count": 0,
+                    "status": "active",
+                    "fee_state": "none",
+                    "origin": "store_admin",
+                    "combinable_with_sales": false,
+                    "created_at": "2026-11-22T15:00:00Z",
+                    "updated_at": "2026-11-22T15:00:00Z"
+                  },
+                  "msg": "Coupon retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Coupons are off for this workspace, or the account has no workspace",
+            "x-error-codes": [
+              "module_disabled",
+              "COUPONS_DISABLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Not one of your stores, or no such coupon in it",
+            "x-error-codes": [
+              "COUPON_STORE_NOT_FOUND",
+              "COUPON_NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure (neutral code)",
+            "x-error-codes": [
+              "COUPON_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Coupons"
+        ],
+        "summary": "Edit a coupon of one of my stores",
+        "description": "Pause (`status: paused`), resume (`status: active`) or archive (`status: archived`, final) a coupon of your store, or edit it. Same rules as editing one of your own coupons: absent fields are untouched, whether it is single-use and whether it has a cap never change, an existing cap of 2 or more may only go up. A store that is not one of yours, or a coupon of another issuer, answers 404.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. The issuer is always the caller's own space.",
+        "operationId": "updateMyStoreCoupon",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Store slug",
+              "title": "Slug"
+            },
+            "description": "Store slug"
+          },
+          {
+            "name": "coupon_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Coupon id",
+              "title": "Coupon Id"
+            },
+            "description": "Coupon id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouponPatchRequest"
+              },
+              "example": {
+                "status": "paused",
+                "label": "Pausado por inventario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Coupon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_CouponOut_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6740a1b2c3d4e5f600000001",
+                    "issuer": {
+                      "kind": "store",
+                      "store_slug": "aurum-labs"
+                    },
+                    "code": "AURUMWELCOME1010",
+                    "code_generated": false,
+                    "type": "percentage",
+                    "value_minor": 10,
+                    "currency": "GTQ",
+                    "max_uses": 1,
+                    "reserved_count": 0,
+                    "confirmed_count": 0,
+                    "status": "paused",
+                    "fee_state": "none",
+                    "origin": "store_admin",
+                    "combinable_with_sales": false,
+                    "created_at": "2026-11-22T15:00:00Z",
+                    "updated_at": "2026-11-22T15:00:00Z"
+                  },
+                  "msg": "Coupon updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Coupons are off for this workspace, or the account has no workspace",
+            "x-error-codes": [
+              "module_disabled",
+              "COUPONS_DISABLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "Not one of your stores, or no such coupon in it",
+            "x-error-codes": [
+              "COUPON_STORE_NOT_FOUND",
+              "COUPON_NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "A rule of the coupon refuses the change",
+            "x-error-codes": [
+              "COUPON_VALIDATION"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure (neutral code)",
+            "x-error-codes": [
+              "COUPON_ERROR"
             ],
             "content": {
               "application/json": {
@@ -97299,7 +98306,7 @@
         "tags": [
           "Newsletter"
         ],
-        "summary": "Pre-check work titles for the fortnightly client news",
+        "summary": "Pre-check work titles for the weekly client news",
         "description": "Up to 100 already cleaned work titles (200 characters each). The answer lists the INDEXES of the titles that name another client or an external vendor, never the matched name, so the publisher can drop them before writing the edition. Nothing is stored.\n\nTwo calls a minute per credential: page the titles in batches of 100.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `newsletter.publish` and platform scope.",
         "operationId": "checkClientNewsTitles",
         "parameters": [
@@ -97461,8 +98468,8 @@
         "tags": [
           "Newsletter"
         ],
-        "summary": "Freeze one fortnightly client news edition",
-        "description": "The body is the edition, STRUCTURED and closed: an intro, one to five highlights and up to three improvements, all short single-line plain text. Links, the signature and the footer are built by the server.\n\nThe server checks every field: it refuses the name of another client or of an external vendor, internal references (an issue number, a version, a story code) and links or markup. A refusal is `422 client_news_content_rejected` with the INDEXES of the refused fields and the rule classes, never the matched text.\n\nOne edition per fortnight (`YYYY-Fnn`, two closed ISO weeks). The first valid content is frozen and answers `202` with `status: \"accepted\"`. Posting the same bytes again answers `202` with the frozen state; different content answers `409` with the frozen `payload`, which the publisher adopts. Both re-check the frozen edition: if it no longer passes, it is held and `status` is `blocked`.\n\nThis call never sends mail: when the mail is switched on, the server delivers the edition later.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `newsletter.publish` and platform scope.",
+        "summary": "Freeze one weekly client news edition",
+        "description": "The body is the edition, STRUCTURED and closed: an intro, one to five highlights and up to three improvements, all short single-line plain text. Links, the signature and the footer are built by the server.\n\nThe server checks every field: it refuses the name of another client or of an external vendor, internal references (an issue number, a version, a story code) and links or markup. A refusal is `422 client_news_content_rejected` with the INDEXES of the refused fields and the rule classes, never the matched text.\n\nOne edition per week (`YYYY-Wnn`, one closed ISO week; the legacy fortnight `YYYY-Fnn` is still accepted). The first valid content is frozen and answers `202` with `status: \"accepted\"`. Posting the same bytes again answers `202` with the frozen state; different content answers `409` with the frozen `payload`, which the publisher adopts. Both re-check the frozen edition: if it no longer passes, it is held and `status` is `blocked`.\n\nThis call never sends mail: when the mail is switched on, the server delivers the edition later.\n\n**Auth:** `Authorization: Bearer SERVICE_API_KEY_EXAMPLE` with capability `newsletter.publish` and platform scope.",
         "operationId": "publishClientNewsIssue",
         "parameters": [
           {
@@ -97492,12 +98499,12 @@
                 "$ref": "#/components/schemas/ClientNewsIssueRequest"
               },
               "example": {
-                "issue_id": "2026-F23",
+                "issue_id": "2026-W48",
                 "period": {
-                  "start": "2026-11-02",
-                  "end": "2026-11-15"
+                  "start": "2026-11-23",
+                  "end": "2026-11-29"
                 },
-                "intro": "Estas dos semanas sumamos formas nuevas de organizar el trabajo de tu equipo.",
+                "intro": "Esta semana sumamos formas nuevas de organizar el trabajo de tu equipo.",
                 "highlights": [
                   {
                     "title": "Comentarios en las tareas",
@@ -97522,18 +98529,18 @@
                 "example": {
                   "success": true,
                   "data": {
-                    "issue_id": "2026-F23",
+                    "issue_id": "2026-W48",
                     "status": "accepted",
                     "recipients_total": 0,
                     "delivered": 0,
                     "email_sent": false,
                     "payload": {
-                      "issue_id": "2026-F23",
+                      "issue_id": "2026-W48",
                       "period": {
-                        "start": "2026-11-02",
-                        "end": "2026-11-15"
+                        "start": "2026-11-23",
+                        "end": "2026-11-29"
                       },
-                      "intro": "Estas dos semanas sumamos formas nuevas de organizar el trabajo de tu equipo.",
+                      "intro": "Esta semana sumamos formas nuevas de organizar el trabajo de tu equipo.",
                       "highlights": [
                         {
                           "title": "Comentarios en las tareas",
@@ -97605,7 +98612,7 @@
             "x-error-code-location": "root"
           },
           "409": {
-            "description": "The fortnight was already submitted with different content; `data.payload` is the frozen edition",
+            "description": "The edition was already submitted with different content; `data.payload` is the frozen edition",
             "x-error-codes": [
               "client_news_issue_conflict"
             ],
@@ -97615,12 +98622,12 @@
                   "success": false,
                   "data": {
                     "payload": {
-                      "issue_id": "2026-F23",
+                      "issue_id": "2026-W48",
                       "period": {
-                        "start": "2026-11-02",
-                        "end": "2026-11-15"
+                        "start": "2026-11-23",
+                        "end": "2026-11-29"
                       },
-                      "intro": "Estas dos semanas sumamos formas nuevas de organizar el trabajo de tu equipo.",
+                      "intro": "Esta semana sumamos formas nuevas de organizar el trabajo de tu equipo.",
                       "highlights": [
                         {
                           "title": "Comentarios en las tareas",
@@ -97635,7 +98642,7 @@
                     },
                     "status": "accepted"
                   },
-                  "msg": "This fortnight's edition was already submitted with different content",
+                  "msg": "This edition was already submitted with different content",
                   "code": "client_news_issue_conflict"
                 },
                 "schema": {
@@ -97646,7 +98653,7 @@
             "x-error-code-location": "root"
           },
           "422": {
-            "description": "Some fields cannot be published (`data.rejected` has their indexes), or the fortnight is malformed, has a different period or has not closed yet",
+            "description": "Some fields cannot be published (`data.rejected` has their indexes), or the edition is malformed, has a different period or has not closed yet",
             "x-error-codes": [
               "client_news_content_rejected",
               "client_news_period_invalid"
@@ -97675,10 +98682,10 @@
                     }
                   },
                   "period": {
-                    "summary": "The fortnight is malformed, its period differs, or it has not closed",
+                    "summary": "The edition is malformed, its period differs, or it has not closed",
                     "value": {
                       "success": false,
-                      "msg": "The edition must be a closed fortnight with its exact period",
+                      "msg": "The edition must be a closed week with its exact period",
                       "code": "client_news_period_invalid"
                     }
                   }
@@ -129197,7 +130204,7 @@
           "Platform Admin"
         ],
         "summary": "Read the client news configuration (staff)",
-        "description": "The platform `client_news` values: whether the fortnightly client mail is on, its signature, the extra names an edition may never mention, the product terms removed from that list and the workspaces whose people do not receive it.\n\nThe workspace never sees nor writes this namespace.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "description": "The platform `client_news` values: whether the weekly client mail is on, its signature, the extra names an edition may never mention, the product terms removed from that list and the workspaces whose people do not receive it.\n\nThe workspace never sees nor writes this namespace.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
         "operationId": "getPlatformClientNewsConfig",
         "security": [
           {
@@ -129301,7 +130308,7 @@
           "Platform Admin"
         ],
         "summary": "Write the client news configuration (staff)",
-        "description": "Writes keys of the platform `client_news` namespace. **Partial and per key**: only what is sent changes; a list replaces the stored list. `null` is not accepted.\n\n`email_enabled: true` turns the fortnightly client mail on: the server mails the edition in force within its window without the publisher doing anything. A change to `denylist` or `allow_terms` applies to the next content check in this worker at once, and in the others with the platform-config refresh. Every write leaves an audit row naming the written keys.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "description": "Writes keys of the platform `client_news` namespace. **Partial and per key**: only what is sent changes; a list replaces the stored list. `null` is not accepted.\n\n`email_enabled: true` turns the weekly client mail on: the server mails the edition in force within its window without the publisher doing anything. A change to `denylist` or `allow_terms` applies to the next content check in this worker at once, and in the others with the platform-config refresh. Every write leaves an audit row naming the written keys.\n\n**Full console access only.**\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
         "operationId": "setPlatformClientNewsConfig",
         "security": [
           {
@@ -194263,6 +195270,58 @@
         "title": "AtlasAgentArmView",
         "description": "The one answer an operator needed a ``psql`` session for."
       },
+      "AttachmentDownloadResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Short-lived link to the file. Images open in place; a PDF downloads"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In",
+            "description": "Seconds the link stays valid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "expires_in"
+        ],
+        "title": "AttachmentDownloadResponse"
+      },
+      "AttachmentResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Attachment key: use it to preview, download or remove the file"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "File name as it goes out"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "Size in bytes"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "description": "`image/gif`, `image/png`, `image/jpeg`, `image/webp` or `application/pdf`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "filename",
+          "size",
+          "content_type"
+        ],
+        "title": "AttachmentResponse"
+      },
       "AttentionItem": {
         "properties": {
           "kind": {
@@ -196495,6 +197554,21 @@
           "file"
         ],
         "title": "Body_uploadPlatformSiteLogo"
+      },
+      "Body_uploadProspectingMessageAttachment": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "The file to attach"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_uploadProspectingMessageAttachment"
       },
       "Body_uploadSocialMedia": {
         "properties": {
@@ -198869,7 +199943,7 @@
           "code": {
             "type": "string",
             "title": "Code",
-            "description": "Rule broken (`unfilled_field`, `too_long`, `banned_term`, `price`, `signature_missing`, `optout_line_missing`, `link_not_allowed`, `booking_link_unavailable`)"
+            "description": "Rule broken (`unfilled_field`, `too_long`, `banned_term`, `price`, `signature_missing`, `optout_line_missing`, `link_not_allowed`, `booking_link_unavailable`, `attachment_not_allowed`, `attachment_type`, `attachment_too_large`, `attachment_limit`)"
           },
           "detail": {
             "anyOf": [
@@ -199405,9 +200479,9 @@
         "properties": {
           "issue_id": {
             "type": "string",
-            "pattern": "^\\d{4}-F\\d{2}$",
+            "pattern": "^\\d{4}-[FW]\\d{2}$",
             "title": "Issue Id",
-            "description": "Fortnight of the edition, `YYYY-Fnn` with `nn = ceil(iso_week / 2)` (e.g. `2026-F23`). In a year with 53 ISO weeks, `F27` covers week 53 alone."
+            "description": "ISO week of the edition, `YYYY-Wnn` (e.g. `2026-W48`). The legacy fortnight form `YYYY-Fnn` (`nn = ceil(iso_week / 2)`; `F27` covers week 53 alone) is still accepted."
           },
           "period": {
             "$ref": "#/components/schemas/ClientNewsPeriod",
@@ -199449,7 +200523,7 @@
           "highlights"
         ],
         "title": "ClientNewsIssueRequest",
-        "description": "One fortnightly client edition (D-5). The agent posts the same bytes on every retry."
+        "description": "One weekly client edition (D-5). The agent posts the same bytes on every retry."
       },
       "ClientNewsPeriod": {
         "properties": {
@@ -199457,13 +200531,13 @@
             "type": "string",
             "format": "date",
             "title": "Start",
-            "description": "Monday of the fortnight's first ISO week (inclusive)."
+            "description": "Monday of the edition's first ISO week (inclusive)."
           },
           "end": {
             "type": "string",
             "format": "date",
             "title": "End",
-            "description": "Sunday of the fortnight's last ISO week (inclusive)."
+            "description": "Sunday of the edition's last ISO week (inclusive)."
           }
         },
         "additionalProperties": false,
@@ -219150,6 +220224,14 @@
             "type": "array",
             "title": "Checks",
             "description": "Rules broken; a message with checks cannot be approved"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentResponse"
+            },
+            "type": "array",
+            "title": "Attachments",
+            "description": "Files sent with the message (email only, at most 3)"
           },
           "status": {
             "type": "string",
@@ -243586,6 +244668,38 @@
           "msg"
         ],
         "title": "SuccessResponse[AtlasAgentArmView]"
+      },
+      "SuccessResponse_AttachmentDownloadResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AttachmentDownloadResponse",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[AttachmentDownloadResponse]"
       },
       "SuccessResponse_AutoInvoiceItem_": {
         "properties": {

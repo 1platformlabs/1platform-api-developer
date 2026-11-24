@@ -1,0 +1,81 @@
+---
+title: Cupones
+description: Cree cupones de descuento porcentuales o de monto fijo, emita lotes de códigos únicos y compruebe qué descontaría un código, para su espacio de trabajo y sus tiendas.
+sidebar_position: 1
+---
+
+import PromptParaAgente from '@site/src/components/PromptParaAgente';
+
+# Cupones
+
+<p className="lead">Un cupón es un código que descuenta un porcentaje o un monto fijo de una compra, con vigencia, topes de uso y un mínimo de compra. Usted los emite desde su espacio de trabajo, los edita, los pausa o los archiva, y puede comprobar qué descontaría un código antes de aplicarlo.</p>
+
+<PromptParaAgente slug="cupones" />
+
+## Disponibilidad
+
+Cupones se habilita por espacio de trabajo. Si está apagado, o la cuenta no pertenece a un espacio de trabajo, todas las operaciones responden `403` con `module_disabled` o `COUPONS_DISABLED`. El emisor de cada cupón es siempre su propio espacio: un cupón de otro emisor responde `404`.
+
+## Cómo funciona
+
+1. Cree un cupón (`POST /coupons`) con su **tipo** (`percentage` o `fixed_amount`), el valor en unidades menores (`value_minor`: un porcentaje entero de 1 a 100, o el monto en centavos) y la moneda. Todo lo demás es opcional: vigencia (`starts_at`, `ends_at`), mínimo de compra (`min_subtotal_minor`), topes (`max_uses` y `max_uses_per_customer`) y si se combina con una oferta vigente (`combinable_with_sales`).
+2. Si omite `code`, el servidor genera uno de 12 caracteres. Si lo elige, se normaliza a mayúsculas sin espacios ni guiones y debe tener entre 6 y 32 caracteres de A a Z y de 0 a 9. Un código es único por emisor: repetirlo responde `409` `COUPON_CODE_EXISTS`.
+3. `max_uses: 1` es un cupón de **un solo uso**; sin `max_uses` es abierto. Que sea de un solo uso, y si tiene tope, no se pueden cambiar después; un tope de 2 o más sólo puede subir.
+4. Consulte sus cupones con `GET /coupons` (más recientes primero, con cursor; filtros `status`, `batch` y `q`) y uno con `GET /coupons/{coupon_id}`. Cada cupón informa cuántos usos están reservados y cuántos confirmados.
+5. Edite con `PATCH /coupons/{coupon_id}`: los campos que no envía no cambian. El estado `status` pasa entre `active` y `paused`, y `archived` es **final**. Pausar o archivar es la forma de retirar un cupón: no se borra.
+6. Antes de aplicar un código a una compra, **compruebe** qué descontaría con `POST /coupons/redemptions/validate`. La comprobación no reserva ni consume nada. El mínimo de compra se mide sobre `subtotal_minor` y el monto sobre `discountable_minor`, si lo envía. Envíe `customer_ref`, su referencia estable del cliente, para que el tope por cliente se evalúe.
+
+## Qué necesita {#qué-necesitas}
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido): `Authorization: Bearer ak-…` y `x-user-token: sk-…`.
+- Cupones habilitado en su espacio de trabajo; si no, `403`.
+- La moneda es obligatoria al emitir desde un espacio de trabajo.
+
+## Lotes de códigos únicos {#lotes}
+
+Para repartir códigos individuales (una campaña, un regalo por persona), `POST /coupons/batches` emite hasta **500** códigos generados en una sola transacción, con un prefijo opcional de hasta 8 caracteres. Cada código nace de un solo uso salvo que indique `max_uses`.
+
+- La cabecera `Idempotency-Key` es **obligatoria** en los lotes: repetir la solicitud con la misma clave devuelve el mismo lote, y la misma clave con otro cuerpo responde `409` `COUPON_IDEMPOTENCY_KEY_REUSED`. En un cupón individual la cabecera es opcional y protege igual el reintento.
+- `GET /coupons/export?batch=…` descarga un lote como CSV: una fila por código, con su valor, moneda, tipo, vigencia, estado y usos confirmados.
+- Para encontrar los códigos de un lote use `GET /coupons?batch=…`.
+
+## Cupones de sus tiendas {#tiendas}
+
+Si su espacio de trabajo tiene tiendas en línea, sus cupones se administran por tienda:
+
+- `GET /coupons/stores` lista sus tiendas habilitadas para cupones.
+- `GET /coupons/stores/{slug}` y `POST /coupons/stores/{slug}` listan y crean cupones de una tienda. Nacen en la moneda de la tienda salvo que indique otra.
+- Una tienda puede cobrar una tarifa por emitir un cupón de un solo uso. En ese caso el alta lo cobra al instante (primero de su crédito en la moneda de la tienda, si no del saldo) y, mientras el cobro no se confirme, el cupón queda en `fee_state` `pending_fee`: no se puede canjear hasta que se confirme.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `POST /coupons` · `GET /coupons` | Crear y listar cupones |
+| `GET /coupons/{coupon_id}` · `PATCH /coupons/{coupon_id}` | Consultar y editar un cupón; el estado lo pausa, lo reactiva o lo archiva |
+| `POST /coupons/batches` | Emitir hasta 500 códigos únicos (exige `Idempotency-Key`) |
+| `GET /coupons/export` | Exportar un lote como CSV |
+| `POST /coupons/redemptions/validate` | Comprobar qué descontaría un código, sin efecto |
+| `GET /coupons/stores` | Listar sus tiendas con cupones |
+| `GET /coupons/stores/{slug}` · `POST /coupons/stores/{slug}` | Listar y crear cupones de una tienda |
+
+Todas las operaciones: [Referencia de API → Coupons](/api-reference/1platform-api#tag/coupons).
+
+## Errores
+
+Los errores llegan como `{"success": false, "data": {"code": "..."}, "msg": "..."}`. Los códigos de abajo no son exhaustivos: la referencia lista los de cada operación.
+
+| Código | Estado | Significa |
+|---|---|---|
+| `module_disabled` · `COUPONS_DISABLED` | 403 | Cupones está apagado en su espacio de trabajo, o la cuenta no tiene uno |
+| `COUPON_NOT_FOUND` | 404 | El código o el cupón no existe en su espacio de trabajo |
+| `COUPON_CODE_EXISTS` | 409 | Ya tiene un cupón con ese código |
+| `COUPON_IDEMPOTENCY_KEY_REUSED` | 409 | La misma `Idempotency-Key` llegó con otro cuerpo |
+| `COUPON_VALIDATION` | 422 | Una regla del cupón rechaza el cambio |
+| `COUPON_INVALID` | 422 | El código no aplica ahora; `reason` indica por qué: vencido, pausado, aún sin empezar, bajo el mínimo, otra moneda o pendiente de cobro |
+| `COUPON_EXHAUSTED` | 409 | Se acabaron los usos del cupón o los del cliente |
+| `COUPON_NOT_COMBINABLE` | 409 | El cupón no se combina con una oferta vigente |
+
+## Con el servidor MCP
+
+El toolset `cupones` lista, consulta y exporta cupones, lista sus tiendas, **crea** un cupón y lo **edita** (pausar, reactivar o archivar). Quedan fuera del MCP la emisión de lotes, el alta de un cupón de tienda (puede cobrar una tarifa) y el canje: impleméntelos por REST.

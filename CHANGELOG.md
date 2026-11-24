@@ -2,6 +2,11 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Cupones
+
+- Nueva sección «Cupones»: crear cupones porcentuales o de monto fijo, listarlos, editarlos (pausar, reactivar, archivar), emitir lotes de hasta 500 códigos únicos con `Idempotency-Key`, exportarlos en CSV, comprobar qué descontaría un código sin efecto y administrar los cupones de sus tiendas. Incluye prompt y skill `cupones`, y el toolset `cupones` del servidor MCP.
+- El canje de saldo y el protocolo de reserva y confirmación de las tiendas no se documentan aquí: son de la plataforma.
+
 ## [Unreleased] — Contenido con la marca One Platform
 
 - Las guías, referencias, prompts, skills y `llms.txt` dicen «One Platform» y «One Platform API». Se conservan «1Platform Labs» (razón social), las cabeceras `X-1Platform-*`, los dominios, las rutas, los nombres de skill y el spec versionado.

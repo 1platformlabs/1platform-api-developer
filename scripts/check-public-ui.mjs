@@ -39,7 +39,7 @@ const BOOT_JS_BUDGET = 180 * 1024;
 // own doc chunk: 489,761 gzip bytes (main 484,088 with the same PROD OpenAPI).
 // Raised to 480 KiB by owner decision.
 // This content allowance does not raise the boot or CSS budgets.
-const TOTAL_JS_BUDGET = 480 * 1024;
+const TOTAL_JS_BUDGET = 500 * 1024; // 480→500 KiB por decisión del dueño (2026-11-24, cupones-motor-core): el total suma el JS de cada página de docs
 const CSS_BUDGET = 25 * 1024;
 
 const SNAPSHOT_REQUIREMENTS = [

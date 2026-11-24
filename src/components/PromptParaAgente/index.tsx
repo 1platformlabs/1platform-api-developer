@@ -3,11 +3,12 @@ import {lazy, Suspense, type ReactNode} from 'react';
 import styles from './styles.module.css';
 
 /**
- * The MDX pages import THIS stub, not the implementation. Six pages use the
- * block; imported directly, webpack inlined the component and the whole icon
+ * The MDX pages import THIS stub, not the implementation. Imported directly,
+ * webpack inlined the component and the whole icon
  * registry into each of their chunks (measured +16.8 KiB gzip over the
  * 470 KiB total). Behind `lazy()` the implementation is one shared chunk,
- * fetched only on a page that shows the block.
+ * fetched only on a page that shows the block. The shared-components plugin
+ * also shares this wrapper instead of copying it into every MDX chunk.
  *
  * The fallback is what the server renders and what a reader without JavaScript
  * keeps: the title, a disabled Copy and the link to the raw file.

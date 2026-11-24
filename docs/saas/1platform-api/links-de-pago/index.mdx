@@ -80,3 +80,19 @@ Para ver cuánto cobró por moneda, con lo pendiente y lo devuelto por separado,
 
 - Para cobrar de forma recurrente con un link de invitación, vea a [Suscripciones](/docs/saas/1platform-api/suscripciones).
 - Para transferir lo cobrado, vea a [Retiros](/docs/saas/1platform-api/retiros).
+
+
+## Reenviar un link {#reenviar}
+
+En las versiones que incluyen `resendPaymentLink`, puede solicitar otro correo al destinatario que ya tiene el link mediante `POST /businesses/{businessId}/payment-links/{linkId}/resend`. Requiere los dos tokens y el mismo permiso de escritura que cancelar: administrador del espacio o rol de administrador/cajero en el comercio. No está disponible durante una sesión de impersonación ni a través de MCP.
+
+El link debe estar activo, sin vencer y tener `customer_email`. El envío de links por correo debe seguir habilitado. La respuesta `202` con `queued: true` acepta la solicitud; no confirma entrega. El límite es de tres intentos por link y día UTC, compartido entre solicitudes concurrentes. Un envío fallido también consume un intento.
+
+| HTTP y código | Qué hacer |
+|---|---|
+| `409 payment_link_no_customer_email` | El link no tiene destinatario; comparta su URL por el canal que corresponda |
+| `409 payment_link_not_resendable` | Consulte su estado. Si venció, cree otro link con una vigencia nueva |
+| `409 payment_link_email_disabled` | El espacio tiene desactivado el envío de links por correo |
+| `429 payment_link_resend_limited` | Espere los segundos indicados en `Retry-After` |
+
+Las respuestas de lista y detalle incluyen `has_customer_email`, `can_resend` y `visit_status`, sin exponer el correo. `can_resend` orienta la interfaz según los permisos actuales; la operación vuelve a validar estado y permisos al solicitar el reenvío. Consulte [Visitas y seguimiento](/docs/saas/1platform-api/analitica/datos-del-espacio#visitas-y-seguimiento) para interpretar las visitas sin confundirlas con aperturas de correo.

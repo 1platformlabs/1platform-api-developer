@@ -27,7 +27,7 @@ Requiere la skill `1platform-hub`. Ventas lo habilita el equipo de la plataforma
    manual (`PATCH /api/v1/sales/leads/{leadId}/control`): sólo con confirmación del desarrollador.
 5. `GET /api/v1/sales/report` para el embudo, las ventas cerradas y su costo.
 
-Con el servidor MCP (toolset `ventas`): preparación, canales, ofertas, prospectos, tablero y reporte, sólo lectura. El
+Con el servidor MCP (toolset `sales`): preparación, canales, ofertas, prospectos, tablero y reporte, sólo lectura. El
 MCP no escribe a prospectos ni crea cobros de reserva.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/ventas.md

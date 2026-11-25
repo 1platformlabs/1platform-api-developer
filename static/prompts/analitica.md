@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/analitica` y las skills `/skills/1platform-h
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `analitica` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `analytics` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -34,7 +34,7 @@ Use la skill `1platform-hub`. Sin el módulo de sitios web (o de mapas de calor)
    `GET /api/v1/users/heatmap/sites/{site_id}/pages` y `GET /api/v1/users/heatmap/sites/{site_id}/maps/{kind}` leen
    los resultados.
 
-Con el servidor MCP (toolset `analitica`): estado y métricas, ingresos y alertas de anuncios, sitios y páginas de mapas
+Con el servidor MCP (toolset `analytics`): estado y métricas, ingresos y alertas de anuncios, sitios y páginas de mapas
 de calor. Autorizar, crear la propiedad y registrar sitios se hace por la API.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/analitica.md

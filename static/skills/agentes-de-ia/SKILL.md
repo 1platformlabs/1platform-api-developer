@@ -29,7 +29,7 @@ Requiere la skill `1platform-hub`. Sin el módulo de agentes, las operaciones re
 5. Las decisiones humanas: `GET /api/v1/agent-actions` y, con la decisión tomada,
    `PATCH /api/v1/agent-actions/{action_id}/consume`.
 
-Con el servidor MCP (toolset `agentes`): leer agentes, catálogo, herramientas, presupuesto, ejecuciones y acciones, y
+Con el servidor MCP (toolset `agents`): leer agentes, catálogo, herramientas, presupuesto, ejecuciones y acciones, y
 detener una ejecución. Instalar, disparar y resolver acciones se hace por la API.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/agentes-de-ia.md

@@ -28,7 +28,7 @@ Requiere la skill `1platform-hub`. Retiros viene apagado: sin él, `403` `CASH_O
    `CASH_OUT_SESSION_REQUIRED`. Pedir un retiro mueve dinero: sólo con confirmación de la persona, y con el mismo
    `idempotency_key` al reintentar.
 
-Con el servidor MCP (toolset `retiros`): saldo retirable, movimientos, retiros y cobros que pueden pasar al saldo
+Con el servidor MCP (toolset `payouts`): saldo retirable, movimientos, retiros y cobros que pueden pasar al saldo
 retirable, sólo lectura. El MCP no pide retiros ni registra métodos.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/retiros.md

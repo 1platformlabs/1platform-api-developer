@@ -30,4 +30,4 @@ Requiere las skills `1platform-hub` y `webhooks`.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/pagos-en-linea/cobrar-y-conciliar.md
 
-El toolset `pagos` consulta transacciones; no crea cobros ni reembolsa. Esas operaciones se implementan por REST.
+El toolset `payments` consulta transacciones; no crea cobros ni reembolsa. Esas operaciones se implementan por REST.

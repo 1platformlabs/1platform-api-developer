@@ -30,6 +30,6 @@ documentada no acreditan campañas operativas. Compruebe la habilitación del es
 6. Cerrar con `POST /api/v1/ads/campaigns/{campaign_id}/close` inicia la liquidación; no prometa devolución inmediata.
 
 El MCP no expone herramientas de gestión de campañas. Use sus herramientas de documentación para implementar
-el cliente REST; el toolset `analitica` consulta métricas e ingresos de sitios y no sustituye esta integración.
+el cliente REST; el toolset `analytics` consulta métricas e ingresos de sitios y no sustituye esta integración.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/publicidad.md

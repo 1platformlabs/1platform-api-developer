@@ -29,4 +29,4 @@ Requiere la skill `1platform-hub`.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/sitios-web-y-contenido.md
 
-El toolset `sitios` sólo consulta sitios y contenido; no registra sitios ni ejecuta generación.
+El toolset `sites` sólo consulta sitios y contenido; no registra sitios ni ejecuta generación.

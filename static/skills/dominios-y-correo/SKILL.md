@@ -27,7 +27,7 @@ Requiere la skill `1platform-hub`. Sin los módulos de Dominios y Correo, la res
    `GET /api/v1/mail/threads/{thread_id}` leen las conversaciones. Iniciar o responder envía correo real y exige
    `Idempotency-Key`: sólo con confirmación del desarrollador.
 
-Con el servidor MCP (toolset `dominios` y `correo`): dominios, disponibilidad, precios, transferencias, registros de
+Con el servidor MCP (toolsets `domains` y `email`): dominios, disponibilidad, precios, transferencias, registros de
 correo y conversaciones, sólo lectura. Registrar, renovar, cambiar DNS y enviar correo se hace por la API.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/dominios-y-correo.md

@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/facturacion-electronica` y las skills `/skil
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `facturacion` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `invoicing` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -34,4 +34,4 @@ Implemente la emisión de facturas electrónicas FEL de Guatemala a nombre de un
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/facturacion-electronica/emitir-una-factura.md
 
-El toolset `facturacion` sólo consulta facturas; no emite ni anula documentos fiscales.
+El toolset `invoicing` sólo consulta facturas; no emite ni anula documentos fiscales.

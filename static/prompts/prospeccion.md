@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/prospeccion` y las skills `/skills/1platform
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `prospeccion` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `prospecting` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -32,7 +32,7 @@ plataforma; apagada, `403` con `data.code` `prospecting_disabled`.
    tercero real, sólo con confirmación del desarrollador y con el objetivo en modo real.
 6. Un `409` trae `data.code`; los topes diarios son `prospecting_daily_cap`, no `429`.
 
-Con el servidor MCP (toolset `prospeccion`): objetivos, preparación, embudo, métricas y prospectos sin datos de
+Con el servidor MCP (toolset `prospecting`): objetivos, preparación, embudo, métricas y prospectos sin datos de
 contacto; alta e importación de prospectos. El MCP no aprueba, envía, marca enviado, cambia el modo, traspasa,
 excluye empresas ni lee datos de contacto.
 

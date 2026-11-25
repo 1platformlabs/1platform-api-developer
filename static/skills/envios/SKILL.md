@@ -36,4 +36,4 @@ Requiere la skill `1platform-hub`. El código de error de Envíos viaja en `data
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/envios.md
 
-El toolset `envios` sólo consulta envíos; registrar, cotizar y despachar se implementa por REST.
+El toolset `shipping` sólo consulta envíos; registrar, cotizar y despachar se implementa por REST.

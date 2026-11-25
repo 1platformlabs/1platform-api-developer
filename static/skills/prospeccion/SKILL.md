@@ -29,7 +29,7 @@ plataforma; apagada, `403` con `data.code` `prospecting_disabled`.
    tercero real, sólo con confirmación del desarrollador y con el objetivo en modo real.
 6. Un `409` trae `data.code`; los topes diarios son `prospecting_daily_cap`, no `429`.
 
-Con el servidor MCP (toolset `prospeccion`): objetivos, preparación, embudo, métricas y prospectos sin datos de
+Con el servidor MCP (toolset `prospecting`): objetivos, preparación, embudo, métricas y prospectos sin datos de
 contacto; alta e importación de prospectos. El MCP no aprueba, envía, marca enviado, cambia el modo, traspasa,
 excluye empresas ni lee datos de contacto.
 

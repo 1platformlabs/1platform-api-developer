@@ -31,4 +31,4 @@ Requiere la skill `1platform-hub` (tokens, entornos y errores).
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/links-de-pago.md
 
-El toolset `pagos` permite leer, crear y cancelar links; crear mediante MCP omite `customer_email` y no envía el enlace por correo.
+El toolset `payments` permite leer, crear y cancelar links; crear mediante MCP omite `customer_email` y no envía el enlace por correo.

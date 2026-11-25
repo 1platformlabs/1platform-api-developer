@@ -28,6 +28,6 @@ Requiere la skill `1platform-hub`. El servicio viene apagado: mientras no esté 
 4. `GET /api/v1/transactional-email/messages/{message_id}` para el estado y los intentos, y
    `GET /api/v1/transactional-email/messages` para el historial.
 
-Con el servidor MCP (toolset `correo`): remitentes, plantillas, cupos y mensajes. El MCP no envía correos.
+Con el servidor MCP (toolset `email`): remitentes, plantillas, cupos y mensajes. El MCP no envía correos.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/correo-transaccional.md

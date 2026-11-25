@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/suscripciones` y las skills `/skills/1platfo
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `suscripciones` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `subscriptions` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -32,7 +32,7 @@ responden `503` `subscriptions_disabled`. Las renovaciones se cobran automática
 5. `GET /api/v1/businesses/{businessId}/subscriptions` y
    `GET /api/v1/businesses/{businessId}/subscriptions/{subscriptionId}` para lo vendido.
 
-Con el servidor MCP (toolset `suscripciones`): leer planes, suscripciones y clientes; crear, editar, publicar y
+Con el servidor MCP (toolset `subscriptions`): leer planes, suscripciones y clientes; crear, editar, publicar y
 archivar planes, crear y editar clientes, emitir una invitación y cancelar una suscripción.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/suscripciones.md

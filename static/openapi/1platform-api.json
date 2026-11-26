@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.185.0"
+    "version": "PRODv5.189.0"
   },
   "servers": [
     {
@@ -6761,7 +6761,7 @@
           "AI Generators"
         ],
         "summary": "Generate AI images",
-        "description": "Generate images using a configurable AI provider.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Each image is generated individually; partial results are returned if some attempts fail\n- Image metadata is persisted for each generation\n- Requires an active App with AI provider configured",
+        "description": "Generate images using a configurable AI provider.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`\n- **Rate limit:** 20 req/min\n- Each image is generated individually; partial results are returned if some attempts fail\n- Each image is kept in the user's library (`GET /users/generations/images`); `images[].id` opens it again later\n- Requires an active App with AI provider configured",
         "operationId": "generateImages",
         "security": [
           {
@@ -6814,11 +6814,12 @@
                   "success": true,
                   "data": {
                     "total": 2,
-                    "provider": "default",
+                    "provider": "1platform",
                     "images": [
                       {
                         "url": "https://cdn.example.com/img1.png",
-                        "prompt": "Professional headshot..."
+                        "prompt": "Professional headshot...",
+                        "id": "6733aa000000000000000a01"
                       }
                     ]
                   },
@@ -6894,6 +6895,141 @@
         },
         "x-rate-limit": [
           "20/minute"
+        ]
+      },
+      "get": {
+        "tags": [
+          "AI Generators"
+        ],
+        "summary": "Your library of generated images",
+        "description": "The images you generated with AI (from the panel, an integration or an agent working for you), newest first, page of up to 50. Each item carries a thumbnail link valid for 300 s.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listGeneratedImages",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "description": "Offset",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Library",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6733aa000000000000000a01",
+                        "context": "Portada para un artículo sobre péptidos",
+                        "content_type": "image/png",
+                        "bytes": 1543210,
+                        "preview_url": "https://files.example/generated-images/6733aa.png?signature=abc",
+                        "created_at": "2026-11-12T15:00:00Z"
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "msg": "Images retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
         ]
       }
     },
@@ -10685,6 +10821,158 @@
         },
         "x-rate-limit": [
           "40/minute"
+        ]
+      }
+    },
+    "/api/v1/users/generations/images/{image_id}/url": {
+      "get": {
+        "tags": [
+          "AI Generators"
+        ],
+        "summary": "Signed link to view or download a generated image",
+        "description": "300 s link; `disposition=attachment` downloads it as `imagen-<id>.<ext>`.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "getGeneratedImageUrl",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Image id, as returned by the library or by the generation",
+              "title": "Image Id"
+            },
+            "description": "Image id, as returned by the library or by the generation"
+          },
+          {
+            "name": "disposition",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(inline|attachment)$",
+              "description": "inline (view) or attachment (download)",
+              "default": "inline",
+              "title": "Disposition"
+            },
+            "description": "inline (view) or attachment (download)"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "success": true,
+                  "data": {
+                    "url": "https://files.example/p.png",
+                    "expires_in": 300
+                  },
+                  "msg": "Link created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This module is not available to the caller — switched off for the workspace, or not granted to this account (`data.code`).",
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Not found",
+            "x-error-codes": [
+              "generated_image_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Images cannot be signed right now",
+            "x-error-codes": [
+              "generated_image_storage_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "240/minute"
         ]
       }
     },
@@ -56927,7 +57215,7 @@
           "Social"
         ],
         "summary": "Social media configuration for the caller's workspace",
-        "description": "Whether the vertical is on for the caller's workspace, which networks are available to it, whether posts need approval, the workspace time zone, the caller's role (`is_admin`, `is_approver`) and the current price of one published post in the currency of the caller's balance. `price.amount` is `null` when no price is configured. The price charged is the one in force when the network confirms the post (`note: price_at_publish`). `price.by_network.x` is the per-post price of the microblogging network, which depends on whether the text carries a link (`amount` / `amount_with_link`); it is the price with the platform's client (a workspace with its own client is charged less). `null` there means that network is not priced. `article_drafts_enabled` says whether a draft can be generated from an agent's store article (`POST /social/posts/from-store-article`).\n\nReadable with the vertical switched off (it then says `enabled: false`).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. Rate limit: 240/minute.",
+        "description": "Whether the vertical is on for the caller's workspace, which networks are available to it, whether posts need approval, the workspace time zone, the caller's role (`is_admin`, `is_approver`) and the current price of one published post in the currency of the caller's balance. `price.amount` is `null` when no price is configured. The price charged is the one in force when the network confirms the post (`note: price_at_publish`). `price.by_network.x` is the per-post price of the microblogging network, which depends on whether the text carries a link (`amount` / `amount_with_link`); it is the price with the platform's client (a workspace with its own client is charged less). `null` there means that network is not priced. `article_drafts_enabled` says whether a draft can be generated from an agent's store article (`POST /social/posts/from-store-article`). `formats_enabled` says whether Reels and Stories can be chosen on the photo-and-video and the pages networks (`network_options.instagram|facebook.format`), and `format_rules` is the table a Reel or Story is validated against, per network and format: `media` (`one_video` = exactly one video, `one_media` = exactly one image or one video), `min_seconds`/`max_seconds` (only for a video whose duration is known) and `max_bytes` (videos only).\n\nReadable with the vertical switched off (it then says `enabled: false`).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. Rate limit: 240/minute.",
         "operationId": "getSocialConfig",
         "security": [
           {
@@ -56992,7 +57280,38 @@
                       "owner_user_id": "6710aa000000000000000b01",
                       "role": "owner"
                     },
-                    "article_drafts_enabled": true
+                    "article_drafts_enabled": true,
+                    "formats_enabled": true,
+                    "format_rules": {
+                      "instagram": {
+                        "reel": {
+                          "media": "one_video",
+                          "min_seconds": 3,
+                          "max_seconds": 900,
+                          "max_bytes": 209715200
+                        },
+                        "story": {
+                          "media": "one_media",
+                          "min_seconds": 3,
+                          "max_seconds": 60,
+                          "max_bytes": 100000000
+                        }
+                      },
+                      "facebook": {
+                        "reel": {
+                          "media": "one_video",
+                          "min_seconds": 3,
+                          "max_seconds": 90,
+                          "max_bytes": 209715200
+                        },
+                        "story": {
+                          "media": "one_media",
+                          "min_seconds": 3,
+                          "max_seconds": 60,
+                          "max_bytes": 209715200
+                        }
+                      }
+                    }
                   },
                   "msg": "Social configuration"
                 }
@@ -58295,7 +58614,7 @@
           "Social"
         ],
         "summary": "Create a draft post, optionally without destination accounts",
-        "description": "Creates a `draft` with one destination per account (0-10 accounts, up to 10 media). Text or media is required even without destinations; choosing accounts is required before submitting for publication. Every destination is validated against the server's per-network rules (text length, media required, exactly one video, title and privacy for the video network); an error names the destination in `data`. The response carries `cost`: the current price per destination in the caller's balance currency (the price charged is the one in force when the network confirms). Optional `Idempotency-Key` (16-128 visible ASCII characters, no spaces) makes CREATE recoverable within the caller's workspace and user: retry the original body with the same key to retrieve the current post, even if it was edited later. A different original body with the same key returns 409 `social_idempotency_conflict`. The key is retained while the post exists. Keyed creation is atomic across the post, destinations and media; when transactions are unavailable it returns 503 `social_unavailable` without a partial post. \n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. Rate limit: 80/minute.",
+        "description": "Creates a `draft` with one destination per account (0-10 accounts, up to 10 media). Text or media is required even without destinations; choosing accounts is required before submitting for publication. Every destination is validated against the server's per-network rules (text length, media required, exactly one video, title and privacy for the video network); an error names the destination in `data`. `network_options.instagram` / `network_options.facebook` choose the format on those networks: `post` (the default when absent), `reel` (exactly one video; 3-900 s on the photo-and-video network, 3-90 s on the pages network) or `story` (exactly one image or one video of 3-60 s; the text is accepted but the network does not show it). The table is `format_rules` of `GET /social/config`; the number of media is required when scheduling (a draft may be saved without media) and a video of unknown duration is never refused. Errors: 422 `social_format_media` (`data.format`, `data.expects`), `social_video_too_short` (`data.min_seconds`), `social_video_too_long` (`data.max_seconds`), 413 `social_media_too_large` (`data.max_bytes`), and 409 `social_format_unavailable` while the platform has Reels and Stories switched off. The response carries `cost`: the current price per destination in the caller's balance currency (the price charged is the one in force when the network confirms). Optional `Idempotency-Key` (16-128 visible ASCII characters, no spaces) makes CREATE recoverable within the caller's workspace and user: retry the original body with the same key to retrieve the current post, even if it was edited later. A different original body with the same key returns 409 `social_idempotency_conflict`. The key is retained while the post exists. Keyed creation is atomic across the post, destinations and media; when transactions are unavailable it returns 503 `social_unavailable` without a partial post. \n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. Rate limit: 80/minute.",
         "operationId": "createSocialPost",
         "security": [
           {
@@ -58358,7 +58677,15 @@
                 "account_ids": [
                   "6710aa000000000000000b02",
                   "6710aa000000000000000b03"
-                ]
+                ],
+                "network_options": {
+                  "instagram": {
+                    "format": "story"
+                  },
+                  "facebook": {
+                    "format": "reel"
+                  }
+                }
               }
             }
           }
@@ -58459,10 +58786,11 @@
             "x-error-code-location": "root_or_data"
           },
           "409": {
-            "description": "An account is not active, or the request key belongs to different content",
+            "description": "An account is not active, the request key belongs to different content, or Reels and Stories are switched off",
             "x-error-codes": [
               "social_account_inactive",
-              "social_idempotency_conflict"
+              "social_idempotency_conflict",
+              "social_format_unavailable"
             ],
             "content": {
               "application/json": {
@@ -58474,7 +58802,7 @@
             "x-error-code-location": "root_or_data"
           },
           "413": {
-            "description": "A video is too large for a destination",
+            "description": "A video is too large for a destination or for its Reel/Story format (`data.max_bytes`)",
             "x-error-codes": [
               "social_media_too_large"
             ],
@@ -58499,7 +58827,10 @@
               "social_title_required",
               "social_yt_public_unavailable",
               "social_tiktok_branded_private",
-              "social_accounts_required"
+              "social_accounts_required",
+              "social_format_media",
+              "social_video_too_short",
+              "social_video_too_long"
             ],
             "content": {
               "application/json": {
@@ -59295,7 +59626,7 @@
           "Social"
         ],
         "summary": "Edit a post (author or approver)",
-        "description": "Only the fields sent are changed. A `draft`, `rejected` or `pending_approval` post is edited in place. Editing a `scheduled` post takes it back out of the schedule — to `pending_approval` when the workspace requires approval, to `draft` otherwise — atomically with its destinations, so nothing approved can go out with different content. Not possible once a destination is publishing (409).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. Rate limit: 80/minute.",
+        "description": "Only the fields sent are changed. A `draft`, `rejected` or `pending_approval` post is edited in place. Editing a `scheduled` post takes it back out of the schedule — to `pending_approval` when the workspace requires approval, to `draft` otherwise — atomically with its destinations, so nothing approved can go out with different content. Not possible once a destination is publishing (409). `network_options`, when sent, is merged PER KEY: `youtube` and `tiktok` keep their meaning (a key left out is cleared); `instagram` and `facebook` left out KEEP the stored format, and `null` clears it (e.g. `{\"network_options\": {\"tiktok\": {...}}}` keeps a Story; `{\"network_options\": {\"instagram\": null}}` turns it back into a normal post, as does `{\"format\": \"post\"}`). `network_options: null` clears every option. The response carries the resulting `network_options`. Format errors are those of `POST /social/posts`.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`. Rate limit: 80/minute.",
         "operationId": "updateSocialPost",
         "security": [
           {
@@ -59343,7 +59674,12 @@
                 "$ref": "#/components/schemas/SocialPostUpdate"
               },
               "example": {
-                "text": "Cobra con tarjeta y con QR desde tu teléfono."
+                "text": "Cobra con tarjeta y con QR desde tu teléfono.",
+                "network_options": {
+                  "instagram": {
+                    "format": "reel"
+                  }
+                }
               }
             }
           }
@@ -59455,10 +59791,11 @@
             "x-error-code-location": "root_or_data"
           },
           "409": {
-            "description": "Not possible in the current state (e.g. a destination is already publishing)",
+            "description": "Not possible in the current state (e.g. a destination is already publishing), or Reels and Stories are switched off (`social_format_unavailable`, `data.network`)",
             "x-error-codes": [
               "social_invalid_state",
-              "social_account_inactive"
+              "social_account_inactive",
+              "social_format_unavailable"
             ],
             "content": {
               "application/json": {
@@ -59470,7 +59807,7 @@
             "x-error-code-location": "root_or_data"
           },
           "413": {
-            "description": "A video is too large for a destination",
+            "description": "A video is too large for a destination or for its Reel/Story format (`data.max_bytes`)",
             "x-error-codes": [
               "social_media_too_large"
             ],
@@ -59495,7 +59832,10 @@
               "social_title_required",
               "social_yt_public_unavailable",
               "social_tiktok_branded_private",
-              "social_accounts_required"
+              "social_accounts_required",
+              "social_format_media",
+              "social_video_too_short",
+              "social_video_too_long"
             ],
             "content": {
               "application/json": {
@@ -59879,10 +60219,11 @@
             "x-error-code-location": "root_or_data"
           },
           "409": {
-            "description": "Not possible in the current state (e.g. a destination is already publishing)",
+            "description": "Not possible in the current state (e.g. a destination is already publishing), or Reels and Stories are switched off (`social_format_unavailable`, `data.network`)",
             "x-error-codes": [
               "social_invalid_state",
-              "social_account_inactive"
+              "social_account_inactive",
+              "social_format_unavailable"
             ],
             "content": {
               "application/json": {
@@ -59894,7 +60235,7 @@
             "x-error-code-location": "root_or_data"
           },
           "413": {
-            "description": "A video is too large for a destination",
+            "description": "A video is too large for a destination or for its Reel/Story format (`data.max_bytes`)",
             "x-error-codes": [
               "social_media_too_large"
             ],
@@ -59926,7 +60267,9 @@
               "social_title_required",
               "social_yt_public_unavailable",
               "social_accounts_required",
-              "social_content_required"
+              "social_content_required",
+              "social_format_media",
+              "social_video_too_short"
             ],
             "content": {
               "application/json": {
@@ -60156,11 +60499,12 @@
             "x-error-code-location": "root_or_data"
           },
           "409": {
-            "description": "Not possible in the current state, or the post changed after it was reviewed",
+            "description": "Not possible in the current state, the post changed after it was reviewed, or Reels and Stories are switched off",
             "x-error-codes": [
               "social_invalid_state",
               "social_account_inactive",
-              "social_post_changed"
+              "social_post_changed",
+              "social_format_unavailable"
             ],
             "content": {
               "application/json": {
@@ -60172,7 +60516,7 @@
             "x-error-code-location": "root_or_data"
           },
           "413": {
-            "description": "A video is too large for a destination",
+            "description": "A video is too large for a destination or for its Reel/Story format (`data.max_bytes`)",
             "x-error-codes": [
               "social_media_too_large"
             ],
@@ -60204,7 +60548,9 @@
               "social_title_required",
               "social_yt_public_unavailable",
               "social_accounts_required",
-              "social_content_required"
+              "social_content_required",
+              "social_format_media",
+              "social_video_too_short"
             ],
             "content": {
               "application/json": {
@@ -74509,7 +74855,7 @@
                         "rules": {
                           "banned_terms": [],
                           "allow_prices": false,
-                          "optout_line": "Si prefieres que no te escriba, respóndeme «no»."
+                          "optout_line": ""
                         },
                         "allowed_link_domains": [],
                         "variants": [],
@@ -74637,10 +74983,7 @@
                 "name": "Clínicas dentales con reservas por teléfono",
                 "outcome": "meeting",
                 "audience": "Clínicas dentales de Guatemala con 2 a 10 sillones",
-                "sender_name": "Ana López",
-                "rules": {
-                  "optout_line": "Si prefieres que no te escriba, respóndeme «no»."
-                }
+                "sender_name": "Ana López"
               }
             }
           }
@@ -74685,7 +75028,7 @@
                     "rules": {
                       "banned_terms": [],
                       "allow_prices": false,
-                      "optout_line": "Si prefieres que no te escriba, respóndeme «no»."
+                      "optout_line": ""
                     },
                     "allowed_link_domains": [],
                     "variants": [],
@@ -74865,7 +75208,7 @@
                     "rules": {
                       "banned_terms": [],
                       "allow_prices": false,
-                      "optout_line": "Si prefieres que no te escriba, respóndeme «no»."
+                      "optout_line": ""
                     },
                     "allowed_link_domains": [],
                     "variants": [],
@@ -75055,7 +75398,7 @@
                     "rules": {
                       "banned_terms": [],
                       "allow_prices": false,
-                      "optout_line": "Si prefieres que no te escriba, respóndeme «no»."
+                      "optout_line": ""
                     },
                     "allowed_link_domains": [],
                     "variants": [],
@@ -75264,7 +75607,7 @@
                     "rules": {
                       "banned_terms": [],
                       "allow_prices": false,
-                      "optout_line": "Si prefieres que no te escriba, respóndeme «no»."
+                      "optout_line": ""
                     },
                     "allowed_link_domains": [],
                     "variants": [],
@@ -75619,7 +75962,7 @@
                     "rules": {
                       "banned_terms": [],
                       "allow_prices": false,
-                      "optout_line": "Si prefieres que no te escriba, respóndeme «no»."
+                      "optout_line": ""
                     },
                     "allowed_link_domains": [],
                     "variants": [],
@@ -109332,11 +109675,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
-              "description": "Proyectos por página.",
+              "description": "Projects per page.",
               "default": 20,
               "title": "Limit"
             },
-            "description": "Proyectos por página."
+            "description": "Projects per page."
           },
           {
             "name": "skip",
@@ -109346,11 +109689,11 @@
               "type": "integer",
               "maximum": 10000,
               "minimum": 0,
-              "description": "Proyectos a saltear.",
+              "description": "Projects to skip.",
               "default": 0,
               "title": "Skip"
             },
-            "description": "Proyectos a saltear."
+            "description": "Projects to skip."
           },
           {
             "name": "website_id",
@@ -109366,10 +109709,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Sólo el proyecto vinculado a este sitio del llamador.",
+              "description": "Only the project linked to this site of the caller.",
               "title": "Website Id"
             },
-            "description": "Sólo el proyecto vinculado a este sitio del llamador."
+            "description": "Only the project linked to this site of the caller."
           },
           {
             "name": "x-user-token",
@@ -109392,7 +109735,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Proyectos del llamador, del más nuevo al más viejo.",
+            "description": "The caller's projects, newest first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -110932,10 +111275,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Texto a buscar en el título del issue.",
+              "description": "Text to search for in the issue title.",
               "title": "Q"
             },
-            "description": "Texto a buscar en el título del issue."
+            "description": "Text to search for in the issue title."
           },
           {
             "name": "cursor",
@@ -110951,10 +111294,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Cursor opaco de la página anterior. Se manda tal cual vino en `next_cursor`.",
+              "description": "Opaque cursor from the previous page. Send it exactly as it came in `next_cursor`.",
               "title": "Cursor"
             },
-            "description": "Cursor opaco de la página anterior. Se manda tal cual vino en `next_cursor`."
+            "description": "Opaque cursor from the previous page. Send it exactly as it came in `next_cursor`."
           },
           {
             "name": "limit",
@@ -110964,11 +111307,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
-              "description": "Issues por página.",
+              "description": "Issues per page.",
               "default": 25,
               "title": "Limit"
             },
-            "description": "Issues por página."
+            "description": "Issues per page."
           },
           {
             "name": "x-user-token",
@@ -110991,7 +111334,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Una página de issues. El cursor es opaco y va firmado.",
+            "description": "A page of issues. The cursor is opaque and signed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -111004,7 +111347,7 @@
                       {
                         "id": "tlm_85e2d5ad74546cda",
                         "state": "open",
-                        "title": "TypeError: el carrito no tiene total",
+                        "title": "TypeError: cart has no total",
                         "culprit": "?(/checkout)",
                         "level": "error",
                         "count": 12,
@@ -111257,7 +111600,7 @@
                   "data": {
                     "id": "tlm_85e2d5ad74546cda",
                     "state": "open",
-                    "title": "TypeError: el carrito no tiene total",
+                    "title": "TypeError: cart has no total",
                     "culprit": "?(/checkout)",
                     "level": "error",
                     "count": 12,
@@ -111764,7 +112107,7 @@
                     "issue_id": "tlm_85e2d5ad74546cda",
                     "occurred_at": "2026-09-14T03:12:47.879Z",
                     "received_at": "2026-09-14T03:12:51.008Z",
-                    "title": "TypeError: el carrito no tiene total",
+                    "title": "TypeError: cart has no total",
                     "culprit": "?(/checkout)",
                     "level": "error",
                     "platform": "javascript",
@@ -111967,7 +112310,7 @@
           "Telemetry"
         ],
         "summary": "Slowest transactions in a window",
-        "description": "Grupos de transacción del proyecto, del más lento al más rápido.\n\nLa ventana se pide en **días** y no en fechas, a propósito: el techo es un límite de producto (30 días) y un rango abierto contra el almacenamiento frío es un barrido que nadie presupuestó.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 240 req/min",
+        "description": "The project's transaction groups, slowest first.\n\nThe window is requested in **days**, not dates, on purpose: the ceiling is a product limit (30 days) and an open range against cold storage is a scan nobody budgeted for.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 240 req/min",
         "operationId": "listTelemetryTransactions",
         "security": [
           {
@@ -111994,11 +112337,11 @@
               "type": "integer",
               "maximum": 30,
               "minimum": 1,
-              "description": "Días hacia atrás desde ahora. El máximo es el que el motor garantiza en caliente.",
+              "description": "Days back from now. The maximum is what the engine guarantees in hot storage.",
               "default": 7,
               "title": "Days"
             },
-            "description": "Días hacia atrás desde ahora. El máximo es el que el motor garantiza en caliente."
+            "description": "Days back from now. The maximum is what the engine guarantees in hot storage."
           },
           {
             "name": "q",
@@ -112014,10 +112357,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Texto a buscar en el nombre de la transacción.",
+              "description": "Text to search for in the transaction name.",
               "title": "Q"
             },
-            "description": "Texto a buscar en el nombre de la transacción."
+            "description": "Text to search for in the transaction name."
           },
           {
             "name": "cursor",
@@ -112033,10 +112376,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Cursor opaco de la página anterior. Se manda tal cual vino en `next_cursor`.",
+              "description": "Opaque cursor from the previous page. Send it exactly as it came in `next_cursor`.",
               "title": "Cursor"
             },
-            "description": "Cursor opaco de la página anterior. Se manda tal cual vino en `next_cursor`."
+            "description": "Opaque cursor from the previous page. Send it exactly as it came in `next_cursor`."
           },
           {
             "name": "limit",
@@ -112046,11 +112389,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
-              "description": "Transacciones por página.",
+              "description": "Transactions per page.",
               "default": 25,
               "title": "Limit"
             },
-            "description": "Transacciones por página."
+            "description": "Transactions per page."
           },
           {
             "name": "x-user-token",
@@ -112073,7 +112416,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Una página de grupos de transacción. El cursor es opaco y va firmado.",
+            "description": "A page of transaction groups. The cursor is opaque and signed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -112278,7 +112621,7 @@
           "Telemetry"
         ],
         "summary": "Structured logs in a window",
-        "description": "Registros estructurados del proyecto, del más reciente al más viejo.\n\nLa ventana máxima son **6 días** y está por debajo de lo que el motor guarda caliente: una consulta más ancha cae al almacenamiento frío, que se escanea entero y en serie.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 240 req/min",
+        "description": "The project's structured logs, newest first.\n\nThe maximum window is **6 days**, below what the engine keeps in hot storage: a wider query falls through to cold storage, which is scanned in full and serially.\n\n- **Auth:** `Authorization: Bearer <app_token>` + `x-user-token`\n- **Rate limit:** 240 req/min",
         "operationId": "listTelemetryLogs",
         "security": [
           {
@@ -112305,11 +112648,11 @@
               "type": "integer",
               "maximum": 6,
               "minimum": 1,
-              "description": "Días hacia atrás desde ahora. El máximo es más chico que el de rendimiento porque los registros son la consulta que puede caer al frío.",
+              "description": "Days back from now. The maximum is smaller than for performance because logs are the query that can fall through to cold storage.",
               "default": 1,
               "title": "Days"
             },
-            "description": "Días hacia atrás desde ahora. El máximo es más chico que el de rendimiento porque los registros son la consulta que puede caer al frío."
+            "description": "Days back from now. The maximum is smaller than for performance because logs are the query that can fall through to cold storage."
           },
           {
             "name": "level",
@@ -112325,10 +112668,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Nivel exacto a filtrar: `debug`, `info`, `warning`, `error` o `fatal`.",
+              "description": "Exact level to filter by: `debug`, `info`, `warning`, `error` or `fatal`.",
               "title": "Level"
             },
-            "description": "Nivel exacto a filtrar: `debug`, `info`, `warning`, `error` o `fatal`."
+            "description": "Exact level to filter by: `debug`, `info`, `warning`, `error` or `fatal`."
           },
           {
             "name": "q",
@@ -112344,10 +112687,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Texto a buscar en el cuerpo del registro.",
+              "description": "Text to search for in the log body.",
               "title": "Q"
             },
-            "description": "Texto a buscar en el cuerpo del registro."
+            "description": "Text to search for in the log body."
           },
           {
             "name": "cursor",
@@ -112363,10 +112706,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Cursor opaco de la página anterior. Se manda tal cual vino en `next_cursor`.",
+              "description": "Opaque cursor from the previous page. Send it exactly as it came in `next_cursor`.",
               "title": "Cursor"
             },
-            "description": "Cursor opaco de la página anterior. Se manda tal cual vino en `next_cursor`."
+            "description": "Opaque cursor from the previous page. Send it exactly as it came in `next_cursor`."
           },
           {
             "name": "limit",
@@ -112376,11 +112719,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
-              "description": "Registros por página.",
+              "description": "Logs per page.",
               "default": 50,
               "title": "Limit"
             },
-            "description": "Registros por página."
+            "description": "Logs per page."
           },
           {
             "name": "x-user-token",
@@ -112403,7 +112746,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Una página de registros. El cursor es opaco y va firmado.",
+            "description": "A page of logs. The cursor is opaque and signed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -112416,7 +112759,7 @@
                       {
                         "timestamp": "2026-09-14T03:11:02.104Z",
                         "level": "error",
-                        "body": "pago rechazado por el emisor",
+                        "body": "payment declined by the issuer",
                         "service": "checkout",
                         "environment": "production",
                         "host": "web-1",
@@ -141955,7 +142298,7 @@
           "Platform Admin"
         ],
         "summary": "Write the platform knobs of the social vertical (staff)",
-        "description": "Writes platform-only leaves of the `social` namespace: per-network switches (`network_enabled_<k>`), allow-lists (`network_allowlist_<k>`: `[\"*\"]` or a list of 24-hex workspace ids; anything else is refused), simulation mode (`provider_mode_<k>`: `mock`/`real`, ignored in production), the dialog configuration id, the review flags, the switch of drafts generated from a store article (`article_drafts_enabled`, boolean) and the exact host names a store article's cover may be downloaded from (`article_media_hosts`: up to 5 lowercase DNS names; IP literals, `*`, ports, schemes and paths are refused; the stored list is lower-cased). Unknown keys and invalid values answer 422 `social_setting_invalid` and write nothing. Turning a network ON is checked on the merged state (stored values + this request), only for networks whose switch or allow-list the request touches: it needs the platform credentials of that network (outside simulation), a non-empty allow-list, and — when it moves INTO `[\"*\"]` enabled (it was not already on for every workspace) — a `standard` approval attestation of the network (`PUT /platform/settings/social/networks/{knob}/approval`), a previous bounded rollout (on for a non-empty list of workspaces with at least one live account connected with the platform's credentials; both waived in simulation) and the request field `confirm_all` set to `ALL` or its Spanish form (trimmed, any case; see the request example). `confirm_all` is never stored. A refusal answers 422 `social_enable_precondition` with `data.reason` (`credentials_missing`, `audience_empty`, `approval_missing`, `no_bounded_rollout`, `confirm_all_required`) and `data.network` (the knob) and writes nothing; turning OFF is always allowed. Each leaf is written on its own and audited with the old and new values of the switches and allow-lists (and of the two article-draft leaves). Takes effect for this worker at once and for the others within the configuration refresh window.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
+        "description": "Writes platform-only leaves of the `social` namespace: per-network switches (`network_enabled_<k>`), allow-lists (`network_allowlist_<k>`: `[\"*\"]` or a list of 24-hex workspace ids; anything else is refused), simulation mode (`provider_mode_<k>`: `mock`/`real`, ignored in production), the dialog configuration id, the review flags, the switch of drafts generated from a store article (`article_drafts_enabled`, boolean) and the exact host names a store article's cover may be downloaded from (`article_media_hosts`: up to 5 lowercase DNS names; IP literals, `*`, ports, schemes and paths are refused; the stored list is lower-cased) and the switch of Reels and Stories on Instagram and Facebook (`meta_formats_enabled`, boolean; off ⇒ new ones answer 409 `social_format_unavailable` and programmed ones are held with `hold_reason=format_unavailable`). Unknown keys and invalid values answer 422 `social_setting_invalid` and write nothing. Turning a network ON is checked on the merged state (stored values + this request), only for networks whose switch or allow-list the request touches: it needs the platform credentials of that network (outside simulation), a non-empty allow-list, and — when it moves INTO `[\"*\"]` enabled (it was not already on for every workspace) — a `standard` approval attestation of the network (`PUT /platform/settings/social/networks/{knob}/approval`), a previous bounded rollout (on for a non-empty list of workspaces with at least one live account connected with the platform's credentials; both waived in simulation) and the request field `confirm_all` set to `ALL` or its Spanish form (trimmed, any case; see the request example). `confirm_all` is never stored. A refusal answers 422 `social_enable_precondition` with `data.reason` (`credentials_missing`, `audience_empty`, `approval_missing`, `no_bounded_rollout`, `confirm_all_required`) and `data.network` (the knob) and writes nothing; turning OFF is always allowed. Each leaf is written on its own and audited with the old and new values of the switches and allow-lists (and of the two article-draft leaves). Takes effect for this worker at once and for the others within the configuration refresh window.\n\n**Auth:** `Authorization: Bearer <app_token>` (console workspace) + `x-user-token: <staff_token>`",
         "operationId": "setPlatformSocialSettings",
         "security": [
           {
@@ -200448,6 +200791,20 @@
             "minLength": 1,
             "title": "Body",
             "description": "What the client can do now and why it helps, plain text."
+          },
+          "example": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example",
+            "description": "Optional short use case: how a business would use it, plain text (owner decision 2026-11-24)."
           }
         },
         "additionalProperties": false,
@@ -200479,9 +200836,9 @@
         "properties": {
           "issue_id": {
             "type": "string",
-            "pattern": "^\\d{4}-[FW]\\d{2}$",
+            "pattern": "^\\d{4}-[FWS]\\d{2}$",
             "title": "Issue Id",
-            "description": "ISO week of the edition, `YYYY-Wnn` (e.g. `2026-W48`). The legacy fortnight form `YYYY-Fnn` (`nn = ceil(iso_week / 2)`; `F27` covers week 53 alone) is still accepted."
+            "description": "ISO week of the edition, `YYYY-Wnn` (e.g. `2026-W48`), or a special edition `YYYY-Snn` with its own closed period of up to 31 days. The legacy fortnight form `YYYY-Fnn` (`nn = ceil(iso_week / 2)`; `F27` covers week 53 alone) is still accepted."
           },
           "period": {
             "$ref": "#/components/schemas/ClientNewsPeriod",
@@ -200499,19 +200856,19 @@
               "$ref": "#/components/schemas/ClientNewsHighlight"
             },
             "type": "array",
-            "maxItems": 5,
+            "maxItems": 8,
             "minItems": 1,
             "title": "Highlights",
-            "description": "One to five new capabilities."
+            "description": "One to eight new capabilities."
           },
           "improvements": {
             "items": {
               "$ref": "#/components/schemas/ClientNewsImprovement"
             },
             "type": "array",
-            "maxItems": 3,
+            "maxItems": 10,
             "title": "Improvements",
-            "description": "Up to three improvements."
+            "description": "Up to ten improvements."
           }
         },
         "additionalProperties": false,
@@ -211369,7 +211726,7 @@
           "provider": {
             "type": "string",
             "title": "Provider",
-            "description": "AI provider used for generation",
+            "description": "Always the platform's own name, never the underlying engine",
             "examples": [
               "1platform"
             ]
@@ -211408,6 +211765,21 @@
             "description": "Prompt used to generate this image",
             "examples": [
               "Professional headshot, studio lighting, neutral background"
+            ]
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Id of the image in the user's library",
+            "examples": [
+              "6733aa000000000000000a01"
             ]
           }
         },
@@ -211902,10 +212274,10 @@
             "type": "string",
             "maxLength": 300,
             "title": "Optout Line",
-            "description": "Opt-out line the first email must include",
+            "description": "Optional opt-out line. When set, the first email must include it; empty means no opt-out line is required",
             "default": "",
             "examples": [
-              "Si prefieres que no te escriba más, respóndeme «no» y no vuelvo a hacerlo."
+              ""
             ]
           }
         },
@@ -239947,6 +240319,28 @@
         "type": "object",
         "title": "SocialClientKeyKeysRequest"
       },
+      "SocialMetaOptionsBody": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "post",
+              "reel",
+              "story"
+            ],
+            "title": "Format",
+            "description": "`post` (a normal publication, the default), `reel` (exactly one video) or `story` (exactly one image or one video; the network does not show the text)",
+            "default": "post"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SocialMetaOptionsBody",
+        "description": "redes-sociales-reels-y-stories D-1: how a post goes out on Instagram or Facebook.",
+        "example": {
+          "format": "story"
+        }
+      },
       "SocialNetworkApprovalRequest": {
         "properties": {
           "tier": {
@@ -240024,6 +240418,28 @@
               }
             ],
             "description": "Options of the short-video network"
+          },
+          "instagram": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SocialMetaOptionsBody"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Format on the photo-and-video network. Absent or null = `post`. In an edit, an ABSENT key keeps the stored format and `null` clears it"
+          },
+          "facebook": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SocialMetaOptionsBody"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Format on the pages network. Absent or null = `post`. In an edit, an ABSENT key keeps the stored format and `null` clears it"
           }
         },
         "additionalProperties": false,
@@ -258216,7 +258632,7 @@
             "title": "Value",
             "description": "Message it carried.",
             "examples": [
-              "el carrito no tiene total"
+              "cart has no total"
             ]
           },
           "mechanism": {
@@ -258290,7 +258706,7 @@
             "title": "Title",
             "description": "Short description of the error.",
             "examples": [
-              "TypeError: el carrito no tiene total"
+              "TypeError: cart has no total"
             ]
           },
           "culprit": {
@@ -258726,7 +259142,7 @@
             "title": "Title",
             "description": "Short description of the error.",
             "examples": [
-              "TypeError: el carrito no tiene total"
+              "TypeError: cart has no total"
             ]
           },
           "culprit": {
@@ -258896,7 +259312,7 @@
             "title": "Body",
             "description": "The message.",
             "examples": [
-              "pago rechazado por el emisor"
+              "payment declined by the issuer"
             ]
           },
           "service": {

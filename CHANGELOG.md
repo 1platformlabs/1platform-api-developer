@@ -2,6 +2,11 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Crecimiento
+
+- Nueva sección «Crecimiento»: catálogo de servicios de alcance, perfiles y sitios a verificar, cotización sin cobro, pedidos con `Idempotency-Key` obligatoria, estados, aceptación, cambios, reportes y reposiciones, con sus códigos `growth_*`. Incluye prompt y skill `crecimiento`.
+- Sin toolset en el servidor MCP (pedir y operar mueven saldo). Las rutas de staff de Crecimiento no se documentan.
+
 ## [Unreleased] — Cupones
 
 - Nueva sección «Cupones»: crear cupones porcentuales o de monto fijo, listarlos, editarlos (pausar, reactivar, archivar), emitir lotes de hasta 500 códigos únicos con `Idempotency-Key`, exportarlos en CSV, comprobar qué descontaría un código sin efecto y administrar los cupones de sus tiendas. Incluye prompt y skill `cupones`, y el toolset `cupones` del servidor MCP.

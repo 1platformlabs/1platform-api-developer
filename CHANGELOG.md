@@ -2,6 +2,11 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Redes sociales
+
+- Nueva sección «Redes sociales»: conectar cuentas, subir medios, crear borradores, elegir Publicación, Reel o Historia por red (`network_options.instagram|facebook.format`, reglas en `format_rules` de `GET /social/config`), la combinación por clave del `PATCH`, programar con o sin aprobación, estados y retenciones de cada destino y cobro por destino confirmado. Incluye prompt y skill `redes-sociales`.
+- OpenAPI de 1platform-api refrescada a PROD v5.189.0.
+
 ## [Unreleased] — Cupones
 
 - Nueva sección «Cupones»: crear cupones porcentuales o de monto fijo, listarlos, editarlos (pausar, reactivar, archivar), emitir lotes de hasta 500 códigos únicos con `Idempotency-Key`, exportarlos en CSV, comprobar qué descontaría un código sin efecto y administrar los cupones de sus tiendas. Incluye prompt y skill `cupones`, y el toolset `cupones` del servidor MCP.

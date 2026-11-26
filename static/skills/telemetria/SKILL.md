@@ -29,7 +29,7 @@ Requiere la skill `1platform-hub`. Telemetría la enciende el equipo de la plata
 5. Avisos: `POST /api/v1/users/telemetry/projects/{project_id}/alert-rules` y monitores con
    `POST /api/v1/users/telemetry/projects/{project_id}/monitors`.
 
-Con el servidor MCP (toolset `telemetria`): proyectos, errores, último evento, registros, rendimiento y uso, y marcar
+Con el servidor MCP (toolset `telemetry`): proyectos, errores, último evento, registros, rendimiento y uso, y marcar
 un error como resuelto o ignorado. Crear proyectos, monitores y reglas se hace por la API.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/telemetria.md

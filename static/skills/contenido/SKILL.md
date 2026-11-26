@@ -28,7 +28,7 @@ Requiere la skill `1platform-hub` y un sitio registrado (skill `sitios-web`). Si
 5. `GET /api/v1/users/websites/{website_id}/searchconsole/performance` para el rendimiento de búsqueda de un sitio
    verificado.
 
-Con el servidor MCP (toolset `sitios`): artículos, trabajos de generación, categorías y rendimiento de búsqueda, sólo
+Con el servidor MCP (toolset `sites`): artículos, trabajos de generación, categorías y rendimiento de búsqueda, sólo
 lectura. El MCP no genera contenido ni pide indexaciones.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/sitios-web-y-contenido/generar-contenido.md

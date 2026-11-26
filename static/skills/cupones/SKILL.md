@@ -30,7 +30,7 @@ o `COUPONS_DISABLED`.
 6. Las tiendas: `GET /api/v1/coupons/stores` y `GET|POST /api/v1/coupons/stores/{slug}`. Una tienda puede cobrar una
    tarifa al emitir un cupón de un solo uso: no lo ejecute sin confirmación del desarrollador.
 
-Con el servidor MCP (toolset `cupones`): listar, consultar y exportar, listar tiendas, crear y editar un cupón. El
+Con el servidor MCP (toolset `coupons`): listar, consultar y exportar, listar tiendas, crear y editar un cupón. El
 MCP no emite lotes, no crea cupones de tienda ni canjea.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/cupones.md

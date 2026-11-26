@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/ventas` y las skills `/skills/1platform-hub/
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `ventas` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `sales` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -30,7 +30,7 @@ Use la skill `1platform-hub`. Ventas lo habilita el equipo de la plataforma: apa
    manual (`PATCH /api/v1/sales/leads/{leadId}/control`): sólo con confirmación del desarrollador.
 5. `GET /api/v1/sales/report` para el embudo, las ventas cerradas y su costo.
 
-Con el servidor MCP (toolset `ventas`): preparación, canales, ofertas, prospectos, tablero y reporte, sólo lectura. El
+Con el servidor MCP (toolset `sales`): preparación, canales, ofertas, prospectos, tablero y reporte, sólo lectura. El
 MCP no escribe a prospectos ni crea cobros de reserva.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/ventas.md

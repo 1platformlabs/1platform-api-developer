@@ -20,14 +20,15 @@ El servidor MCP expone la documentación y un conjunto acotado de operaciones de
 
 - Sin llaves: `docs_search`, `docs_get_page` y `api_get_operation`.
 - Con llaves (`ONEPLATFORM_APP_KEY` y `ONEPLATFORM_USER_KEY`): las operaciones de la API agrupadas por producto
-  (toolsets): `cuenta`, `pagos`, `retiros`, `suscripciones`, `terminal`, `facturacion`, `envios`, `sitios`,
-    `analitica`, `correo`, `dominios`, `telemetria`, `ventas`, `agentes`, `agenda`, `redes`, `tareas`, `estudio`, `prospeccion` y `cupones`.
+  (toolsets): `account`, `payments`, `payouts`, `subscriptions`, `terminal`, `invoicing`, `shipping`, `sites`,
+    `analytics`, `email`, `domains`, `telemetry`, `sales`, `agents`, `scheduling`, `social`, `tasks`, `studio`, `prospecting` y `coupons`.
   Las escrituras no cobran saldo en el acto, no emiten documentos fiscales ni mueven dinero: links de pago, planes,
   clientes y suscripciones, solicitudes de terminal, visitas de la agenda, borradores y publicaciones programadas de
   redes, tareas y subtareas, detener una ejecución de un agente y el estado de un error de telemetría. Agendar, mover
   o cancelar una visita avisa a la persona y al asesor; una publicación programada se cobra cuando sale en la red.
-- Acotar productos: `ONEPLATFORM_TOOLSETS=pagos,envios` (local) o la cabecera `X-OnePlatform-Toolsets` (alojado).
-  `cuenta` y la documentación se listan siempre.
+- Acotar productos: `ONEPLATFORM_TOOLSETS=payments,shipping` (local) o la cabecera `X-OnePlatform-Toolsets` (alojado).
+  `account` y la documentación se listan siempre. Los nombres en español de la versión 0.3.0 (`cuenta`, `pagos`…)
+  se siguen aceptando.
 - Entorno: QA salvo `ONEPLATFORM_ENV=prod`.
 - Alojado, sin instalar nada: `https://mcp-qa.1platform.pro/mcp` (QA) o `https://mcp.1platform.pro/mcp`
   (producción), con las llaves en las cabeceras `X-OnePlatform-App-Key` y `X-OnePlatform-User-Key`. La URL fija el

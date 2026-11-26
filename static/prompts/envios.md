@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/envios` y las skills `/skills/1platform-hub/
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `envios` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `shipping` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -39,4 +39,4 @@ Use la skill `1platform-hub`. El código de error de Envíos viaja en `data.code
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/envios.md
 
-El toolset `envios` sólo consulta envíos; registrar, cotizar y despachar se implementa por REST.
+El toolset `shipping` sólo consulta envíos; registrar, cotizar y despachar se implementa por REST.

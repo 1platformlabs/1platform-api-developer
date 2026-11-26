@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/correo-transaccional` y las skills `/skills/
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `correo` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `email` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -31,6 +31,6 @@ Use la skill `1platform-hub`. El servicio viene apagado: mientras no esté habil
 4. `GET /api/v1/transactional-email/messages/{message_id}` para el estado y los intentos, y
    `GET /api/v1/transactional-email/messages` para el historial.
 
-Con el servidor MCP (toolset `correo`): remitentes, plantillas, cupos y mensajes. El MCP no envía correos.
+Con el servidor MCP (toolset `email`): remitentes, plantillas, cupos y mensajes. El MCP no envía correos.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/correo-transaccional.md

@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/links-de-pago` y las skills `/skills/1platfo
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `pagos` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `payments` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -35,4 +35,4 @@ Implemente en el servidor la creación y el seguimiento de links de pago (QA por
 Campos y estados exactos: https://developer.1platform.pro/openapi/1platform-api.json. Guía:
 https://developer.1platform.pro/docs/saas/1platform-api/links-de-pago.md
 
-El toolset `pagos` permite leer, crear y cancelar links; crear mediante MCP omite `customer_email` y no envía el enlace por correo.
+El toolset `payments` permite leer, crear y cancelar links; crear mediante MCP omite `customer_email` y no envía el enlace por correo.

@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/cupones` y las skills `/skills/1platform-hub
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `cupones` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `coupons` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -33,7 +33,7 @@ Use la skill `1platform-hub`. Cupones se habilita por espacio de trabajo; apagad
 6. Las tiendas: `GET /api/v1/coupons/stores` y `GET|POST /api/v1/coupons/stores/{slug}`. Una tienda puede cobrar una
    tarifa al emitir un cupón de un solo uso: no lo ejecute sin confirmación del desarrollador.
 
-Con el servidor MCP (toolset `cupones`): listar, consultar y exportar, listar tiendas, crear y editar un cupón. El
+Con el servidor MCP (toolset `coupons`): listar, consultar y exportar, listar tiendas, crear y editar un cupón. El
 MCP no emite lotes, no crea cupones de tienda ni canjea.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/cupones.md

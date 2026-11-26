@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/agentes-de-ia` y las skills `/skills/1platfo
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `agentes` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `agents` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -32,7 +32,7 @@ Use la skill `1platform-hub`. Sin el módulo de agentes, las operaciones respond
 5. Las decisiones humanas: `GET /api/v1/agent-actions` y, con la decisión tomada,
    `PATCH /api/v1/agent-actions/{action_id}/consume`.
 
-Con el servidor MCP (toolset `agentes`): leer agentes, catálogo, herramientas, presupuesto, ejecuciones y acciones, y
+Con el servidor MCP (toolset `agents`): leer agentes, catálogo, herramientas, presupuesto, ejecuciones y acciones, y
 detener una ejecución. Instalar, disparar y resolver acciones se hace por la API.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/agentes-de-ia.md

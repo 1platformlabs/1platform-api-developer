@@ -31,7 +31,7 @@ Requiere la skill `1platform-hub`. Sin el módulo de sitios web (o de mapas de c
    `GET /api/v1/users/heatmap/sites/{site_id}/pages` y `GET /api/v1/users/heatmap/sites/{site_id}/maps/{kind}` leen
    los resultados.
 
-Con el servidor MCP (toolset `analitica`): estado y métricas, ingresos y alertas de anuncios, sitios y páginas de mapas
+Con el servidor MCP (toolset `analytics`): estado y métricas, ingresos y alertas de anuncios, sitios y páginas de mapas
 de calor. Autorizar, crear la propiedad y registrar sitios se hace por la API.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/analitica.md

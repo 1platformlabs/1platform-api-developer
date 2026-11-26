@@ -7,7 +7,7 @@ para leer `/docs/saas/1platform-api/telemetria` y las skills `/skills/1platform-
 Consulte `api_get_operation` con el `operationId` de cada llamada que vaya a implementar: valide método, ruta,
 campos, autenticación y errores. No invente operaciones cuando el contrato no las encuentre.
 
-Para las herramientas operativas, seleccione el toolset `telemetria` y compruebe lo que su cliente lista.
+Para las herramientas operativas, seleccione el toolset `telemetry` y compruebe lo que su cliente lista.
 Las tres herramientas de documentación funcionan sin claves. Leer el contrato no significa que esa operación
 pueda ejecutarse como herramienta MCP: implemente por REST las operaciones que no estén disponibles.
 Si el MCP no está conectado, siga https://developer.1platform.pro/docs/saas/1platform-api/integrar-con-ia.md;
@@ -32,7 +32,7 @@ Use la skill `1platform-hub`. Telemetría la enciende el equipo de la plataforma
 5. Avisos: `POST /api/v1/users/telemetry/projects/{project_id}/alert-rules` y monitores con
    `POST /api/v1/users/telemetry/projects/{project_id}/monitors`.
 
-Con el servidor MCP (toolset `telemetria`): proyectos, errores, último evento, registros, rendimiento y uso, y marcar
+Con el servidor MCP (toolset `telemetry`): proyectos, errores, último evento, registros, rendimiento y uso, y marcar
 un error como resuelto o ignorado. Crear proyectos, monitores y reglas se hace por la API.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/telemetria.md

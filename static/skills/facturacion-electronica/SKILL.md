@@ -30,4 +30,4 @@ explícita del desarrollador.
 
 Guía: https://developer.1platform.pro/docs/saas/1platform-api/facturacion-electronica/emitir-una-factura.md
 
-El toolset `facturacion` sólo consulta facturas; no emite ni anula documentos fiscales.
+El toolset `invoicing` sólo consulta facturas; no emite ni anula documentos fiscales.

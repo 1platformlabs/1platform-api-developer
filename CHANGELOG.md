@@ -2,6 +2,10 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Base de conocimiento
+
+- Nueva sección «Base de conocimiento»: subir documentos (PDF, DOCX, TXT o Markdown) con audiencia pública o interna, seguir su indexación, sincronizar preguntas frecuentes y sitios, probar la búsqueda (se cobra), medir el uso de 30 días, reindexar y borrar, y encender la base en un agente (`knowledge_enabled`, `knowledge_audience`, con tope de gasto mensual). Incluye prompt y skill `base-de-conocimiento`.
+
 ## [Unreleased] — Cupones
 
 - Nueva sección «Cupones»: crear cupones porcentuales o de monto fijo, listarlos, editarlos (pausar, reactivar, archivar), emitir lotes de hasta 500 códigos únicos con `Idempotency-Key`, exportarlos en CSV, comprobar qué descontaría un código sin efecto y administrar los cupones de sus tiendas. Incluye prompt y skill `cupones`, y el toolset `cupones` del servidor MCP.

@@ -1,0 +1,137 @@
+---
+title: Base de conocimiento
+description: Suba documentos, mantenga sincronizadas sus preguntas frecuentes y las páginas de sus sitios, pruebe la búsqueda y mida qué consultan sus agentes, que responden citando la fuente.
+sidebar_position: 1
+---
+
+import PromptParaAgente from '@site/src/components/PromptParaAgente';
+
+# Base de conocimiento
+
+<p className="lead">La base de conocimiento reúne lo que su negocio sabe: documentos que usted sube, sus preguntas frecuentes publicadas y las páginas y artículos publicados de sus propios sitios. Sus agentes la consultan antes de responder y citan de qué fuente sale cada dato. Hay una base por espacio de trabajo, compartida por todos sus agentes.</p>
+
+<PromptParaAgente slug="base-de-conocimiento" />
+
+## Disponibilidad
+
+La base se administra sólo como **administrador** del espacio de trabajo: cualquier otra cuenta recibe `403` `forbidden`. Si la base está apagada en su espacio, todas las operaciones responden `403` `knowledge_disabled`; si el módulo no está habilitado para el usuario, `403` `module_disabled`. El espacio es siempre el de la cuenta que llama: una fuente de otro espacio responde `404`, nunca `403`.
+
+## Qué necesita {#qué-necesitas}
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido): `Authorization: Bearer ak-…` y `x-user-token: sk-…`, de un administrador del espacio.
+- **Saldo**: indexar un documento y cada búsqueda se cobran. Ver [Saldo y consumo](/docs/saas/1platform-api/plataforma/saldo-y-consumo).
+- Para que un agente la use, un agente con tope de gasto mensual. Ver [Que sus agentes la usen](#agentes).
+
+## Públicas e internas {#audiencias}
+
+Cada fuente es `public` o `internal`, y la audiencia es **obligatoria** al subir un documento: nada se vuelve público por omisión.
+
+- `public`: cualquier agente del espacio puede citarla.
+- `internal`: sólo la leen los agentes autorizados a fuentes internas. Un agente que conversa con sus clientes lee **sólo** fuentes públicas, sin excepción.
+
+Las preguntas frecuentes y las páginas sincronizadas entran como públicas, porque ya están publicadas.
+
+## Paso 1 — Subir un documento {#subir}
+
+`POST /knowledge/sources` recibe un formulario `multipart/form-data` con el archivo (`file`: PDF, DOCX, TXT o Markdown), un título (`title`, el que citan los agentes) y la audiencia (`audience`). El tipo se comprueba por el contenido del archivo y no por su nombre, el archivo se revisa contra software malicioso y se guarda cifrado.
+
+```bash
+curl -X POST "$BASE_URL/knowledge/sources" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -F "file=@lista-de-precios.pdf" \
+  -F "title=Lista de precios 2026" \
+  -F "audience=internal"
+```
+
+Responde `201` con la fuente en `pending`. La indexación corre en segundo plano y pasa por `processing` hasta `ready`. Antes de que el documento se pueda buscar, se cobra de su saldo según los fragmentos en que se divide: sin saldo, la fuente termina en `failed` con `failure_code` `insufficient_balance` y no se indexa nada. Un archivo rechazado (tipo, tamaño, contenido) responde `422` `knowledge_file_rejected`, y alcanzar el máximo de documentos del espacio, `409` `knowledge_quota_exceeded`.
+
+## Paso 2 — Seguir el estado de sus fuentes {#estado}
+
+`GET /knowledge/sources` lista las fuentes del espacio, las más recientes primero, con filtros `kind` (`document`, `faq`, `site_page`, `site_post`) y `status`, y paginación con `limit` y `skip`. Consulte hasta que su documento llegue a `ready` o a `failed`.
+
+- Sólo se busca la versión de `indexed_rev`; `chunk_count` dice cuántos fragmentos tiene.
+- `failure_code` explica una versión fallida. Con `reindex_failed: true`, la versión nueva falló pero la anterior sigue respondiendo.
+- `citations_30d` cuenta cuántas veces la citaron sus agentes en los últimos 30 días.
+
+## Paso 3 — Sincronizar preguntas frecuentes y sitios {#sincronizar}
+
+Lo que ya publicó no hace falta subirlo. `GET /knowledge/sync` muestra qué mantiene sincronizado la base y lista los sitios del espacio; `eligible` indica cuáles se pueden elegir ahora (activos y servidos por la plataforma).
+
+`PUT /knowledge/sync` reemplaza la elección completa, con las dos claves obligatorias: `faqs` (sus preguntas frecuentes publicadas) y `website_ids` (hasta 50 sitios cuyas páginas y artículos publicados entran a la base; `[]` para ninguno).
+
+- Una pasada periódica concilia el contenido: agrega lo nuevo, actualiza lo que cambió y quita lo que despublicó. `last_swept_at` dice cuándo fue la última. Esta sincronización **no se cobra**, pero cuenta para el límite de fragmentos del espacio.
+- Apagar algo quita **en el acto** lo que aportó: sus agentes dejan de citarlo sin esperar la próxima pasada.
+- Un sitio que no es un sitio activo de su espacio responde `404` `knowledge_website_not_found`.
+
+## Paso 4 — Probar la búsqueda {#probar}
+
+`POST /knowledge/search` busca como lo haría un agente y devuelve los fragmentos más cercanos, cada uno con el título y el id de su fuente y su relevancia (`score`, mayor es más cercano). Envíe `query` (hasta 500 caracteres) y, si quiere, `top_k`; un valor por encima del límite del espacio se baja a ese límite. La prueba busca en fuentes públicas **e** internas.
+
+```bash
+curl -X POST "$BASE_URL/knowledge/search" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "¿Cuál es la política de devoluciones?", "top_k": 5}'
+```
+
+- **Cada búsqueda se cobra** como una búsqueda de agente, también cuando no encuentra nada; `charged` informa lo debitado. Si la base no puede responder (`503` `knowledge_unavailable`), el cobro se devuelve.
+- Sin saldo, `402` `insufficient_balance`; si el espacio llegó a su tope de gasto, `429` `plan_limit_exceeded`.
+- La consulta **no se guarda**: sólo su longitud, para la medición.
+
+## Paso 5 — Medir el uso {#medir}
+
+`GET /knowledge/usage` informa las fuentes y los fragmentos que se pueden buscar, el límite de fragmentos del espacio, las búsquedas y los fragmentos devueltos en los últimos 30 días (de sus agentes y de las pruebas) y las cinco fuentes más citadas. Úselo para ver qué documentos sirven y cuánto margen le queda.
+
+## Paso 6 — Reindexar o borrar {#mantener}
+
+- `POST /knowledge/sources/{source_id}/reindex` construye una versión nueva en segundo plano (`202`). La versión actual sigue respondiendo hasta que la nueva esté lista. Reindexar un documento **vuelve a cobrar** su indexación.
+- `DELETE /knowledge/sources/{source_id}` deja de buscar la fuente al instante y, en segundo plano, borra sus fragmentos, el archivo guardado y su lugar en los límites. Borrar no devuelve indexaciones ya cobradas.
+- Las dos responden `409` `knowledge_source_busy` mientras la fuente se está procesando: espere a que termine y repita.
+
+Las fuentes sincronizadas se actualizan solas; para quitarlas, apague su sincronización en el paso 3.
+
+## Que sus agentes la usen {#agentes}
+
+Un agente consulta la base con la herramienta «Buscar en la base de conocimiento»; en el panel se enciende con «Usar la base de conocimiento».
+
+- Por API, `PUT /agents/{agent_id}` con `knowledge_enabled: true`. `knowledge_audience` es `public` (por defecto, sólo fuentes públicas) o `all` (públicas e internas). En un agente que conversa con sus clientes, `all` responde `422` `knowledge_audience_forbidden`.
+- La búsqueda cuesta dinero, así que el agente **necesita un tope de gasto mensual** (`PUT /agents/{agent_id}/budget`). Sin tope, el agente queda en modo propuesta y no recibe las herramientas que cobran: aunque tenga la base encendida, no buscará. Ver [Agentes de IA](/docs/saas/1platform-api/agentes-de-ia).
+- Cada búsqueda del agente se cobra al saldo de quien paga la ejecución, igual que la prueba del paso 4.
+- El agente recibe el contenido de los fragmentos como **datos de terceros**, nunca como instrucciones, y cita el título de la fuente que usa.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `POST /knowledge/sources` · `GET /knowledge/sources` | Subir un documento y listar las fuentes con su estado |
+| `POST /knowledge/sources/{source_id}/reindex` | Construir una versión nueva de una fuente |
+| `DELETE /knowledge/sources/{source_id}` | Borrar una fuente |
+| `GET /knowledge/sync` · `PUT /knowledge/sync` | Ver y elegir qué preguntas frecuentes y sitios se sincronizan |
+| `POST /knowledge/search` | Probar una búsqueda (se cobra) |
+| `GET /knowledge/usage` | Medir el uso de los últimos 30 días |
+
+Todas las operaciones: [Referencia de API → Knowledge Base](/api-reference/1platform-api#tag/knowledge-base).
+
+## Errores
+
+Los errores llegan como `{"success": false, "data": {"code": "..."}, "msg": "..."}`. Los códigos de abajo no son exhaustivos: la referencia lista los de cada operación.
+
+| Código | Estado | Significa |
+|---|---|---|
+| `forbidden` | 403 | La cuenta no administra el espacio de trabajo |
+| `knowledge_disabled` · `module_disabled` | 403 | La base está apagada en el espacio, o el módulo no está habilitado para el usuario |
+| `knowledge_source_not_found` | 404 | La fuente no existe en su espacio de trabajo |
+| `knowledge_website_not_found` | 404 | Un sitio elegido no es un sitio activo de su espacio |
+| `insufficient_balance` | 402 | El saldo no cubre la búsqueda o la indexación |
+| `knowledge_quota_exceeded` | 409 | El espacio llegó a su máximo de documentos |
+| `knowledge_source_busy` | 409 | La fuente se está procesando ahora mismo |
+| `knowledge_file_rejected` | 422 | El archivo no se acepta: tipo, tamaño o contenido |
+| `knowledge_audience_forbidden` | 422 | Un agente que conversa con clientes no puede leer fuentes internas |
+| `plan_limit_exceeded` | 429 | El espacio llegó a su tope de gasto |
+| `knowledge_unavailable` | 503 | La base no está disponible por un momento; no se cobró nada |
+
+## Con el servidor MCP
+
+Compruebe qué herramientas de la base lista su cliente. Subir un documento y borrar una fuente no se ofrecen como herramientas: impleméntelos por REST.

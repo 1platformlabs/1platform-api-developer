@@ -1,0 +1,131 @@
+---
+title: Crecimiento
+description: Consulte el catálogo de servicios de alcance, verifique sus perfiles y sitios, cotice y haga pedidos con saldo, y siga su entrega hasta aceptarla.
+sidebar_position: 1
+---
+
+import PromptParaAgente from '@site/src/components/PromptParaAgente';
+
+# Crecimiento
+
+<p className="lead">Crecimiento vende alcance para los perfiles y sitios de la persona: servicios automáticos (seguidores, reproducciones, comentarios y similares) que se cobran del saldo al pedir, y encargos hechos por el equipo (enlaces, notas de prensa, locución) que reservan el monto y se cobran cuando la persona acepta la entrega.</p>
+
+<PromptParaAgente slug="crecimiento" />
+
+## Disponibilidad
+
+Crecimiento se habilita por espacio de trabajo y por cuenta. Si la cuenta no tiene el módulo, las operaciones responden `403` con `module_disabled`; si el espacio lo tiene apagado, `403` con `growth_disabled`. Los encargos son una mitad aparte que el espacio puede no ofrecer: entonces el catálogo trae `custom_enabled: false` y pedir uno responde `403` `growth_custom_disabled`.
+
+Todo es de la propia persona: un pedido o un destino de otra cuenta responde `404`, nunca `403`.
+
+## Cómo funciona
+
+1. Lea el catálogo con `GET /growth/catalog`. Trae los servicios activos con precio, los medios disponibles para los encargos de enlaces y prensa, y las reglas del espacio (`rules`: pedido mínimo, días hasta la aceptación automática, rondas de cambios y límites de comentarios). Todos los montos van en USD como texto con dos decimales (`"12.90"`); el precio por unidad de los comentarios puede llevar tres (`"0.045"`).
+2. Elija el **destino**. `GET /growth/destinations` lista las cuentas que la persona conectó en Redes y sus sitios (los dos ya verificados) y los perfiles o sitios que agregó aquí. Sólo un destino `verified` puede recibir un pedido.
+3. **Cotice** con `POST /growth/orders/quote`, con el mismo cuerpo que el pedido. Responde el monto, si se cobra (`mode: "charge"`) o se reserva (`mode: "reserve"`), si se subió al pedido mínimo (`raised_to_minimum`) y, sólo cuando hoy no se puede pagar, `blocked` con el motivo. La cotización no cobra nada.
+4. **Pida** con `POST /growth/orders`, con la cabecera `Idempotency-Key` y `accept_terms: true` (la persona aceptó las condiciones que se muestran junto al pago). Responde `201` con el pedido.
+5. Siga el pedido con `GET /growth/orders` (más recientes primero; filtros `status` y `kind`; `attention` cuenta las entregas que esperan su revisión) y `GET /growth/orders/{order_id}`, que trae lo entregado (`deliverables`) y el historial (`events`).
+6. En un encargo entregado, la persona **acepta**, **pide cambios** o **reporta un problema**. Si no hace nada, la entrega se acepta sola al llegar `auto_accept_at`.
+
+## Qué necesita {#qué-necesitas}
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido): `Authorization: Bearer ak-…` y `x-user-token: sk-…`.
+- Crecimiento habilitado en su espacio de trabajo y en la cuenta; si no, `403`.
+- Saldo disponible en la cuenta para cubrir el pedido.
+- Un perfil o sitio verificado para los servicios que lo piden.
+
+## Servicios del catálogo {#catálogo}
+
+Cada servicio indica qué pide el pedido:
+
+| Campo del servicio | Qué indica |
+|---|---|
+| `kind` | `auto`: se cobra al pedir y se entrega solo · `custom`: lo hace el equipo, se reserva y se cobra al aceptar |
+| `target` | A qué apunta el pedido: `profile` o `site` (envíe `destination_id`), `post` (envíe `target_url` con el enlace de la publicación) o `none` |
+| `pricing_model` | `per_1000`, `per_unit`, `package` (elija `package_id`), `media` (elija `media_id`), `per_minute` (envíe `script`) o `fixed` |
+| `min_qty` · `max_qty` | Cantidad permitida por pedido (`quantity`) |
+| `fields` | Otros campos que el servicio pide; los detalles libres van en `details` |
+| `moderated` | El equipo revisa el texto antes de enviarlo: el pedido pasa por `review` |
+| `sponsored` | La publicación sale identificada como patrocinada: el pedido exige `sponsored_ack: true` |
+| `refill_days` | Días después de completado en que se puede pedir una reposición sin costo (`0` = no tiene) |
+| `instant` | Se cobra al generarse y no tiene paso de aceptación |
+
+Los comentarios van en `comments`, uno por elemento, con el largo y la cantidad máximos de `rules`. Un comentario que no cumple las reglas de contenido responde `422` `growth_comments_invalid`.
+
+## Perfiles y sitios {#destinos}
+
+Los destinos llevan un prefijo en su `id`: `sa:` una cuenta conectada en Redes, `ws:` un sitio de la persona y `gd:` un perfil o sitio agregado aquí.
+
+- `POST /growth/destinations` agrega un perfil o sitio con su red (`network`, o `web` para un sitio) y su enlace público. Nace `pending` con un `code` que la persona pega en la biografía del perfil o agrega a su sitio; el equipo lo revisa y lo deja `verified` o `rejected` (con `rejected_reason`).
+- Pedir para un destino que no está verificado responde `409` `growth_destination_unverified`.
+- `DELETE /growth/destinations/{destination_id}` quita sólo un destino `gd:`. Los pedidos ya hechos siguen su curso.
+
+## Dinero, límites e idempotencia {#dinero}
+
+- Los servicios automáticos y la locución instantánea se **cobran** al pedir. Los encargos **reservan** el monto: se cobra una sola vez al aceptar (o en la aceptación automática) y se libera si se cancela antes de empezar.
+- `Idempotency-Key` es **obligatoria** al pedir: de 8 a 64 caracteres (letras, números y `_ . : -`). Repetir la solicitud con la misma clave y el mismo cuerpo devuelve el mismo pedido con `200` y nunca cobra dos veces; la misma clave con otro cuerpo responde `409` `growth_order_key_conflict`, y mientras el primer intento sigue en curso, `409` `growth_order_in_progress`.
+- El saldo recargado hace poco queda retenido unas horas, y cada cuenta tiene un tope de gasto diario. La cotización lo anticipa en `blocked`: `insufficient_balance` con lo que falta (`shortfall`), `balance_held` con cuándo se libera (`releases_at`) o `daily_limit` con lo que queda del día (`remaining_today`).
+
+## Estados del pedido {#estados}
+
+| Tipo | Estados |
+|---|---|
+| Automático | `review` (texto en revisión), `queued`, `in_progress`, `completed`, `partial`, `refill`, `rejected` |
+| Encargo | `reserved`, `consent` (consentimiento de voz en revisión), `production`, `delivered`, `changes`, `reported`, `accepted`, `refunded`, `consent_rejected` |
+| Locución instantánea | `ready` |
+| Todos | `paying`, `failed`, `canceled` |
+
+`money` dice por dónde pasó el saldo: `charged`, `reserved`, `captured`, `released`, `refunded` o `partially_refunded`. `refunded_amount` informa lo devuelto.
+
+## Acciones sobre un pedido {#acciones}
+
+- **Cancelar** (`POST /growth/orders/{order_id}/cancel`): un automático, sólo mientras está en `review` o `queued`, y se devuelve todo; un encargo, sólo antes de que empiece la producción, y se libera la reserva.
+- **Aceptar** (`POST /growth/orders/{order_id}/accept`): cobra la reserva exactamente una vez. Aceptar un pedido ya aceptado lo devuelve sin cambios.
+- **Pedir cambios** (`POST /growth/orders/{order_id}/changes`, con `text`): devuelve la entrega al equipo. Las rondas son limitadas (`max_change_rounds`); agotadas, `409` `growth_change_rounds_exhausted`.
+- **Reportar un problema** (`POST /growth/orders/{order_id}/report`, con `text`): el equipo lo revisa y, mientras tanto, no se cobra ni se acepta solo.
+- **Pedir una reposición** (`POST /growth/orders/{order_id}/refill`): en un automático completado cuyo servicio la incluye, mientras dura la ventana; si no, `409` `growth_refill_unavailable`.
+
+Una acción que el estado actual no permite responde `409` `growth_order_invalid_transition`.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `GET /growth/catalog` | Servicios, medios y reglas del espacio |
+| `GET /growth/destinations` · `POST /growth/destinations` | Listar destinos y agregar un perfil o sitio a verificar |
+| `DELETE /growth/destinations/{destination_id}` | Quitar un destino agregado aquí |
+| `POST /growth/orders/quote` | Cotizar un pedido sin cobrar |
+| `POST /growth/orders` · `GET /growth/orders` | Pedir (exige `Idempotency-Key`) y listar pedidos |
+| `GET /growth/orders/{order_id}` | Consultar un pedido con lo entregado y su historial |
+| `POST /growth/orders/{order_id}/cancel` | Cancelar |
+| `POST /growth/orders/{order_id}/accept` | Aceptar una entrega |
+| `POST /growth/orders/{order_id}/changes` | Pedir cambios |
+| `POST /growth/orders/{order_id}/report` | Reportar un problema |
+| `POST /growth/orders/{order_id}/refill` | Pedir una reposición |
+
+Todas las operaciones: [Referencia de API → Growth](/api-reference/1platform-api#tag/growth).
+
+## Errores
+
+Los errores llegan como `{"success": false, "data": {"code": "..."}, "msg": "..."}`. Los códigos de abajo no son exhaustivos: la referencia lista los de cada operación.
+
+| Código | Estado | Significa |
+|---|---|---|
+| `module_disabled` | 403 | La cuenta no tiene el módulo |
+| `growth_disabled` · `growth_custom_disabled` | 403 | Crecimiento, o su mitad de encargos, está apagado en su espacio de trabajo |
+| `growth_forbidden` | 403 | La cuenta no pertenece a un espacio de trabajo |
+| `growth_service_not_found` · `growth_media_not_found` · `growth_destination_not_found` | 404 | El servicio, el medio o el destino no existe o no está disponible |
+| `growth_order_not_found` | 404 | El pedido no existe entre los suyos |
+| `growth_insufficient_balance` · `growth_balance_held` | 402 | El saldo disponible no cubre el pedido, o parte está retenida |
+| `growth_daily_limit` | 409 | El pedido supera el tope diario de la cuenta |
+| `growth_destination_unverified` | 409 | Verifique el perfil o sitio antes de pedir para él |
+| `growth_destination_exists` · `growth_destination_limit` | 409 | El destino ya está en su lista, o llegó al máximo |
+| `growth_not_priced` | 409 | El servicio no se ofrece en la moneda de su saldo |
+| `growth_order_key_conflict` · `growth_order_in_progress` | 409 | La `Idempotency-Key` ya se usó con otro cuerpo, o el primer intento sigue en curso |
+| `growth_order_invalid_transition` · `growth_change_rounds_exhausted` · `growth_refill_unavailable` | 409 | El pedido no puede hacer eso ahora |
+| `growth_order_invalid` · `growth_comments_invalid` · `growth_destination_invalid` | 422 | El pedido está incompleto, un comentario no cumple las reglas o el enlace no es de esa red |
+| `growth_internal_error` · `growth_unavailable` | 500 · 503 | No se completó; no se cobró nada. Reintente con la misma `Idempotency-Key` |
+
+## Con el servidor MCP
+
+Crecimiento no tiene toolset en el MCP: pedir, cotizar y operar un pedido mueven o retienen saldo, y los destinos son cuentas de terceros que el equipo verifica. Lea el contrato con `api_get_operation` e implemente el flujo por REST.

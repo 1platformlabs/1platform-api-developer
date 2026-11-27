@@ -1,0 +1,54 @@
+---
+title: Datos del espacio de trabajo
+description: Consulte cobros, facturas y ventas de sus tiendas con el alcance del usuario, monedas separadas y fecha de actualización explícita.
+sidebar_position: 5
+---
+
+# Datos del espacio de trabajo
+
+Data reúne consultas y tableros sobre los datos que puede ver el usuario. Requiere los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido). El catálogo se adapta a sus módulos y permisos; no sustituya esa respuesta por una lista fija de datasets.
+
+:::note Disponibilidad
+Esta guía acompaña la versión de Data que incorpora comercios y seguimiento de links. Compruebe que el contrato de su entorno incluya `getDataCatalog`, `queryData` y `sendPaymentLinkAgain` antes de integrar esas operaciones.
+:::
+
+## Consultar con el alcance correcto
+
+1. Lea `GET /data/catalog`. Devuelve los datasets, medidas y dimensiones permitidos, además de la zona horaria del espacio.
+2. Envíe un `WidgetSpec` a `POST /data/query`, o varios widgets a `POST /data/query/batch`. Use exclusivamente los nombres publicados en el catálogo.
+3. Muestre `data_as_of`, el rango efectivo y `coverage` junto a las cifras. Una copia anterior al esquema vigente responde `data_not_ready` hasta que termine la siguiente extracción.
+4. Respete `truncated`: un resultado parcial no permite afirmar un total completo ni una variación entre períodos.
+
+Los movimientos corresponden al propio usuario. Cobros, facturas y comercios respetan el acceso a cada comercio dentro de su espacio. Las tiendas requieren una vinculación propia y verificada: ser administrador del espacio no concede las tiendas de otras personas.
+
+## Comercio, moneda y cohorte
+
+`business_id` es una dimensión de cobros y facturas. El resultado incluye `business_labels`, un mapa de los identificadores devueltos a sus nombres dentro del mismo espacio; una referencia eliminada puede tener nombre vacío. No use el identificador como nombre visible ni intente resolverlo en otro espacio.
+
+El dataset `merchants` permite contar comercios y revisar el estado de activación de facturación y su última actividad. No contiene direcciones de clientes. Sus filtros y dimensiones disponibles salen del catálogo.
+
+El dinero se agrupa por moneda. Para un indicador, gráfico de pastel o embudo monetario, seleccione una sola moneda. No sume importes de distintas monedas ni calcule un promedio de promedios. Las medidas monetarias usan por defecto los estados liquidados, salvo que el widget solicite un estado explícito.
+
+En `collections`, `time_field` permite elegir `local_date` (compatibilidad con tableros existentes), `created_date` o `paid_date`. Para la conversión de links, use la cohorte de creación: links pagados divididos por links creados en ese período. Esto no equivale a dividir los cobros realizados durante el período por los links creados en él.
+
+## Visitas y seguimiento
+
+Los links nuevos distinguen `visited`, `not_visited` y `unmeasured`. Una visita se cuenta cuando el checkout se sirve más de cinco minutos después del último correo entregado; la ventana reduce el efecto de los escáneres de correo, pero no prueba que haya sido una persona. Por eso se presenta como «visitado», nunca «correo abierto».
+
+Sin un envío exitoso que sirva de referencia, o sin instrumentación histórica, el estado es `unmeasured`. Un intento de reenvío fallido no crea esa referencia. Las cifras de Data son una copia y pueden retrasarse hasta la siguiente extracción.
+
+La lista accionable sigue en Links de pago. `GET /businesses/{businessId}/payment-links?follow_up=true` filtra antes de paginar: links activos, con correo, visitados después de la ventana de medición, creados hace al menos 48 horas y sin intento de reenvío en las últimas 48 horas. El concepto y el correo del cliente no se incorporan a las copias analíticas.
+
+## Tableros, descargas y límites
+
+Al abrir Data, el panel solicita `POST /data/dashboards/initialize` para que un administrador reciba una sola vez el tablero privado «Pulso de mis comercios», adaptado a sus datasets. Esa inicialización no está disponible durante impersonación ni por MCP. `GET /data/dashboards` sólo lee; no crea tableros. Puede editar o eliminar el tablero inicial; eliminarlo no lo vuelve a crear. Compartir un tablero comparte su estructura: cada persona consulta las cifras que puede ver.
+
+`POST /data/export` descarga una consulta en CSV o XLSX. Los programas de reportes vuelven a resolver los permisos del destinatario al ejecutarse. Un enlace de descarga no amplía su acceso.
+
+Las consultas interactivas comparten un cupo de widgets por espacio. `429` con `data_workspace_rate_limited` incluye `Retry-After`; espere ese intervalo antes de reintentar. Un lote consume un cupo por widget. Exportaciones y reportes conservan sus propios límites.
+
+## MCP y operaciones explícitas
+
+El toolset `data` expone lecturas con el mismo catálogo y alcance del usuario. El reenvío de un link es una escritura excluida de MCP: requiere una decisión explícita desde el panel o la API. Consulte [Reenviar un link](/docs/saas/1platform-api/links-de-pago#reenviar).
+
+Referencia de las consultas: [API → queryData](/api-reference/1platform-api#operation/queryData).

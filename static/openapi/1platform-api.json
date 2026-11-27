@@ -3,7 +3,7 @@
   "info": {
     "title": "1Platform API",
     "description": "# 1Platform API\n\nREST API powering the **1Platform** platform — content generation, SEO tooling, billing, invoicing, and third-party integrations.\n\n---\n\n## Authentication\n\n1Platform uses a **two-token** authentication model:\n\n| Token | Header | How to obtain | Purpose |\n|-------|--------|---------------|---------|\n| **App token** | `Authorization: Bearer <token>` | `POST /api/v1/auth/token` with your App API key | Identifies the calling application |\n| **User token** | `x-user-token: <token>` | `POST /api/v1/users/token` with the user API key | Identifies the end user |\n\nMost endpoints require **both** tokens. Exceptions are noted per endpoint.\n\n## Quickstart\n\n```bash\n# 1. Get an app token\ncurl -X POST https://api.1platform.pro/api/v1/auth/token \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"APP_API_KEY_EXAMPLE\"}'\n\n# 2. Get a user token (requires app token)\ncurl -X POST https://api.1platform.pro/api/v1/users/token \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"apiKey\": \"USER_API_KEY_EXAMPLE\"}'\n\n# 3. Call any protected endpoint (requires both tokens)\ncurl https://api.1platform.pro/api/v1/users/profile \\\n  -H \"Authorization: Bearer $APP_TOKEN\" \\\n  -H \"x-user-token: $USER_TOKEN\"\n```\n\n## Base URL\n\nAll endpoints are prefixed with `/api/v1/`.\n\n## Rate Limits\n\n| Category | Limit |\n|----------|-------|\n| Health | 100 req/min |\n| Auth | 10 req/min |\n| Read operations | 50 req/min |\n| Write operations | 20 req/min |\n| Keyword generation | 10 req/min |\n| Content generation | 5 req/min |\n| Indexing | 20 req/min |\n| Agent runs | 10 req/min |\n| Agent wizard | 20 req/min |\n| Agent CRUD | 30 req/min |\n| Agent metrics | 10 req/min |\n| Client logs | 10 req/min |\n| Analytics reads | 30 req/min |\n| Analytics writes | 10 req/min |\n| Analytics reports | 20 req/min |\n| Analytics realtime | 10 req/min |\n| Analytics events | 10 req/min |\n\n## Response Format\n\nAll endpoints return a standard wrapper (except webhooks):\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"msg\": \"Operation completed successfully\"\n}\n```\n",
-    "version": "PRODv5.189.0"
+    "version": "PRODv5.190.0"
   },
   "servers": [
     {
@@ -37905,6 +37905,18 @@
             "description": "Filter by status (active/paid/cancelled/expired/denied)"
           },
           {
+            "name": "follow_up",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only actionable visited, unpaid links older than 48 hours",
+              "default": false,
+              "title": "Follow Up"
+            },
+            "description": "Only actionable visited, unpaid links older than 48 hours"
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -38179,6 +38191,167 @@
         },
         "x-rate-limit": [
           "200/minute"
+        ]
+      }
+    },
+    "/api/v1/businesses/{businessId}/payment-links/{linkId}/send-again": {
+      "post": {
+        "tags": [
+          "Payment Links"
+        ],
+        "summary": "Request a payment link email again",
+        "description": "Explicitly request another email to the existing customer address. Requires both tokens and the same business roles as cancellation. Only active, unexpired links with an address are eligible. A shared atomic limit allows three attempts per link per UTC day; failed deliveries also consume an attempt. Returns acceptance, not delivery confirmation. Unavailable during impersonation. This write operation is excluded from MCP.",
+        "operationId": "sendPaymentLinkAgain",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "businessId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The business (commerce) id",
+              "title": "Businessid"
+            },
+            "description": "The business (commerce) id"
+          },
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The payment link id",
+              "title": "Linkid"
+            },
+            "description": "The payment link id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Email request accepted; delivery is not confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_str__bool__"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "queued": true
+                  },
+                  "msg": "Payment link email requested"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Both tokens are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient business role or impersonation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "module_disabled"
+            ],
+            "x-error-code-location": "data"
+          },
+          "404": {
+            "description": "Link or business not found in caller scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Link is ineligible or customer email is disabled",
+            "x-error-codes": [
+              "payment_link_no_customer_email",
+              "payment_link_not_resendable",
+              "payment_link_email_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily email or request limit reached",
+            "x-error-codes": [
+              "payment_link_email_limit_reached"
+            ],
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until retry"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
         ]
       }
     },
@@ -71112,6 +71285,3195 @@
         },
         "x-rate-limit": [
           "240/minute"
+        ]
+      }
+    },
+    "/api/v1/data/catalog": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Datasets I can analyse",
+        "description": "The datasets you may read (only those whose source you can already see), with their dimensions, measures, filters and chart types, and the cut-off of your copies.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "getDataCatalog",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "datasets": [
+                      {
+                        "id": "movements",
+                        "label_key": "data.dataset.movements",
+                        "dimensions": [
+                          {
+                            "id": "day",
+                            "type": "date",
+                            "label_key": "data.dimension.day",
+                            "values": []
+                          },
+                          {
+                            "id": "week",
+                            "type": "date",
+                            "label_key": "data.dimension.week",
+                            "values": []
+                          },
+                          {
+                            "id": "month",
+                            "type": "date",
+                            "label_key": "data.dimension.month",
+                            "values": []
+                          },
+                          {
+                            "id": "direction",
+                            "type": "string",
+                            "label_key": "data.dimension.direction",
+                            "values": [
+                              "credit",
+                              "debit"
+                            ]
+                          },
+                          {
+                            "id": "vertical",
+                            "type": "string",
+                            "label_key": "data.dimension.vertical",
+                            "values": []
+                          },
+                          {
+                            "id": "source",
+                            "type": "string",
+                            "label_key": "data.dimension.source",
+                            "values": [
+                              "transaction",
+                              "consumption",
+                              "terminal"
+                            ]
+                          },
+                          {
+                            "id": "status",
+                            "type": "string",
+                            "label_key": "data.dimension.status",
+                            "values": [
+                              "paid",
+                              "pending",
+                              "failed",
+                              "refunded"
+                            ]
+                          },
+                          {
+                            "id": "currency",
+                            "type": "string",
+                            "label_key": "data.dimension.currency",
+                            "values": []
+                          }
+                        ],
+                        "measures": [
+                          {
+                            "id": "count",
+                            "type": "number",
+                            "label_key": "data.measure.count",
+                            "money": false
+                          },
+                          {
+                            "id": "amount_sum",
+                            "type": "money",
+                            "label_key": "data.measure.amount_sum",
+                            "money": true
+                          },
+                          {
+                            "id": "net_sum",
+                            "type": "money",
+                            "label_key": "data.measure.net_sum",
+                            "money": true
+                          },
+                          {
+                            "id": "credit_sum",
+                            "type": "money",
+                            "label_key": "data.measure.credit_sum",
+                            "money": true
+                          },
+                          {
+                            "id": "debit_sum",
+                            "type": "money",
+                            "label_key": "data.measure.debit_sum",
+                            "money": true
+                          },
+                          {
+                            "id": "amount_avg",
+                            "type": "money",
+                            "label_key": "data.measure.amount_avg",
+                            "money": true
+                          }
+                        ],
+                        "filters": [
+                          "direction",
+                          "vertical",
+                          "source",
+                          "status",
+                          "currency"
+                        ],
+                        "time_fields": [
+                          "local_date"
+                        ],
+                        "charts": [
+                          "bar",
+                          "line",
+                          "pie",
+                          "funnel",
+                          "table",
+                          "kpi"
+                        ],
+                        "operators": [
+                          "eq",
+                          "in",
+                          "gte",
+                          "lte",
+                          "between"
+                        ]
+                      }
+                    ],
+                    "data_as_of": "2026-11-05T14:00:00Z"
+                  },
+                  "msg": "Catalog retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Data is temporarily unavailable",
+            "x-error-codes": [
+              "data_engine_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      }
+    },
+    "/api/v1/data/query": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Run one widget",
+        "description": "Runs one widget definition over your own copies. Money is always grouped by currency; `kpi`, `pie` and `funnel` with money require a single-currency filter. `time_range.preset=all` returns the whole available period (bounded by the platform ceiling, reported in `range.limited`).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "queryData",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WidgetSpec"
+              },
+              "example": {
+                "dataset": "movements",
+                "measures": [
+                  "amount_sum"
+                ],
+                "dimensions": [
+                  "day",
+                  "vertical"
+                ],
+                "filters": [
+                  {
+                    "field": "direction",
+                    "op": "eq",
+                    "value": "debit"
+                  }
+                ],
+                "time_range": {
+                  "preset": "last_30_days"
+                },
+                "chart": "bar",
+                "limit": 500
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "columns": [
+                      {
+                        "id": "day",
+                        "type": "date"
+                      },
+                      {
+                        "id": "vertical",
+                        "type": "string"
+                      },
+                      {
+                        "id": "currency",
+                        "type": "string"
+                      },
+                      {
+                        "id": "amount_sum",
+                        "type": "money"
+                      }
+                    ],
+                    "rows": [
+                      [
+                        "2026-11-01",
+                        "social",
+                        "USD",
+                        "12.40"
+                      ]
+                    ],
+                    "truncated": false,
+                    "data_as_of": "2026-11-05T14:00:00Z",
+                    "range": {
+                      "from": "2026-10-07",
+                      "to": "2026-11-05",
+                      "preset": "last_30_days",
+                      "limited": false
+                    },
+                    "coverage": {
+                      "from": "2026-01-12",
+                      "to": "2026-11-05"
+                    },
+                    "stale": false
+                  },
+                  "msg": "Query completed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "A selected store is not available to you",
+            "x-error-codes": [
+              "data_store_not_available"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Your data is being prepared",
+            "x-error-codes": [
+              "data_not_ready"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid widget definition or period",
+            "x-error-codes": [
+              "data_spec_invalid",
+              "data_range_too_wide",
+              "data_currency_required",
+              "data_scope_too_wide",
+              "data_query_too_heavy",
+              "data_range_unavailable",
+              "data_store_scope_too_large",
+              "data_source_inconsistent"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Workspace widget limit exceeded",
+            "x-error-codes": [
+              "data_workspace_rate_limited"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "500": {
+            "description": "Unexpected failure",
+            "x-error-codes": [
+              "data_error"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "503": {
+            "description": "Data is temporarily unavailable",
+            "x-error-codes": [
+              "data_engine_unavailable",
+              "data_busy",
+              "data_query_timeout",
+              "data_store_source_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      }
+    },
+    "/api/v1/data/query/batch": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Run a dashboard",
+        "description": "Runs up to 24 widgets with one scope resolution and a total deadline of 25 s. A widget that fails carries its own `error` code; the others keep their results.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "queryDataBatch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryBatchRequest"
+              },
+              "example": {
+                "widgets": [
+                  {
+                    "dataset": "movements",
+                    "measures": [
+                      "amount_sum"
+                    ],
+                    "dimensions": [
+                      "day",
+                      "vertical"
+                    ],
+                    "filters": [
+                      {
+                        "field": "direction",
+                        "op": "eq",
+                        "value": "debit"
+                      }
+                    ],
+                    "time_range": {
+                      "preset": "last_30_days"
+                    },
+                    "chart": "bar",
+                    "limit": 500
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "results": [
+                      {
+                        "result": {
+                          "columns": [
+                            {
+                              "id": "day",
+                              "type": "date"
+                            },
+                            {
+                              "id": "vertical",
+                              "type": "string"
+                            },
+                            {
+                              "id": "currency",
+                              "type": "string"
+                            },
+                            {
+                              "id": "amount_sum",
+                              "type": "money"
+                            }
+                          ],
+                          "rows": [
+                            [
+                              "2026-11-01",
+                              "social",
+                              "USD",
+                              "12.40"
+                            ]
+                          ],
+                          "truncated": false,
+                          "data_as_of": "2026-11-05T14:00:00Z",
+                          "range": {
+                            "from": "2026-10-07",
+                            "to": "2026-11-05",
+                            "preset": "last_30_days",
+                            "limited": false
+                          },
+                          "coverage": {
+                            "from": "2026-01-12",
+                            "to": "2026-11-05"
+                          },
+                          "stale": false
+                        }
+                      },
+                      {
+                        "error": "data_query_timeout"
+                      }
+                    ]
+                  },
+                  "msg": "Batch completed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid widget definition or period",
+            "x-error-codes": [
+              "data_spec_invalid",
+              "data_range_too_wide",
+              "data_currency_required",
+              "data_scope_too_wide",
+              "data_query_too_heavy",
+              "data_range_unavailable",
+              "data_store_scope_too_large",
+              "data_source_inconsistent"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Workspace widget limit exceeded",
+            "x-error-codes": [
+              "data_workspace_rate_limited"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "503": {
+            "description": "Data is temporarily unavailable",
+            "x-error-codes": [
+              "data_engine_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      }
+    },
+    "/api/v1/data/export": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Download one widget as CSV or XLSX",
+        "description": "The same query as the screen, with the export row cap. A cut file says so in its name (`-truncated`) and in the `X-Data-Truncated` header. Refused under impersonation.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "exportData",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              },
+              "example": {
+                "spec": {
+                  "dataset": "movements",
+                  "measures": [
+                    "amount_sum"
+                  ],
+                  "dimensions": [
+                    "day",
+                    "vertical"
+                  ],
+                  "filters": [
+                    {
+                      "field": "direction",
+                      "op": "eq",
+                      "value": "debit"
+                    }
+                  ],
+                  "time_range": {
+                    "preset": "last_30_days"
+                  },
+                  "chart": "bar",
+                  "limit": 500
+                },
+                "format": "csv",
+                "title": "Mis cobros"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/csv": {
+                "example": "﻿day,currency,amount_sum\n"
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "A selected store is not available to you",
+            "x-error-codes": [
+              "data_store_not_available"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Your data is being prepared",
+            "x-error-codes": [
+              "data_not_ready"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid widget definition or period",
+            "x-error-codes": [
+              "data_spec_invalid",
+              "data_range_too_wide",
+              "data_currency_required",
+              "data_scope_too_wide",
+              "data_query_too_heavy",
+              "data_range_unavailable",
+              "data_store_scope_too_large",
+              "data_source_inconsistent"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure",
+            "x-error-codes": [
+              "data_error"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "503": {
+            "description": "Data is temporarily unavailable",
+            "x-error-codes": [
+              "data_engine_unavailable",
+              "data_busy",
+              "data_query_timeout",
+              "data_store_source_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
+        ]
+      }
+    },
+    "/api/v1/data/refresh": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Ask for fresh copies",
+        "description": "Queues a refresh of your workspace's copies, served on the next extractor tick. At most once per cooldown (409 `data_refresh_cooldown`).\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "refreshData",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Refresh queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "queued": true
+                  },
+                  "msg": "Refresh queued"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Refreshed recently",
+            "x-error-codes": [
+              "data_refresh_cooldown"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Data is temporarily unavailable",
+            "x-error-codes": [
+              "data_engine_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "40/minute"
+        ]
+      }
+    },
+    "/api/v1/data/stores": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "My linked stores",
+        "description": "The stores you OWN that were linked to your workspace when they were created. Being an admin does not add other members' stores. An empty list means no linked store yet.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listDataStores",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Page size (max 100)",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Page size (max 100)"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor of the next page",
+              "title": "Cursor"
+            },
+            "description": "Opaque cursor of the next page"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stores",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "website_id": "6a1f0c2e9b1d4a0012345678",
+                        "name": "Aurum Labs"
+                      }
+                    ]
+                  },
+                  "msg": "Stores retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid cursor",
+            "x-error-codes": [
+              "data_spec_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      }
+    },
+    "/api/v1/data/dashboards": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "My dashboards and the shared ones",
+        "description": "Your private dashboards and the ones a workspace admin shared.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listDataDashboards",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6a1f0c2e9b1d4a0012345678",
+                        "name": "Mis cobros",
+                        "visibility": "private",
+                        "owner_user_id": "6a1f0c2e9b1d4a0012345600",
+                        "is_owner": true,
+                        "can_edit": true,
+                        "widgets": [
+                          {
+                            "id": "w1",
+                            "title": "Cobros por mes",
+                            "spec": {
+                              "dataset": "movements",
+                              "measures": [
+                                "amount_sum"
+                              ],
+                              "dimensions": [
+                                "day",
+                                "vertical"
+                              ],
+                              "filters": [
+                                {
+                                  "field": "direction",
+                                  "op": "eq",
+                                  "value": "debit"
+                                }
+                              ],
+                              "time_range": {
+                                "preset": "last_30_days"
+                              },
+                              "chart": "bar",
+                              "limit": 500
+                            },
+                            "layout": {
+                              "x": 0,
+                              "y": 0,
+                              "w": 6,
+                              "h": 4
+                            }
+                          }
+                        ],
+                        "version": 1,
+                        "created_at": "2026-11-05T14:00:00Z",
+                        "updated_at": "2026-11-05T14:00:00Z"
+                      }
+                    ]
+                  },
+                  "msg": "Dashboards retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      },
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Create a dashboard",
+        "description": "Creates a private dashboard. Only a workspace admin may create it shared.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "createDataDashboard",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardWrite"
+              },
+              "example": {
+                "name": "Mis cobros",
+                "visibility": "private",
+                "widgets": [
+                  {
+                    "id": "w1",
+                    "title": "Cobros por mes",
+                    "spec": {
+                      "dataset": "movements",
+                      "measures": [
+                        "amount_sum"
+                      ],
+                      "dimensions": [
+                        "day",
+                        "vertical"
+                      ],
+                      "filters": [
+                        {
+                          "field": "direction",
+                          "op": "eq",
+                          "value": "debit"
+                        }
+                      ],
+                      "time_range": {
+                        "preset": "last_30_days"
+                      },
+                      "chart": "bar",
+                      "limit": 500
+                    },
+                    "layout": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 6,
+                      "h": 4
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a1f0c2e9b1d4a0012345678",
+                    "name": "Mis cobros",
+                    "visibility": "private",
+                    "owner_user_id": "6a1f0c2e9b1d4a0012345600",
+                    "is_owner": true,
+                    "can_edit": true,
+                    "widgets": [
+                      {
+                        "id": "w1",
+                        "title": "Cobros por mes",
+                        "spec": {
+                          "dataset": "movements",
+                          "measures": [
+                            "amount_sum"
+                          ],
+                          "dimensions": [
+                            "day",
+                            "vertical"
+                          ],
+                          "filters": [
+                            {
+                              "field": "direction",
+                              "op": "eq",
+                              "value": "debit"
+                            }
+                          ],
+                          "time_range": {
+                            "preset": "last_30_days"
+                          },
+                          "chart": "bar",
+                          "limit": 500
+                        },
+                        "layout": {
+                          "x": 0,
+                          "y": 0,
+                          "w": 6,
+                          "h": 4
+                        }
+                      }
+                    ],
+                    "version": 1,
+                    "created_at": "2026-11-05T14:00:00Z",
+                    "updated_at": "2026-11-05T14:00:00Z"
+                  },
+                  "msg": "Dashboard created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sharing requires a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "data_share_forbidden",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Limit reached",
+            "x-error-codes": [
+              "data_limit_reached"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid widget definition or period",
+            "x-error-codes": [
+              "data_spec_invalid",
+              "data_range_too_wide",
+              "data_currency_required",
+              "data_scope_too_wide",
+              "data_query_too_heavy",
+              "data_range_unavailable",
+              "data_store_scope_too_large",
+              "data_source_inconsistent"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/data/dashboards/initialize": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Initialize your starter dashboard",
+        "description": "Explicit, idempotent initialization for a workspace administrator opening Data. Returns the private starter dashboard when created, otherwise null. Listing dashboards never initializes it.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "initializeDataDashboard",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Initialized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_Union_dict__NoneType__"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a1f0c2e9b1d4a0012345678",
+                    "name": "Mis cobros",
+                    "visibility": "private",
+                    "owner_user_id": "6a1f0c2e9b1d4a0012345600",
+                    "is_owner": true,
+                    "can_edit": true,
+                    "widgets": [
+                      {
+                        "id": "w1",
+                        "title": "Cobros por mes",
+                        "spec": {
+                          "dataset": "movements",
+                          "measures": [
+                            "amount_sum"
+                          ],
+                          "dimensions": [
+                            "day",
+                            "vertical"
+                          ],
+                          "filters": [
+                            {
+                              "field": "direction",
+                              "op": "eq",
+                              "value": "debit"
+                            }
+                          ],
+                          "time_range": {
+                            "preset": "last_30_days"
+                          },
+                          "chart": "bar",
+                          "limit": 500
+                        },
+                        "layout": {
+                          "x": 0,
+                          "y": 0,
+                          "w": 6,
+                          "h": 4
+                        }
+                      }
+                    ],
+                    "version": 1,
+                    "created_at": "2026-11-05T14:00:00Z",
+                    "updated_at": "2026-11-05T14:00:00Z"
+                  },
+                  "msg": "Dashboard initialized"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Initialization requires a workspace administrator",
+            "x-error-codes": [
+              "module_disabled",
+              "data_admin_required",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Atomic initialization is temporarily unavailable",
+            "x-error-codes": [
+              "data_engine_unavailable"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/data/dashboards/{dashboard_id}": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "One dashboard",
+        "description": "One of your dashboards or a shared one.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "getDataDashboard",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Dashboard id",
+              "title": "Dashboard Id"
+            },
+            "description": "Dashboard id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a1f0c2e9b1d4a0012345678",
+                    "name": "Mis cobros",
+                    "visibility": "private",
+                    "owner_user_id": "6a1f0c2e9b1d4a0012345600",
+                    "is_owner": true,
+                    "can_edit": true,
+                    "widgets": [
+                      {
+                        "id": "w1",
+                        "title": "Cobros por mes",
+                        "spec": {
+                          "dataset": "movements",
+                          "measures": [
+                            "amount_sum"
+                          ],
+                          "dimensions": [
+                            "day",
+                            "vertical"
+                          ],
+                          "filters": [
+                            {
+                              "field": "direction",
+                              "op": "eq",
+                              "value": "debit"
+                            }
+                          ],
+                          "time_range": {
+                            "preset": "last_30_days"
+                          },
+                          "chart": "bar",
+                          "limit": 500
+                        },
+                        "layout": {
+                          "x": 0,
+                          "y": 0,
+                          "w": 6,
+                          "h": 4
+                        }
+                      }
+                    ],
+                    "version": 1,
+                    "created_at": "2026-11-05T14:00:00Z",
+                    "updated_at": "2026-11-05T14:00:00Z"
+                  },
+                  "msg": "Dashboard retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such dashboard among yours or the shared ones",
+            "x-error-codes": [
+              "data_dashboard_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      },
+      "put": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Replace a dashboard",
+        "description": "Replaces name, visibility and widgets. Send the `version` you read: a dashboard that changed meanwhile answers 409. Only the owner or a workspace admin may edit; others get 404.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "replaceDataDashboard",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Dashboard id",
+              "title": "Dashboard Id"
+            },
+            "description": "Dashboard id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardWrite"
+              },
+              "example": {
+                "name": "Mis cobros",
+                "visibility": "private",
+                "widgets": [],
+                "version": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a1f0c2e9b1d4a0012345678",
+                    "name": "Mis cobros",
+                    "visibility": "private",
+                    "owner_user_id": "6a1f0c2e9b1d4a0012345600",
+                    "is_owner": true,
+                    "can_edit": true,
+                    "widgets": [
+                      {
+                        "id": "w1",
+                        "title": "Cobros por mes",
+                        "spec": {
+                          "dataset": "movements",
+                          "measures": [
+                            "amount_sum"
+                          ],
+                          "dimensions": [
+                            "day",
+                            "vertical"
+                          ],
+                          "filters": [
+                            {
+                              "field": "direction",
+                              "op": "eq",
+                              "value": "debit"
+                            }
+                          ],
+                          "time_range": {
+                            "preset": "last_30_days"
+                          },
+                          "chart": "bar",
+                          "limit": 500
+                        },
+                        "layout": {
+                          "x": 0,
+                          "y": 0,
+                          "w": 6,
+                          "h": 4
+                        }
+                      }
+                    ],
+                    "version": 1,
+                    "created_at": "2026-11-05T14:00:00Z",
+                    "updated_at": "2026-11-05T14:00:00Z"
+                  },
+                  "msg": "Dashboard updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sharing requires a workspace admin",
+            "x-error-codes": [
+              "module_disabled",
+              "data_share_forbidden",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such dashboard among yours or the shared ones",
+            "x-error-codes": [
+              "data_dashboard_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Changed meanwhile or limit reached",
+            "x-error-codes": [
+              "data_dashboard_version_conflict",
+              "data_limit_reached"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid widget definition or period",
+            "x-error-codes": [
+              "data_spec_invalid",
+              "data_range_too_wide",
+              "data_currency_required",
+              "data_scope_too_wide",
+              "data_query_too_heavy",
+              "data_range_unavailable",
+              "data_store_scope_too_large",
+              "data_source_inconsistent"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Delete a dashboard",
+        "description": "Only the owner or a workspace admin.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "deleteDataDashboard",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Dashboard id",
+              "title": "Dashboard Id"
+            },
+            "description": "Dashboard id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "deleted": true
+                  },
+                  "msg": "Dashboard deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such dashboard among yours or the shared ones",
+            "x-error-codes": [
+              "data_dashboard_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/data/dashboards/{dashboard_id}/duplicate": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Duplicate a dashboard as mine",
+        "description": "A private copy. Widgets over datasets you cannot read are left out: sharing never widens permissions.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "duplicateDataDashboard",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Dashboard id",
+              "title": "Dashboard Id"
+            },
+            "description": "Dashboard id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Copied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a1f0c2e9b1d4a0012345678",
+                    "name": "Mis cobros",
+                    "visibility": "private",
+                    "owner_user_id": "6a1f0c2e9b1d4a0012345600",
+                    "is_owner": true,
+                    "can_edit": true,
+                    "widgets": [
+                      {
+                        "id": "w1",
+                        "title": "Cobros por mes",
+                        "spec": {
+                          "dataset": "movements",
+                          "measures": [
+                            "amount_sum"
+                          ],
+                          "dimensions": [
+                            "day",
+                            "vertical"
+                          ],
+                          "filters": [
+                            {
+                              "field": "direction",
+                              "op": "eq",
+                              "value": "debit"
+                            }
+                          ],
+                          "time_range": {
+                            "preset": "last_30_days"
+                          },
+                          "chart": "bar",
+                          "limit": 500
+                        },
+                        "layout": {
+                          "x": 0,
+                          "y": 0,
+                          "w": 6,
+                          "h": 4
+                        }
+                      }
+                    ],
+                    "version": 1,
+                    "created_at": "2026-11-05T14:00:00Z",
+                    "updated_at": "2026-11-05T14:00:00Z"
+                  },
+                  "msg": "Dashboard duplicated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such dashboard among yours or the shared ones",
+            "x-error-codes": [
+              "data_dashboard_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Limit reached",
+            "x-error-codes": [
+              "data_limit_reached"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/data/schedules": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "My scheduled reports",
+        "description": "Refused under impersonation.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listDataSchedules",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "id": "6a1f0c2e9b1d4a0012345690",
+                        "dashboard_id": "6a1f0c2e9b1d4a0012345678",
+                        "format": "xlsx",
+                        "frequency": "weekly",
+                        "hour": 8,
+                        "weekday": 0,
+                        "timezone": "America/Guatemala",
+                        "recipient_user_ids": [
+                          "6a1f0c2e9b1d4a0012345600"
+                        ],
+                        "next_run_at": "2026-11-09T14:00:00Z",
+                        "active": true
+                      }
+                    ]
+                  },
+                  "msg": "Schedules retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      },
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Schedule a report by e-mail",
+        "description": "Every recipient (a verified user of your workspace, up to 5) gets their OWN file generated with their own access; the e-mail carries no data and links to a download that asks for their session. Refused under impersonation.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "createDataSchedule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleWrite"
+              },
+              "example": {
+                "dashboard_id": "6a1f0c2e9b1d4a0012345678",
+                "format": "xlsx",
+                "frequency": "weekly",
+                "hour": 8,
+                "weekday": 0,
+                "timezone": "America/Guatemala",
+                "recipient_user_ids": [
+                  "6a1f0c2e9b1d4a0012345600"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a1f0c2e9b1d4a0012345690",
+                    "dashboard_id": "6a1f0c2e9b1d4a0012345678",
+                    "format": "xlsx",
+                    "frequency": "weekly",
+                    "hour": 8,
+                    "weekday": 0,
+                    "timezone": "America/Guatemala",
+                    "recipient_user_ids": [
+                      "6a1f0c2e9b1d4a0012345600"
+                    ],
+                    "next_run_at": "2026-11-09T14:00:00Z",
+                    "active": true
+                  },
+                  "msg": "Schedule created"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such scheduled report among yours",
+            "x-error-codes": [
+              "data_schedule_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "409": {
+            "description": "Limit reached",
+            "x-error-codes": [
+              "data_limit_reached"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid schedule or recipient",
+            "x-error-codes": [
+              "data_recipient_invalid",
+              "data_spec_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/data/recipients": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Who can receive a scheduled report",
+        "description": "Active members of your workspace with a display name and whether they are verified (only verified members can be recipients). No e-mail addresses. Refused under impersonation.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "listDataRecipients",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "items": [
+                      {
+                        "user_id": "6a0000000000000000000a11",
+                        "name": "Alex",
+                        "verified": true,
+                        "is_me": true
+                      }
+                    ]
+                  },
+                  "msg": "Recipients retrieved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "480/minute"
+        ]
+      }
+    },
+    "/api/v1/data/schedules/{schedule_id}": {
+      "put": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Replace a scheduled report",
+        "description": "Refused under impersonation.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "replaceDataSchedule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Schedule id",
+              "title": "Schedule Id"
+            },
+            "description": "Schedule id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleWrite"
+              },
+              "example": {
+                "dashboard_id": "6a1f0c2e9b1d4a0012345678",
+                "format": "xlsx",
+                "frequency": "weekly",
+                "hour": 8,
+                "weekday": 0,
+                "timezone": "America/Guatemala",
+                "recipient_user_ids": [
+                  "6a1f0c2e9b1d4a0012345600"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "6a1f0c2e9b1d4a0012345690",
+                    "dashboard_id": "6a1f0c2e9b1d4a0012345678",
+                    "format": "xlsx",
+                    "frequency": "weekly",
+                    "hour": 8,
+                    "weekday": 0,
+                    "timezone": "America/Guatemala",
+                    "recipient_user_ids": [
+                      "6a1f0c2e9b1d4a0012345600"
+                    ],
+                    "next_run_at": "2026-11-09T14:00:00Z",
+                    "active": true
+                  },
+                  "msg": "Schedule updated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such scheduled report among yours",
+            "x-error-codes": [
+              "data_schedule_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Invalid schedule or recipient",
+            "x-error-codes": [
+              "data_recipient_invalid",
+              "data_spec_invalid"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Delete a scheduled report",
+        "description": "Refused under impersonation.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "deleteDataSchedule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Schedule id",
+              "title": "Schedule Id"
+            },
+            "description": "Schedule id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "deleted": true
+                  },
+                  "msg": "Schedule deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such scheduled report among yours",
+            "x-error-codes": [
+              "data_schedule_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "120/minute"
+        ]
+      }
+    },
+    "/api/v1/data/downloads/{delivery_id}": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Download a report sent to me",
+        "description": "The file of a scheduled report, ONLY for its recipient, while it lasts (7 days) and while the recipient's access is the one the file was generated with. Refused under impersonation.\n\n**Auth:** `Authorization: Bearer <app_token>` + `x-user-token: <user_token>`",
+        "operationId": "downloadDataReport",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "delivery_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Delivery id",
+              "title": "Delivery Id"
+            },
+            "description": "Delivery id"
+          },
+          {
+            "name": "x-user-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User JWT token",
+              "title": "X-User-Token"
+            },
+            "description": "User JWT token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "text/csv": {
+                "example": "﻿day,count\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Data is switched off for this workspace or this user",
+            "x-error-codes": [
+              "module_disabled",
+              "data_disabled"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "404": {
+            "description": "No such download for you",
+            "x-error-codes": [
+              "data_download_not_found"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-code-location": "root_or_data"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-rate-limit": [
+          "80/minute"
         ]
       }
     },
@@ -206717,6 +210079,91 @@
         "title": "DashboardUIProfile",
         "description": "Closed visual profile catalogue for authenticated dashboard surfaces."
       },
+      "DashboardWidget": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,40}$",
+            "title": "Id",
+            "description": "Stable id within the dashboard"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "description": "Title shown on the widget"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/WidgetSpec",
+            "description": "What the widget reads and how it draws it"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/WidgetLayout",
+            "description": "Position and size on the grid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "spec",
+          "layout"
+        ],
+        "title": "DashboardWidget"
+      },
+      "DashboardWrite": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Dashboard name"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "workspace"
+            ],
+            "title": "Visibility",
+            "description": "`workspace` shares the structure with the workspace (admins only)",
+            "default": "private"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardWidget"
+            },
+            "type": "array",
+            "maxItems": 24,
+            "title": "Widgets",
+            "description": "Up to 24 widgets"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "The version you read; required on PUT (compare-and-swap)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "DashboardWrite"
+      },
       "DecisionIn": {
         "properties": {
           "decision_id": {
@@ -210285,6 +213732,43 @@
           "observed_price": "66350.10"
         }
       },
+      "ExportRequest": {
+        "properties": {
+          "spec": {
+            "$ref": "#/components/schemas/WidgetSpec",
+            "description": "The widget to download"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Format",
+            "description": "File format"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Title written in the file and its name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec",
+          "format"
+        ],
+        "title": "ExportRequest"
+      },
       "FAQCreateRequest": {
         "properties": {
           "question": {
@@ -211416,6 +214900,75 @@
         },
         "type": "object",
         "title": "FelTax"
+      },
+      "FilterSpec": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Field",
+            "description": "A filterable field of the dataset, as listed in the catalogue"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "in",
+              "gte",
+              "lte",
+              "between"
+            ],
+            "title": "Op",
+            "description": "Closed set of operators"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value",
+            "description": "One value (`eq`, `gte`, `lte`), 1-50 values (`in`) or exactly two (`between`)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "op",
+          "value"
+        ],
+        "title": "FilterSpec"
       },
       "ForceDisconnectRequest": {
         "properties": {
@@ -230594,6 +234147,26 @@
         ],
         "title": "QaRouteErrorsOut"
       },
+      "QueryBatchRequest": {
+        "properties": {
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetSpec"
+            },
+            "type": "array",
+            "maxItems": 24,
+            "minItems": 1,
+            "title": "Widgets",
+            "description": "The widgets of one dashboard"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "widgets"
+        ],
+        "title": "QueryBatchRequest"
+      },
       "ReadinessItem": {
         "properties": {
           "ready": {
@@ -233823,6 +237396,120 @@
         ],
         "title": "SatActivationResponse",
         "description": "Result of a self-service activation.\n\n``signaturePassword`` is generated for this certificate and returned EXACTLY\nONCE: it is not stored anywhere, so a client that discards it cannot ask for\nit again."
+      },
+      "ScheduleWrite": {
+        "properties": {
+          "dashboard_id": {
+            "type": "string",
+            "maxLength": 24,
+            "minLength": 24,
+            "pattern": "^[0-9a-f]{24}$",
+            "title": "Dashboard Id",
+            "description": "Dashboard to send"
+          },
+          "widget_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[A-Za-z0-9_-]{1,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widget Id",
+            "description": "Send only this widget (default: the whole dashboard)"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Format",
+            "description": "File format",
+            "default": "csv"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "title": "Frequency",
+            "description": "How often it is sent"
+          },
+          "hour": {
+            "type": "integer",
+            "maximum": 23,
+            "minimum": 0,
+            "title": "Hour",
+            "description": "Hour of the day in `timezone`"
+          },
+          "weekday": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 6,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekday",
+            "description": "Weekly: 0 = Monday"
+          },
+          "day_of_month": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 28,
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month",
+            "description": "Monthly: day 1-28"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "description": "IANA timezone of `hour`"
+          },
+          "recipient_user_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Recipient User Ids",
+            "description": "1-5 verified users of your workspace"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Whether the schedule runs",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dashboard_id",
+          "frequency",
+          "hour",
+          "timezone",
+          "recipient_user_ids"
+        ],
+        "title": "ScheduleWrite"
       },
       "ScheduledJobRow": {
         "properties": {
@@ -243027,6 +246714,40 @@
           "bank_checked": true,
           "note": "Ana no pudo seguir; verifiqué el banco"
         }
+      },
+      "StoreScope": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "all_owned",
+              "selected"
+            ],
+            "title": "Mode",
+            "description": "`all_owned`: every store you own that is linked and verified, resolved when the query runs; `selected`: only the listed ones"
+          },
+          "website_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website Ids",
+            "description": "1-100 distinct store ids (`selected` only)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "StoreScope"
       },
       "StorefrontSpec": {
         "properties": {
@@ -253803,6 +257524,47 @@
         ],
         "title": "SuccessResponse[Union[WeddimiHealthRunView, NoneType]]"
       },
+      "SuccessResponse_Union_dict__NoneType__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[Union[dict, NoneType]]"
+      },
       "SuccessResponse_UnsubscribePreviewResponse_": {
         "properties": {
           "success": {
@@ -255372,6 +259134,42 @@
           "msg"
         ],
         "title": "SuccessResponse[dict]"
+      },
+      "SuccessResponse_dict_str__bool__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "description": "Always true for success responses",
+            "default": true,
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Data",
+            "description": "Response data"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Response message",
+            "examples": [
+              "Operation completed successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "msg"
+        ],
+        "title": "SuccessResponse[dict[str, bool]]"
       },
       "SuccessResponse_list_": {
         "properties": {
@@ -262724,6 +266522,60 @@
         ],
         "title": "TimeOff",
         "description": "Inclusive local days a visit advisor is away (D-10)."
+      },
+      "TimeRange": {
+        "properties": {
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "last_7_days",
+                  "last_30_days",
+                  "last_90_days",
+                  "last_365_days",
+                  "this_month",
+                  "last_month",
+                  "all"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "A named period in the workspace timezone. `all` is the whole available history (bounded by the platform ceiling, reported in `range.limited`)"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From",
+            "description": "First day of a custom period"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To",
+            "description": "Last day of a custom period (inclusive)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TimeRange"
       },
       "TokenRequest": {
         "properties": {
@@ -273022,6 +276874,149 @@
           }
         }
       },
+      "WidgetLayout": {
+        "properties": {
+          "x": {
+            "type": "integer",
+            "maximum": 11,
+            "minimum": 0,
+            "title": "X",
+            "description": "Column (0-11)"
+          },
+          "y": {
+            "type": "integer",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Y",
+            "description": "Row"
+          },
+          "w": {
+            "type": "integer",
+            "maximum": 12,
+            "minimum": 1,
+            "title": "W",
+            "description": "Width in columns"
+          },
+          "h": {
+            "type": "integer",
+            "maximum": 24,
+            "minimum": 1,
+            "title": "H",
+            "description": "Height in rows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "w",
+          "h"
+        ],
+        "title": "WidgetLayout"
+      },
+      "WidgetSpec": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "enum": [
+              "movements",
+              "collections",
+              "sales_funnel",
+              "invoices",
+              "store_sales",
+              "merchants"
+            ],
+            "title": "Dataset",
+            "description": "The dataset to read"
+          },
+          "measures": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Measures",
+            "description": "1-4 measures of the dataset"
+          },
+          "dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Dimensions",
+            "description": "0-2 dimensions (at most one of day/week/month)"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterSpec"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Filters",
+            "description": "Up to 8 filters"
+          },
+          "time_field": {
+            "type": "string",
+            "enum": [
+              "local_date",
+              "created_date",
+              "paid_date"
+            ],
+            "title": "Time Field",
+            "description": "Date axis; use created_date for a creation cohort",
+            "default": "local_date"
+          },
+          "time_range": {
+            "$ref": "#/components/schemas/TimeRange",
+            "description": "The period to read"
+          },
+          "store_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoreScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which of your stores (store sales only)"
+          },
+          "chart": {
+            "type": "string",
+            "enum": [
+              "bar",
+              "line",
+              "pie",
+              "funnel",
+              "table",
+              "kpi"
+            ],
+            "title": "Chart",
+            "description": "How the panel draws the result",
+            "default": "table"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 50000,
+            "minimum": 1,
+            "title": "Limit",
+            "description": "Row cap; the server clips it further",
+            "default": 500
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset",
+          "measures",
+          "time_range"
+        ],
+        "title": "WidgetSpec",
+        "description": "One widget: what to read, how to group it, how to draw it (D-2, D-10)."
+      },
       "WizardMessage": {
         "properties": {
           "role": {
@@ -274492,6 +278487,10 @@
     {
       "name": "Futures Agent",
       "description": "The surface the futures engine uses. Authenticated with a service credential alone (`Authorization: Bearer SERVICE_API_KEY_EXAMPLE`), platform scope: `futures.trade` to read the feed and act, `futures.wf.write` ONLY to submit walk-forward reports. The feed carries no identity and no money; the server derives amount, size, margin and stop and applies every risk rule."
+    },
+    {
+      "name": "Data",
+      "description": "Dashboards each user builds over their own data: payments collected, balance movements of every product, sales leads, invoices and the sales of the stores they own. Queries run on periodic copies (the cut-off travels in every answer) and only ever return what the caller can already see; a shared dashboard shares its structure, never its data. Widgets can be downloaded as CSV or XLSX and scheduled by e-mail without data in the message."
     },
     {
       "name": "Plates",

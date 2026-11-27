@@ -19,6 +19,7 @@ import PromptParaAgente from '@site/src/components/PromptParaAgente';
 - **Tope de gasto.** El tope es por ciclo, que corresponde al mes calendario en UTC, y lo aplica el servidor antes de cada iteración. Un agente **sin tope no tiene gasto ilimitado**: queda en modo propuesta, en el que razona y registra lo que haría, pero no recibe las herramientas que cuestan dinero. Bajar el tope por debajo de lo ya consumido lo pasa a ese modo de inmediato: la siguiente iteración no se reserva ni se ejecuta y `GET /agents/{agent_id}/budget` informa el modo `proposing`.
 - **Ejecuciones.** Una ejecución se dispara a mano o por la cadencia (`schedule`, en formato cron, con intervalos de al menos 15 minutos). Es asíncrona: devuelve `202` y se consulta hasta que termina en `completed`, `failed` o `stopped`.
 - **Acciones pendientes.** Cuando el agente necesita una decisión humana, crea una acción (por ejemplo `publish_content`, `review_invoice` o `send_email`) que queda `pending` hasta que alguien la consume con su decisión.
+- **Base de conocimiento.** Con `knowledge_enabled`, el agente consulta los documentos, preguntas frecuentes y páginas del espacio y cita la fuente; la búsqueda se cobra, así que necesita tope. Ver [Base de conocimiento](/docs/saas/1platform-api/base-de-conocimiento).
 - **Memoria.** El agente recuerda lo que hizo entre ejecuciones. El dueño puede cerrar o hacer olvidar un recuerdo, y dejarle instrucciones permanentes que el agente lee al empezar cada ejecución y no puede modificar.
 
 ## Qué necesita {#qué-necesitas}

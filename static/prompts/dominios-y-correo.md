@@ -26,8 +26,11 @@ Use la skill `1platform-hub`. Sin los módulos de Dominios y Correo, la respuest
    sólo con confirmación del desarrollador. Un dominio comprado en otro lado se conecta con
    `POST /api/v1/domains/external` y se comprueba con `POST /api/v1/domains/{domain_id}/verify`.
 3. `PUT /api/v1/domains/{domain_id}/dns` **reemplaza todos** los registros: envíe siempre la lista completa.
-4. Correo: `POST /api/v1/domains/{domain_id}/mail/addresses` crea la dirección. `GET /api/v1/mail/threads` y
-   `GET /api/v1/mail/threads/{thread_id}` leen las conversaciones. Iniciar o responder envía correo real y exige
+4. Correo: `POST /api/v1/domains/{domain_id}/mail/addresses` crea la dirección; un dominio admite varias, hasta su
+   tope (`409` `mail_address_limit`, con el tope en `data.limit`). `GET /api/v1/mail/threads` y
+   `GET /api/v1/mail/threads/{thread_id}` leen las conversaciones; para la bandeja de una sola dirección pase
+   `address_id` y `folder` (`inbox`, `unread`, `starred`, `sent`, `archived`), y `GET /api/v1/mail/threads/counts`
+   da los contadores de cada carpeta. Iniciar o responder envía correo real y exige
    `Idempotency-Key`: sólo con confirmación del desarrollador.
 
 Con el servidor MCP (toolsets `domains` y `email`): dominios, disponibilidad, precios, transferencias, registros de

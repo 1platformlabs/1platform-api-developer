@@ -7,6 +7,26 @@ All notable changes to the 1Platform API Developer Docs will be documented in th
 - Nueva sección «Redes sociales»: conectar cuentas, subir medios, crear borradores, elegir Publicación, Reel o Historia por red (`network_options.instagram|facebook.format`, reglas en `format_rules` de `GET /social/config`), la combinación por clave del `PATCH`, programar con o sin aprobación, estados y retenciones de cada destino y cobro por destino confirmado. Incluye prompt y skill `redes-sociales`.
 - OpenAPI de 1platform-api refrescada a PROD v5.189.0.
 
+## [Unreleased] — Varias direcciones de correo por dominio
+
+- Dominios y correo: un dominio admite varias direcciones, cada una se desactiva por
+  separado. Nuevos desenlaces de `POST /domains/{domain_id}/mail/addresses`:
+  `409` `mail_address_limit` (tope por dominio, en `data.limit`) y `409`
+  `mail_provider_domain_limit` (el dominio no se pudo habilitar; no queda dirección).
+- Bandeja por dirección: `GET /mail/threads` acepta `address_id` (sólo estrecha) y
+  `folder` (`inbox`, `unread`, `starred`, `sent`, `archived`); nueva
+  `GET /mail/threads/counts` con `{total, unread}` por carpeta; cada conversación
+  trae `address_id` y `starred`, y `PATCH /mail/threads/{thread_id}` acepta `starred`.
+
+## [Unreleased] — Crecimiento
+
+- Nueva sección «Crecimiento»: catálogo de servicios de alcance, perfiles y sitios a verificar, cotización sin cobro, pedidos con `Idempotency-Key` obligatoria, estados, aceptación, cambios, reportes y reposiciones, con sus códigos `growth_*`. Incluye prompt y skill `crecimiento`.
+- Sin toolset en el servidor MCP (pedir y operar mueven saldo). Las rutas de staff de Crecimiento no se documentan.
+
+## [Unreleased] — Base de conocimiento
+
+- Nueva sección «Base de conocimiento»: subir documentos (PDF, DOCX, TXT o Markdown) con audiencia pública o interna, seguir su indexación, sincronizar preguntas frecuentes y sitios, probar la búsqueda (se cobra), medir el uso de 30 días, reindexar y borrar, y encender la base en un agente (`knowledge_enabled`, `knowledge_audience`, con tope de gasto mensual). Incluye prompt y skill `base-de-conocimiento`.
+
 ## [Unreleased] — Cupones
 
 - Nueva sección «Cupones»: crear cupones porcentuales o de monto fijo, listarlos, editarlos (pausar, reactivar, archivar), emitir lotes de hasta 500 códigos únicos con `Idempotency-Key`, exportarlos en CSV, comprobar qué descontaría un código sin efecto y administrar los cupones de sus tiendas. Incluye prompt y skill `cupones`, y el toolset `cupones` del servidor MCP.

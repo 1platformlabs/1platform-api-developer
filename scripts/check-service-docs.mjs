@@ -14,7 +14,7 @@ const excluded = ['Contenido', 'SEO', 'Imágenes', 'Ingresos publicitarios', 'Li
 const required = ['plataforma/index.mdx', 'plataforma/webhooks.mdx', 'reference/retry-and-delivery.mdx',
   'nube/index.mdx', 'nube/_category_.json', 'analitica/index.mdx', 'analitica/google-analytics.mdx', 'analitica/mapas-de-calor.mdx',
   'agentes-de-ia/integrar-en-su-aplicacion.mdx', 'ventas/index.mdx'];
-for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas', 'prospeccion', 'cupones', 'redes-sociales']) {
+for (const product of ['suscripciones', 'publicidad', 'terminal-de-tarjetas', 'prospeccion', 'cupones', 'base-de-conocimiento', 'crecimiento', 'redes-sociales']) {
   required.push(`${product}/index.mdx`, `${product}/_category_.json`);
 }
 

@@ -1,0 +1,132 @@
+---
+title: Redes sociales
+description: Conecte las cuentas de su negocio, prepare publicaciones, Reels e Historias, prográmelas con o sin aprobación y siga el estado de cada destino hasta que la red lo publique.
+sidebar_position: 1
+---
+
+import PromptParaAgente from '@site/src/components/PromptParaAgente';
+
+# Redes sociales
+
+<p className="lead">Prepare una publicación una sola vez y prográmela en varias cuentas de su negocio. Cada cuenta elegida es un destino con su propio estado: el servidor lo valida contra las reglas de su red, lo publica en la fecha elegida y lo cobra sólo cuando la red confirma que salió. En las cuentas de fotos y video y en las páginas puede elegir, además, si sale como publicación, como Reel o como Historia.</p>
+
+<PromptParaAgente slug="redes-sociales" />
+
+## Disponibilidad
+
+Redes sociales se habilita por espacio de trabajo. Consulte `GET /social/config` antes de nada: dice si está encendida (`enabled`), qué redes puede usar su espacio, si las publicaciones requieren aprobación, el rol de quien llama (`is_admin`, `is_approver`) y el precio vigente de una publicación en la moneda de su saldo. Esa consulta, los listados y el detalle responden aunque la vertical esté apagada; crear, programar y publicar no.
+
+Las redes se nombran con su valor literal en `network`: `facebook` (páginas), `instagram` (fotos y video), `linkedin`, `youtube` (video), `tiktok` (video corto) y `x` (microblog).
+
+## Cómo funciona
+
+1. **Conecte las cuentas.** Un administrador del espacio abre en una ventana emergente la URL de `POST /social/connection/{network}/authorize`, autoriza la red y luego lista lo que puede publicar con `GET /social/connection/{network}/pages`. `POST /social/accounts` convierte esas páginas en cuentas del espacio. `GET /social/accounts` informa el estado de cada una (`active`, `expiring`, `needs_reconnect`) y nunca devuelve tokens.
+2. **Suba los medios.** `POST /social/media` recibe un archivo por `multipart/form-data`. El tipo se decide por el contenido del archivo: imágenes JPEG, PNG, WEBP y GIF, y video MP4 y QuickTime. Los medios que ninguna publicación usa se borran a los 7 días.
+3. **Cree el borrador.** `POST /social/posts` con el texto, los `media_ids` en orden y las cuentas de destino (`account_ids`, hasta 10). Un borrador puede no tener destinos todavía. Cada destino se valida contra las reglas de su red y un error nombra el destino en `data`.
+4. **Prográmelo.** `POST /social/posts/{post_id}/submit` con `publish_at` (UTC, futura, dentro de un año). Si el espacio exige aprobación y quien llama no aprueba, la publicación pasa a `pending_approval` y se avisa a quienes aprueban; si no, cada destino queda `scheduled` y quien programa es quien paga.
+5. **Siga cada destino.** `GET /social/posts/{post_id}` devuelve la publicación con sus destinos (`targets`): estado, formato, enlace de la red (`permalink`) una vez publicado, código de falla si falló y las acciones que quien llama puede tomar. `GET /social/calendar` lista un rango de hasta 62 días.
+
+## Qué necesita {#qué-necesitas}
+
+- Las credenciales y los dos tokens de [Inicio rápido](/docs/saas/1platform-api/inicio-rapido): `Authorization: Bearer ak-…` y `x-user-token: sk-…`.
+- Redes sociales encendida en su espacio de trabajo y al menos una cuenta conectada por un administrador.
+- Saldo en la moneda de su espacio: cada destino se cobra al precio vigente cuando la red lo confirma.
+
+## Publicación, Reel o Historia {#formatos}
+
+En `instagram` y `facebook` el formato se elige por red con `network_options.instagram.format` y `network_options.facebook.format`:
+
+| Formato | Medios | Duración del video |
+|---|---|---|
+| `post` (predeterminado) | Los de una publicación normal | — |
+| `reel` | Exactamente un video | 3 a 900 s en `instagram`; 3 a 90 s en `facebook` |
+| `story` | Exactamente una imagen o un video | 3 a 60 s |
+
+- La tabla vigente es `format_rules` de `GET /social/config`, por red y formato: `media` (`one_video` o `one_media`), `min_seconds`, `max_seconds` y `max_bytes`. `formats_enabled` dice si Reels e Historias se pueden elegir ahora.
+- En una Historia el texto se acepta, pero la red no lo muestra.
+- La cantidad de medios se exige al programar: un borrador puede guardarse sin ellos. Un video cuya duración no se conoce no se rechaza por duración.
+- Las Historias vencen a las 24 horas en la red. Sus métricas no se consultan; las de Reels y publicaciones sí.
+
+```bash
+curl -X POST "$API_URL/api/v1/social/posts" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H "x-user-token: $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: lanzamiento-otono-2026-0001" \
+  -d '{
+    "text": "Nuevo lanzamiento",
+    "media_ids": ["<media_id_del_video>"],
+    "account_ids": ["<cuenta_instagram>", "<cuenta_facebook>"],
+    "network_options": {"instagram": {"format": "reel"}, "facebook": {"format": "story"}}
+  }'
+```
+
+## Editar sin perder el formato {#editar}
+
+`PATCH /social/posts/{post_id}` cambia sólo los campos que envía. Una publicación `scheduled` que se edita sale de la programación (a `pending_approval` si el espacio exige aprobación, si no a `draft`), para que nada aprobado salga con otro contenido. Con un destino ya publicándose responde `409`.
+
+`network_options` se combina **por clave**:
+
+- `instagram` y `facebook` omitidos **conservan** el formato guardado: enviar sólo `{"network_options": {"tiktok": {...}}}` mantiene una Historia.
+- `{"network_options": {"instagram": null}}` o `{"format": "post"}` la devuelve a publicación normal.
+- `youtube` y `tiktok` conservan su comportamiento: una clave omitida se borra.
+- `network_options: null` borra todas las opciones.
+
+La respuesta trae el `network_options` resultante.
+
+## Aprobación, fecha y cancelación {#aprobacion}
+
+- `POST /social/posts/{post_id}/approve` programa una publicación pendiente; quien aprueba pasa a ser quien paga. Envíe el `content_hash` de la versión que revisó: si el autor la editó mientras tanto, responde `409` `social_post_changed`.
+- `POST /social/posts/{post_id}/reject` la devuelve al autor con una nota.
+- `POST /social/posts/{post_id}/reschedule` y `POST /social/posts/{post_id}/publish-now` mueven todos los destinos pendientes o ninguno: si uno ya se está publicando, responden `409`.
+- `POST /social/posts/{post_id}/cancel` cancela los destinos aún programados sin publicarlos ni cobrarlos. `DELETE /social/posts/{post_id}` borra un borrador o una publicación rechazada.
+- `GET /social/settings` y `PATCH /social/settings` (administradores) fijan si se exige aprobación y quiénes aprueban.
+
+## Estados de un destino {#estados}
+
+Un destino pasa por `scheduled` y, mientras se publica, por estados intermedios. `processing` significa que la red procesa el video por su cuenta: el destino se cierra solo cuando la red responde. Termina en `published`, `failed` o `cancelled`.
+
+- `uncertain`: no se sabe si la red lo publicó. `POST /social/targets/{target_id}/resolve` pregunta primero a la red; si su respuesta es exacta, el destino se cierra solo (`auto_resolved`). Reintentar exige `confirmed_not_on_network: true`.
+- Un destino con `hold_reason` está retenido: por el saldo de quien paga (`insufficient_balance`, `payer_debt`, `payer_pending_resolution`), por la cuenta (`account_needs_reconnect`), por la red o porque Reels e Historias se apagaron (`format_unavailable`). Si la causa es el pago, otra persona puede pagarlo con `POST /social/targets/{target_id}/reassign-payer`.
+- Sólo un destino `published` se cobra. El precio es el vigente cuando la red lo confirma.
+
+## Operaciones
+
+| Operación | Para qué |
+|---|---|
+| `GET /social/config` | Estado de la vertical, redes, aprobación, precio y reglas de formato |
+| `POST /social/connection/{network}/authorize` · `GET /social/connection/{network}/pages` | Autorizar una red y listar lo que puede publicar |
+| `POST /social/accounts` · `GET /social/accounts` · `DELETE /social/accounts/{account_id}` | Agregar, listar y desconectar cuentas |
+| `POST /social/media` | Subir una imagen o un video |
+| `POST /social/posts` · `GET /social/posts` | Crear un borrador y listar publicaciones |
+| `GET /social/posts/{post_id}` · `PATCH /social/posts/{post_id}` · `DELETE /social/posts/{post_id}` | Consultar, editar y borrar |
+| `POST /social/posts/{post_id}/submit` | Programar o enviar a aprobación |
+| `POST /social/posts/{post_id}/approve` · `POST /social/posts/{post_id}/reject` | Aprobar o devolver |
+| `POST /social/posts/{post_id}/reschedule` · `POST /social/posts/{post_id}/publish-now` · `POST /social/posts/{post_id}/cancel` | Mover, publicar ya o cancelar |
+| `GET /social/calendar` | Publicaciones de un rango de fechas |
+| `POST /social/targets/{target_id}/resolve` · `POST /social/targets/{target_id}/reassign-payer` | Resolver un destino en duda o pagar uno retenido |
+| `GET /social/comments` · `POST /social/comments/{comment_id}/reply` · `PATCH /social/comments/{comment_id}` | Bandeja de comentarios |
+| `GET /social/analytics` · `GET /social/reports` | Métricas de una cuenta y reporte en PDF o CSV |
+
+Todas las operaciones: [Referencia de API → Social](/api-reference/1platform-api#tag/social).
+
+## Errores
+
+Los errores llegan como `{"success": false, "data": {"code": "..."}, "msg": "..."}`. Los códigos de abajo no son exhaustivos: la referencia lista los de cada operación.
+
+| Código | Estado | Significa |
+|---|---|---|
+| `social_format_media` | 422 | Los medios no son los del formato; `data.format` y `data.expects` dicen cuáles espera |
+| `social_video_too_short` · `social_video_too_long` | 422 | El video dura menos de `data.min_seconds` o más de `data.max_seconds` |
+| `social_media_too_large` | 413 | El archivo supera el tamaño permitido (`data.max_bytes` en un formato) |
+| `social_media_type` | 422 | El archivo no es una imagen ni un video aceptado |
+| `social_format_unavailable` | 409 | Reels e Historias están apagados en la plataforma |
+| `social_idempotency_conflict` | 409 | La misma `Idempotency-Key` llegó con otro cuerpo |
+| `social_post_changed` | 409 | La publicación cambió después de la versión que se revisó |
+| `social_publish_at_past` | 422 | La fecha ya pasó; envíe una nueva |
+| `social_range_too_large` | 422 | El rango del calendario supera 62 días |
+| `social_still_processing` | 409 | La red todavía procesa el destino |
+
+## Con el servidor MCP
+
+El toolset `social` lee la configuración, los portafolios, las cuentas, las publicaciones, el calendario, los comentarios y la analítica, **crea y edita** un borrador (con su formato por red), lo **programa**, lo **mueve** y lo **cancela**. Publicar al instante, aprobar y responder comentarios se hacen por REST.

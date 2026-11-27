@@ -2,6 +2,11 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Redes sociales
+
+- Nueva sección «Redes sociales»: conectar cuentas, subir medios, crear borradores, elegir Publicación, Reel o Historia por red (`network_options.instagram|facebook.format`, reglas en `format_rules` de `GET /social/config`), la combinación por clave del `PATCH`, programar con o sin aprobación, estados y retenciones de cada destino y cobro por destino confirmado. Incluye prompt y skill `redes-sociales`.
+- OpenAPI de 1platform-api refrescada a PROD v5.189.0.
+
 ## [Unreleased] — Varias direcciones de correo por dominio
 
 - Dominios y correo: un dominio admite varias direcciones, cada una se desactiva por

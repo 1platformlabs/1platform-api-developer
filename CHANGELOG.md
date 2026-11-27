@@ -2,6 +2,11 @@
 
 All notable changes to the 1Platform API Developer Docs will be documented in this file.
 
+## [Unreleased] — Crecimiento
+
+- Nueva sección «Crecimiento»: catálogo de servicios de alcance, perfiles y sitios a verificar, cotización sin cobro, pedidos con `Idempotency-Key` obligatoria, estados, aceptación, cambios, reportes y reposiciones, con sus códigos `growth_*`. Incluye prompt y skill `crecimiento`.
+- Sin toolset en el servidor MCP (pedir y operar mueven saldo). Las rutas de staff de Crecimiento no se documentan.
+
 ## [Unreleased] — Base de conocimiento
 
 - Nueva sección «Base de conocimiento»: subir documentos (PDF, DOCX, TXT o Markdown) con audiencia pública o interna, seguir su indexación, sincronizar preguntas frecuentes y sitios, probar la búsqueda (se cobra), medir el uso de 30 días, reindexar y borrar, y encender la base en un agente (`knowledge_enabled`, `knowledge_audience`, con tope de gasto mensual). Incluye prompt y skill `base-de-conocimiento`.

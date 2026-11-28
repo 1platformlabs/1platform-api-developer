@@ -41,6 +41,18 @@ try {
     }
     await page.close();
   }
+  // La 404 no pasa por DocRoot: su h1 no puede quedar bajo la barra flotante (issue #115).
+  for (const width of [1366, 1024, 768, 390]) {
+    const notFound = await browser.newPage({viewport: {width, height: 900}});
+    await notFound.goto(`${origin}/404.html`);
+    await notFound.locator('html[data-has-hydrated="true"]').waitFor();
+    const {heading, navBottom} = await notFound.evaluate(() => ({
+      heading: document.querySelector('main h1').getBoundingClientRect().top,
+      navBottom: document.querySelector('.navbar').getBoundingClientRect().bottom,
+    }));
+    assert.ok(heading >= navBottom, `404 h1 (${heading}px) tapado por la barra (${navBottom}px) a ${width}px`);
+    await notFound.close();
+  }
   // Slow local indexing preserves the visitor's current intent in both directions.
   for (const destination of ['search', 'menu']) {
     const delayed = await browser.newPage({viewport: {width: 390, height: 844}});
